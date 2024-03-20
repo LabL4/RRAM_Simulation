@@ -5,7 +5,16 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 
 
-def RepresentateState(matriz):
+def RepresentateState(matriz: np.ndarray, filename: str = "grafica.png"):
+    """
+    Represent the state of a matrix as a colored plot.
+
+    Parameters:
+    - matriz (np.ndarray): The input matrix to be represented.
+
+    Returns:
+    None
+    """
     nrows, ncols = matriz.shape
 
     x = np.arange(ncols)
@@ -48,7 +57,7 @@ def RepresentateState(matriz):
     # ax.axvline(x=nrows + 0.5, color="black", linewidth=4)  # Línea al final
 
     # Guardar la imagen
-    plt.savefig("grafica.png")
+    plt.savefig(filename)
 
 
 if __name__ == "__main__":

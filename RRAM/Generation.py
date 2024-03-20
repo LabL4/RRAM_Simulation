@@ -49,6 +49,7 @@ def generation(Delta_t, electric_field, temperature, grid_size=0.25e-9, carga_va
     Returns:
     - generation_rate (float): The calculated generation rate.
     """
+
     # TODO: METERLE REESCALADO PARA INTENTAR ENVITAR TRATAR CON NUMEROS TAN GRANDES Y PEQUEÑOS.
 
     exponente = (E_a - gamma * grid_size * carga_vacante * carga_vacante *
