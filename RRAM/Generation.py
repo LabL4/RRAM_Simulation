@@ -2,11 +2,12 @@ import math
 
 import numpy as np
 
-from Constants import E_a, gamma, k_b_ev, t_0
 from scipy.constants import elementary_charge
+from .Constants import E_a, gamma, k_b_ev, t_0
 
 
-def initial_state(Eje_x, Eje_y, num_trampas):
+def initial_state(
+        Eje_x: float, Eje_y: float, num_trampas: int):
     """
     Generate an initial state for a grid with given dimensions and number of traps.
 
@@ -35,7 +36,9 @@ def initial_state(Eje_x, Eje_y, num_trampas):
     return InitialState
 
 
-def generation(Delta_t, electric_field, temperature, grid_size=0.25e-9, carga_vacante=2):
+def generation(
+        simulation_time: float, electric_field: float, temperature: float, grid_size: float = 0.25e-9,
+        carga_vacante: float = 2) -> float:
     """
     Calculates the generation rate of a certain process.
 
@@ -55,7 +58,7 @@ def generation(Delta_t, electric_field, temperature, grid_size=0.25e-9, carga_va
     exponente = (E_a - gamma * grid_size * carga_vacante * carga_vacante *
                  2 * elementary_charge * abs(electric_field)) / (k_b_ev * temperature)
 
-    return Delta_t * t_0 * (math.exp(-exponente))
+    return simulation_time * t_0 * (math.exp(-exponente))
 
 
 if __name__ == "__main__":
@@ -73,7 +76,6 @@ if __name__ == "__main__":
     InitialState = np.zeros((Eje_x, Eje_y), dtype=int)
     # Generar 5 posiciones aleatorias para los unos
 
-    posiciones_unos = np.random.choice(
-        Eje_x * Eje_y, num_trampas, replace=False)
+    posiciones_unos = np.random.choice(Eje_x * Eje_y, num_trampas, replace=False)
 
     # Asignar el valor 1 a las posiciones seleccionadas

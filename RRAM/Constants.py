@@ -20,7 +20,7 @@ k_b_ev = Boltzmann / elementary_charge
 beta_0 = 3e3
 
 # m, longitud de decaimiento de la concentración de oxígeno
-L_p_r = 1e-9
+L_p = 1e-9
 
 # Coeficiente de deriva de los iones de oxígeno debido a la presencia de un campo eléctrico externo
 gamma_drift = 8
