@@ -17,7 +17,7 @@ def recombination(
         (math.exp(-E_a /
          (k_b_ev * temperature)))
 
-    Recombination_Probability = beta_0(
+    Recombination_Probability = beta_0 * (
         math.exp(-simulation_time * Oxigen_Ion_velocity / L_p)) * \
         DifussiveBehaviour(pos_x, Oxigen_Ion_velocity, simulation_time, grid_size)
 
