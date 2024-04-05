@@ -51,7 +51,8 @@ for k in range(1, num_pasos + 1):
             else:
                 # TODO: REVISAR PROBABILIDAD QUE A VECES SALE MAYOR DE 1
                 # TODO: HACER UN REESCALADO DE LOS VALORES PARA EVITAR TENER QUE TRABAJAR CON NUMEROS TAN GRANDES
-                prob_recombinacion = Recombination.recombination(paso_temporal, i, Campo_Electrico, Temperatura)
+                prob_recombinacion = Recombination.recombination(
+                    paso_temporal, i, Campo_Electrico, Temperatura)
 
                 # genero un número aleatorio entre 0 y 1
                 random_number = np.random.rand()
@@ -59,6 +60,6 @@ for k in range(1, num_pasos + 1):
                     actual_state[i, j] = 0  # Recombinación
 
     print("Paso: ", k)
-    # TODO: REVISAR POR QUÉ NO SE GUARDA LA IMAGEN
     RepresentateState(actual_state, "grafica" + str(k) + ".png")
+    #
     # Guardo una imagen de la matriz con el nombre de grafica + el numero de paso

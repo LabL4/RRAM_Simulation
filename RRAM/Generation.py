@@ -37,8 +37,8 @@ def initial_state(
 
 
 def generation(
-        simulation_time: float, electric_field: float, temperature: float, grid_size: float = 0.25e-9,
-        carga_vacante: float = 2) -> float:
+        simulation_time: float, electric_field: float, temperature: float,
+        grid_size: float = 0.25e-9, carga_vacante: float = 2) -> float:
     """
     Calculates the generation rate of a certain process.
 

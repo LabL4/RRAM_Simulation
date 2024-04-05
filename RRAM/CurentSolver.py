@@ -1,5 +1,6 @@
 import numpy as np
-from math import pi
+
+from scipy.constants import elementary_charge, Boltzmann
 
 
 def OmhCurrent(DDP, State):
@@ -22,19 +23,13 @@ def OmhCurrent(DDP, State):
     return DDP/total_resistance
 
 
-def poole_frenkel(V, T, eps, N, E):
-    """
-    Función para calcular la densidad de corriente utilizando el efecto Poole-Frenkel
-    V: voltaje aplicado
-    T: temperatura absoluta
-    eps: permitividad
-    N: densidad de trampas
-    E: Campo eléctrico
-    phi_b: energía de barrera
-    """
-    k = 1.38e-23  # Constante de Boltzmann
-    e = 1.6e-19  # Carga del electrón
-    phi_b = 123  # Energía de barrera
-    exponencial = np.exp(-2*e*(phi_b - math.sqtr((2*e*E)/pi*eps)) / (k * T))
-    J = E*exponencial
-    return J
+def poole_frenkel(temperature: float, electric_field: np.ndarray,
+                  barrera: float = 0.895, beta: float = 2.8E-5, I_0: float = 1e-12) -> np.ndarray:
+
+    k_b_ev = Boltzmann / elementary_charge
+
+    exponencial = np.exp((beta * np.sqrt(electric_field) - barrera) / (k_b_ev * temperature))
+
+    I_poole_frenkel = I_0 * electric_field * exponencial
+
+    return I_poole_frenkel

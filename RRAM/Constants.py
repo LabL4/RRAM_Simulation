@@ -4,7 +4,7 @@ import numpy as np
 
 from scipy.constants import Boltzmann, elementary_charge
 
-# Hz, en verdad este es el valor de 1/t_0
+# Hz,  el valor de 1/t_0
 t_0 = 10**13
 
 # eV
