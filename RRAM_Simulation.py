@@ -9,8 +9,9 @@ Atom_size = 0.5
 eje_x = round(long_dispositivo / Atom_size)
 eje_y = round(long_dispositivo / Atom_size)
 
-num_trampas = 10
+num_trampas = 250
 
+# FIXME: Hay una zona donde nunca se ponen trampas
 actual_state = Generation.initial_state(eje_x, eje_y, num_trampas)
 
 
@@ -51,8 +52,7 @@ for k in range(1, num_pasos + 1):
             else:
                 # TODO: REVISAR PROBABILIDAD QUE A VECES SALE MAYOR DE 1
                 # TODO: HACER UN REESCALADO DE LOS VALORES PARA EVITAR TENER QUE TRABAJAR CON NUMEROS TAN GRANDES
-                prob_recombinacion = Recombination.recombination(
-                    paso_temporal, i, Campo_Electrico, Temperatura)
+                prob_recombinacion = Recombination.recombination(paso_temporal, i, Campo_Electrico, Temperatura)
 
                 # genero un número aleatorio entre 0 y 1
                 random_number = np.random.rand()

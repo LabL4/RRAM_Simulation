@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 
 
-def RepresentateState(matriz: np.ndarray, filename: str = "grafica.png"):
+def RepresentateState(matriz: np.ndarray, filename: str = "grafica.png") -> None:
     """
     Represent the state of a matrix as a colored plot.
 
@@ -42,8 +42,8 @@ def RepresentateState(matriz: np.ndarray, filename: str = "grafica.png"):
     )
 
     # Configurar las marcas de los ejes
-    major_ticks = np.arange(0, 10, 10)
-    minor_ticks = np.arange(0, 10, 5)
+    major_ticks = np.arange(0, nrows, 1)
+    minor_ticks = np.arange(0, nrows, 0.5)
     ax.set_xticks(major_ticks)
     ax.set_xticks(minor_ticks, minor=True)
     ax.set_yticks(major_ticks)
@@ -52,12 +52,16 @@ def RepresentateState(matriz: np.ndarray, filename: str = "grafica.png"):
     # Establecer relación de aspecto cuadrada
     ax.set_aspect("equal")
 
-    # # Añadir líneas gruesas horizontales al inicio y al final
-    # ax.axvline(x=-0.5, color="black", linewidth=4)  # Línea al inicio
-    # ax.axvline(x=nrows + 0.5, color="black", linewidth=4)  # Línea al final
+    # Invertir el eje y para que el punto (0, 0) esté en la esquina superior izquierda
+    ax.invert_yaxis()
+
+    # Coloco las etiquetas del eje x en la parte superior
+    ax.xaxis.tick_top()
 
     # Guardar la imagen
     plt.savefig(filename)
+
+    return None
 
 
 if __name__ == "__main__":
