@@ -3,24 +3,27 @@ from RRAM import *
 
 # comienzo la simulación montecaarlo
 
-long_dispositivo = 10
+espesor_dispositivo = 10
 Atom_size = 0.5
 
-eje_x = round(long_dispositivo / Atom_size)
-eje_y = round(long_dispositivo / Atom_size)
+eje_x = round(espesor_dispositivo / Atom_size)
+eje_y = round(espesor_dispositivo / Atom_size)
 
-num_trampas = 250
+num_trampas = 20
 
 # FIXME: Hay una zona donde nunca se ponen trampas
 actual_state = Generation.initial_state(eje_x, eje_y, num_trampas)
 
 
 # Guardo la gráfica en el esritorio con el nombre grafica 2
-RepresentateState(actual_state, "grafica2.png")
+RepresentateState(actual_state, "Configuracion_inicial.png")
 
 time_simulation = 1
-num_pasos = 10
-final_volt = 1
+num_pasos = 100
+voltaje_final = 1
+
+Temperatura = 300
+Campo_Electrico = 0
 
 paso_temporal = time_simulation / num_pasos
 
@@ -30,14 +33,22 @@ for k in range(1, num_pasos + 1):
     # Guardo el estado anterior
     last_state = actual_state
 
-    # Calculo el campo eléctrico
-    voltaje = voltaje + final_volt * paso_temporal
-    Campo_Electrico = SimpleElectricField(voltaje, long_dispositivo)
+    # Calculo la corriente
+    voltaje += voltaje_final * paso_temporal
 
-    # Calculo la temperatura
-    Temperatura = SimpleTemperature()
+    # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
+    if Percolation.is_path(actual_state):
+        # Si ha percolado uso la corriente de percolación
+        Corriente = CurentSolver.poole_frenkel(Temperatura, Campo_Electrico)
+    else:
+        # Si no ha percolado uso la corriente de campo
+        Corriente = CurentSolver.poole_frenkel(Temperatura, Campo_Electrico)
 
-    # Calculo la probabilidad de generación o recombinación para ello recorro toda kla matriz
+    # Obtengo los valores del campo eléctrico y la temperatura
+    Campo_Electrico = SimpleElectricField(voltaje, espesor_dispositivo)
+    Temperatura = Temperature_Joule(voltaje, Corriente)
+
+    # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
     for i in range(eje_x):
         for j in range(eje_y):
             if actual_state[i, j] == 0:
@@ -59,7 +70,7 @@ for k in range(1, num_pasos + 1):
                 if random_number < prob_recombinacion:
                     actual_state[i, j] = 0  # Recombinación
 
-    print("Paso: ", k)
-    RepresentateState(actual_state, "grafica" + str(k) + ".png")
-    #
-    # Guardo una imagen de la matriz con el nombre de grafica + el numero de paso
+    # Guardo el estado actual CADA 10 PASOS
+    if k % 10 == 0:
+        print("Paso: ", k)
+        RepresentateState(actual_state, "grafica" + str(k) + ".png")

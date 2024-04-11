@@ -1,7 +1,6 @@
 # Módulo que contiene todas las constantes que usa el paquete
 
 import numpy as np
-
 from scipy.constants import Boltzmann, elementary_charge
 
 # Hz,  el valor de 1/t_0
@@ -27,6 +26,12 @@ gamma_drift = 8
 
 # Potencial de migración de los iones de oxígeno en eV
 E_m = 1.0
+
+# Constante de resistencia térmica en K/W
+resistencia_termica = 5e5
+
+# Constante de resistencia térmica en ohmios
+resistencia_ohmica = 1e6
 
 
 def DifussiveBehaviour(

@@ -11,6 +11,7 @@ def RepresentateState(matriz: np.ndarray, filename: str = "grafica.png") -> None
 
     Parameters:
     - matriz (np.ndarray): The input matrix to be represented.
+    - filename (str, optional): The name of the file to save the plot. Default is "grafica.png".
 
     Returns:
     None
@@ -24,9 +25,10 @@ def RepresentateState(matriz: np.ndarray, filename: str = "grafica.png") -> None
 
     # Indico qué valores van en las subdivisiones
     colors = [
-        (1, 1, 1),  # Color para el valor 0
-        (0.478, 0.627, 0.870),  # Color para el valor 1
+        (1, 1, 1),  # Color para el valor 0 qie representa que No hay trampa
+        (0.478, 0.627, 0.870),  # Color para el valor 1 que representa que hay trampa
     ]
+
     cmap_name = "my_list"
     cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=2)
 

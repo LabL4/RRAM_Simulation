@@ -3,12 +3,12 @@ import numpy as np
 from scipy.constants import elementary_charge, Boltzmann
 
 
-def OmhCurrent(DDP, State):
+def OmhCurrent(DDP: float, Configuration_state, resistance: float = 1) -> float:
     # Initialize total resistance
     total_resistance = 0
 
     # SObre cada columna de la matriz
-    for column in State.T:
+    for column in Configuration_state.T:
         # Se calcula la resistencia paralela de los elementos de la columna
         parallel_resistance = 0
         for resistance in column:
@@ -32,4 +32,4 @@ def poole_frenkel(temperature: float, electric_field: np.ndarray,
 
     I_poole_frenkel = I_0 * electric_field * exponencial
 
-    return I_poole_frenkel
+    # return I_poole_frenkel
