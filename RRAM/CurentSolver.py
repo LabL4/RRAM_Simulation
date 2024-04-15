@@ -23,8 +23,8 @@ def OmhCurrent(DDP: float, Configuration_state, resistance: float = 1) -> float:
     return DDP/total_resistance
 
 
-def poole_frenkel(temperature: float, electric_field: np.ndarray,
-                  barrera: float = 0.895, beta: float = 2.8E-5, I_0: float = 1e-12) -> np.ndarray:
+def poole_frenkel(temperature: float, electric_field: float,
+                  barrera: float = 0.895, beta: float = 2.8E-5, I_0: float = 1e-12) -> float:
 
     k_b_ev = Boltzmann / elementary_charge
 
@@ -32,4 +32,4 @@ def poole_frenkel(temperature: float, electric_field: np.ndarray,
 
     I_poole_frenkel = I_0 * electric_field * exponencial
 
-    # return I_poole_frenkel
+    return I_poole_frenkel

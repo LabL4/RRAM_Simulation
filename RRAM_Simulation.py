@@ -1,4 +1,3 @@
-
 from RRAM import *
 
 # comienzo la simulación montecaarlo

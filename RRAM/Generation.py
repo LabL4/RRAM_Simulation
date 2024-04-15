@@ -6,8 +6,7 @@ from scipy.constants import elementary_charge
 from .Constants import E_a, gamma, k_b_ev, t_0
 
 
-def initial_state(
-        Eje_x: float, Eje_y: float, num_trampas: int):
+def initial_state(Eje_x: float, Eje_y: float, num_trampas: int):
     """
     Generate an initial state for a grid with given dimensions and number of traps.
 
@@ -25,11 +24,10 @@ def initial_state(
     InitialState = np.zeros((Eje_x, Eje_y), dtype=int)
     # Generate random positions for the traps
 
-    posiciones_unos = np.random.choice(
-        Eje_x * Eje_y, num_trampas, replace=False)
+    posiciones_unos = np.random.choice(Eje_x * Eje_y, num_trampas, replace=False)
+    print(posiciones_unos)
 
     # Assign the value 1 to the selected positions
-
     for pos in posiciones_unos:
         fila, columna = divmod(pos, Eje_x)
         InitialState[fila, columna] = 1
@@ -55,8 +53,8 @@ def generation(
 
     # TODO: METERLE REESCALADO PARA INTENTAR ENVITAR TRATAR CON NUMEROS TAN GRANDES Y PEQUEÑOS.
 
-    exponente = (E_a - gamma * grid_size * carga_vacante * carga_vacante *
-                 2 * elementary_charge * abs(electric_field)) / (k_b_ev * temperature)
+    exponente = (E_a - (gamma * grid_size * carga_vacante * elementary_charge * abs(electric_field))) /\
+                (k_b_ev * temperature)
 
     return simulation_time * t_0 * (math.exp(-exponente))
 
