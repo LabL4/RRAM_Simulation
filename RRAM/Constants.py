@@ -22,7 +22,7 @@ beta_0 = 3e3
 L_p = 1e-9
 
 # Coeficiente de deriva de los iones de oxígeno debido a la presencia de un campo eléctrico externo
-gamma_drift = 8
+gamma_drift = 8e9
 
 # Potencial de migración de los iones de oxígeno en eV
 E_m = 1.0
@@ -56,8 +56,8 @@ def DifussiveBehaviour(
 
     condiciones = [pos_x <= vt,
                    (vt < pos_x) and (pos_x <= vt + grid_size),
-                   (vt + grid_size < pos_x) and (pos_x <= vt + 3*grid_size),
-                   (pos_x > vt + 3*grid_size)
+                   (vt + grid_size < pos_x) and (pos_x <= vt + 3 * grid_size),
+                   (pos_x > vt + 3 * grid_size)
                    ]
 
     valores_Difusion = [1, 0.3, 0.1, 0]

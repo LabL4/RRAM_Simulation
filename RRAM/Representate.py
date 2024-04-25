@@ -61,7 +61,39 @@ def RepresentateState(matriz: np.ndarray, filename: str = "grafica.png") -> None
     ax.xaxis.tick_top()
 
     # Guardar la imagen
-    plt.savefig(filename)
+    # plt.savefig(filename)
+
+    return None
+
+
+def RepresentateStateOpt(matriz: np.ndarray, filename: str = "grafica.png") -> None:
+    """
+    Represent the state of a matrix as a colored plot.
+
+    Parameters:
+    - matriz (np.ndarray): The input matrix to be represented.
+    - filename (str, optional): The name of the file to save the plot. Default is "grafica.png".
+
+    Returns:
+    None
+    """
+    # Crear una figura y un eje con plt.subplots()
+    fig, ax = plt.subplots()
+
+    # Crear un mapa de colores personalizado
+    cmap = LinearSegmentedColormap.from_list("my_list", [(1, 1, 1), (0.478, 0.627, 0.870)], N=2)
+
+    # Usar imshow en lugar de pcolormesh para una representación más eficiente
+    ax.imshow(matriz, cmap=cmap, origin='upper')
+
+    # Establecer la relación de aspecto para que las celdas sean cuadradas
+    ax.set_aspect('equal')
+
+    # Colocar las etiquetas del eje x en la parte superior
+    ax.xaxis.tick_top()
+
+    # Guardar la imagen
+    # plt.savefig(filename)
 
     return None
 

@@ -7,7 +7,7 @@ def OmhCurrent(DDP: float, Configuration_state, resistance: float = 1) -> float:
     # Initialize total resistance
     total_resistance = 0
 
-    # SObre cada columna de la matriz
+    # Sobre cada columna de la matriz
     for column in Configuration_state.T:
         # Se calcula la resistencia paralela de los elementos de la columna
         parallel_resistance = 0
