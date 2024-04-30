@@ -1,8 +1,9 @@
 import math
 import numpy as np
+from icecream import ic
 
+from .Constants import *
 from scipy.constants import elementary_charge
-from .Constants import E_a, gamma, k_b_ev, t_0
 
 
 def initial_state(Eje_x: float, Eje_y: float, num_trampas: int):
@@ -24,7 +25,6 @@ def initial_state(Eje_x: float, Eje_y: float, num_trampas: int):
     # Generate random positions for the traps
 
     posiciones_unos = np.random.choice(Eje_x * Eje_y, num_trampas, replace=False)
-    print(posiciones_unos)
 
     # Assign the value 1 to the selected positions
     for pos in posiciones_unos:

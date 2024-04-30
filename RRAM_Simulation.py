@@ -10,13 +10,13 @@ from icecream import ic
 
 # comienzo la simulación montecaarlo
 
-espesor_dispositivo = 10        # nm
-Atom_size = 0.25                # nm
+espesor_dispositivo = 5        # nm
+Atom_size = 0.5                # nm
 
 eje_x = round(espesor_dispositivo / Atom_size)
 eje_y = round(espesor_dispositivo / Atom_size)
 
-num_trampas = 40
+num_trampas = 10
 
 # FIXME: Hay una zona donde nunca se ponen trampas
 actual_state = Generation.initial_state(eje_x, eje_y, num_trampas)
@@ -25,28 +25,31 @@ actual_state = Generation.initial_state(eje_x, eje_y, num_trampas)
 # Guardo la gráfica en el esritorio con el nombre grafica 2
 RepresentateState(actual_state, "Configuracion_inicial.png")
 
-time_simulation = 1
+total_simulation_time = 1
 num_pasos = 10
 voltaje_final = 3
 
-paso_guardar = 10
+paso_guardar = 1
 
 configuraciones_matriz = np.zeros((int((num_pasos / paso_guardar)), eje_x, eje_y))
 
 Temperatura = 300
 Campo_Electrico = 0
 
-paso_temporal = time_simulation / num_pasos
+paso_temporal = total_simulation_time / num_pasos
 
 voltaje = 0
+simulation_time = 0
 
 for k in tqdm(range(0, num_pasos)):
     # Guardo el estado anterior
     last_state = actual_state
 
+    simulation_time = paso_temporal*k
+    ic(simulation_time)
+
     # Calculo la corriente
     voltaje += voltaje_final * paso_temporal
-    ic(voltaje)
 
     # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
     if Percolation.is_path(actual_state):
@@ -55,22 +58,22 @@ for k in tqdm(range(0, num_pasos)):
     else:
         # Si no ha percolado uso la corriente de campo
         Corriente = CurentSolver.poole_frenkel(Temperatura, Campo_Electrico)
-        ic(Temperatura, Campo_Electrico)
-        ic(CurentSolver.poole_frenkel(Temperatura, Campo_Electrico))
 
     # Obtengo los valores del campo eléctrico y la temperatura
-    Campo_Electrico = SimpleElectricField(voltaje, espesor_dispositivo)
-    ic(Campo_Electrico)
+    Campo_Electrico = SimpleElectricField(voltaje, espesor_dispositivo*1e-9)
+
     Temperatura = Temperature_Joule(voltaje, Corriente)
 
     # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
     for i in range(eje_x):
         for j in range(eje_y):
             if actual_state[i, j] == 0:
+
                 # TODO: REVISAR PROBABILIDAD QUE A VECES SALE MAYOR DE 1
                 # TODO: HACER UN REESCALADO DE LOS VALORES PARA EVITAR TENER QUE TRABAJAR CON NUMEROS TAN GRANDES
                 prob_generacion = Generation.generation(paso_temporal, Campo_Electrico, Temperatura)
-
+                if (i == 0 and j == 0):
+                    (ic(prob_generacion))
                 # genero un número aleatorio entre 0 y 1
                 random_number = np.random.rand()
                 if random_number < prob_generacion:
@@ -97,7 +100,7 @@ images = []
 k = 1
 for matrix in tqdm(configuraciones_matriz):
     # Llamar a tu función para representar la matriz y guardar la imagen
-    RepresentateStateOpt(matrix, filename="Figuras/grafica" + str(k) + ".png")
+    RepresentateStateOpt(matrix, filename="Figuras/grafica_" + str(k) + ".png")
 
     plt.savefig((buffer := BytesIO()), format='png')
     plt.close()
@@ -108,7 +111,7 @@ for matrix in tqdm(configuraciones_matriz):
     k += 1
 
 # Guardar las imágenes como un GIF
-images[0].save('animated_matrix.gif', save_all=True, append_images=images[1:], optimize=False, duration=500, loop=0)
+images[0].save('animated_matrix.gif', save_all=True, append_images=images[1:], optimize=False, duration=100, loop=0)
 
 # Imprimir un mensaje de éxito
 print("Las matrices se han guardado correctamente como un GIF en 'animated_matrix.gif'")

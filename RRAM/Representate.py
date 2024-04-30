@@ -92,6 +92,8 @@ def RepresentateStateOpt(matriz: np.ndarray, filename: str = "grafica.png") -> N
     # Colocar las etiquetas del eje x en la parte superior
     ax.xaxis.tick_top()
 
+    plt.title("Iteracion {}".format(filename.split("_")[1].split(".")[0]))
+
     # Guardar la imagen
     # plt.savefig(filename)
 
