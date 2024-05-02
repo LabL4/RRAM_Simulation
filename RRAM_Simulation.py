@@ -1,4 +1,5 @@
 import glob
+from re import T
 import matplotlib.pyplot as plt
 
 from RRAM import *
@@ -10,13 +11,13 @@ from icecream import ic
 
 # comienzo la simulación montecaarlo
 
-espesor_dispositivo = 5        # nm
-Atom_size = 0.5                # nm
+espesor_dispositivo = 10        # nm
+Atom_size = 0.25                 # nm
 
 eje_x = round(espesor_dispositivo / Atom_size)
 eje_y = round(espesor_dispositivo / Atom_size)
 
-num_trampas = 10
+num_trampas = 15
 
 # FIXME: Hay una zona donde nunca se ponen trampas
 actual_state = Generation.initial_state(eje_x, eje_y, num_trampas)
@@ -26,20 +27,23 @@ actual_state = Generation.initial_state(eje_x, eje_y, num_trampas)
 RepresentateState(actual_state, "Configuracion_inicial.png")
 
 total_simulation_time = 1
-num_pasos = 10
+num_pasos = 1000000
+paso_temporal = total_simulation_time / num_pasos
+
 voltaje_final = 3
 
-paso_guardar = 1
+paso_guardar = 100
 
 configuraciones_matriz = np.zeros((int((num_pasos / paso_guardar)), eje_x, eje_y))
 
-Temperatura = 300
+# Configuraciones iniciales:
+Temperatura = 350
 Campo_Electrico = 0
-
-paso_temporal = total_simulation_time / num_pasos
-
 voltaje = 0
 simulation_time = 0
+Corriente = 0
+
+ic.disable()
 
 for k in tqdm(range(0, num_pasos)):
     # Guardo el estado anterior
@@ -52,23 +56,25 @@ for k in tqdm(range(0, num_pasos)):
     voltaje += voltaje_final * paso_temporal
 
     # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
+    # TODO: Revisar por qué me dice que ha percolado si no lo ha hecho
     if Percolation.is_path(actual_state):
         # Si ha percolado uso la corriente de percolación
-        Corriente = CurentSolver.OmhCurrent(Temperatura, Campo_Electrico)
+        # Corriente = CurentSolver.OmhCurrent(Temperatura, Campo_Electrico)
+        print("Ha percolado")
     else:
         # Si no ha percolado uso la corriente de campo
-        Corriente = CurentSolver.poole_frenkel(Temperatura, Campo_Electrico)
+        # TODO: REVISAR QUE LA CORRIENTE TIENE LAS UNIDADES CORRECTAS PORQUE NO CUADRAN VALORES.
+        Corriente = 10000*CurentSolver.poole_frenkel(Temperatura, Campo_Electrico)
 
+    ic(Corriente)
     # Obtengo los valores del campo eléctrico y la temperatura
-    Campo_Electrico = SimpleElectricField(voltaje, espesor_dispositivo*1e-9)
-
-    Temperatura = Temperature_Joule(voltaje, Corriente)
+    Campo_Electrico = ic(SimpleElectricField(voltaje, espesor_dispositivo*1e-9))
+    Temperatura = ic(Temperature_Joule(voltaje, Corriente, T_0=350))
 
     # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
     for i in range(eje_x):
         for j in range(eje_y):
             if actual_state[i, j] == 0:
-
                 # TODO: REVISAR PROBABILIDAD QUE A VECES SALE MAYOR DE 1
                 # TODO: HACER UN REESCALADO DE LOS VALORES PARA EVITAR TENER QUE TRABAJAR CON NUMEROS TAN GRANDES
                 prob_generacion = Generation.generation(paso_temporal, Campo_Electrico, Temperatura)
@@ -111,7 +117,7 @@ for matrix in tqdm(configuraciones_matriz):
     k += 1
 
 # Guardar las imágenes como un GIF
-images[0].save('animated_matrix.gif', save_all=True, append_images=images[1:], optimize=False, duration=100, loop=0)
+images[0].save('animated_matrix.gif', save_all=True, append_images=images[1:], optimize=False, duration=30, loop=0)
 
 # Imprimir un mensaje de éxito
 print("Las matrices se han guardado correctamente como un GIF en 'animated_matrix.gif'")

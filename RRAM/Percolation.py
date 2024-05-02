@@ -28,7 +28,8 @@ def is_path(configuration_matrix: np.ndarray) -> bool:
     path, _ = finder.find_path(node_start, node_end, grid)
 
     if len(path) > 0:
-        print(grid.grid_str(path=path, start=node_start, end=node_end))
+        # Para dibujar el camino
+        # print(grid.grid_str(path=path, start=node_start, end=node_end))
         return True
     else:
         return False

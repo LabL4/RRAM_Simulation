@@ -10,7 +10,8 @@ t_0 = 10**13
 E_a = 1
 
 # Tiene distintos valores dependiendo si el estado es FORMING/SET y RESET
-gamma = 3
+# La estoy modificando a mano para que el campo eléctrico tmb tenga algún papel en la dinámica
+gamma = 0.95e-10
 
 # Valor de la constante de Boltzmann en eV/K
 k_b_ev = Boltzmann / elementary_charge
@@ -28,7 +29,7 @@ gamma_drift = 8e9
 E_m = 1.0
 
 # Constante de resistencia térmica en K/W
-resistencia_termica = 5e5
+resistencia_termica = 7e5
 
 # Constante de resistencia térmica en ohmios
 resistencia_ohmica = 1e6

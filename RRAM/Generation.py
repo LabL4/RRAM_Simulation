@@ -33,29 +33,25 @@ def initial_state(Eje_x: float, Eje_y: float, num_trampas: int):
     return InitialState
 
 
-def generation(
-        simulation_time: float, electric_field: float, temperature: float,
-        grid_size: float = 0.25e-9, carga_vacante: float = 2) -> float:
+def generation(simulation_time: np.ndarray, electric_field: np.ndarray,
+               temperature: np.ndarray, carga_vacante: float = 2,) -> np.ndarray:
     """
-    Calculates the generation rate of a certain process.
+    Calculate the generation rate of RRAM devices.
 
     Parameters:
-    - Delta_t (float): Time step.
-    - electric_field (float): Electric field strength in V/m.
-    - temperature (float): Temperature in Kelvin.
-    - grid_size (float, optional): Size of the grid in meters. Default is 0.25e-9.
-    - carga_vacante (int, optional): Vacancy charge. Default is 2.
+        - simulation_time (numpy.ndarray): Array of simulation time values.
+        - electric_field (numpy.ndarray): Array of electric field values.
+        - temperature (numpy.ndarray): Array of temperature values.
+        - carga_vacante (float, optional): Vacancy charge value (default: 2).
 
     Returns:
-    - generation_rate (float): The calculated generation rate.
+    - numpy.ndarray
+        Array of generation rates.
+
     """
+    exponente = (E_a - (gamma * carga_vacante * np.abs(electric_field))) / (k_b_ev * temperature)
 
-    # TODO: METERLE REESCALADO PARA INTENTAR ENVITAR TRATAR CON NUMEROS TAN GRANDES Y PEQUEÑOS.
-
-    exponente = (E_a - (gamma * grid_size * carga_vacante * elementary_charge * abs(electric_field))) /\
-                (k_b_ev * temperature)
-
-    return simulation_time * t_0 * (math.exp(-exponente))
+    return (simulation_time * t_0 * (np.exp(-exponente)))
 
 
 if __name__ == "__main__":
