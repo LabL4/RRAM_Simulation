@@ -5,6 +5,7 @@ from .Percolation import *
 from .Temperature import *
 from .CurentSolver import *
 from .Representate import *
-from .Recombination import recombination
+from .ElectricField import *
+from .Recombination import *
 from .Generation import initial_state, generation
-from .ElectricField import Simple as SimpleElectricField
+# from .Recombination import recombination_prueba as recombination

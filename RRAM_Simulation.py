@@ -8,6 +8,7 @@ from PIL import Image
 from tqdm import tqdm
 from io import BytesIO
 from icecream import ic
+import concurrent.futures
 
 
 # Creo el excel donde voy a sacar todos los datos
@@ -17,15 +18,15 @@ df = pd.DataFrame(columns=['Tiempo simulacion', 'Voltaje', 'Campo Eléctrico', '
 # comienzo la simulación montecaarlo
 
 espesor_dispositivo = 10        # nm
-Atom_size = 0.5                 # nm
+Atom_size = 0.25                 # nm
 
 eje_x = round(espesor_dispositivo / Atom_size)
 eje_y = round(espesor_dispositivo / Atom_size)
 
-num_trampas = 10
+num_trampas = 20
 
 # FIXME: Hay una zona donde nunca se ponen trampas
-actual_state = Generation.initial_state(eje_x, eje_y, num_trampas)
+actual_state = Generation.initial_state_priv(eje_x, eje_y, num_trampas)
 
 
 # Guardo la gráfica en el esritorio con el nombre grafica 2
@@ -35,9 +36,9 @@ total_simulation_time = 1
 num_pasos = 1000
 paso_temporal = total_simulation_time / num_pasos
 
-voltaje_final = 3
+voltaje_final = 1
 
-paso_guardar = 10
+paso_guardar = 1
 
 configuraciones_matriz = np.zeros((int((num_pasos / paso_guardar)), eje_x, eje_y))
 
@@ -64,11 +65,12 @@ for k in tqdm(range(0, num_pasos)):
     if Percolation.is_path(actual_state):
         # Si ha percolado uso la corriente de percolación
         # Corriente = CurentSolver.OmhCurrent(Temperatura, Campo_Electrico)
-        print("Ha percolado")
+        # print("Ha percolado")
+        pass
     else:
         # Si no ha percolado uso la corriente de campo
         # TODO: REVISAR QUE LA CORRIENTE TIENE LAS UNIDADES CORRECTAS PORQUE NO CUADRAN VALORES.
-        Corriente = 10000*CurentSolver.poole_frenkel(Temperatura, Campo_Electrico)
+        Corriente = 1000*CurentSolver.poole_frenkel(Temperatura, Campo_Electrico)
 
     # Obtengo los valores del campo eléctrico y la temperatura
     Campo_Electrico = SimpleElectricField(voltaje, espesor_dispositivo*1e-9)
@@ -107,26 +109,35 @@ for k in tqdm(range(0, num_pasos)):
 # Guardo los datos en un excel
 df.to_excel('resultados.xlsx', index=False)
 
-# Supongamos que las imágenes están en el subdirectorio "Figuras" y tienen nombres de archivo que siguen el patrón "image*.png"
-filenames = glob.glob('Figuras/grafica*.png')
+# Lista para almacenar las imágenes generadas
+images = [None for _ in range(len(configuraciones_matriz))]
 
-# Crear una lista para almacenar las imágenes
-images = []
-k = 1
-for matrix in tqdm(configuraciones_matriz):
-    # Llamar a tu función para representar la matriz y guardar la imagen
-    RepresentateStateOpt(matrix, filename="Figuras/grafica_" + str(k) + ".png")
 
-    plt.savefig((buffer := BytesIO()), format='png')
-    plt.close()
+def process_matrix(matrix, start, n_iter):
+    for i in range(start, start + n_iter):
+        RepresentateStateOpt(matrix, filename="Figuras/grafica_" + str(i) + ".png")
 
-    # Leer la imagen guardada y agregarla a la lista de imágenes
-    images.append(Image.open(buffer))
+        plt.savefig((buffer := BytesIO()), format='png')
+        plt.close()
 
-    k += 1
+        images[i] = (Image.open(buffer))
+
+
+# Número de procesos paralelos (ajústalo según tus necesidades)
+NUM_PARALLEL_PROCESSES = 4
+
+with concurrent.futures.ThreadPoolExecutor(max_workers=NUM_PARALLEL_PROCESSES) as executor:
+    futures = []
+    for k, matrix in enumerate(tqdm(configuraciones_matriz)):
+        start = (configuraciones_matriz.length // NUM_PARALLEL_PROCESSES) * k
+        n_iter = len(configuraciones_matriz) // NUM_PARALLEL_PROCESSES + (len(configuraciones_matriz) %
+                                                                          NUM_PARALLEL_PROCESSES if k == NUM_PARALLEL_PROCESSES - 1 else 0)
+        futures.append(executor.submit(process_matrix, matrix, start, n_iter))
+    concurrent.futures.wait(futures)
+
 
 # Guardar las imágenes como un GIF
-images[0].save('animated_matrix.gif', save_all=True, append_images=images[1:], optimize=False, duration=100, loop=0)
+images[0].save('animated_matrix.gif', save_all=True, append_images=images[1:], optimize=False, duration=40, loop=1)
 
 # Imprimir un mensaje de éxito
 print("Las matrices se han guardado correctamente como un GIF en 'animated_matrix.gif'")

@@ -33,6 +33,45 @@ def initial_state(Eje_x: float, Eje_y: float, num_trampas: int):
     return InitialState
 
 
+def initial_state_priv(Eje_x: int, Eje_y: int, num_trampas: int):
+    """
+    Generate an initial state matrix with traps based on the given parameters.
+
+    Args:
+        Eje_x (int): The size of the x-axis.
+        Eje_y (int): The size of the y-axis.
+        num_trampas (int): The number of traps to generate.
+
+    Returns:
+        np.ndarray: The initial state matrix with traps.
+
+    """
+    # Favorezco que las trampas estén en la parte central de los bordes
+    x_priv = Eje_x/3
+
+    x_priv_inf = x_priv
+    x_priv_sup = 2*x_priv
+
+    # Create a matrix of zeros with size Eje_x x Eje_y
+    InitialState = np.zeros((Eje_x, Eje_y), dtype=int)
+
+    # Generate weights for positions
+    pesos_x = np.array([0 if (x == x_priv_inf or x == x_priv_sup) else 0 for x in range(Eje_x)])
+    pesos_y = np.array([20 if (y == 0 or y == Eje_y-1 or y == 1 or y == Eje_y-2) else 1 for y in range(Eje_y)])
+
+    # Extend the weights to match the grid size
+    pesos = np.concatenate([pesos_x] * Eje_x) + np.concatenate([pesos_y] * Eje_y)
+
+    # Generate random positions for the traps with weights
+    posiciones_unos = np.random.choice(Eje_x * Eje_y, num_trampas, replace=False, p=pesos/np.sum(pesos))
+
+    # Assign the value 1 to the selected positions
+    for pos in posiciones_unos:
+        fila, columna = divmod(pos, Eje_x)
+        InitialState[fila, columna] = 1
+    return InitialState
+
+
 def generation(simulation_time: np.ndarray, electric_field: np.ndarray,
                temperature: np.ndarray, carga_vacante: float = 2,) -> np.ndarray:
     """

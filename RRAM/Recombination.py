@@ -1,5 +1,6 @@
 import math
 import numpy as np
+from icecream import ic
 
 from scipy.constants import elementary_charge
 from .Constants import t_0, E_a, k_b_ev, beta_0, L_p, E_m, gamma_drift, DifussiveBehaviour
@@ -12,8 +13,7 @@ def recombination(simulation_time: float, pos_x: int, electric_field: float,
         math.exp(-E_m / (k_b_ev * temperature)) * \
         math.sinh((2*elementary_charge * electric_field * gamma_drift) / (k_b_ev * temperature))
 
-    Prob_in_equilibrio = (simulation_time * t_0) / \
-        (math.exp(-E_a / (k_b_ev * temperature)))
+    Prob_in_equilibrio = (simulation_time * t_0)*(math.exp(-E_a / (k_b_ev * temperature)))
 
     Recombination_Probability = beta_0 * (
         math.exp(-simulation_time * Oxigen_Ion_velocity / L_p)) * \
