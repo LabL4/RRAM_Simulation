@@ -8,7 +8,6 @@ from PIL import Image
 from tqdm import tqdm
 from io import BytesIO
 from icecream import ic
-import concurrent.futures
 
 
 # Creo el excel donde voy a sacar todos los datos
@@ -109,32 +108,22 @@ for k in tqdm(range(0, num_pasos)):
 # Guardo los datos en un excel
 df.to_excel('resultados.xlsx', index=False)
 
-# Lista para almacenar las imágenes generadas
-images = [None for _ in range(len(configuraciones_matriz))]
+# Supongamos que las imágenes están en el subdirectorio "Figuras" y tienen nombres de archivo que siguen el patrón "image*.png"
+filenames = glob.glob('Figuras/grafica*.png')
 
+# Crear una lista para almacenar las imágenes
+images = []
+k = 1
+for matrix in tqdm(configuraciones_matriz):
+    # Llamar a tu función para representar la matriz y guardar la imagen
+    RepresentateStateOpt(matrix, filename="Figuras/grafica_" + str(k) + ".png")
 
-def process_matrix(matrix, start, n_iter):
-    for i in range(start, start + n_iter):
-        RepresentateStateOpt(matrix, filename="Figuras/grafica_" + str(i) + ".png")
+    plt.savefig((buffer := BytesIO()), format='png')
+    plt.close()
 
-        plt.savefig((buffer := BytesIO()), format='png')
-        plt.close()
-
-        images[i] = (Image.open(buffer))
-
-
-# Número de procesos paralelos (ajústalo según tus necesidades)
-NUM_PARALLEL_PROCESSES = 4
-
-with concurrent.futures.ThreadPoolExecutor(max_workers=NUM_PARALLEL_PROCESSES) as executor:
-    futures = []
-    for k, matrix in enumerate(tqdm(configuraciones_matriz)):
-        start = (configuraciones_matriz.length // NUM_PARALLEL_PROCESSES) * k
-        n_iter = len(configuraciones_matriz) // NUM_PARALLEL_PROCESSES + (len(configuraciones_matriz) %
-                                                                          NUM_PARALLEL_PROCESSES if k == NUM_PARALLEL_PROCESSES - 1 else 0)
-        futures.append(executor.submit(process_matrix, matrix, start, n_iter))
-    concurrent.futures.wait(futures)
-
+    # Leer la imagen guardada y agregarla a la lista de imágenes
+    images.append(Image.open(buffer))
+    k += 1
 
 # Guardar las imágenes como un GIF
 images[0].save('animated_matrix.gif', save_all=True, append_images=images[1:], optimize=False, duration=40, loop=1)

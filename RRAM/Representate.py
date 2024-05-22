@@ -25,7 +25,7 @@ def RepresentateState(matriz: np.ndarray, filename: str = "grafica.png") -> None
 
     # Indico qué valores van en las subdivisiones
     colors = [
-        (1, 1, 1),  # Color para el valor 0 qie representa que No hay trampa
+        (1, 1, 1),  # Color para el valor 0 que representa que No hay trampa
         (0.478, 0.627, 0.870),  # Color para el valor 1 que representa que hay trampa
     ]
 
@@ -81,7 +81,15 @@ def RepresentateStateOpt(matriz: np.ndarray, filename: str = "grafica.png") -> N
     fig, ax = plt.subplots()
 
     # Crear un mapa de colores personalizado
-    cmap = LinearSegmentedColormap.from_list("my_list", [(1, 1, 1), (0.478, 0.627, 0.870)], N=2)
+    colors = [
+        (1, 1, 1),                  # Color para el valor 0 que representa que No hay trampa
+        (0.478, 0.627, 0.870),      # Color para el valor 1 que representa que hay trampa (azul)
+    ]
+    if np.all(matriz == 1):
+        colors = list(reversed(colors))
+
+    cmap_name = "my_list"
+    cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=2)
 
     # Usar imshow en lugar de pcolormesh para una representación más eficiente
     ax.imshow(matriz, cmap=cmap, origin='upper')
@@ -90,12 +98,56 @@ def RepresentateStateOpt(matriz: np.ndarray, filename: str = "grafica.png") -> N
     ax.set_aspect('equal')
 
     # Colocar las etiquetas del eje x en la parte superior
-    ax.xaxis.tick_top()
+    # ax.xaxis.tick_top()
 
     plt.title("Iteracion {}".format(filename.split("_")[1].split(".")[0]))
 
     # Guardar la imagen
     # plt.savefig(filename)
+
+
+def RepresentatePoints(matriz: np.ndarray, filename: str = "grafica.png") -> None:
+
+    # Inicializamos listas para las coordenadas de los puntos
+    x = []
+    y = []
+
+    # Recorremos la matriz y agregamos las coordenadas donde hay un 1
+    for i in range(len(matriz)):
+        for j in range(len(matriz[i])):
+            if matriz[i][j] == 1:
+                x.append(j)
+                y.append(len(matriz) - i - 1)  # Invertimos el eje y para que se vea de forma intuitiva
+
+    # Crear el gráfico
+    fig, ax = plt.subplots()
+
+    plt.scatter(x, y, c='blue', marker='o')  # 'c' define el color y 'marker' define la forma de los puntos
+    plt.title('Representación de Matriz')
+    plt.xlabel('X')
+    plt.ylabel('Y')
+    plt.grid(True)  # Opcional: para mostrar la cuadrícula
+
+    # Establecer la relación de aspecto para que las celdas sean cuadradas
+    ax.set_aspect('equal')
+
+    # Colocar las etiquetas del eje x en la parte superior
+    ax.xaxis.tick_top()
+    nrows, _ = matriz.shape
+
+    # Configurar las marcas de los ejes
+    major_ticks = np.arange(0, nrows, 1)
+    minor_ticks = np.arange(0, nrows, 0.5)
+    ax.set_xticks(major_ticks)
+    ax.set_xticks(minor_ticks, minor=True)
+    ax.set_yticks(major_ticks)
+    ax.set_yticks(minor_ticks, minor=True)
+
+    # Invertir el eje y para que el punto (0, 0) esté en la esquina superior izquierda
+    # ax.invert_yaxis()
+
+    # Añado una leyenda fuera del gráfico
+    plt.legend(['Trampas'], loc='center left', bbox_to_anchor=(1, 0.5))
 
     return None
 
@@ -119,4 +171,4 @@ if __name__ == "__main__":
         fila, columna = divmod(pos, Eje_x)
         InitialState[fila, columna] = 1
 
-    RepresentateState(InitialState)
+    RepresentatePoints(InitialState, 'grafica0.png')
