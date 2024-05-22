@@ -108,22 +108,20 @@ def RepresentateStateOpt(matriz: np.ndarray, filename: str = "grafica.png") -> N
 
 def RepresentatePoints(matriz: np.ndarray, filename: str = "grafica.png") -> None:
 
+    n = len(matriz)
+
     # Inicializamos listas para las coordenadas de los puntos
     x = []
     y = []
 
-    # Recorremos la matriz y agregamos las coordenadas donde hay un 1
-    for i in range(len(matriz)):
-        for j in range(len(matriz[i])):
-            if matriz[i][j] == 1:
-                x.append(j)
-                y.append(len(matriz) - i - 1)  # Invertimos el eje y para que se vea de forma intuitiva
+    x = [j for i in range(n) for j in range(len(matriz[i])) if matriz[i][j] == 1]
+    y = [n - i - 1 for i in range(n) for j in range(len(matriz[i])) if matriz[i][j] == 1]
 
     # Crear el gráfico
     fig, ax = plt.subplots()
 
     plt.scatter(x, y, c='blue', marker='o')  # 'c' define el color y 'marker' define la forma de los puntos
-    plt.title('Representación de Matriz')
+    plt.title("Iteracion {}".format(filename.split("_")[1].split(".")[0]))
     plt.xlabel('X')
     plt.ylabel('Y')
     plt.grid(True)  # Opcional: para mostrar la cuadrícula
@@ -144,12 +142,53 @@ def RepresentatePoints(matriz: np.ndarray, filename: str = "grafica.png") -> Non
     ax.set_yticks(minor_ticks, minor=True)
 
     # Invertir el eje y para que el punto (0, 0) esté en la esquina superior izquierda
-    # ax.invert_yaxis()
+    ax.invert_yaxis()
 
     # Añado una leyenda fuera del gráfico
     plt.legend(['Trampas'], loc='center left', bbox_to_anchor=(1, 0.5))
 
     return None
+
+
+def RepresentateStateOptAnto(matriz: np.ndarray, fig, ax, im=None, filename: str = "grafica.png") -> None:
+    """
+    Represent the state of a matrix as a colored plot.
+
+    Parameters:
+    - matriz (np.ndarray): The input matrix to be represented.
+    - filename (str, optional): The name of the file to save the plot. Default is "grafica.png".
+
+    Returns:
+    None
+    """
+    # Crear una figura y un eje con plt.subplots()
+
+    # Crear un mapa de colores personalizado
+    colors = [
+        (1, 1, 1),                  # Color para el valor 0 que representa que No hay trampa
+        (0.478, 0.627, 0.870),      # Color para el valor 1 que representa que hay trampa (azul)
+    ]
+    if np.all(matriz == 1):
+        colors = list(reversed(colors))
+
+    if False:
+        im.set_data(matriz)
+    else:
+        cmap_name = "my_list"
+        cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=2)
+
+        # Usar imshow en lugar de pcolormesh para una representación más eficiente
+        im = ax.imshow(matriz, cmap=cmap, origin='upper')
+
+        # Establecer la relación de aspecto para que las celdas sean cuadradas
+        ax.set_aspect('equal')
+
+    # Colocar las etiquetas del eje x en la parte superior
+    # ax.xaxis.tick_top()
+
+    plt.title("Iteracion {}".format(filename.split("_")[1].split(".")[0]))
+
+    return im
 
 
 if __name__ == "__main__":
