@@ -56,7 +56,8 @@ def initial_state_priv(Eje_x: int, Eje_y: int, num_trampas: int):
     InitialState = np.zeros((Eje_x, Eje_y), dtype=int)
 
     # Generate weights for positions
-    pesos_x = np.array([0 if (x == x_priv_inf or x == x_priv_sup) else 0 for x in range(Eje_x)])
+    pesos_x = np.array([0 if (x == x_priv_inf or x == x_priv_sup or x ==
+                       1 or x == 2 or x == 3 or x == x_priv_sup-1 or x == x_priv_sup-2 or x == x_priv_sup-3) else 0 for x in range(Eje_x)])
     pesos_y = np.array([20 if (y == 0 or y == Eje_y-1 or y == 1 or y == Eje_y-2) else 1 for y in range(Eje_y)])
 
     # Extend the weights to match the grid size

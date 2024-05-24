@@ -17,7 +17,7 @@ df = pd.DataFrame(columns=['Tiempo simulacion', 'Voltaje', 'Campo Eléctrico', '
 # comienzo la simulación montecaarlo
 
 espesor_dispositivo = 10        # nm
-Atom_size = 0.25                 # nm
+Atom_size = 0.25                # nm
 
 eje_x = round(espesor_dispositivo / Atom_size)
 eje_y = round(espesor_dispositivo / Atom_size)
@@ -106,7 +106,7 @@ for k in tqdm(range(0, num_pasos)):
         configuraciones_matriz[int(k / paso_guardar) - 1] = actual_state
 
 # Guardo los datos en un excel
-df.to_excel('resultados.xlsx', index=False)
+df.to_excel('Resultados_numericos/resultados.xlsx', index=False)
 
 # Supongamos que las imágenes están en el subdirectorio "Figuras" y tienen nombres de archivo que siguen el patrón "image*.png"
 filenames = glob.glob('Figuras/grafica*.png')
