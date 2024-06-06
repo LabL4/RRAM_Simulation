@@ -4,6 +4,7 @@ from icecream import ic
 
 from .Constants import *
 from scipy.constants import elementary_charge
+from .Representate import RepresentateStateOpt
 
 
 def initial_state(Eje_x: float, Eje_y: float, num_trampas: int):
@@ -33,7 +34,7 @@ def initial_state(Eje_x: float, Eje_y: float, num_trampas: int):
     return InitialState
 
 
-def initial_state_priv(Eje_x: int, Eje_y: int, num_trampas: int):
+def initial_state_priv(Eje_x: int, Eje_y: int, num_trampas: int, regiones_pesos: list):
     """
     Generate an initial state matrix with traps based on the given parameters.
 
@@ -41,35 +42,33 @@ def initial_state_priv(Eje_x: int, Eje_y: int, num_trampas: int):
         Eje_x (int): The size of the x-axis.
         Eje_y (int): The size of the y-axis.
         num_trampas (int): The number of traps to generate.
+        regiones_pesos (list): A list of tuples defining regions and their weights.
+                               Each tuple should be ((x_start, x_end, y_start, y_end), weight).
 
     Returns:
         np.ndarray: The initial state matrix with traps.
-
     """
-    # Favorezco que las trampas estén en la parte central de los bordes
-    x_priv = Eje_x/3
-
-    x_priv_inf = x_priv
-    x_priv_sup = 2*x_priv
-
     # Create a matrix of zeros with size Eje_x x Eje_y
     InitialState = np.zeros((Eje_x, Eje_y), dtype=int)
 
-    # Generate weights for positions
-    pesos_x = np.array([0 if (x == x_priv_inf or x == x_priv_sup or x ==
-                       1 or x == 2 or x == 3 or x == x_priv_sup-1 or x == x_priv_sup-2 or x == x_priv_sup-3) else 0 for x in range(Eje_x)])
-    pesos_y = np.array([20 if (y == 0 or y == Eje_y-1 or y == 1 or y == Eje_y-2) else 1 for y in range(Eje_y)])
+    # Create a weight matrix initialized to 1
+    pesos = np.ones((Eje_x, Eje_y), dtype=float)
 
-    # Extend the weights to match the grid size
-    pesos = np.concatenate([pesos_x] * Eje_x) + np.concatenate([pesos_y] * Eje_y)
+    # Apply weights to specified regions
+    for (x_start, x_end, y_start, y_end), weight in regiones_pesos:
+        pesos[x_start:x_end, y_start:y_end] = weight
+
+    # Flatten the weight matrix for use with np.random.choice
+    pesos_flat = pesos.flatten()
 
     # Generate random positions for the traps with weights
-    posiciones_unos = np.random.choice(Eje_x * Eje_y, num_trampas, replace=False, p=pesos/np.sum(pesos))
+    posiciones_unos = np.random.choice(Eje_x * Eje_y, num_trampas, replace=False, p=pesos_flat/np.sum(pesos_flat))
 
     # Assign the value 1 to the selected positions
     for pos in posiciones_unos:
-        fila, columna = divmod(pos, Eje_x)
+        fila, columna = divmod(pos, Eje_y)
         InitialState[fila, columna] = 1
+
     return InitialState
 
 
@@ -96,13 +95,13 @@ def generation(simulation_time: np.ndarray, electric_field: np.ndarray,
 
 if __name__ == "__main__":
 
-    Longitud_Dispositivo = 10
+    Longitud_Dispositivo = 5
     Atom_size = 0.5
 
     Eje_x = round(Longitud_Dispositivo / Atom_size)
     Eje_y = round(Longitud_Dispositivo / Atom_size)
 
-    num_trampas = 10
+    num_trampas = 15
 
     # Crear una matriz de ceros de tamaño Eje_x x Eje_y
 
@@ -112,3 +111,6 @@ if __name__ == "__main__":
     posiciones_unos = np.random.choice(Eje_x * Eje_y, num_trampas, replace=False)
 
     # Asignar el valor 1 a las posiciones seleccionadas
+    estado_inicial = initial_state_priv(Eje_x, Eje_y, num_trampas)
+
+    RepresentateStateOpt(estado_inicial, filename="Pruebas/grafica_inicial.png")

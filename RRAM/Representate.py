@@ -1,6 +1,8 @@
 # Description: This file contains the code to generate the mesh of the RRAM.
 import numpy as np
+
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
 
 from matplotlib.colors import LinearSegmentedColormap
 
@@ -23,11 +25,13 @@ def RepresentateState(matriz: np.ndarray, filename: str = "grafica.png") -> None
 
     fig, ax = plt.subplots()
 
-    # Indico qué valores van en las subdivisiones
+    # Crear un mapa de colores personalizado
     colors = [
-        (1, 1, 1),  # Color para el valor 0 que representa que No hay trampa
-        (0.478, 0.627, 0.870),  # Color para el valor 1 que representa que hay trampa
+        (1, 1, 1),                  # Color para el valor 0 que representa que No hay trampa
+        (0.478, 0.627, 0.870),      # Color para el valor 1 que representa que hay trampa (azul)
     ]
+    if np.all(matriz == 1):
+        colors = list(reversed(colors))
 
     cmap_name = "my_list"
     cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=2)
@@ -98,9 +102,12 @@ def RepresentateStateOpt(matriz: np.ndarray, filename: str = "grafica.png") -> N
     ax.set_aspect('equal')
 
     # Colocar las etiquetas del eje x en la parte superior
-    # ax.xaxis.tick_top()
+    ax.xaxis.tick_top()
 
-    plt.title("Iteracion {}".format(filename.split("_")[1].split(".")[0]))
+    # Colocar las etiquetas del eje y en la parte izquierda
+    ax.yaxis.tick_left()
+
+    # plt.title("Iteracion {}".format(filename.split("_")[1].split(".")[0]))
 
     # Guardar la imagen
     # plt.savefig(filename)
@@ -189,6 +196,43 @@ def RepresentateStateOptAnto(matriz: np.ndarray, fig, ax, im=None, filename: str
     plt.title("Iteracion {}".format(filename.split("_")[1].split(".")[0]))
 
     return im
+
+
+def plot_regions(Eje_x: int, Eje_y: int, regiones_pesos: list):
+    """
+    Plot the regions with privileged probability.
+
+    Args:
+        Eje_x (int): The size of the x-axis.
+        Eje_y (int): The size of the y-axis.
+        regiones_pesos (list): A list of tuples defining regions and their weights.
+                               Each tuple should be ((x_start, x_end, y_start, y_end), weight).
+    """
+    fig, ax = plt.subplots()
+    ax.set_xlim(0, Eje_y)
+    ax.set_ylim(0, Eje_x)
+    ax.invert_yaxis()
+
+    # Draw grid
+    for i in range(Eje_x):
+        for j in range(Eje_y):
+            rect = patches.Rectangle((j, i), 1, 1, edgecolor='grey', facecolor='white', fill=True)
+            ax.add_patch(rect)
+
+    # Highlight privileged regions
+    for (x_start, x_end, y_start, y_end), weight in regiones_pesos:
+        rect = patches.Rectangle((y_start, x_start), y_end - y_start, x_end - x_start,
+                                 linewidth=4, edgecolor='r', facecolor='none')
+        ax.add_patch(rect)
+        # Add text for weight
+        cx = (y_start + y_end) / 2
+        cy = (x_start + x_end) / 2
+        ax.text(cx, cy, f'w={weight}', color='red', ha='center', va='center', fontsize=8)
+
+    plt.gca().set_aspect('equal', adjustable='box')
+
+    filename = "Pruebas/Region_privilegiada.png"
+    plt.savefig(filename)
 
 
 if __name__ == "__main__":
