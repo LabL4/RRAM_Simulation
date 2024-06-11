@@ -1,4 +1,4 @@
-from . import SimpleElectricField
+from .import SimpleElectricField
 
 
 def main():
