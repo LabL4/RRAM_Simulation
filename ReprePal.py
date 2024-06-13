@@ -44,7 +44,7 @@ def process_matrix(args):
 
 if __name__ == '__main__':
 
-    NUM_PARALLEL_PROCESSES = 5
+    NUM_PARALLEL_PROCESSES = 7
     start = time.time()
     args = [(configuraciones_matriz[i], i) for i in range(len(configuraciones_matriz))]
     buffers = process_map(process_matrix, args, max_workers=NUM_PARALLEL_PROCESSES, chunksize=25)

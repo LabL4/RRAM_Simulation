@@ -6,7 +6,7 @@ from scipy.constants import Boltzmann, elementary_charge
 # Hz,  el valor de 1/t_0
 t_0 = 10**13
 
-# eV
+# eV Energía de activación
 E_a = 1
 
 # Tiene distintos valores dependiendo si el estado es FORMING/SET y RESET
@@ -23,7 +23,7 @@ beta_0 = 3e3
 L_p = 1e-9
 
 # Coeficiente de deriva de los iones de oxígeno debido a la presencia de un campo eléctrico externo
-gamma_drift = 8e9
+gamma_drift = 8  # e9
 
 # Potencial de migración de los iones de oxígeno en eV
 E_m = 1.0

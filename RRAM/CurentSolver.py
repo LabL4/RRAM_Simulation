@@ -4,9 +4,9 @@ from scipy.constants import elementary_charge, Boltzmann
 
 
 def OmhCurrent(DDP: float, Configuration_state, resistance: float = 1) -> float:
+    # TODO ARREGLAR LA CORRIENTE ÓHMICA
     # Initialize total resistance
     total_resistance = 0
-
     # Sobre cada columna de la matriz
     for column in Configuration_state.T:
         # Se calcula la resistencia paralela de los elementos de la columna
