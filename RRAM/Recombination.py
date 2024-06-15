@@ -13,7 +13,7 @@ def recombination(simu_time: float, pos_x: int, E_field: float, temperature: flo
     senoh = math.sinh((2*elementary_charge * E_field * pos_x * gamma_drift) / (k_b_ev * temperature))
     exponencial_velocidad = math.exp(-E_m / (k_b_ev * temperature))
     # TODO: he modificado el valor por la cara para ver si siendo mas alto sale algo
-    Oxigen_Ion_velocity = (0.01) * t_0 * grid_size * (senoh * exponencial_velocidad)
+    Oxigen_Ion_velocity = (1000) * t_0 * grid_size * (senoh * exponencial_velocidad)
 
     Funcion = DifussiveBehaviour(pos_x, Oxigen_Ion_velocity, simu_time, grid_size)
     exponencial = math.exp(-(simu_time * Oxigen_Ion_velocity) / L_p)
