@@ -1,13 +1,13 @@
 import glob
 import pandas as pd
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as pltlot as pltlot as pltlot as plt
 
 from re import T
 from RRAM import *
 from PIL import Image
 from tqdm import tqdm
 from io import BytesIO
-from icecream import ic
+from icecream import icfrom icecream import icfrom icecream import icfrom icecream import ic
 
 
 # Creo el excel donde voy a sacar todos los datos
@@ -17,10 +17,10 @@ df = pd.DataFrame(columns=['Tiempo simulacion', 'Voltaje', 'Campo Eléctrico', '
 # comienzo la simulación montecaarlo
 
 espesor_dispositivo = 10        # nm
-Atom_size = 0.25                # nm
+atom_size = 0.25                # nm
 
-eje_x = round(espesor_dispositivo / Atom_size)
-eje_y = round(espesor_dispositivo / Atom_size)
+eje_x = round(espesor_dispositivo / atom_size)
+eje_y = round(espesor_dispositivo / atom_size)
 
 num_trampas = 20
 

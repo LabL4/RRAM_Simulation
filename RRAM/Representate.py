@@ -237,10 +237,10 @@ def plot_regions(Eje_x: int, Eje_y: int, regiones_pesos: list):
 
 if __name__ == "__main__":
     Longitud_Dispositivo = 10
-    Atom_size = 0.5
+    atom_size = 0.5
 
-    Eje_x, Eje_y = round(Longitud_Dispositivo / Atom_size), round(
-        Longitud_Dispositivo / Atom_size
+    Eje_x, Eje_y = round(Longitud_Dispositivo / atom_size), round(
+        Longitud_Dispositivo / atom_size
     )
     num_trampas = 10
 
