@@ -23,7 +23,7 @@ beta_0 = 3e3
 L_p = 1e-9
 
 # Coeficiente de deriva de los iones de oxígeno debido a la presencia de un campo eléctrico externo
-gamma_drift = 8e5
+gamma_drift = 8e8
 
 # Potencial de migración de los iones de oxígeno en eV
 E_m = 1.0
@@ -37,7 +37,7 @@ resistencia_ohmica = 1e6
 
 def DifussiveBehaviour(
         pos_x: int, Oxigen_Ion_velocity: float, Simulation_time: float,
-        grid_size: float = 0.25e-9) -> float:
+        grid_size: float) -> float:
     """
     Calculates the diffusion behavior based on the given parameters.
 
@@ -49,7 +49,6 @@ def DifussiveBehaviour(
 
     Returns:
     - float: The diffusion value based on the given conditions.
-
     """
 
     vt = Oxigen_Ion_velocity*Simulation_time

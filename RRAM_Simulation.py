@@ -1,13 +1,13 @@
 import glob
 import pandas as pd
-import matplotlib.pyplot as pltlot as pltlot as pltlot as plt
+import matplotlib.pyplot as plt
 
 from re import T
 from RRAM import *
 from PIL import Image
 from tqdm import tqdm
 from io import BytesIO
-from icecream import icfrom icecream import icfrom icecream import icfrom icecream import ic
+from icecream import ic
 
 
 # Creo el excel donde voy a sacar todos los datos

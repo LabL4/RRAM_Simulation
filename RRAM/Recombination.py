@@ -5,7 +5,22 @@ from scipy.constants import elementary_charge
 from .Constants import t_0, E_a, k_b_ev, beta_0, L_p, E_m, gamma_drift, DifussiveBehaviour
 
 
-def recombination(simu_time: float, pos_x: int, E_field: float, temperature: float, grid_size, factor: float):
+def recombination(simu_time: float, pos_x: int, E_field: float, temperature: float, grid_size: float, factor: float):
+    """
+    Calculates the recombination probability Function that calculates the probability of recombination. 
+    It is calculated from the equilibrium probability and a factor that contains the ion velocity.
+
+    Args:
+        simu_time (float): The simulation time.
+        pos_x (int): The position in the x-axis.
+        E_field (float): The electric field.
+        temperature (float): The temperature.
+        grid_size (float): The grid size.
+        factor (float): A factor used in the calculation.
+
+    Returns:
+        tuple: A tuple containing the recombination probability, oxygen ion velocity, and diffusion function.
+    """
 
     Prob_in_equilibrio = (simu_time * t_0)*(math.exp(-E_a / (k_b_ev * temperature)))
 
@@ -21,4 +36,4 @@ def recombination(simu_time: float, pos_x: int, E_field: float, temperature: flo
 
     Prob_recom = Prob_in_equilibrio * beta
 
-    return Prob_recom, Oxigen_Ion_velocity*simu_time, Funcion
+    return Prob_recom, Oxigen_Ion_velocity, Funcion
