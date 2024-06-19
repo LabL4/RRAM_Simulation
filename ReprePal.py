@@ -32,7 +32,7 @@ def process_matrix(args):
         fig, ax = plt.gcf(), plt.gca()
     # fig, ax = plt.subplots()
 
-    im = RepresentateStateOptAnto(matrix, fig, ax, im, filename="Figuras/grafica_" + str(idx) + ".png")
+    im = RepresentateStateOptAnto(matrix, fig, ax, im, filename="Figuras/grafica_" + str(idx+1) + ".png")
 
     plt.savefig((buffer := BytesIO()), format='png')
     # plt.close()
@@ -47,7 +47,7 @@ if __name__ == '__main__':
     NUM_PARALLEL_PROCESSES = 7
     start = time.time()
     args = [(configuraciones_matriz[i], i) for i in range(len(configuraciones_matriz))]
-    buffers = process_map(process_matrix, args, max_workers=NUM_PARALLEL_PROCESSES, chunksize=25)
+    buffers = process_map(process_matrix, args, max_workers=NUM_PARALLEL_PROCESSES, chunksize=50)
     images = [Image.open(buffer) for buffer in buffers]
     end = time.time()
 
@@ -59,7 +59,7 @@ if __name__ == '__main__':
 
     start = time.time()
     # Crear un escritor de video
-    writer = imageio.get_writer('animated_matrix.mp4', fps=25)
+    writer = imageio.get_writer('animated_matrix.mp4', fps=60)
 
     # Cargar y procesar las imágenes una por una
     for img in images:

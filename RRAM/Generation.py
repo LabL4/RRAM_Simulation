@@ -91,26 +91,3 @@ def generation(simulation_time: np.ndarray, electric_field: np.ndarray,
     exponente = (E_a - (gamma * carga_vacante * np.abs(electric_field))) / (k_b_ev * temperature)
 
     return (simulation_time * t_0 * (np.exp(-exponente)))
-
-
-if __name__ == "__main__":
-
-    Longitud_Dispositivo = 5
-    Atom_size = 0.5
-
-    Eje_x = round(Longitud_Dispositivo / Atom_size)
-    Eje_y = round(Longitud_Dispositivo / Atom_size)
-
-    num_trampas = 15
-
-    # Crear una matriz de ceros de tamaño Eje_x x Eje_y
-
-    InitialState = np.zeros((Eje_x, Eje_y), dtype=int)
-    # Generar 5 posiciones aleatorias para los unos
-
-    posiciones_unos = np.random.choice(Eje_x * Eje_y, num_trampas, replace=False)
-
-    # Asignar el valor 1 a las posiciones seleccionadas
-    estado_inicial = initial_state_priv(Eje_x, Eje_y, num_trampas)
-
-    RepresentateStateOpt(estado_inicial, filename="Pruebas/grafica_inicial.png")

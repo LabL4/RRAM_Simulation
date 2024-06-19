@@ -1,18 +1,18 @@
-# import pickle
+import pickle
 from RRAM import *
-# import pandas as pd
+import pandas as pd
 import time as time
 from tqdm import tqdm
 
 # comienzo la simulación montecaarlo
 
-espesor_dispositivo = 10        # nm
-atom_size = 0.25                # nm
+espesor_dispositivo = 10e-9        # nm
+atom_size = 0.25e-9                # nm
 
 eje_x = round(espesor_dispositivo / atom_size)
 eje_y = round(espesor_dispositivo / atom_size)
 
-num_trampas = 600
+num_trampas = 500
 
 Rellenado = num_trampas/(eje_x*eje_y)
 
@@ -30,21 +30,31 @@ total_simulation_time = 1
 num_pasos = 10000
 paso_temporal = total_simulation_time / num_pasos
 
-voltaje_final = 1
+voltaje_final = 3
 paso_guardar = 1
 
 configuraciones_matriz = np.zeros((int((num_pasos / paso_guardar)), eje_x, eje_y))
 
 # Configuraciones iniciales:
-temperatura = 300
+temperatura = 350
 Campo_Electrico = 0
 voltaje = 0
 simulation_time = 0
 Corriente = 0
 
 # Creo el vector de datos como una matriz de num_pasos filas y 4 columnas (x,y,probabilidad recombionacion, velocidad)
+
+# Crear una matriz vacía
+data = []
+colunm_number = 7
+# # Añadir filas a la matriz
+# for i in range(colunm_number):  # n es el número de filas que quieres añadir
+#     fila = [0] * 7  # Crea una fila con 7 columnas
+#     data.append(fila)
+
 num_datos = num_pasos*eje_x*eje_y
-data = np.zeros((num_datos, 7))
+data = np.zeros((num_datos, colunm_number))
+
 re_index = 0
 
 # Creo el excel donde voy a sacar todos los datos
@@ -71,7 +81,7 @@ for k in tqdm(range(1, num_pasos+1)):
         Corriente = CurentSolver.poole_frenkel(temperatura, Campo_Electrico)/(1e-10)
 
     # Obtengo los valores del campo eléctrico y la temperatura
-    Campo_Electrico = SimpleElectricField(voltaje, espesor_dispositivo*1e-9)
+    Campo_Electrico = SimpleElectricField(voltaje, espesor_dispositivo)
     # Temperatura = Temperature_Joule(voltaje, Corriente, T_0=350)
 
     # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
@@ -81,7 +91,7 @@ for k in tqdm(range(1, num_pasos+1)):
                 # TODO: REVISAR PROBABILIDAD QUE A VECES SALE MAYOR DE 1
                 # TODO: HACER UN REESCALADO DE LOS VALORES PARA EVITAR TENER QUE TRABAJAR CON NUMEROS TAN GRANDES
                 prob_generacion = Generation.generation(paso_temporal, Campo_Electrico, temperatura)
-                random_number = np.random.rand()
+                random_number = np.random.rand()  # BUG he puesto 1.5 para bajar la recombinación de forma artificial
                 if random_number < prob_generacion:
                     actual_state[i, j] = 1  # Generación
 
@@ -89,7 +99,7 @@ for k in tqdm(range(1, num_pasos+1)):
                 # TODO: REVISAR PROBABILIDAD QUE A VECES SALE MAYOR DE 1
                 # TODO: HACER UN REESCALADO DE LOS VALORES PARA EVITAR TENER QUE TRABAJAR CON NUMEROS TAN GRANDES
                 prob_recombinacion, espacio_recorr, funcion_trozos = Recombination.recombination(
-                    paso_temporal, i+1, Campo_Electrico, temperatura, atom_size*(1e-9), 1)
+                    paso_temporal, i+1, Campo_Electrico, temperatura, atom_size, 1000)
                 data[re_index] = np.array([k, simulation_time, i+1, j, prob_recombinacion,
                                           espacio_recorr, funcion_trozos])
                 re_index += 1
@@ -99,15 +109,19 @@ for k in tqdm(range(1, num_pasos+1)):
                     actual_state[i, j] = 0  # Recombinación
 
     # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
-    # if k % paso_guardar == 0:
-    #     configuraciones_matriz[int(k / paso_guardar) - 1] = actual_state
+    if k % paso_guardar == 0:
+        configuraciones_matriz[int(k / paso_guardar) - 1] = actual_state
 
-# # Guardar la lista en un archivo
-# with open('Configuraciones.pkl', 'wb') as f:
-#     pickle.dump(configuraciones_matriz, f)
+# Guardar la lista en un archivo
+with open('Configuraciones.pkl', 'wb') as f:
+    pickle.dump(configuraciones_matriz, f)
 
 start = time.time()
-np.savetxt('Recombinacion_data.csv', data,  fmt=['%d', '%.5f', '%d', '%d', '%e', '%.6e', '%.1f'],
+
+# Suponiendo que 'data' es un array de NumPy que ya contiene tus datos
+data_filtrados = np.array([fila for fila in data if fila[-1] != 0.0])
+
+np.savetxt('Recombinacion_data.csv', data_filtrados,  fmt=['%d', '%.5f', '%d', '%d', '%e', '%.6e', '%.1f'],
            header='paso, tiempo simulacion, x, y, probabilidad recombinacion, espacio recorrido, funcion a trozos', comments='', delimiter=', ')
 end = time.time()
 
