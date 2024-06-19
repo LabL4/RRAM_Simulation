@@ -1,6 +1,6 @@
-import pickle
+# import pickle
 from RRAM import *
-import pandas as pd
+# import pandas as pd
 import time as time
 from tqdm import tqdm
 
@@ -22,7 +22,6 @@ regiones_pesos = [
     ((10, eje_x-10, 0, 15), 50),                       # First three columns with higher weight
 ]
 
-# FIXME: Hay una zona donde nunca se ponen trampas --> Solucionado
 actual_state = Generation.initial_state_priv(eje_x, eje_y, num_trampas, regiones_pesos)
 
 RepresentateState(actual_state, 'Estado inicial')
@@ -31,13 +30,13 @@ total_simulation_time = 1
 num_pasos = 10000
 paso_temporal = total_simulation_time / num_pasos
 
-voltaje_final = 3
+voltaje_final = 1
 paso_guardar = 1
 
 configuraciones_matriz = np.zeros((int((num_pasos / paso_guardar)), eje_x, eje_y))
 
 # Configuraciones iniciales:
-temperatura = 350
+temperatura = 300
 Campo_Electrico = 0
 voltaje = 0
 simulation_time = 0
@@ -54,7 +53,7 @@ for k in tqdm(range(1, num_pasos+1)):
     # Guardo el estado anterior
     last_state = actual_state
 
-    simulation_time = paso_temporal*k
+    simulation_time = paso_temporal * k
 
     # Calculo la corriente
     voltaje += voltaje_final * paso_temporal
@@ -90,7 +89,7 @@ for k in tqdm(range(1, num_pasos+1)):
                 # TODO: REVISAR PROBABILIDAD QUE A VECES SALE MAYOR DE 1
                 # TODO: HACER UN REESCALADO DE LOS VALORES PARA EVITAR TENER QUE TRABAJAR CON NUMEROS TAN GRANDES
                 prob_recombinacion, espacio_recorr, funcion_trozos = Recombination.recombination(
-                    paso_temporal, i+1, Campo_Electrico, temperatura, atom_size*(1E-9), 1)
+                    paso_temporal, i+1, Campo_Electrico, temperatura, atom_size*(1e-9), 1)
                 data[re_index] = np.array([k, simulation_time, i+1, j, prob_recombinacion,
                                           espacio_recorr, funcion_trozos])
                 re_index += 1

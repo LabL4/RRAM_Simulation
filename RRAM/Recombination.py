@@ -36,4 +36,4 @@ def recombination(simu_time: float, pos_x: int, E_field: float, temperature: flo
 
     Prob_recom = Prob_in_equilibrio * beta
 
-    return Prob_recom, Oxigen_Ion_velocity, Funcion
+    return Prob_recom, Oxigen_Ion_velocity*simu_time, Funcion
