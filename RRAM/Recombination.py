@@ -24,7 +24,7 @@ def recombination(simu_time: float, pos_x: int, E_field: float, temperature: flo
 
     Prob_in_equilibrio = (simu_time * t_0)*(math.exp(-E_a / (k_b_ev * temperature)))
 
-    senoh = math.sinh((2*elementary_charge * E_field * pos_x * gamma_drift) / (k_b_ev * temperature))
+    senoh = math.sinh((2*elementary_charge * E_field * gamma_drift) / (k_b_ev * temperature))
     exponencial_velocidad = math.exp(-E_m / (k_b_ev * temperature))
 
     # TODO: he modificado el valor por la cara para ver si siendo mas alto sale algo

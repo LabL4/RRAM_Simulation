@@ -47,7 +47,7 @@ if __name__ == '__main__':
     NUM_PARALLEL_PROCESSES = 7
     start = time.time()
     args = [(configuraciones_matriz[i], i) for i in range(len(configuraciones_matriz))]
-    buffers = process_map(process_matrix, args, max_workers=NUM_PARALLEL_PROCESSES, chunksize=50)
+    buffers = process_map(process_matrix, args, max_workers=NUM_PARALLEL_PROCESSES, chunksize=25)
     images = [Image.open(buffer) for buffer in buffers]
     end = time.time()
 

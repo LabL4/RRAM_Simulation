@@ -12,7 +12,7 @@ atom_size = 0.25e-9                # nm
 eje_x = round(espesor_dispositivo / atom_size)
 eje_y = round(espesor_dispositivo / atom_size)
 
-num_trampas = 500
+num_trampas = 300
 
 Rellenado = num_trampas/(eje_x*eje_y)
 
@@ -26,31 +26,24 @@ actual_state = Generation.initial_state_priv(eje_x, eje_y, num_trampas, regiones
 
 RepresentateState(actual_state, 'Estado inicial')
 
-total_simulation_time = 1
+total_simulation_time = 5
 num_pasos = 10000
 paso_temporal = total_simulation_time / num_pasos
 
-voltaje_final = 3
+voltaje_final = 1
 paso_guardar = 1
 
 configuraciones_matriz = np.zeros((int((num_pasos / paso_guardar)), eje_x, eje_y))
 
 # Configuraciones iniciales:
-temperatura = 350
+temperatura = 300
 Campo_Electrico = 0
 voltaje = 0
 simulation_time = 0
 Corriente = 0
 
-# Creo el vector de datos como una matriz de num_pasos filas y 4 columnas (x,y,probabilidad recombionacion, velocidad)
-
-# Crear una matriz vacía
-data = []
+# Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias (x,y,probabilidad recombionacion, velocidad)
 colunm_number = 7
-# # Añadir filas a la matriz
-# for i in range(colunm_number):  # n es el número de filas que quieres añadir
-#     fila = [0] * 7  # Crea una fila con 7 columnas
-#     data.append(fila)
 
 num_datos = num_pasos*eje_x*eje_y
 data = np.zeros((num_datos, colunm_number))
@@ -91,7 +84,7 @@ for k in tqdm(range(1, num_pasos+1)):
                 # TODO: REVISAR PROBABILIDAD QUE A VECES SALE MAYOR DE 1
                 # TODO: HACER UN REESCALADO DE LOS VALORES PARA EVITAR TENER QUE TRABAJAR CON NUMEROS TAN GRANDES
                 prob_generacion = Generation.generation(paso_temporal, Campo_Electrico, temperatura)
-                random_number = np.random.rand()  # BUG he puesto 1.5 para bajar la recombinación de forma artificial
+                random_number = np.random.rand()  # BUG he puesto 1.5 para bajar la generacion de forma artificial
                 if random_number < prob_generacion:
                     actual_state[i, j] = 1  # Generación
 
@@ -99,7 +92,7 @@ for k in tqdm(range(1, num_pasos+1)):
                 # TODO: REVISAR PROBABILIDAD QUE A VECES SALE MAYOR DE 1
                 # TODO: HACER UN REESCALADO DE LOS VALORES PARA EVITAR TENER QUE TRABAJAR CON NUMEROS TAN GRANDES
                 prob_recombinacion, espacio_recorr, funcion_trozos = Recombination.recombination(
-                    paso_temporal, i+1, Campo_Electrico, temperatura, atom_size, 1000)
+                    paso_temporal, i+1, Campo_Electrico, temperatura, atom_size, 10)
                 data[re_index] = np.array([k, simulation_time, i+1, j, prob_recombinacion,
                                           espacio_recorr, funcion_trozos])
                 re_index += 1
