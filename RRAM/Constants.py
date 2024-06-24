@@ -61,4 +61,6 @@ def DifussiveBehaviour(
                    ]
 
     valores_Difusion = [1, 0.3, 0.1, 0]
-    return np.piecewise(pos_x, condiciones, valores_Difusion)
+    valor_elegido = np.piecewise(pos_x, condiciones, valores_Difusion).item()
+
+    return valor_elegido

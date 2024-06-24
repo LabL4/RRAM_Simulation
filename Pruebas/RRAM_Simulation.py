@@ -1,6 +1,6 @@
 import glob
 import pandas as pd
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as pltimport matplotlib.pyplot as plt
 
 from re import T
 from RRAM import *
@@ -90,7 +90,7 @@ for k in tqdm(range(0, num_pasos)):
             else:
                 # TODO: REVISAR PROBABILIDAD QUE A VECES SALE MAYOR DE 1
                 # TODO: HACER UN REESCALADO DE LOS VALORES PARA EVITAR TENER QUE TRABAJAR CON NUMEROS TAN GRANDES
-                prob_recombinacion = Recombination.recombination(paso_temporal, i, Campo_Electrico, Temperatura)
+                prob_recombinacion = Recombination.Simple_recombination(paso_temporal, i, Campo_Electrico, Temperatura)
 
                 # genero un número aleatorio entre 0 y 1
                 random_number = np.random.rand()

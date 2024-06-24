@@ -1,6 +1,6 @@
 import numpy as np
 from RRAM import *
-from tqdm import tqdm
+from tqdm import tqdmfrom tqdm import tqdm
 
 
 def funcion_montecarlo(num_pasos, simulation_time, voltaje_final, factor_externo,
@@ -68,7 +68,7 @@ def funcion_montecarlo(num_pasos, simulation_time, voltaje_final, factor_externo
                 if actual_state[i, j] == 1:
                     # TODO: REVISAR PROBABILIDAD QUE A VECES SALE MAYOR DE 1
                     # TODO: HACER UN REESCALADO DE LOS VALORES PARA EVITAR TENER QUE TRABAJAR CON NUMEROS TAN GRANDES
-                    prob_rec, espacio_recorr, funcion_trozos = Recombination.recombination(
+                    prob_rec, espacio_recorr, funcion_trozos = Recombination.Simple_recombination(
                         paso_temporal, i, campo_electrico, temperatura, atom_size, factor=factor_externo)
                     data[re_index] = np.array([k, simulation_time, i, j, prob_rec, espacio_recorr, funcion_trozos])
                     re_index += 1

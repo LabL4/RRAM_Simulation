@@ -5,7 +5,7 @@ from scipy.constants import elementary_charge
 from .Constants import t_0, E_a, k_b_ev, beta_0, L_p, E_m, gamma_drift, DifussiveBehaviour
 
 
-def recombination(simu_time: float, pos_x: int, E_field: float, temperature: float, grid_size: float, factor: float):
+def Simple_recombination(simu_time: float, pos_x: int, E_field: float, temperature: float, grid_size: float, factor: float):
     """
     Calculates the recombination probability Function that calculates the probability of recombination. 
     It is calculated from the equilibrium probability and a factor that contains the ion velocity.

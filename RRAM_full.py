@@ -26,7 +26,7 @@ actual_state = Generation.initial_state_priv(eje_x, eje_y, num_trampas, regiones
 
 RepresentateState(actual_state, 'Estado inicial')
 
-total_simulation_time = 5
+total_simulation_time = 3
 num_pasos = 10000
 paso_temporal = total_simulation_time / num_pasos
 
@@ -91,8 +91,8 @@ for k in tqdm(range(1, num_pasos+1)):
             if actual_state[i, j] == 1:
                 # TODO: REVISAR PROBABILIDAD QUE A VECES SALE MAYOR DE 1
                 # TODO: HACER UN REESCALADO DE LOS VALORES PARA EVITAR TENER QUE TRABAJAR CON NUMEROS TAN GRANDES
-                prob_recombinacion, espacio_recorr, funcion_trozos = Recombination.recombination(
-                    paso_temporal, i+1, Campo_Electrico, temperatura, atom_size, 10)
+                prob_recombinacion, espacio_recorr, funcion_trozos = Recombination.Simple_recombination(
+                    paso_temporal, i+1, Campo_Electrico, temperatura, atom_size, 1)
                 data[re_index] = np.array([k, simulation_time, i+1, j, prob_recombinacion,
                                           espacio_recorr, funcion_trozos])
                 re_index += 1
