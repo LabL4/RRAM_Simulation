@@ -1,6 +1,6 @@
 import glob
 import pandas as pd
-import matplotlib.pyplot as pltimport matplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 
 from re import T
 from RRAM import *

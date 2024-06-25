@@ -3,6 +3,9 @@
 import numpy as np
 from scipy.constants import Boltzmann, elementary_charge
 
+# Carga elemental del electrón
+electron_charge = elementary_charge
+
 # Hz,  el valor de 1/t_0
 t_0 = 10**13
 

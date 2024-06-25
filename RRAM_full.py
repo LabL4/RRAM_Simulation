@@ -4,7 +4,7 @@ import pandas as pd
 import time as time
 from tqdm import tqdm
 
-# comienzo la simulación montecaarlo
+# comienzo la simulación montecarlo
 
 espesor_dispositivo = 10e-9        # nm
 atom_size = 0.25e-9                # nm
@@ -25,9 +25,10 @@ regiones_pesos = [
 actual_state = Generation.initial_state_priv(eje_x, eje_y, num_trampas, regiones_pesos)
 
 RepresentateState(actual_state, 'Estado inicial')
+oxygen_state = Init_OxygenState(espesor_dispositivo, atom_size)
 
-total_simulation_time = 3
-num_pasos = 10000
+total_simulation_time = 1
+num_pasos = 1000
 paso_temporal = total_simulation_time / num_pasos
 
 voltaje_final = 1
@@ -41,14 +42,6 @@ Campo_Electrico = 0
 voltaje = 0
 simulation_time = 0
 Corriente = 0
-
-# Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias (x,y,probabilidad recombionacion, velocidad)
-colunm_number = 7
-
-num_datos = num_pasos*eje_x*eje_y
-data = np.zeros((num_datos, colunm_number))
-
-re_index = 0
 
 # Creo el excel donde voy a sacar todos los datos
 for k in tqdm(range(1, num_pasos+1)):
@@ -84,22 +77,18 @@ for k in tqdm(range(1, num_pasos+1)):
                 # TODO: REVISAR PROBABILIDAD QUE A VECES SALE MAYOR DE 1
                 # TODO: HACER UN REESCALADO DE LOS VALORES PARA EVITAR TENER QUE TRABAJAR CON NUMEROS TAN GRANDES
                 prob_generacion = Generation.generation(paso_temporal, Campo_Electrico, temperatura)
-                random_number = np.random.rand()  # BUG he puesto 1.5 para bajar la generacion de forma artificial
+                random_number = np.random.rand()
                 if random_number < prob_generacion:
                     actual_state[i, j] = 1  # Generación
 
-            if actual_state[i, j] == 1:
-                # TODO: REVISAR PROBABILIDAD QUE A VECES SALE MAYOR DE 1
-                # TODO: HACER UN REESCALADO DE LOS VALORES PARA EVITAR TENER QUE TRABAJAR CON NUMEROS TAN GRANDES
-                prob_recombinacion, espacio_recorr, funcion_trozos = Recombination.Simple_recombination(
-                    paso_temporal, i+1, Campo_Electrico, temperatura, atom_size, 1)
-                data[re_index] = np.array([k, simulation_time, i+1, j, prob_recombinacion,
-                                          espacio_recorr, funcion_trozos])
-                re_index += 1
-                # genero un número aleatorio entre 0 y 1
-                random_number = np.random.rand()
-                if random_number < prob_recombinacion:
-                    actual_state[i, j] = 0  # Recombinación
+    # Genero los oxígenos
+    oxygen_state = GenerateOxigen(oxygen_state, 3)
+
+    # Muevo los oxígenos
+    oxygen_state = Move_OxygenIons(simulation_time, oxygen_state, temperatura, Campo_Electrico, atom_size, factor=1)
+
+    # Obtengo la nueva configuración
+    actual_state = Recombination.Recombine(actual_state, oxygen_state)
 
     # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
     if k % paso_guardar == 0:
@@ -108,14 +97,3 @@ for k in tqdm(range(1, num_pasos+1)):
 # Guardar la lista en un archivo
 with open('Configuraciones.pkl', 'wb') as f:
     pickle.dump(configuraciones_matriz, f)
-
-start = time.time()
-
-# Suponiendo que 'data' es un array de NumPy que ya contiene tus datos
-data_filtrados = np.array([fila for fila in data if fila[-1] != 0.0])
-
-np.savetxt('Recombinacion_data.csv', data_filtrados,  fmt=['%d', '%.5f', '%d', '%d', '%e', '%.6e', '%.1f'],
-           header='paso, tiempo simulacion, x, y, probabilidad recombinacion, espacio recorrido, funcion a trozos', comments='', delimiter=', ')
-end = time.time()
-
-print(f"Tiempo de creación del txt: {end - start:.3f} segundos")
