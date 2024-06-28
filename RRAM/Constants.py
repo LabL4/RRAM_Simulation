@@ -6,8 +6,11 @@ from scipy.constants import Boltzmann, elementary_charge
 # Carga elemental del electrón
 electron_charge = elementary_charge
 
+# Valor de la constante de Boltzmann en eV/K
+k_b_ev = Boltzmann / elementary_charge
+
 # Hz,  el valor de 1/t_0
-t_0 = 10**13
+t_0 = 1e13
 
 # eV Energía de activación
 E_a = 1
@@ -15,9 +18,6 @@ E_a = 1
 # Tiene distintos valores dependiendo si el estado es FORMING/SET y RESET
 # La estoy modificando a mano para que el campo eléctrico tmb tenga algún papel en la dinámica
 gamma = 0.95e-10
-
-# Valor de la constante de Boltzmann en eV/K
-k_b_ev = Boltzmann / elementary_charge
 
 # Factor de recombinación debido a la presencia de exceso de iones de oxígeno
 beta_0 = 3e3

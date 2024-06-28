@@ -114,22 +114,26 @@ def Move_OxygenIons(simu_time: float, oxygen_state: np.array, temperature: float
     # Calculo la cantidad de "casillas" que se moverá el ion de oxígeno
     displacement = int(round(oxigen_velocity * simu_time / atom_size))
 
-    # Recorro la matriz de oxígeno para mover los iones
-    for i in range(oxygen_state.shape[1]):
-        for j in range(oxygen_state.shape[0]):
-            if oxygen_state[j, i] == 1:
-                # Muevo el oxígeno
-                if i + displacement < oxygen_state.shape[1]:
-                    oxygen_state[j, i + displacement] = 1
-                    oxygen_state[j, i] = 0
-                else:  # Si se sale de la matriz, lo coloco en la última posición
-                    # oxygen_state[j, oxygen_state.shape[1] - 1] = 1
-                    oxygen_state[j, i] = 0
+    if displacement == 0:
+        pass
+        # print("No se mueve")
+    else:
+        # Recorro la matriz de oxígeno para mover los iones
+        for i in range(oxygen_state.shape[1]):
+            for j in range(oxygen_state.shape[0]):
+                if oxygen_state[j, i] == 1:
+                    # Muevo el oxígeno
+                    if i + displacement < oxygen_state.shape[1]:
+                        oxygen_state[j, i + displacement] = 1
+                        oxygen_state[j, i] = 0
+                    else:  # Si se sale de la matriz, lo coloco en la última posición
+                        # oxygen_state[j, oxygen_state.shape[1] - 1] = 1
+                        oxygen_state[j, i] = 0
 
-    return oxygen_state
+    return oxygen_state, displacement
 
 
-def Recombine(oxygen_state: np.array, actual_state: np.array):
+def Recombine(actual_state: np.array, oxygen_state: np.array):
     """
     Recombines oxygen and actual states based on certain conditions.
 
@@ -142,15 +146,15 @@ def Recombine(oxygen_state: np.array, actual_state: np.array):
     """
 
     # Recorro la matriz de oxígeno para saber en qué posiciones hay oxígeno
-    for i in range(oxygen_state.shape[1]):
-        for j in range(oxygen_state.shape[0]):
+    for i in range(oxygen_state.shape[0]):
+        for j in range(oxygen_state.shape[1]):
             # Si hay oxígeno en la posición de la matriz de oxígeno y hay un hueco en la matriz de estado actual
-            if oxygen_state[j, i] == 1 and actual_state[j, i] == 1:
+            if oxygen_state[i, j] == 1 and actual_state[i, j] == 1:
                 # Si hay un hueco, calculo la probabilidad de recombinación
                 prob_recom = np.random.rand()
                 # Si la probabilidad es menor a 0.5, recombinan:
                 if prob_recom < 0.5:  # Cambiar luego a la probabilidad en equilibrio que menciona en el paper original
-                    actual_state[j, i] = 0
-                    oxygen_state[j, i] = 0
+                    actual_state[i, j] = 0
+                    oxygen_state[i, j] = 0
 
-    return actual_state
+    return (actual_state, oxygen_state)

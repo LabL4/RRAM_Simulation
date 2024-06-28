@@ -1,6 +1,6 @@
 import numpy as np
 from RRAM import *
-from tqdm import tqdmfrom tqdm import tqdm
+from tqdm import tqdm
 
 
 def funcion_montecarlo(num_pasos, simulation_time, voltaje_final, factor_externo,

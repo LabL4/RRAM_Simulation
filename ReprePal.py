@@ -11,8 +11,8 @@ from tqdm.contrib.concurrent import process_map
 global im
 
 # Cargo el fichero con las configuraciones
-with open('Configuraciones.pkl', 'rb') as f:
-    configuraciones_matriz = pickle.load(f)
+with open('Oxigeno.pkl', 'rb') as f:
+    Oxigeno = pickle.load(f)
 
 # Supongamos que las imágenes están en el subdirectorio "Figuras" y tienen nombres de archivo que siguen el patrón "image*.png"
 filenames = glob.glob('Figuras/grafica*.png')
@@ -46,7 +46,7 @@ if __name__ == '__main__':
 
     NUM_PARALLEL_PROCESSES = 7
     start = time.time()
-    args = [(configuraciones_matriz[i], i) for i in range(len(configuraciones_matriz))]
+    args = [(Oxigeno[i], i) for i in range(len(Oxigeno))]
     buffers = process_map(process_matrix, args, max_workers=NUM_PARALLEL_PROCESSES, chunksize=25)
     images = [Image.open(buffer) for buffer in buffers]
     end = time.time()

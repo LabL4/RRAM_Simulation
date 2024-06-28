@@ -24,20 +24,29 @@ regiones_pesos = [
 
 actual_state = Generation.initial_state_priv(eje_x, eje_y, num_trampas, regiones_pesos)
 
-RepresentateState(actual_state, 'Estado inicial')
 oxygen_state = Init_OxygenState(espesor_dispositivo, atom_size)
 
-total_simulation_time = 1
-num_pasos = 1000
+total_simulation_time = 4
+num_pasos = 10000
 paso_temporal = total_simulation_time / num_pasos
+
+
+# Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias (x,y,probabilidad recombionacion, velocidad)
+colunm_number = 2
+
+data = np.zeros((num_pasos, colunm_number))
+
+# Creo el excel donde voy a sacar todos los datos
+df = pd.DataFrame(columns=['Tiempo simulacion', 'desplazamiento'])
 
 voltaje_final = 1
 paso_guardar = 1
 
 configuraciones_matriz = np.zeros((int((num_pasos / paso_guardar)), eje_x, eje_y))
+oxygen_matrix = np.zeros((int((num_pasos / paso_guardar)), eje_x, eje_y))
 
 # Configuraciones iniciales:
-temperatura = 300
+temperatura = 350
 Campo_Electrico = 0
 voltaje = 0
 simulation_time = 0
@@ -82,18 +91,34 @@ for k in tqdm(range(1, num_pasos+1)):
                     actual_state[i, j] = 1  # Generación
 
     # Genero los oxígenos
-    oxygen_state = GenerateOxigen(oxygen_state, 3)
+    oxygen_state = GenerateOxigen(oxygen_state, 30)
 
     # Muevo los oxígenos
-    oxygen_state = Move_OxygenIons(simulation_time, oxygen_state, temperatura, Campo_Electrico, atom_size, factor=1)
+    oxygen_state, displacement = Move_OxygenIons(
+        simulation_time, oxygen_state, temperatura, Campo_Electrico, atom_size, factor=10)
+
+    data[k-1] = np.array([simulation_time, displacement])
 
     # Obtengo la nueva configuración
-    actual_state = Recombination.Recombine(actual_state, oxygen_state)
+    actual_state, oxygen_state = Recombination.Recombine(actual_state, oxygen_state)
 
     # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
     if k % paso_guardar == 0:
         configuraciones_matriz[int(k / paso_guardar) - 1] = actual_state
+        oxygen_matrix[int(k / paso_guardar) - 1] = oxygen_state
 
 # Guardar la lista en un archivo
 with open('Configuraciones.pkl', 'wb') as f:
     pickle.dump(configuraciones_matriz, f)
+with open('Oxigeno.pkl', 'wb') as f:
+    pickle.dump(oxygen_matrix, f)
+
+start = time.time()
+
+# # Suponiendo que 'data' es un array de NumPy que ya contiene tus datos
+# data_filtrados = np.array([fila for fila in data if fila[-1] != 0.0])
+
+np.savetxt('Desplazamiento_data.csv', data, header='tiempo simulacion, desplazamiento', comments='', delimiter=', ')
+end = time.time()
+
+print(f"Tiempo de creación del txt: {end - start:.3f} segundos")
