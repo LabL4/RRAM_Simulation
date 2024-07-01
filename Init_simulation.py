@@ -2,10 +2,20 @@ from RRAM import *
 import pandas as pd
 
 
-espesor_dispositivo = 10e-9        # nm
-atom_size = 0.25e-9                # nm
+# Número de simulaciones que realizo
+num_simulations = 1
 
-num_trampas = 300
+# Defino los parámetros de la simulación
+
+# Es espesor es un  array de unos multiplicados por el tamaño que quiero
+espesor_dispositivo = np.ones(num_simulations) * 10e-9  # m
+atom_size = np.ones(num_simulations) * 0.25e-9  # m
+num_trampas = np.ones(num_simulations) * 300
+priv_x = np.ones(num_simulations) * 10
+priv_y = np.ones(num_simulations) * 15
+total_simulation_time = np.ones(num_simulations) * 1
+num_pasos = np.ones(num_simulations) * 10000
+
 
 eje_x = round(espesor_dispositivo / atom_size)
 eje_y = round(espesor_dispositivo / atom_size)
@@ -20,8 +30,7 @@ actual_state = Generation.initial_state_priv(eje_x, eje_y, num_trampas, regiones
 
 oxygen_state = Init_OxygenState(espesor_dispositivo, atom_size)
 
-total_simulation_time = 4
-num_pasos = 10000
+
 paso_temporal = total_simulation_time / num_pasos
 
 # Creo el excel donde voy a sacar todos los datos
