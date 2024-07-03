@@ -1,5 +1,4 @@
 # Módulo que contiene todas las constantes que usa el paquete
-
 import numpy as np
 from scipy.constants import Boltzmann, elementary_charge
 

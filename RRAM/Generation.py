@@ -36,7 +36,7 @@ def initial_state(Eje_x: float, Eje_y: float, num_trampas: int):
 
 def initial_state_priv(Eje_x: int, Eje_y: int, num_trampas: int, regiones_pesos: list):
     """
-    Generate an initial state matrix with traps based on the given parameters.
+    Generate an initial state matrix with traps based on the given parameters with weighted regions.
 
     Args:
         Eje_x (int): The size of the x-axis.

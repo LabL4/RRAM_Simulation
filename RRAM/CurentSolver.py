@@ -4,6 +4,18 @@ from scipy.constants import elementary_charge, Boltzmann
 
 
 def OmhCurrent(DDP: float, Configuration_state, resistance: float = 1) -> float:
+    """
+    Calculates the Ohmic current based on the given parameters.
+
+    Parameters:
+    - DDP (float): The voltage difference across the circuit.
+    - Configuration_state: The configuration state of the circuit.
+    - resistance (float): The default resistance value (optional, default is 1).
+
+    Returns:
+    - float: The calculated Ohmic current.
+
+    """
     # TODO ARREGLAR LA CORRIENTE ÓHMICA
     # Initialize total resistance
     total_resistance = 0
@@ -25,6 +37,19 @@ def OmhCurrent(DDP: float, Configuration_state, resistance: float = 1) -> float:
 
 def poole_frenkel(temperature: float, electric_field: float,
                   barrera: float = 0.895, beta: float = 2.8E-5, I_0: float = 1e-12) -> float:
+    """
+    Calculates the current using the Poole-Frenkel equation.
+
+    Args:
+        temperature (float): The temperature in Kelvin.
+        electric_field (float): The electric field strength in V/m.
+        barrera (float, optional): The barrier height in eV. Defaults to 0.895.
+        beta (float, optional): The Poole-Frenkel constant. Defaults to 2.8E-5.
+        I_0 (float, optional): The saturation current in A. Defaults to 1e-12.
+
+    Returns:
+        float: The calculated current in A.
+    """
 
     k_b_ev = Boltzmann / elementary_charge
 
