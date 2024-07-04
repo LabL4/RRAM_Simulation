@@ -7,16 +7,17 @@ import matplotlib.patches as patches
 from matplotlib.colors import LinearSegmentedColormap
 
 
-def RepresentateState(matriz: np.ndarray, filename: str = "grafica.png") -> None:
+def RepresentateState(matriz: np.ndarray, filename: str = None) -> None:
     """
     Represent the state of a matrix as a colored plot.
 
     Parameters:
     - matriz (np.ndarray): The input matrix to be represented.
-    - filename (str, optional): The name of the file to save the plot. Default is "grafica.png".
+    - filename (str, optional): The name of the file to save the plot. If not provided, the plot will not be saved.
 
     Returns:
-    None
+    - None
+
     """
     nrows, ncols = matriz.shape
 
@@ -64,8 +65,9 @@ def RepresentateState(matriz: np.ndarray, filename: str = "grafica.png") -> None
     # Coloco las etiquetas del eje x en la parte superior
     ax.xaxis.tick_top()
 
-    # Guardar la imagen
-    # plt.savefig(filename)
+    # Guardar la imagen solo si se proporciona un nombre de archivo
+    if filename is not None:
+        plt.savefig(filename)
 
     return None
 
@@ -114,6 +116,16 @@ def RepresentateStateOpt(matriz: np.ndarray, filename: str = "grafica.png") -> N
 
 
 def RepresentatePoints(matriz: np.ndarray, filename: str = "grafica.png") -> None:
+    """
+    Represent the points in a matrix as a scatter plot.
+
+    Parameters:
+    - matriz (np.ndarray): The matrix containing the points.
+    - filename (str): The name of the output file (default is "grafica.png").
+
+    Returns:
+    None
+    """
 
     n = len(matriz)
 

@@ -3,8 +3,6 @@ from RRAM import *
 import pandas as pd
 from RRAM import Constants as cte
 
-import RRAM
-
 # Número de simulaciones que realizo
 num_simulations = 10
 
@@ -15,8 +13,14 @@ num_simulations = 10
 device_size = np.ones(num_simulations) * 10e-9  # m
 atom_size = np.ones(num_simulations) * 0.25e-9  # m
 num_trampas = np.ones(num_simulations, dtype=int) * 300
-priv_x = np.ones(num_simulations, dtype=int) * 10
-priv_y = np.ones(num_simulations, dtype=int) * 15
+
+priv_y_sup_right = np.ones(num_simulations, dtype=int) * 10
+priv_y_inf_right = np.ones(num_simulations, dtype=int) * 10
+priv_x_right = np.ones(num_simulations, dtype=int) * 10
+priv_y_sup_left = np.ones(num_simulations, dtype=int) * 10
+priv_y_inf_left = np.ones(num_simulations, dtype=int) * 10
+priv_x_left = np.ones(num_simulations, dtype=int) * 10
+
 total_simulation_time = np.ones(num_simulations) * 1
 num_pasos = np.ones(num_simulations, dtype=int) * 10000
 voltaje_final = np.ones(num_simulations) * 1
@@ -33,7 +37,8 @@ eje_x = np.round(device_size / atom_size).astype(int)
 eje_y = np.round(device_size / atom_size).astype(int)
 
 # Creo un dataframe con los parámetros de la simulación
-df = pd.DataFrame(columns=['device_size', 'atom_size', 'x_size', 'y_size', 'num_trampas', 'priv_x', 'priv_y',
+df = pd.DataFrame(columns=['device_size', 'atom_size', 'x_size', 'y_size', 'num_trampas',
+                           'priv_y_sup_right', 'priv_y_inf_right', 'priv_x_right', 'priv_y_sup_left', 'priv_y_sup_left', 'priv_y_inf_left', 'priv_x_left',
                            'total_simulation_time', 'num_pasos', 'voltaje_final', 'paso_guardar',
                            'init_temp', 'initial_elec_field', 'initial_voltaje', 'initial_current', 'init_simulation_time'])
 
@@ -42,8 +47,14 @@ df['atom_size'] = atom_size
 df['x_size'] = eje_x
 df['y_size'] = eje_y
 df['num_trampas'] = num_trampas
-df['priv_x'] = priv_x
-df['priv_y'] = priv_y
+
+df['priv_y_sup_right'] = priv_y_sup_right
+df['priv_y_inf_right'] = priv_y_inf_right
+df['priv_x_right'] = priv_x_right
+df['priv_y_sup_left'] = priv_y_sup_left
+df['priv_y_inf_left'] = priv_y_inf_left
+df['priv_x_left'] = priv_x_left
+
 df['total_simulation_time'] = total_simulation_time
 df['num_pasos'] = num_pasos
 df['voltaje_final'] = voltaje_final
@@ -57,16 +68,18 @@ df['init_simulation_time'] = init_simulation_time
 # Guardo el dataframe en un archivo csv
 df.to_csv('Init_data/simulation_parameters.csv', index=False)
 
-
 for i in range(num_simulations):
     # Defino la región que quiero privilegiar y su peso
     regiones_pesos = [
-        ((priv_x[i], eje_x[i]-priv_x[i], eje_y[i]-priv_y[i], eje_y[i]),
-         50),             # First three columns with higher weight
-        ((priv_x[i], eje_x[i]-priv_x[i], 0, priv_y[i]), 50),  # First three columns with higher weight
+        ((priv_y_sup_right[i], eje_x[i]-priv_y_inf_right[i], eje_y[i]-priv_x_right[i], eje_y[i]),
+         50),
+        ((priv_y_sup_left[i], eje_x[i]-priv_y_inf_left[i], 0, priv_x_left[i]), 50),
     ]
 
     init_state = Generation.initial_state_priv(eje_x[i], eje_y[i], num_trampas[i], regiones_pesos)
+
+    RepresentateState(init_state, 'Results/init_state_' + str(i))
+
     oxygen_state = Init_OxygenState(device_size[i], atom_size[i])
 
     # Guardo el estado inicial con el nombre estado inicial mas el número de simulación
@@ -90,7 +103,6 @@ gamma_drift = np.ones(num_simulations) * cte.gamma_drift  # Drift coefficient of
 
 # Creo un dataframe nuevo con las constantes de la simulación
 df_ctes = pd.DataFrame(columns=['vibration_frequency', 'migration_energy', 'drift_coefficient'])
-
 
 df_ctes['vibration_frequency'] = t_0
 df_ctes['migration_energy'] = E_m

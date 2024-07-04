@@ -1,6 +1,7 @@
 import math
 import numpy as np
 
+from RRAM import Constants as cte
 from scipy.constants import elementary_charge
 from .Constants import t_0, k_b_ev, E_m, gamma_drift
 
@@ -53,21 +54,32 @@ def GenerateOxigen(oxygen_state: np.array, num_oxygen: int):
     return oxygen_state
 
 
-def Move_OxygenIons(simu_time: float, oxygen_state: np.array, temperature: float, E_field: float, atom_size: float, factor: float):
+def Move_OxygenIons(simu_time: float, oxygen_state: np.array, temperature: float, E_field: float, atom_size: float, factor: float, **kwargs):
     """
     Move the oxygen ions in the simulation based on the given parameters.
 
     Parameters:
-    simu_time (float): The simulation time.
-    oxygen_state (np.array): The matrix representing the state of oxygen ions.
-    temperature (float): The temperature of the system.
-    E_field (float): The electric field strength.
-    atom_size (float): The size of each atom.
-    factor (float): A factor used to adjust the velocity.
+        - simu_time (float): The simulation time.
+        - oxygen_state (np.array): The matrix representing the state of oxygen ions.
+        - temperature (float): The temperature of the system.
+        - E_field (float): The electric field strength.
+        - atom_size (float): The size of each atom.
+        - factor (float): A factor used to adjust the velocity.
 
     Returns:
     np.array: The updated matrix representing the state of oxygen ions after the movement.
     """
+
+    # Obtengo los valores de las constantes si las estoy pasando como argumentos
+    if kwargs:
+        # Obtengo el valor de las constantes que necesita la función
+        t_0 = kwargs.get('t_0', cte.t_0)
+        gamma_drift = kwargs.get('k_b_ev', cte.gamma_drift)
+        E_m = kwargs.get('E_m', cte.E_m)
+
+    else:
+        # No hacer nada si no hay kwargs
+        pass
 
     # Obtengo la velocidad de los iones de oxígeno v = (a/t0)*exp(−Em/kT) sinh(q * γ_drift * F/kT)
     senoh = math.sinh((2*elementary_charge * E_field * gamma_drift) / (k_b_ev * temperature))
