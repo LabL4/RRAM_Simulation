@@ -32,12 +32,12 @@ paso_temporal = total_simulation_time / num_pasos
 
 
 # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias (x,y,probabilidad recombionacion, velocidad)
-colunm_number = 2
+colunm_number = 4
 
 data = np.zeros((num_pasos, colunm_number))
 
 # Creo el excel donde voy a sacar todos los datos
-df = pd.DataFrame(columns=['Tiempo simulacion', 'desplazamiento'])
+df = pd.DataFrame(columns=['Tiempo simulacion', 'velocidad', 'desplazamiento', 'prob_generacion'])
 
 voltaje_final = 1
 paso_guardar = 1
@@ -94,10 +94,10 @@ for k in tqdm(range(1, num_pasos+1)):
     oxygen_state = GenerateOxigen(oxygen_state, 30)
 
     # Muevo los oxígenos
-    oxygen_state, displacement = Move_OxygenIons(
-        simulation_time, oxygen_state, temperatura, Campo_Electrico, atom_size, factor=10)
+    oxygen_state, velocidad, desplazamiento = Move_OxygenIons(
+        simulation_time, oxygen_state, temperatura, Campo_Electrico, atom_size, factor=1)
 
-    data[k-1] = np.array([simulation_time, displacement])
+    data[k-1] = np.array([simulation_time, velocidad, desplazamiento, prob_generacion])
 
     # Obtengo la nueva configuración
     actual_state, oxygen_state = Recombination.Recombine(actual_state, oxygen_state)
@@ -118,7 +118,8 @@ start = time.time()
 # # Suponiendo que 'data' es un array de NumPy que ya contiene tus datos
 # data_filtrados = np.array([fila for fila in data if fila[-1] != 0.0])
 
-np.savetxt('Desplazamiento_data.csv', data, header='tiempo simulacion, desplazamiento', comments='', delimiter=', ')
+np.savetxt('datos.csv', data, header='tiempo simulacion, velocidad, desplazamiento, prob_generacion',
+           comments='', delimiter=', ')
 end = time.time()
 
 print(f"Tiempo de creación del txt: {end - start:.3f} segundos")

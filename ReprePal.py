@@ -22,6 +22,15 @@ images = []
 
 
 def process_matrix(args):
+    """
+    Process a matrix and generate a plot.
+
+    Args:
+        args (tuple): A tuple containing the matrix and idx.
+
+    Returns:
+        BytesIO: A BytesIO object containing the generated plot image.
+    """
     global im
 
     matrix, idx = args
@@ -30,21 +39,18 @@ def process_matrix(args):
         im = None
     else:
         fig, ax = plt.gcf(), plt.gca()
-    # fig, ax = plt.subplots()
 
     im = RepresentateStateOptAnto(matrix, fig, ax, im, filename="Figuras/grafica_" + str(idx+1) + ".png")
 
     plt.savefig((buffer := BytesIO()), format='png')
-    # plt.close()
     plt.clf()
 
-    # images[idx] = (Image.open(buffer))
     return buffer
 
 
 if __name__ == '__main__':
 
-    NUM_PARALLEL_PROCESSES = 7
+    NUM_PARALLEL_PROCESSES = 5
     start = time.time()
     args = [(Oxigeno[i], i) for i in range(len(Oxigeno))]
     buffers = process_map(process_matrix, args, max_workers=NUM_PARALLEL_PROCESSES, chunksize=25)

@@ -86,8 +86,8 @@ def generation(simulation_time: np.ndarray, electric_field: np.ndarray,
     Returns:
     - numpy.ndarray
         Array of generation rates.
-
     """
+
     exponente = (E_a - (gamma * carga_vacante * np.abs(electric_field))) / (k_b_ev * temperature)
 
     return (simulation_time * t_0 * (np.exp(-exponente)))

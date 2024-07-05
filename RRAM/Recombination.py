@@ -74,12 +74,12 @@ def Move_OxygenIons(simu_time: float, oxygen_state: np.array, temperature: float
     if kwargs:
         # Obtengo el valor de las constantes que necesita la función
         t_0 = kwargs.get('t_0', cte.t_0)
-        gamma_drift = kwargs.get('k_b_ev', cte.gamma_drift)
+        gamma_drift = kwargs.get('gamma_drift', cte.gamma_drift)
         E_m = kwargs.get('E_m', cte.E_m)
-
     else:
-        # No hacer nada si no hay kwargs
-        pass
+        t_0 = cte.t_0
+        gamma_drift = cte.gamma_drift
+        E_m = cte.E_m
 
     # Obtengo la velocidad de los iones de oxígeno v = (a/t0)*exp(−Em/kT) sinh(q * γ_drift * F/kT)
     senoh = math.sinh((2*elementary_charge * E_field * gamma_drift) / (k_b_ev * temperature))
@@ -107,7 +107,7 @@ def Move_OxygenIons(simu_time: float, oxygen_state: np.array, temperature: float
                         # oxygen_state[j, oxygen_state.shape[1] - 1] = 1
                         oxygen_state[j, i] = 0
 
-    return oxygen_state, displacement
+    return oxygen_state, oxigen_velocity, displacement
 
 
 def Recombine(actual_state: np.array, oxygen_state: np.array):
