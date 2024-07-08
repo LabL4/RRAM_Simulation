@@ -46,6 +46,10 @@ def Plot_panel(data_path: str):
     ax3.plot(x, y[:, 2])
     ax3.set_title('Probabilidad generacion')
 
+    # Creo el cuarto subplot
+    ax3.plot(x, y[:, 2])
+    ax3.set_title('vacio')
+
     # Ajustamos el espacio entre los plots
     fig.tight_layout()
 

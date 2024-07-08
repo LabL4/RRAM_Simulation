@@ -4,6 +4,7 @@ import pandas as pd
 import time as time
 from tqdm import tqdm
 
+
 # comienzo la simulación montecarlo
 
 espesor_dispositivo = 10e-9        # nm
@@ -29,7 +30,6 @@ oxygen_state = Init_OxygenState(espesor_dispositivo, atom_size)
 total_simulation_time = 4
 num_pasos = 10000
 paso_temporal = total_simulation_time / num_pasos
-
 
 # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias (x,y,probabilidad recombionacion, velocidad)
 colunm_number = 4
