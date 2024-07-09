@@ -1,6 +1,7 @@
 import pickle
 from RRAM import *
 import pandas as pd
+from RRAM import Recombination
 from RRAM import Constants as cte
 
 # Número de simulaciones que realizo
@@ -80,7 +81,7 @@ for i in range(num_simulations):
 
     RepresentateState(init_state, 'Results/init_state_' + str(i))
 
-    oxygen_state = Init_OxygenState(device_size[i], atom_size[i])
+    oxygen_state = Recombination.Init_OxygenState(device_size[i], atom_size[i])
 
     # Guardo el estado inicial con el nombre estado inicial mas el número de simulación
     with open('Init_data/init_state_' + str(i) + '.pkl', 'wb') as f:
@@ -111,8 +112,6 @@ df_ctes['drift_coefficient'] = gamma_drift
 # Guardo el dataframe de las ctes en un archivo csv
 df_ctes.to_csv('Init_data/simulation_constants.csv', index=False)
 
-# Leer el archivo Excel y almacenarlo como un diccionario
-df_leido = pd.read_csv('Init_data/simulation_constants.csv')
-diccionario = df_leido.to_dict(orient='records')
-
-print(diccionario[0])
+# # Leer el archivo Excel y almacenarlo como un diccionario
+# df_leido = pd.read_csv('Init_data/simulation_constants.csv')
+# diccionario = df_leido.to_dict(orient='records')

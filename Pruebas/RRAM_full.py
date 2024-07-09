@@ -4,6 +4,8 @@ import pandas as pd
 import time as time
 from tqdm import tqdm
 
+from RRAM import Recombination
+
 
 # comienzo la simulación montecarlo
 
@@ -25,7 +27,7 @@ regiones_pesos = [
 
 actual_state = Generation.initial_state_priv(eje_x, eje_y, num_trampas, regiones_pesos)
 
-oxygen_state = Init_OxygenState(espesor_dispositivo, atom_size)
+oxygen_state = Recombination.Init_OxygenState(espesor_dispositivo, atom_size)
 
 total_simulation_time = 4
 num_pasos = 10000
@@ -91,10 +93,10 @@ for k in tqdm(range(1, num_pasos+1)):
                     actual_state[i, j] = 1  # Generación
 
     # Genero los oxígenos
-    oxygen_state = GenerateOxigen(oxygen_state, 30)
+    oxygen_state = Recombination.GenerateOxigen(oxygen_state, 30)
 
     # Muevo los oxígenos
-    oxygen_state, velocidad, desplazamiento = Move_OxygenIons(
+    oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
         simulation_time, oxygen_state, temperatura, Campo_Electrico, atom_size, factor=1)
 
     data[k-1] = np.array([simulation_time, velocidad, desplazamiento, prob_generacion])

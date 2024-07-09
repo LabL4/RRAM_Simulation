@@ -85,7 +85,7 @@ def Move_OxygenIons(simu_time: float, oxygen_state: np.array, temperature: float
     senoh = math.sinh((2*elementary_charge * E_field * gamma_drift) / (k_b_ev * temperature))
     exp_velocity = math.exp(-E_m / (k_b_ev * temperature))
 
-    # el t_0 es en verdad el valor de 1/t_0 que lo pongo directamente y el factor es algo que introduzco a mano para ajustar la velocidad
+    # el t_0 es el valor de 1/t_0 que lo pongo directamente y "factor" es algo que introduzco a mano para ajustar la velocidad
     oxigen_velocity = factor * t_0 * atom_size * (senoh * exp_velocity)
 
     # Calculo la cantidad de "casillas" que se moverá el ion de oxígeno
@@ -136,9 +136,11 @@ def Recombine(actual_state: np.array, oxygen_state: np.array):
 
     return (actual_state, oxygen_state)
 
-
-# Esta función es la original del paper: On the Switching Parameter Variation of Metal-Oxide RRAM—Part I: Physical Modeling and Simulation Methodology
-# que no tengo forma de conseguir los resultados que indica el paper.
+# |----------------------------------------------------------------------------------------------------------------------|
+# | Esta función es la original del paper: On the Switching Parameter Variation of Metal-Oxide RRAM—Part I:              |
+# | Physical Modeling and Simulation Methodologyque no tengo forma de conseguir los resultados que indica                |
+# | el paper.                                                                                                            |
+# |----------------------------------------------------------------------------------------------------------------------|
 
 # def Simple_recombination(simu_time: float, pos_x: int, E_field: float, temperature: float, grid_size: float, factor: float):
 #     """

@@ -4,111 +4,119 @@ import pandas as pd
 import time as time
 from tqdm import tqdm
 
+from RRAM import Recombination
+
 # comienzo leyendo los datos de la simulación almacenados en un archivo csv dentro de la carpeta Init y los guardo en sus respectivas variables
 sim_parmtrs = Montecarlo.read_csv_to_dic("Init_data/simulation_parameters.csv")
 sim_ctes = Montecarlo.read_csv_to_dic("Init_data/simulation_constants.csv")
 
+# quiero un bucle que recorra todas las simulaciones desde 0 hasta la longityud de sim_parmtrs-1
 
-for num_simulation in len(sim_parmtrs):
+for num_simulation in range(len(sim_parmtrs)):
+
+    # POngo el nombre de la simulación y un salto de línea
+    print(f"Simulación {num_simulation} \n")
 
     # Asigno los valores de los datos de la simulación a las variables correspondientes
-    device_size = sim_parmtrs['device_size'][num_simulation]
-    atom_size = sim_parmtrs['atom_size'][num_simulation]
-    x_size = sim_parmtrs['x_size'][num_simulation]
-    y_size = sim_parmtrs['y_size'][num_simulation]
-    num_trampas = sim_parmtrs['num_trampas'][num_simulation]
+    device_size = float(sim_parmtrs[num_simulation]['device_size'])
+    atom_size = float(sim_parmtrs[num_simulation]['atom_size'])
+    x_size = int(sim_parmtrs[num_simulation]['x_size'])
+    y_size = int(sim_parmtrs[num_simulation]['y_size'])
+    num_trampas = int(sim_parmtrs[num_simulation]['num_trampas'])
 
-    init_simulation_time = sim_parmtrs['init_simulation_time'][num_simulation]
-    total_simulation_time = sim_parmtrs['total_simulation_time'][num_simulation]
-    num_pasos = sim_parmtrs['num_pasos'][num_simulation]
-    paso_guardar = sim_parmtrs['paso_guardar'][num_simulation]
+    init_simulation_time = float(sim_parmtrs[num_simulation]['init_simulation_time'])
+    total_simulation_time = float(sim_parmtrs[num_simulation]['total_simulation_time'])
+    num_pasos = int(sim_parmtrs[num_simulation]['num_pasos'])
+    paso_guardar = int(sim_parmtrs[num_simulation]['paso_guardar'])
 
-    voltaje_final = sim_parmtrs['voltaje_final'][num_simulation]
-    voltaje_inicial = sim_parmtrs['initial_voltaje'][num_simulation]
-    current_inicial = sim_parmtrs['initial_current'][num_simulation]
-    init_temp = sim_parmtrs['init_temp'][num_simulation]
-    initial_elec_field = sim_parmtrs['initial_elec_field'][num_simulation]
+    voltaje_final = float(sim_parmtrs[num_simulation]['voltaje_final'])
 
+    voltaje = float(sim_parmtrs[num_simulation]['initial_voltaje'])
+    Corriente = float(sim_parmtrs[num_simulation]['initial_current'])
+    temperatura = float(sim_parmtrs[num_simulation]['init_temp'])
+    E_field = float(sim_parmtrs[num_simulation]['initial_elec_field'])
 
-# paso_temporal = total_simulation_time / num_pasos
+    # Leo los estados iniciales de la simulación
+    with open('Init_data/init_state_' + str(num_simulation) + '.pkl', 'rb') as f:
+        actual_state = pickle.load(f)
 
-# # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias (x,y,probabilidad recombionacion, velocidad)
-# colunm_number = 4
+    with open('Init_data/oxygen_state_' + str(num_simulation) + '.pkl', 'rb') as f:
+        oxygen_state = pickle.load(f)
 
-# data = np.zeros((num_pasos, colunm_number))
+    # Defino las matrices donde guardo las configuración del sistema y la de los oxígenos
+    Config_matrix = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
+    oxygen_matrix = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
 
-# # Creo el excel donde voy a sacar todos los datos
-# df = pd.DataFrame(columns=['Tiempo simulacion', 'velocidad', 'desplazamiento', 'prob_generacion'])
+    # Defino el paso temporal
+    paso_temporal = total_simulation_time / num_pasos
 
+    # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias (x,y,probabilidad recombionacion, velocidad)
+    colunm_number = 4
+    data = np.zeros((num_pasos, colunm_number))
+    # Creo el excel donde voy a sacar todos los datos
+    df = pd.DataFrame(columns=['Tiempo simulacion', 'velocidad', 'desplazamiento', 'prob_generacion'])
 
-# # Creo el excel donde voy a sacar todos los datos
-# for k in tqdm(range(1, num_pasos+1)):
+    for k in tqdm(range(1, num_pasos+1)):
+        # Guardo el estado anterior
+        last_state = actual_state
 
-#     # Guardo el estado anterior
-#     last_state = actual_state
+        # Actualizo el tiempo de simulación
+        simulation_time = paso_temporal * k
 
-#     simulation_time = paso_temporal * k
+        # Calculo la corriente
+        voltaje += voltaje_final * paso_temporal
 
-#     # Calculo la corriente
-#     voltaje += voltaje_final * paso_temporal
+        # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
+        # TODO: Revisar la corriente óhmica que no funciona
+        if Percolation.is_path(actual_state):
+            # Si ha percolado uso la corriente de percolación
+            # Corriente = CurentSolver.OmhCurrent(Temperatura, Campo_Electrico)
+            print("Ha percolado")
+            break
+        else:
+            # Si no ha percolado uso la corriente de campo
+            # TODO: REVISAR QUE LA CORRIENTE TIENE LAS UNIDADES CORRECTAS PORQUE NO CUADRAN VALORES.
+            Corriente = CurentSolver.poole_frenkel(temperatura, E_field)/(1e-10)
 
-#     # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
-#     # TODO: Revisar la corriente óhmica que no funciona
-#     if Percolation.is_path(actual_state):
-#         # Si ha percolado uso la corriente de percolación
-#         # Corriente = CurentSolver.OmhCurrent(Temperatura, Campo_Electrico)
-#         print("Ha percolado")
-#         break
-#     else:
-#         # Si no ha percolado uso la corriente de campo
-#         # TODO: REVISAR QUE LA CORRIENTE TIENE LAS UNIDADES CORRECTAS PORQUE NO CUADRAN VALORES.
-#         Corriente = CurentSolver.poole_frenkel(temperatura, Campo_Electrico)/(1e-10)
+        # Obtengo los valores del campo eléctrico y la temperatura
+        E_field = SimpleElectricField(voltaje, device_size)
+        # temperatura = Temperature_Joule(voltaje, Corriente, T_0=350) TODO: Estoy usando la temperatura constante
 
-#     # Obtengo los valores del campo eléctrico y la temperatura
-#     Campo_Electrico = SimpleElectricField(voltaje, espesor_dispositivo)
-#     # Temperatura = Temperature_Joule(voltaje, Corriente, T_0=350)
+        # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
+        for i in range(x_size):
+            for j in range(y_size):
+                if actual_state[i, j] == 0:
+                    # TODO: REVISAR PROBABILIDAD QUE A VECES SALE MAYOR DE 1
+                    # TODO: HACER UN REESCALADO DE LOS VALORES PARA EVITAR TENER QUE TRABAJAR CON NUMEROS TAN GRANDES
+                    prob_generacion = Generation.generation(paso_temporal, E_field, temperatura)
+                    random_number = np.random.rand()
+                    if random_number < prob_generacion:
+                        actual_state[i, j] = 1  # Generación
 
-#     # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
-#     for i in range(eje_x):
-#         for j in range(eje_y):
-#             if actual_state[i, j] == 0:
-#                 # TODO: REVISAR PROBABILIDAD QUE A VECES SALE MAYOR DE 1
-#                 # TODO: HACER UN REESCALADO DE LOS VALORES PARA EVITAR TENER QUE TRABAJAR CON NUMEROS TAN GRANDES
-#                 prob_generacion = Generation.generation(paso_temporal, Campo_Electrico, temperatura)
-#                 random_number = np.random.rand()
-#                 if random_number < prob_generacion:
-#                     actual_state[i, j] = 1  # Generación
+        # Genero los oxígenos
+        oxygen_state = Recombination.GenerateOxigen(oxygen_state, 10)
 
-#     # Genero los oxígenos
-#     oxygen_state = GenerateOxigen(oxygen_state, 30)
+        # Muevo los oxígenos
+        oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
+            simulation_time, oxygen_state, temperatura, E_field, atom_size, factor=1, **sim_ctes[num_simulation])
 
-#     # Muevo los oxígenos
-#     oxygen_state, velocidad, desplazamiento = Move_OxygenIons(
-#         simulation_time, oxygen_state, temperatura, Campo_Electrico, atom_size, factor=1)
+        data[k-1] = np.array([simulation_time, velocidad, desplazamiento, prob_generacion])
 
-#     data[k-1] = np.array([simulation_time, velocidad, desplazamiento, prob_generacion])
+        # Obtengo la nueva configuración
+        actual_state, oxygen_state = Recombination.Recombine(actual_state, oxygen_state)
 
-#     # Obtengo la nueva configuración
-#     actual_state, oxygen_state = Recombination.Recombine(actual_state, oxygen_state)
+        # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
+        if k % paso_guardar == 0:
+            Config_matrix[int(k / paso_guardar) - 1] = actual_state
+            oxygen_matrix[int(k / paso_guardar) - 1] = oxygen_state
 
-#     # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
-#     if k % paso_guardar == 0:
-#         configuraciones_matriz[int(k / paso_guardar) - 1] = actual_state
-#         oxygen_matrix[int(k / paso_guardar) - 1] = oxygen_state
+    # Cuando acaba la simulacion Guardo las matrices de configuraciones y oxigenos
+    with open(f'Results/Configurations_{num_simulation}.pkl', 'wb') as f:
+        pickle.dump(Config_matrix, f)
+    with open(f'Results/Configurations_{num_simulation}.pkl', 'wb') as f:
+        pickle.dump(oxygen_matrix, f)
 
-# # Guardar la lista en un archivo
-# with open('Configuraciones.pkl', 'wb') as f:
-#     pickle.dump(configuraciones_matriz, f)
-# with open('Oxigeno.pkl', 'wb') as f:
-#     pickle.dump(oxygen_matrix, f)
+    # data_filtrados = np.array([fila for fila in data if fila[-1] != 0.0])
 
-# start = time.time()
-
-# # # Suponiendo que 'data' es un array de NumPy que ya contiene tus datos
-# # data_filtrados = np.array([fila for fila in data if fila[-1] != 0.0])
-
-# np.savetxt('datos.csv', data, header='tiempo simulacion, velocidad, desplazamiento, prob_generacion',
-#            comments='', delimiter=', ')
-# end = time.time()
-
-# print(f"Tiempo de creación del txt: {end - start:.3f} segundos")
+    np.savetxt(f'Results/resultados_{num_simulation}.csv', data, header='tiempo simulacion, velocidad, desplazamiento, prob_generacion',
+               comments=' ', delimiter=', ')
