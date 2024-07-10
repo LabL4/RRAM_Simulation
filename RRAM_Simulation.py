@@ -1,21 +1,35 @@
+import os
 import pickle
-from RRAM import *
+import shutil
+
 import pandas as pd
 import time as time
 from tqdm import tqdm
 
+from RRAM import *
 from RRAM import Recombination
 
 # comienzo leyendo los datos de la simulación almacenados en un archivo csv dentro de la carpeta Init y los guardo en sus respectivas variables
 sim_parmtrs = Montecarlo.read_csv_to_dic("Init_data/simulation_parameters.csv")
 sim_ctes = Montecarlo.read_csv_to_dic("Init_data/simulation_constants.csv")
 
-# quiero un bucle que recorra todas las simulaciones desde 0 hasta la longityud de sim_parmtrs-1
+# Defino la carpeta donde se guardan los datos iniciales de la simulación
+carpeta = 'Results'
+
+# Verifica si la carpeta existe
+if os.path.exists(carpeta):
+    # Elimina la carpeta y su contenido
+    shutil.rmtree(carpeta)
+
+# Crea la carpeta de nuevo
+os.makedirs(carpeta)
+
+# quiero un bucle que recorra todas las simulaciones desde 0 hasta la longitud de sim_parmtrs-1
 
 for num_simulation in range(len(sim_parmtrs)):
 
     # POngo el nombre de la simulación y un salto de línea
-    print(f"Simulación {num_simulation} \n")
+    print(f"\n Simulación {num_simulation +1}")
 
     # Asigno los valores de los datos de la simulación a las variables correspondientes
     device_size = float(sim_parmtrs[num_simulation]['device_size'])
@@ -44,7 +58,7 @@ for num_simulation in range(len(sim_parmtrs)):
         oxygen_state = pickle.load(f)
 
     # Defino las matrices donde guardo las configuración del sistema y la de los oxígenos
-    Config_matrix = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
+    config_matrix = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
     oxygen_matrix = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
 
     # Defino el paso temporal
@@ -71,7 +85,7 @@ for num_simulation in range(len(sim_parmtrs)):
         if Percolation.is_path(actual_state):
             # Si ha percolado uso la corriente de percolación
             # Corriente = CurentSolver.OmhCurrent(Temperatura, Campo_Electrico)
-            print("Ha percolado")
+            print(f"\n Ha percolado")
             break
         else:
             # Si no ha percolado uso la corriente de campo
@@ -98,7 +112,7 @@ for num_simulation in range(len(sim_parmtrs)):
 
         # Muevo los oxígenos
         oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
-            simulation_time, oxygen_state, temperatura, E_field, atom_size, factor=1, **sim_ctes[num_simulation])
+            simulation_time, oxygen_state, temperatura, E_field, atom_size, factor=10, **sim_ctes[num_simulation])
 
         data[k-1] = np.array([simulation_time, velocidad, desplazamiento, prob_generacion])
 
@@ -107,16 +121,20 @@ for num_simulation in range(len(sim_parmtrs)):
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
-            Config_matrix[int(k / paso_guardar) - 1] = actual_state
+            config_matrix[int(k / paso_guardar) - 1] = actual_state
             oxygen_matrix[int(k / paso_guardar) - 1] = oxygen_state
+
+    # Elimino de la matriz config_matrix las filas que no se han completado que ocurre cuando percola
+    config_matrix = np.array([fila for fila in config_matrix if fila.sum() != 0.0])
+    oxygen_matrix = np.array([fila for fila in oxygen_matrix if fila.sum() != 0.0])
 
     # Cuando acaba la simulacion Guardo las matrices de configuraciones y oxigenos
     with open(f'Results/Configurations_{num_simulation}.pkl', 'wb') as f:
-        pickle.dump(Config_matrix, f)
-    with open(f'Results/Configurations_{num_simulation}.pkl', 'wb') as f:
+        pickle.dump(config_matrix, f)
+    with open(f'Results/Oxygen_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(oxygen_matrix, f)
 
-    # data_filtrados = np.array([fila for fila in data if fila[-1] != 0.0])
-
-    np.savetxt(f'Results/resultados_{num_simulation}.csv', data, header='tiempo simulacion, velocidad, desplazamiento, prob_generacion',
+    # Cuando percola no se completa la matriz de datos, por lo que la recorto
+    data_filtrados = np.array([fila for fila in data if fila[-1] != 0.0])
+    np.savetxt(f'Results/resultados_{num_simulation}.csv', data_filtrados, header='tiempo simulacion, velocidad, desplazamiento, prob_generacion',
                comments=' ', delimiter=', ')

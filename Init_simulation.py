@@ -1,3 +1,5 @@
+import os
+import shutil
 import pickle
 from RRAM import *
 import pandas as pd
@@ -5,7 +7,18 @@ from RRAM import Recombination
 from RRAM import Constants as cte
 
 # Número de simulaciones que realizo
-num_simulations = 10
+num_simulations = 1
+
+# Defino la carpeta donde se guardan los datos iniciales de la simulación
+carpeta = 'Init_data'
+
+# Verifica si la carpeta existe
+if os.path.exists(carpeta):
+    # Elimina la carpeta y su contenido
+    shutil.rmtree(carpeta)
+
+# Crea la carpeta de nuevo
+os.makedirs(carpeta)
 
 # ------------------------------------------------------------------------------------------------------------------------------------------------------
 # Defino los parámetros de la simulación
@@ -22,7 +35,7 @@ priv_y_sup_left = np.ones(num_simulations, dtype=int) * 10
 priv_y_inf_left = np.ones(num_simulations, dtype=int) * 10
 priv_x_left = np.ones(num_simulations, dtype=int) * 10
 
-total_simulation_time = np.ones(num_simulations) * 1
+total_simulation_time = np.ones(num_simulations) * 2
 num_pasos = np.ones(num_simulations, dtype=int) * 10000
 voltaje_final = np.ones(num_simulations) * 1
 paso_guardar = np.ones(num_simulations, dtype=int) * 1
@@ -77,10 +90,9 @@ for i in range(num_simulations):
         ((priv_y_sup_left[i], eje_x[i]-priv_y_inf_left[i], 0, priv_x_left[i]), 50),
     ]
 
+    # Estado inicial de la simulación para los oxígenos y el sistema
     init_state = Generation.initial_state_priv(eje_x[i], eje_y[i], num_trampas[i], regiones_pesos)
-
-    RepresentateState(init_state, 'Results/init_state_' + str(i))
-
+    RepresentateState(init_state, 'Init_data/init_state_' + str(i))
     oxygen_state = Recombination.Init_OxygenState(device_size[i], atom_size[i])
 
     # Guardo el estado inicial con el nombre estado inicial mas el número de simulación
@@ -89,9 +101,6 @@ for i in range(num_simulations):
 
     with open('Init_data/oxygen_state_' + str(i) + '.pkl', 'wb') as f:
         pickle.dump(oxygen_state, f)
-
-    # configuraciones_matriz = np.zeros((int((num_pasos[i] / paso_guardar[i])), eje_x[i], eje_y[i]))
-    # oxygen_matrix = np.zeros((int((num_pasos[i] / paso_guardar[i])), eje_x[i], eje_y[i]))
 
 # # ------------------------------------------------------------------------------------------------------------------------------------------------------
 # # Defino las constantes de la simulación y las guardo en un archivo
@@ -111,7 +120,3 @@ df_ctes['drift_coefficient'] = gamma_drift
 
 # Guardo el dataframe de las ctes en un archivo csv
 df_ctes.to_csv('Init_data/simulation_constants.csv', index=False)
-
-# # Leer el archivo Excel y almacenarlo como un diccionario
-# df_leido = pd.read_csv('Init_data/simulation_constants.csv')
-# diccionario = df_leido.to_dict(orient='records')

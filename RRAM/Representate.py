@@ -20,8 +20,6 @@ def RepresentateState(matriz: np.ndarray, filename: str = None) -> None:
 
     """
     nrows, ncols = matriz.shape
-    fig, ax = plt.subplots(figsize=(20, 20))
-
     x = np.arange(ncols)
     y = np.arange(nrows)
 
@@ -50,12 +48,12 @@ def RepresentateState(matriz: np.ndarray, filename: str = None) -> None:
     )
 
     # Configurar las marcas de los ejes
-    major_ticks = np.arange(0, nrows, 1)
-    # minor_ticks = np.arange(0, nrows, 0.5)
+    major_ticks = np.arange(0, nrows, 5)
+    minor_ticks = np.arange(0, nrows, 1)
     ax.set_xticks(major_ticks)
-    # ax.set_xticks(minor_ticks, minor=True)
+    ax.set_xticks(minor_ticks, minor=True)
     ax.set_yticks(major_ticks)
-    # ax.set_yticks(minor_ticks, minor=True)
+    ax.set_yticks(minor_ticks, minor=True)
 
     # Establecer relación de aspecto cuadrada
     ax.set_aspect("equal")
@@ -69,6 +67,9 @@ def RepresentateState(matriz: np.ndarray, filename: str = None) -> None:
     # Guardar la imagen solo si se proporciona un nombre de archivo
     if filename is not None:
         plt.savefig(filename)
+
+    # Cierro la figura generada para no acumular
+    plt.close(fig)
 
     return None
 

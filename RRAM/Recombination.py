@@ -1,8 +1,8 @@
 import math
 import numpy as np
 
-from RRAM import Constants as cte
 from scipy.constants import elementary_charge
+from RRAM import Constants as cte, Representate
 from .Constants import t_0, k_b_ev, E_m, gamma_drift
 
 
@@ -81,6 +81,9 @@ def Move_OxygenIons(simu_time: float, oxygen_state: np.array, temperature: float
         gamma_drift = cte.gamma_drift
         E_m = cte.E_m
 
+    # Duplico la matriz de oxígeno para no modificar la original
+    oxygen_state_before = np.copy(oxygen_state)
+
     # Obtengo la velocidad de los iones de oxígeno v = (a/t0)*exp(−Em/kT) sinh(q * γ_drift * F/kT)
     senoh = math.sinh((2*elementary_charge * E_field * gamma_drift) / (k_b_ev * temperature))
     exp_velocity = math.exp(-E_m / (k_b_ev * temperature))
@@ -96,16 +99,20 @@ def Move_OxygenIons(simu_time: float, oxygen_state: np.array, temperature: float
         # print("No se mueve")
     else:
         # Recorro la matriz de oxígeno para mover los iones
-        for i in range(oxygen_state.shape[1]):
-            for j in range(oxygen_state.shape[0]):
-                if oxygen_state[j, i] == 1:
+        for i in range(oxygen_state_before.shape[0]):              # Recorro las filas
+            for j in range(oxygen_state_before.shape[1]):
+                if oxygen_state_before[j, i] == 1:
                     # Muevo el oxígeno
-                    if i + displacement < oxygen_state.shape[1]:
+                    if i + displacement < oxygen_state_before.shape[1]:
+                        # Representate.RepresentateState(oxygen_state, f'Figuras/oxigen_state_{simu_time}_b.png')
                         oxygen_state[j, i + displacement] = 1
                         oxygen_state[j, i] = 0
+                        # Representate.RepresentateState(oxygen_state, f'Figuras/oxigen_state_{simu_time}_a.png')
                     else:  # Si se sale de la matriz, lo coloco en la última posición
                         # oxygen_state[j, oxygen_state.shape[1] - 1] = 1
+                        # Representate.RepresentateState(oxygen_state, f'Figuras/oxigen_state_{simu_time}_pasa_b.png')
                         oxygen_state[j, i] = 0
+                        # Representate.RepresentateState(oxygen_state, f'Figuras/oxigen_state_{simu_time}_pasa_a.png')
 
     return oxygen_state, oxigen_velocity, displacement
 
