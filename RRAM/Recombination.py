@@ -26,7 +26,7 @@ def Init_OxygenState(espesor_dispositivo: float, atom_size: float):
     return InitialOxygenState
 
 
-def GenerateOxigen(oxygen_state: np.array, num_oxygen: int):
+def Generate_Oxigen(oxygen_state: np.array, num_oxygen: int):
     """
     Generates random oxygen positions in the given oxygen state matrix.
 

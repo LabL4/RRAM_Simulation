@@ -8,6 +8,7 @@ from tqdm import tqdm
 
 from RRAM import *
 from RRAM import Recombination
+from RRAM import Plot_PostProcess
 
 # comienzo leyendo los datos de la simulación almacenados en un archivo csv dentro de la carpeta Init y los guardo en sus respectivas variables
 sim_parmtrs = Montecarlo.read_csv_to_dic("Init_data/simulation_parameters.csv")
@@ -107,12 +108,12 @@ for num_simulation in range(len(sim_parmtrs)):
                     if random_number < prob_generacion:
                         actual_state[i, j] = 1  # Generación
 
-        # Genero los oxígenos
-        oxygen_state = Recombination.GenerateOxigen(oxygen_state, 10)
+        # Genero los oxígenos TODO: cambiar el número de oxígenos generados por un parámetro del init
+        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 3)
 
         # Muevo los oxígenos
         oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
-            simulation_time, oxygen_state, temperatura, E_field, atom_size, factor=10, **sim_ctes[num_simulation])
+            simulation_time, oxygen_state, temperatura, E_field, atom_size, factor=1, **sim_ctes[num_simulation])
 
         data[k-1] = np.array([simulation_time, velocidad, desplazamiento, prob_generacion])
 
@@ -138,3 +139,6 @@ for num_simulation in range(len(sim_parmtrs)):
     data_filtrados = np.array([fila for fila in data if fila[-1] != 0.0])
     np.savetxt(f'Results/resultados_{num_simulation}.csv', data_filtrados, header='tiempo simulacion, velocidad, desplazamiento, prob_generacion',
                comments=' ', delimiter=', ')
+
+    # Represento los datos de la simulación
+    Plot_PostProcess.Plot_panel(f'Results/resultados_{num_simulation}.csv')

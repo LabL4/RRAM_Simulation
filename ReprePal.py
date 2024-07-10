@@ -11,7 +11,7 @@ from tqdm.contrib.concurrent import process_map
 global im
 
 # Cargo el fichero con las configuraciones
-with open('Results/Oxygen_0.pkl', 'rb') as f:
+with open('Results/Configurations_0.pkl', 'rb') as f:
     Oxigeno = pickle.load(f)
 
 # Supongamos que las imágenes están en el subdirectorio "Figuras" y tienen nombres de archivo que siguen el patrón "image*.png"
@@ -64,7 +64,7 @@ if __name__ == '__main__':
 
     start = time.time()
     # Crear un escritor de video
-    writer = imageio.get_writer('animated_matrix.mp4', fps=12)
+    writer = imageio.get_writer('animated_config.mp4', fps=24)
 
     # Cargar y procesar las imágenes una por una
     for img in images:

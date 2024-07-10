@@ -7,7 +7,7 @@ from RRAM import Recombination
 from RRAM import Constants as cte
 
 # Número de simulaciones que realizo
-num_simulations = 1
+num_simulations = 9
 
 # Defino la carpeta donde se guardan los datos iniciales de la simulación
 carpeta = 'Init_data'
@@ -108,8 +108,10 @@ for i in range(num_simulations):
 
 t_0 = np.ones(num_simulations) * cte.t_0  # Characteristic vibration frequency of oxygen ions in HfOx
 E_m = np.ones(num_simulations) * cte.E_m  # Migration energy of oxygen ions in HfOx
-gamma_drift = np.ones(num_simulations) * cte.gamma_drift  # Drift coefficient of oxygen ions due to an external field
 
+# Drift coefficient of oxygen ions due to an external field FIXME: Cambiando valores para ver cuando la velocidad es importante
+gamma_drift = np.linspace(1e8, 9e8, 9)
+# gamma_drift = np.ones(num_simulations) * cte.gamma_drift  # Drift coefficient of oxygen ions due to an external field
 
 # Creo un dataframe nuevo con las constantes de la simulación
 df_ctes = pd.DataFrame(columns=['vibration_frequency', 'migration_energy', 'drift_coefficient'])

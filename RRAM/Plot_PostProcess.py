@@ -46,14 +46,20 @@ def Plot_panel(data_path: str):
     ax3.plot(x, y[:, 2])
     ax3.set_title('Probabilidad generacion')
 
-    # Creo el cuarto subplot
-    ax3.plot(x, y[:, 2])
-    ax3.set_title('vacio')
+    # Creo el tercer subplot
+    ax4.plot(x, y[:, 2])
+    ax4.set_title('Probabilidad generacion')
 
     # Ajustamos el espacio entre los plots
     fig.tight_layout()
 
+    # Elimino la extensión del archivo
+    data_path = (data_path.split('/')[1]).split('.')[0]
+
     # Guardo la figura
     plt.savefig('Results/Panel_' + data_path + '.png')
+
+    # Cierro la figura
+    plt.close(fig)
 
     return None

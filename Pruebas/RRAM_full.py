@@ -93,7 +93,7 @@ for k in tqdm(range(1, num_pasos+1)):
                     actual_state[i, j] = 1  # Generación
 
     # Genero los oxígenos
-    oxygen_state = Recombination.GenerateOxigen(oxygen_state, 30)
+    oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 30)
 
     # Muevo los oxígenos
     oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
