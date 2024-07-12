@@ -2,9 +2,6 @@
 import numpy as np
 from scipy.constants import Boltzmann, elementary_charge
 
-# Carga elemental del electrón
-electron_charge = elementary_charge
-
 # Valor de la constante de Boltzmann en eV/K
 k_b_ev = Boltzmann / elementary_charge
 
@@ -25,7 +22,7 @@ beta_0 = 3e3
 L_p = 1e-9
 
 # Coeficiente de deriva de los iones de oxígeno debido a la presencia de un campo eléctrico externo
-gamma_drift = 5e8
+gamma_drift = 8
 
 # Potencial de migración de los iones de oxígeno en eV
 E_m = 1.0

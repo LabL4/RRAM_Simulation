@@ -47,8 +47,8 @@ def Plot_panel(data_path: str):
     ax3.set_title('Probabilidad generacion')
 
     # Creo el tercer subplot
-    ax4.plot(x, y[:, 2])
-    ax4.set_title('Probabilidad generacion')
+    ax4.plot(x, y[:, 3])
+    ax4.set_title('sinh')
 
     # Ajustamos el espacio entre los plots
     fig.tight_layout()

@@ -54,7 +54,7 @@ def Generate_Oxigen(oxygen_state: np.array, num_oxygen: int):
     return oxygen_state
 
 
-def Move_OxygenIons(simu_time: float, oxygen_state: np.array, temperature: float, E_field: float, atom_size: float, factor: float, **kwargs):
+def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float, E_field: float, atom_size: float, factor: float, **kwargs):
     """
     Move the oxygen ions in the simulation based on the given parameters.
 
@@ -73,9 +73,9 @@ def Move_OxygenIons(simu_time: float, oxygen_state: np.array, temperature: float
     # Obtengo los valores de las constantes si las estoy pasando como argumentos
     if kwargs:
         # Obtengo el valor de las constantes que necesita la función
-        t_0 = kwargs.get('t_0', cte.t_0)
-        gamma_drift = kwargs.get('gamma_drift', cte.gamma_drift)
-        E_m = kwargs.get('E_m', cte.E_m)
+        t_0 = float(kwargs.get('vibration_frequency'))
+        gamma_drift = float(kwargs.get('drift_coefficient'))
+        E_m = float(kwargs.get('migration_energy'))
     else:
         t_0 = cte.t_0
         gamma_drift = cte.gamma_drift
@@ -85,14 +85,14 @@ def Move_OxygenIons(simu_time: float, oxygen_state: np.array, temperature: float
     oxygen_state_before = np.copy(oxygen_state)
 
     # Obtengo la velocidad de los iones de oxígeno v = (a/t0)*exp(−Em/kT) sinh(q * γ_drift * F/kT)
-    senoh = math.sinh((2*elementary_charge * E_field * gamma_drift) / (k_b_ev * temperature))
+    senoh = math.sinh((atom_size * E_field * gamma_drift) / (2 * k_b_ev * temperature))
     exp_velocity = math.exp(-E_m / (k_b_ev * temperature))
 
     # el t_0 es el valor de 1/t_0 que lo pongo directamente y "factor" es algo que introduzco a mano para ajustar la velocidad
-    oxigen_velocity = factor * t_0 * atom_size * (senoh * exp_velocity)
+    oxigen_velocity = 2 * factor * t_0 * atom_size * (senoh * exp_velocity)
 
     # Calculo la cantidad de "casillas" que se moverá el ion de oxígeno
-    displacement = int(round(oxigen_velocity * simu_time / atom_size))
+    displacement = int(round((oxigen_velocity * paso_temp) / atom_size))
 
     if displacement == 0:
         pass
@@ -114,7 +114,7 @@ def Move_OxygenIons(simu_time: float, oxygen_state: np.array, temperature: float
                         oxygen_state[j, i] = 0
                         # Representate.RepresentateState(oxygen_state, f'Figuras/oxigen_state_{simu_time}_pasa_a.png')
 
-    return oxygen_state, oxigen_velocity, displacement
+    return oxygen_state, oxigen_velocity, displacement, senoh
 
 
 def Recombine(actual_state: np.array, oxygen_state: np.array):
@@ -129,11 +129,15 @@ def Recombine(actual_state: np.array, oxygen_state: np.array):
     np.array: The updated actual state after recombination.
     """
 
+    # Duplico la matriz de oxígeno y configuraciones para no modificar la original
+    oxygen_state_before = np.copy(oxygen_state)
+    actual_state_before = np.copy(actual_state)
+
     # Recorro la matriz de oxígeno para saber en qué posiciones hay oxígeno
-    for i in range(oxygen_state.shape[0]):
-        for j in range(oxygen_state.shape[1]):
+    for i in range(oxygen_state_before.shape[0]):
+        for j in range(oxygen_state_before.shape[1]):
             # Si hay oxígeno en la posición de la matriz de oxígeno y hay un hueco en la matriz de estado actual
-            if oxygen_state[i, j] == 1 and actual_state[i, j] == 1:
+            if oxygen_state_before[i, j] == 1 and actual_state_before[i, j] == 1:
                 # Si hay un hueco, calculo la probabilidad de recombinación
                 prob_recom = np.random.rand()
                 # Si la probabilidad es menor a 0.5, recombinan:

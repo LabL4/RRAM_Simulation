@@ -72,22 +72,22 @@ def initial_state_priv(Eje_x: int, Eje_y: int, num_trampas: int, regiones_pesos:
     return InitialState
 
 
-def generation(simulation_time: np.ndarray, electric_field: np.ndarray,
-               temperature: np.ndarray, carga_vacante: float = 2,) -> np.ndarray:
+def generation(paso_temporal: float, electric_field: float,
+               temperature: float, carga_vacante: float = 2) -> float:
     """
-    Calculate the generation rate of RRAM devices.
+    Calculate the generation rate of charge carriers in a RRAM device.
 
     Parameters:
-        - simulation_time (numpy.ndarray): Array of simulation time values.
-        - electric_field (numpy.ndarray): Array of electric field values.
-        - temperature (numpy.ndarray): Array of temperature values.
-        - carga_vacante (float, optional): Vacancy charge value (default: 2).
+    - paso_temporal (float): The time step for the simulation.
+    - electric_field (float): The electric field applied to the device.
+    - temperature (float): The temperature of the device.
+    - carga_vacante (float, optional): The vacancy charge. Default is 2.
 
     Returns:
-    - numpy.ndarray
-        Array of generation rates.
+    - float: The generation rate of charge carriers.
+
     """
-
     exponente = (E_a - (gamma * carga_vacante * np.abs(electric_field))) / (k_b_ev * temperature)
+    prob_generacion = paso_temporal * t_0 * (np.exp(-exponente))
 
-    return (simulation_time * t_0 * (np.exp(-exponente)))
+    return prob_generacion

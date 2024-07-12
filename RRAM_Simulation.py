@@ -66,10 +66,10 @@ for num_simulation in range(len(sim_parmtrs)):
     paso_temporal = total_simulation_time / num_pasos
 
     # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias (x,y,probabilidad recombionacion, velocidad)
-    colunm_number = 4
+    colunm_number = 5
     data = np.zeros((num_pasos, colunm_number))
     # Creo el excel donde voy a sacar todos los datos
-    df = pd.DataFrame(columns=['Tiempo simulacion', 'velocidad', 'desplazamiento', 'prob_generacion'])
+    df = pd.DataFrame(columns=['Tiempo simulacion', 'velocidad', 'desplazamiento', 'prob_generacion', 'sinh'])
 
     for k in tqdm(range(1, num_pasos+1)):
         # Guardo el estado anterior
@@ -97,25 +97,26 @@ for num_simulation in range(len(sim_parmtrs)):
         E_field = SimpleElectricField(voltaje, device_size)
         # temperatura = Temperature_Joule(voltaje, Corriente, T_0=350) TODO: Estoy usando la temperatura constante
 
+        # TODO: REVISAR PROBABILIDAD QUE A VECES SALE MAYOR DE 1
+        # TODO: HACER UN REESCALADO DE LOS VALORES PARA EVITAR TENER QUE TRABAJAR CON NUMEROS TAN GRANDES
+        prob_generacion = Generation.generation(paso_temporal, E_field, temperatura)
+        # TODO: Revisa COMO SE GENERA LA PROBABILIDAD DE GENERACIÓN
         # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
         for i in range(x_size):
             for j in range(y_size):
                 if actual_state[i, j] == 0:
-                    # TODO: REVISAR PROBABILIDAD QUE A VECES SALE MAYOR DE 1
-                    # TODO: HACER UN REESCALADO DE LOS VALORES PARA EVITAR TENER QUE TRABAJAR CON NUMEROS TAN GRANDES
-                    prob_generacion = Generation.generation(paso_temporal, E_field, temperatura)
                     random_number = np.random.rand()
                     if random_number < prob_generacion:
-                        actual_state[i, j] = 1  # Generación
+                        actual_state[i, j] = 1  # Generación de una vacante
 
-        # Genero los oxígenos TODO: cambiar el número de oxígenos generados por un parámetro del init
-        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 3)
+        # Genero los oxígenos
+        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 5)
 
         # Muevo los oxígenos
-        oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
-            simulation_time, oxygen_state, temperatura, E_field, atom_size, factor=1, **sim_ctes[num_simulation])
+        oxygen_state, velocidad, desplazamiento, senh = Recombination.Move_OxygenIons(
+            paso_temporal, oxygen_state, temperatura, E_field, atom_size, factor=1, **sim_ctes[num_simulation])
 
-        data[k-1] = np.array([simulation_time, velocidad, desplazamiento, prob_generacion])
+        data[k-1] = np.array([simulation_time, velocidad, desplazamiento, prob_generacion, senh])
 
         # Obtengo la nueva configuración
         actual_state, oxygen_state = Recombination.Recombine(actual_state, oxygen_state)
@@ -137,7 +138,7 @@ for num_simulation in range(len(sim_parmtrs)):
 
     # Cuando percola no se completa la matriz de datos, por lo que la recorto
     data_filtrados = np.array([fila for fila in data if fila[-1] != 0.0])
-    np.savetxt(f'Results/resultados_{num_simulation}.csv', data_filtrados, header='tiempo simulacion, velocidad, desplazamiento, prob_generacion',
+    np.savetxt(f'Results/resultados_{num_simulation}.csv', data_filtrados, header='tiempo simulacion, velocidad, desplazamiento, prob_generacion, sinh',
                comments=' ', delimiter=', ')
 
     # Represento los datos de la simulación

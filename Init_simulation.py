@@ -1,13 +1,14 @@
 import os
 import shutil
 import pickle
-from RRAM import *
 import pandas as pd
+
+from RRAM import *
 from RRAM import Recombination
 from RRAM import Constants as cte
 
 # Número de simulaciones que realizo
-num_simulations = 9
+num_simulations = 2
 
 # Defino la carpeta donde se guardan los datos iniciales de la simulación
 carpeta = 'Init_data'
@@ -23,7 +24,6 @@ os.makedirs(carpeta)
 # ------------------------------------------------------------------------------------------------------------------------------------------------------
 # Defino los parámetros de la simulación
 # ------------------------------------------------------------------------------------------------------------------------------------------------------
-
 device_size = np.ones(num_simulations) * 10e-9  # m
 atom_size = np.ones(num_simulations) * 0.25e-9  # m
 num_trampas = np.ones(num_simulations, dtype=int) * 300
@@ -35,12 +35,12 @@ priv_y_sup_left = np.ones(num_simulations, dtype=int) * 10
 priv_y_inf_left = np.ones(num_simulations, dtype=int) * 10
 priv_x_left = np.ones(num_simulations, dtype=int) * 10
 
-total_simulation_time = np.ones(num_simulations) * 2
+total_simulation_time = np.ones(num_simulations) * 10
 num_pasos = np.ones(num_simulations, dtype=int) * 10000
-voltaje_final = np.ones(num_simulations) * 1
+voltaje_final = np.ones(num_simulations) * 3
 paso_guardar = np.ones(num_simulations, dtype=int) * 1
 
-init_temp = np.ones(num_simulations) * 350
+init_temp = np.ones(num_simulations) * 300
 initial_elec_field = np.ones(num_simulations) * 0
 initial_voltaje = np.ones(num_simulations) * 0
 initial_current = np.ones(num_simulations) * 0
@@ -110,7 +110,7 @@ t_0 = np.ones(num_simulations) * cte.t_0  # Characteristic vibration frequency o
 E_m = np.ones(num_simulations) * cte.E_m  # Migration energy of oxygen ions in HfOx
 
 # Drift coefficient of oxygen ions due to an external field FIXME: Cambiando valores para ver cuando la velocidad es importante
-gamma_drift = np.linspace(1e8, 9e8, 9)
+gamma_drift = np.ones(num_simulations) * 8
 # gamma_drift = np.ones(num_simulations) * cte.gamma_drift  # Drift coefficient of oxygen ions due to an external field
 
 # Creo un dataframe nuevo con las constantes de la simulación
