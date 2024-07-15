@@ -2,8 +2,10 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
+from matplotlib.colors import LinearSegmentedColormap
 
 # Varias funciones para representar los datos obtenidos de la simulación
+
 
 def Plot_panel(data_path: str):
     """
@@ -60,6 +62,57 @@ def Plot_panel(data_path: str):
     plt.savefig('Results/Panel_' + data_path + '.png')
 
     # Cierro la figura
+    plt.close(fig)
+
+    return None
+
+
+def RepresentateALLState(state_matrix: np.ndarray, oxygen_matrix: np.ndarray, fig, ax, filename: str = "grafica.png") -> None:
+    """
+    Representates the state and oxygen matrices using a custom colormap and saves the plot as an image.
+
+    Parameters:
+    - state_matrix (np.ndarray): The state matrix to be represented.
+    - oxygen_matrix (np.ndarray): The oxygen matrix to be represented.
+    - fig: The figure object to plot on.
+    - ax: The axes object to plot on.
+    - filename (str): The name of the output image file (default: "grafica.png").
+
+    Returns:
+    None
+    """
+
+    # Create a custom color map for the first matrix
+    colors1 = [
+        (1, 1, 1),                 # Color for value 0 (white)
+        (0.478, 0.627, 0.870),     # Color for value 1 (blue)
+    ]
+
+    # Create a custom color map for the second matrix
+    colors2 = [
+        (1, 1, 1),                 # Color for value 0 (white)
+        (0.870, 0.478, 0.627),     # Color for value 1 (red)
+    ]
+
+    cmap1 = LinearSegmentedColormap.from_list("cmap1", colors1, N=2)
+    cmap2 = LinearSegmentedColormap.from_list("cmap2", colors2, N=2)
+
+    # Use imshow to represent the configuration matrix
+    ax.imshow(state_matrix, cmap=cmap1, origin='upper', alpha=0.85)
+
+    # Use imshow to represent the oxygen matrix
+    ax.imshow(oxygen_matrix, cmap=cmap2, origin='upper', alpha=0.45)
+
+    # Set the aspect ratio to make cells square
+    ax.set_aspect('equal')
+
+    # Set the x-axis labels at the top
+    # ax.xaxis.tick_top()
+
+    # plt.title("Iteration {}".format(filename.split("_")[1].split(".")[0]))
+
+    # Close the figure and save it to a file
+    plt.savefig(filename)
     plt.close(fig)
 
     return None

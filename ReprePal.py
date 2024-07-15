@@ -1,11 +1,12 @@
 import glob
 import pickle
 import imageio
-from RRAM import *
 import time as time
+import matplotlib.pyplot as plt
+
+from RRAM import *
 from PIL import Image
 from io import BytesIO
-import matplotlib.pyplot as plt
 from tqdm.contrib.concurrent import process_map
 
 global im
@@ -52,7 +53,7 @@ if __name__ == '__main__':
     NUM_PARALLEL_PROCESSES = 8
     start = time.time()
     args = [(Oxigeno[i], i) for i in range(len(Oxigeno))]
-    buffers = process_map(process_matrix, args, max_workers=NUM_PARALLEL_PROCESSES, chunksize=25)
+    buffers = process_map(process_matrix, args, max_workers=NUM_PARALLEL_PROCESSES, chunksize=50)
     images = [Image.open(buffer) for buffer in buffers]
     end = time.time()
 

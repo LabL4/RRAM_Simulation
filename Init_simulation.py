@@ -8,7 +8,7 @@ from RRAM import Recombination
 from RRAM import Constants as cte
 
 # Número de simulaciones que realizo
-num_simulations = 2
+num_simulations = 1
 
 # Defino la carpeta donde se guardan los datos iniciales de la simulación
 carpeta = 'Init_data'
@@ -37,7 +37,7 @@ priv_x_left = np.ones(num_simulations, dtype=int) * 10
 
 total_simulation_time = np.ones(num_simulations) * 10
 num_pasos = np.ones(num_simulations, dtype=int) * 10000
-voltaje_final = np.ones(num_simulations) * 3
+voltaje_final = np.ones(num_simulations) * 1
 paso_guardar = np.ones(num_simulations, dtype=int) * 1
 
 init_temp = np.ones(num_simulations) * 300
@@ -109,7 +109,7 @@ for i in range(num_simulations):
 t_0 = np.ones(num_simulations) * cte.t_0  # Characteristic vibration frequency of oxygen ions in HfOx
 E_m = np.ones(num_simulations) * cte.E_m  # Migration energy of oxygen ions in HfOx
 
-# Drift coefficient of oxygen ions due to an external field FIXME: Cambiando valores para ver cuando la velocidad es importante
+# Drift coefficient of oxygen ions due to an external field
 gamma_drift = np.ones(num_simulations) * 8
 # gamma_drift = np.ones(num_simulations) * cte.gamma_drift  # Drift coefficient of oxygen ions due to an external field
 

@@ -71,6 +71,7 @@ for num_simulation in range(len(sim_parmtrs)):
     # Creo el excel donde voy a sacar todos los datos
     df = pd.DataFrame(columns=['Tiempo simulacion', 'velocidad', 'desplazamiento', 'prob_generacion', 'sinh'])
 
+    # Comienzo la simulación
     for k in tqdm(range(1, num_pasos+1)):
         # Guardo el estado anterior
         last_state = actual_state
@@ -100,6 +101,7 @@ for num_simulation in range(len(sim_parmtrs)):
         # TODO: REVISAR PROBABILIDAD QUE A VECES SALE MAYOR DE 1
         # TODO: HACER UN REESCALADO DE LOS VALORES PARA EVITAR TENER QUE TRABAJAR CON NUMEROS TAN GRANDES
         prob_generacion = Generation.generation(paso_temporal, E_field, temperatura)
+
         # TODO: Revisa COMO SE GENERA LA PROBABILIDAD DE GENERACIÓN
         # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
         for i in range(x_size):
@@ -109,12 +111,15 @@ for num_simulation in range(len(sim_parmtrs)):
                     if random_number < prob_generacion:
                         actual_state[i, j] = 1  # Generación de una vacante
 
+        if (simulation_time > 7.9)and(simulation_time < 8.1):
+            print("hola")
+
         # Genero los oxígenos
         oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 5)
 
         # Muevo los oxígenos
         oxygen_state, velocidad, desplazamiento, senh = Recombination.Move_OxygenIons(
-            paso_temporal, oxygen_state, temperatura, E_field, atom_size, factor=1, **sim_ctes[num_simulation])
+            paso_temporal, oxygen_state, temperatura, E_field, atom_size, **sim_ctes[num_simulation])
 
         data[k-1] = np.array([simulation_time, velocidad, desplazamiento, prob_generacion, senh])
 
@@ -127,10 +132,10 @@ for num_simulation in range(len(sim_parmtrs)):
             oxygen_matrix[int(k / paso_guardar) - 1] = oxygen_state
 
     # Elimino de la matriz config_matrix las filas que no se han completado que ocurre cuando percola
-    config_matrix = np.array([fila for fila in config_matrix if fila.sum() != 0.0])
-    oxygen_matrix = np.array([fila for fila in oxygen_matrix if fila.sum() != 0.0])
+    # config_matrix = np.array([fila for fila in config_matrix if fila.sum() != 0.0])
+    # oxygen_matrix = np.array([fila for fila in oxygen_matrix if fila.sum() != 0.0])
 
-    # Cuando acaba la simulacion Guardo las matrices de configuraciones y oxigenos
+    # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
     with open(f'Results/Configurations_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(config_matrix, f)
     with open(f'Results/Oxygen_{num_simulation}.pkl', 'wb') as f:

@@ -54,7 +54,7 @@ def Generate_Oxigen(oxygen_state: np.array, num_oxygen: int):
     return oxygen_state
 
 
-def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float, E_field: float, atom_size: float, factor: float, **kwargs):
+def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float, E_field: float, atom_size: float, **kwargs):
     """
     Move the oxygen ions in the simulation based on the given parameters.
 
@@ -64,7 +64,6 @@ def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float
         - temperature (float): The temperature of the system.
         - E_field (float): The electric field strength.
         - atom_size (float): The size of each atom.
-        - factor (float): A factor used to adjust the velocity.
 
     Returns:
     np.array: The updated matrix representing the state of oxygen ions after the movement.
@@ -84,12 +83,13 @@ def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float
     # Duplico la matriz de oxígeno para no modificar la original
     oxygen_state_before = np.copy(oxygen_state)
 
-    # Obtengo la velocidad de los iones de oxígeno v = (a/t0)*exp(−Em/kT) sinh(q * γ_drift * F/kT)
+    # Obtengo la velocidad de los iones de oxígeno v = ((2 * a)/t0)*exp(−Em/kT) sinh((d * γ_drift * F)/kT)
     senoh = math.sinh((atom_size * E_field * gamma_drift) / (2 * k_b_ev * temperature))
     exp_velocity = math.exp(-E_m / (k_b_ev * temperature))
 
     # el t_0 es el valor de 1/t_0 que lo pongo directamente y "factor" es algo que introduzco a mano para ajustar la velocidad
-    oxigen_velocity = 2 * factor * t_0 * atom_size * (senoh * exp_velocity)
+    # En la expresión original se multiplica por 2 lo he quitado para ver si sale algo mejor
+    oxigen_velocity = t_0 * atom_size * (senoh * exp_velocity)
 
     # Calculo la cantidad de "casillas" que se moverá el ion de oxígeno
     displacement = int(round((oxigen_velocity * paso_temp) / atom_size))
@@ -102,18 +102,12 @@ def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float
         for i in range(oxygen_state_before.shape[0]):              # Recorro las filas
             for j in range(oxygen_state_before.shape[1]):
                 if oxygen_state_before[j, i] == 1:
-                    # Muevo el oxígeno
+                    # Muevo el oxígeno si queda dentro de la matriz
                     if i + displacement < oxygen_state_before.shape[1]:
-                        # Representate.RepresentateState(oxygen_state, f'Figuras/oxigen_state_{simu_time}_b.png')
                         oxygen_state[j, i + displacement] = 1
                         oxygen_state[j, i] = 0
-                        # Representate.RepresentateState(oxygen_state, f'Figuras/oxigen_state_{simu_time}_a.png')
-                    else:  # Si se sale de la matriz, lo coloco en la última posición
-                        # oxygen_state[j, oxygen_state.shape[1] - 1] = 1
-                        # Representate.RepresentateState(oxygen_state, f'Figuras/oxigen_state_{simu_time}_pasa_b.png')
+                    else:  # Si se sale de la matriz, lo elimino
                         oxygen_state[j, i] = 0
-                        # Representate.RepresentateState(oxygen_state, f'Figuras/oxigen_state_{simu_time}_pasa_a.png')
-
     return oxygen_state, oxigen_velocity, displacement, senoh
 
 
@@ -153,11 +147,12 @@ def Recombine(actual_state: np.array, oxygen_state: np.array):
 # | el paper.                                                                                                            |
 # |----------------------------------------------------------------------------------------------------------------------|
 
-# def Simple_recombination(simu_time: float, pos_x: int, E_field: float, temperature: float, grid_size: float, factor: float):
+
+# def Simple_recombination(paso_temp: float, pos_x: int, E_field: float, temperature: float, grid_size: float, factor: float):
 #     """
 #     Calculates the recombination probability Function that calculates the probability of recombination.
 #     It is calculated from the equilibrium probability and a factor that contains the ion velocity.
-#
+
 #     Args:
 #         simu_time (float): The simulation time.
 #         pos_x (int): The position in the x-axis.
@@ -165,22 +160,22 @@ def Recombine(actual_state: np.array, oxygen_state: np.array):
 #         temperature (float): The temperature.
 #         grid_size (float): The grid size.
 #         factor (float): A factor used in the calculation.
-#
+
 #     Returns:
 #         tuple: A tuple containing the recombination probability, oxygen ion velocity, and diffusion function.
 #     """
-#
-#     Prob_in_equilibrio = (simu_time * t_0)*(math.exp(-E_a / (k_b_ev * temperature)))
-#
+
+#     Prob_in_equilibrio = (paso_temp * t_0)*(math.exp(-E_a / (k_b_ev * temperature)))
+
 #     senoh = math.sinh((2*elementary_charge * E_field * gamma_drift) / (k_b_ev * temperature))
 #     exponencial_velocidad = math.exp(-E_m / (k_b_ev * temperature))
-#
+
 #     Oxigen_Ion_velocity = factor * t_0 * grid_size * (senoh * exponencial_velocidad)
-#
-#     Funcion = DifussiveBehaviour(pos_x, Oxigen_Ion_velocity, simu_time, grid_size)
-#     exponencial = math.exp(-(simu_time * Oxigen_Ion_velocity) / L_p)
+
+#     Funcion = DifussiveBehaviour(pos_x, Oxigen_Ion_velocity, paso_temp, grid_size)
+#     exponencial = math.exp(-(paso_temp * Oxigen_Ion_velocity) / L_p)
 #     beta = (beta_0 * exponencial * Funcion)
-#
+
 #     Prob_recom = Prob_in_equilibrio * beta
-#
-#     return Prob_recom, Oxigen_Ion_velocity*simu_time, Funcion
+
+#     return Prob_recom, Oxigen_Ion_velocity*paso_temp, Funcion
