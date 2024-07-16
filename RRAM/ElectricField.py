@@ -10,4 +10,5 @@ def SimpleElectricField(DDP: float, espesor: float) -> float:
     """
 
     ElectricField = DDP / espesor
+
     return ElectricField

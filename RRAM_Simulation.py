@@ -4,6 +4,7 @@ import shutil
 
 import pandas as pd
 import time as time
+from sympy import E
 from tqdm import tqdm
 
 from RRAM import *
@@ -30,7 +31,7 @@ os.makedirs(carpeta)
 for num_simulation in range(len(sim_parmtrs)):
 
     # POngo el nombre de la simulación y un salto de línea
-    print(f"\n Simulación {num_simulation +1}")
+    print(f"\n Simulación {num_simulation + 1}")
 
     # Asigno los valores de los datos de la simulación a las variables correspondientes
     device_size = float(sim_parmtrs[num_simulation]['device_size'])
@@ -65,11 +66,15 @@ for num_simulation in range(len(sim_parmtrs)):
     # Defino el paso temporal
     paso_temporal = total_simulation_time / num_pasos
 
+    # Creo el vector de diferencias de potencial
+    vector_ddp = np.linspace(0, voltaje_final, num_pasos + 1)
+
     # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias (x,y,probabilidad recombionacion, velocidad)
     colunm_number = 5
     data = np.zeros((num_pasos, colunm_number))
     # Creo el excel donde voy a sacar todos los datos
-    df = pd.DataFrame(columns=['Tiempo simulacion', 'velocidad', 'desplazamiento', 'prob_generacion', 'sinh'])
+    df = pd.DataFrame(columns=['Tiempo simulacion', 'velocidad', 'desplazamiento',
+                      'prob_generacion', 'sinh'])
 
     # Comienzo la simulación
     for k in tqdm(range(1, num_pasos+1)):
@@ -80,7 +85,8 @@ for num_simulation in range(len(sim_parmtrs)):
         simulation_time = paso_temporal * k
 
         # Calculo la corriente
-        voltaje += voltaje_final * paso_temporal
+        voltaje = vector_ddp[k]
+        # voltaje += voltaje_final / paso_temporal
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         # TODO: Revisar la corriente óhmica que no funciona
@@ -111,8 +117,8 @@ for num_simulation in range(len(sim_parmtrs)):
                     if random_number < prob_generacion:
                         actual_state[i, j] = 1  # Generación de una vacante
 
-        if (simulation_time > 7.9)and(simulation_time < 8.1):
-            print("hola")
+        if (simulation_time > 7.9) and (simulation_time < 8.0):
+            pass
 
         # Genero los oxígenos
         oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 5)
