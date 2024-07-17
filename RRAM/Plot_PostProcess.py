@@ -7,7 +7,7 @@ from matplotlib.colors import LinearSegmentedColormap
 # Varias funciones para representar los datos obtenidos de la simulación
 
 
-def Plot_panel(data_path: str):
+def Plot_panel(data_path: str, title: str = None) -> None:
     """
     Función que representa los datos obtenidos de la simulación en un panel con 4 subplots, acepta un archivo csv con los datos con la siguiente estructura:
         - La primera columna contiene la variable independiente
@@ -36,24 +36,46 @@ def Plot_panel(data_path: str):
     # Creo la figura que será un panel con 4 subplots
     fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
 
+    # Establezco el título del conjunto de figuras si se ha proporcionado uno
+    if title is not None:
+        fig.suptitle(title)
+
     # Creo el primer subplot
     ax1.plot(x, y[:, 0])
     ax1.set_title('Velocidad')
+
+    # añado una etiqueta al eje x
+    ax1.set_xlabel('Tiempo [s]')
+    ax1.set_ylabel('Velocidad [m/s]')
 
     # Creo el segundo subplot
     ax2.plot(x, y[:, 1])
     ax2.set_title('desplazamiento')
 
+    # añado una etiqueta al eje x
+    ax2.set_xlabel('Tiempo [s]')
+    ax2.set_ylabel('Desplazamiento [m]')
+
     # Creo el tercer subplot
     ax3.plot(x, y[:, 2])
     ax3.set_title('Probabilidad generacion')
 
-    # Creo el tercer subplot
+    # añado una etiqueta al eje x
+    ax3.set_xlabel('Tiempo [s]')
+
+    # Creo el cuarto subplot
     ax4.plot(x, y[:, 3])
     ax4.set_title('sinh')
 
+    # añado una etiqueta al eje x
+    ax4.set_xlabel('Tiempo [s]')
+
     # Ajustamos el espacio entre los plots
     fig.tight_layout()
+
+    # Ajusto el espacio para el título principal si se ha proporcionado uno
+    if title is not None:
+        fig.subplots_adjust(top=0.88)
 
     # Elimino la extensión del archivo
     data_path = (data_path.split('/')[1]).split('.')[0]

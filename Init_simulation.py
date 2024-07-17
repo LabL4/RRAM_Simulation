@@ -25,7 +25,8 @@ os.makedirs(carpeta)
 # Defino los parámetros de la simulación
 # ------------------------------------------------------------------------------------------------------------------------------------------------------
 device_size = np.ones(num_simulations) * 10e-9  # m
-atom_size = np.ones(num_simulations) * 0.25e-9  # m
+atom_size = np.linspace(0.15e-9, 0.24e-9, num_simulations)  # m
+# atom_size = np.ones(num_simulations) * 0.25e-9  # m
 num_trampas = np.ones(num_simulations, dtype=int) * 100
 
 priv_y_sup_right = np.ones(num_simulations, dtype=int) * 10
@@ -107,8 +108,8 @@ for i in range(num_simulations):
 # # ------------------------------------------------------------------------------------------------------------------------------------------------------
 
 t_0 = np.ones(num_simulations) * cte.t_0  # Characteristic vibration frequency of oxygen ions in HfOx
-E_m = np.linspace(0.8, 1.0, num_simulations)  # Migration energy of oxygen ions in HfOx
-# E_m = np.ones(num_simulations) * cte.E_m  # Migration energy of oxygen ions in HfOx
+E_m = np.ones(num_simulations) * cte.E_m  # Migration energy of oxygen ions in HfOx
+# E_m = np.linspace(0.8, 1.0, num_simulations)  # Migration energy of oxygen ions in HfOx
 
 # Drift coefficient of oxygen ions due to an external field
 gamma_drift = np.ones(num_simulations) * 8

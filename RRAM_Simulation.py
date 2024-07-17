@@ -153,4 +153,5 @@ for num_simulation in range(len(sim_parmtrs)):
                comments=' ', delimiter=', ')
 
     # Represento los datos de la simulación
-    Plot_PostProcess.Plot_panel(f'Results/resultados_{num_simulation}.csv')
+    Plot_PostProcess.Plot_panel(f'Results/resultados_{num_simulation}.csv',
+                                title=f'Simulación {num_simulation + 1} valor de espaciado $a_0$ = {sim_parmtrs[num_simulation]["atom_size"]}',)
