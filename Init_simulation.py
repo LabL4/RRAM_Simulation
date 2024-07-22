@@ -8,7 +8,7 @@ from RRAM import Recombination
 from RRAM import Constants as cte
 
 # Número de simulaciones que realizo
-num_simulations = 10
+num_simulations = 40
 
 # Defino la carpeta donde se guardan los datos iniciales de la simulación
 carpeta = 'Init_data'
@@ -25,8 +25,8 @@ os.makedirs(carpeta)
 # Defino los parámetros de la simulación
 # ------------------------------------------------------------------------------------------------------------------------------------------------------
 device_size = np.ones(num_simulations) * 10e-9  # m
-atom_size = np.linspace(0.15e-9, 0.24e-9, num_simulations)  # m
-# atom_size = np.ones(num_simulations) * 0.25e-9  # m
+atom_size = np.ones(num_simulations) * 0.25e-9  # m
+# atom_size = np.linspace(0.15e-9, 0.24e-9, num_simulations)  # m
 num_trampas = np.ones(num_simulations, dtype=int) * 100
 
 priv_y_sup_right = np.ones(num_simulations, dtype=int) * 10
@@ -108,19 +108,28 @@ for i in range(num_simulations):
 # # ------------------------------------------------------------------------------------------------------------------------------------------------------
 
 t_0 = np.ones(num_simulations) * cte.t_0  # Characteristic vibration frequency of oxygen ions in HfOx
-E_m = np.ones(num_simulations) * cte.E_m  # Migration energy of oxygen ions in HfOx
-# E_m = np.linspace(0.8, 1.0, num_simulations)  # Migration energy of oxygen ions in HfOx
+
+# Migration energy of oxygen ions in HfOx
+E_m = np.linspace(0.8, 1, 10)
+E_m = np.tile(E_m, 4)
+
+# E_m = np.linspace(0.9, 1.0, num_simulations)  # Migration energy of oxygen ions in HfOx
+
+cte_red = np.ones(num_simulations) * cte.cte_red  # Constante de red, el paper original propone 0.25 nm
 
 # Drift coefficient of oxygen ions due to an external field
-gamma_drift = np.ones(num_simulations) * 8
-# gamma_drift = np.ones(num_simulations) * cte.gamma_drift  # Drift coefficient of oxygen ions due to an external field
+
+gamma_drift = np.array([8, 9, 10, 11])
+gamma_drift = np.repeat(gamma_drift, 10)
+# gamma_drift = np.ones(num_simulations) * cte.gamma_drift
 
 # Creo un dataframe nuevo con las constantes de la simulación
-df_ctes = pd.DataFrame(columns=['vibration_frequency', 'migration_energy', 'drift_coefficient'])
+df_ctes = pd.DataFrame(columns=['vibration_frequency', 'migration_energy', 'drift_coefficient', 'cte_red'])
 
 df_ctes['vibration_frequency'] = t_0
 df_ctes['migration_energy'] = E_m
 df_ctes['drift_coefficient'] = gamma_drift
+df_ctes['cte_red'] = cte_red
 
 # Guardo el dataframe de las ctes en un archivo csv
 df_ctes.to_csv('Init_data/simulation_constants.csv', index=False)

@@ -33,6 +33,9 @@ resistencia_termica = 7e5
 # Constante de resistencia térmica en ohmios
 resistencia_ohmica = 1e6
 
+# Constante de red, el paper original propone 0.25 nm
+cte_red = 0.25e-9
+
 # def DifussiveBehaviour(
 #         pos_x: int, Oxigen_Ion_velocity: float, paso_temp: float,
 #         grid_size: float) -> float:

@@ -1,13 +1,11 @@
 import os
 import pickle
 import shutil
-
-import pandas as pd
 import time as time
-from sympy import E
-from tqdm import tqdm
+import pandas as pd
 
 from RRAM import *
+from tqdm import tqdm
 from RRAM import Recombination
 from RRAM import Plot_PostProcess
 
@@ -117,7 +115,7 @@ for num_simulation in range(len(sim_parmtrs)):
                     if random_number < prob_generacion:
                         actual_state[i, j] = 1  # Generación de una vacante
 
-        if (simulation_time > 7.9) and (simulation_time < 8.0):
+        if (simulation_time > 8.5) and (simulation_time < 8.7):
             pass
 
         # Genero los oxígenos
@@ -154,4 +152,4 @@ for num_simulation in range(len(sim_parmtrs)):
 
     # Represento los datos de la simulación
     Plot_PostProcess.Plot_panel(f'Results/resultados_{num_simulation}.csv',
-                                title=f'Simulación {num_simulation + 1} valor de espaciado $a_0$ = {sim_parmtrs[num_simulation]["atom_size"]}',)
+                                title=f'valor de $\gamma^drift$ = {sim_ctes[num_simulation]["drift_coefficient"]}, valor de $E_m$ = {sim_ctes[num_simulation]["migration_energy"]}')
