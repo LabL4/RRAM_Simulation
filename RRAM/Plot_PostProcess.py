@@ -34,11 +34,11 @@ def Plot_panel(data_path: str, title: str = None) -> None:
     y = data[:, 1:]
 
     # Creo la figura que será un panel con 4 subplots
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(9, 7))
 
     # Establezco el título del conjunto de figuras si se ha proporcionado uno
     if title is not None:
-        fig.suptitle(title)
+        fig.suptitle(title, fontsize=16)
 
     # Creo el primer subplot
     ax1.plot(x, y[:, 0])
@@ -77,11 +77,14 @@ def Plot_panel(data_path: str, title: str = None) -> None:
     if title is not None:
         fig.subplots_adjust(top=0.88)
 
+    # TODO: Cambiar esto por si no le pongo titulo
     # Elimino la extensión del archivo
     data_path = (data_path.split('/')[1]).split('.')[0]
+    partes = title.split(',')
 
     # Guardo la figura
-    plt.savefig('Results/Panel_' + data_path + '.png')
+    plt.savefig('Results/Panel_' + data_path + '_' + partes[0].split('=')
+                [1].strip() + '-' + partes[1].split('=')[1].strip() + '.png')
 
     # Cierro la figura
     plt.close(fig)
