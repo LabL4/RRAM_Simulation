@@ -29,7 +29,7 @@ os.makedirs(carpeta)
 
 for num_simulation in range(len(sim_parmtrs)):
 
-    # POngo el nombre de la simulación y un salto de línea
+    # Pongo el nombre de la simulación y un salto de línea
     print(f"\n Simulación {num_simulation + 1}")
 
     # Asigno los valores de los datos de la simulación a las variables correspondientes
@@ -83,8 +83,9 @@ for num_simulation in range(len(sim_parmtrs)):
         # Actualizo el tiempo de simulación
         simulation_time = paso_temporal * k
 
-        # Calculo la corriente
+        # Calculo la corriente TODO: asasasasasa
         voltaje = vector_ddp[k]
+
         # voltaje += voltaje_final / paso_temporal
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no

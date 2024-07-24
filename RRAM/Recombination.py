@@ -86,7 +86,7 @@ def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float
     oxygen_state_before = np.copy(oxygen_state)
 
     # Obtengo la velocidad de los iones de oxígeno v = ((2 * a)/t0)*exp(−Em/kT) sinh((d * γ_drift * F)/2kT)
-    senoh = math.sinh((cte_red * E_field * gamma_drift) / (2 * k_b_ev * temperature))
+    senoh = math.sinh((cte_red * E_field * gamma_drift)/(2 * k_b_ev * temperature))
     exp_velocity = math.exp(-E_m / (k_b_ev * temperature))
 
     # el t_0 es el valor de 1/t_0 que lo pongo directamente y "factor" es algo que introduzco a mano para ajustar la velocidad
