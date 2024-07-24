@@ -122,13 +122,22 @@ gamma_drift = np.ones(num_simulations) * cte.gamma_drift
 # gamma_drift = np.array([8, 9, 10, 11])
 # gamma_drift = np.repeat(gamma_drift, 10)
 
+# Recombination enhancement factor due to the presence of excessive oxygen ions
+beta_0 = np.ones(num_simulations) * cte.beta_0
+
+# Decay length of the oxygen concentration
+L_p = np.ones(num_simulations) * cte.L_p
+
 # Creo un dataframe nuevo con las constantes de la simulación
-df_ctes = pd.DataFrame(columns=['vibration_frequency', 'migration_energy', 'drift_coefficient', 'cte_red'])
+df_ctes = pd.DataFrame(columns=['vibration_frequency', 'migration_energy',
+                       'drift_coefficient', 'cte_red', 'recom_enchancement_factor', 'decaimiento_concentracion'])
 
 df_ctes['vibration_frequency'] = t_0
 df_ctes['migration_energy'] = E_m
 df_ctes['drift_coefficient'] = gamma_drift
 df_ctes['cte_red'] = cte_red
+df_ctes['recom_enchancement_factor'] = beta_0
+df_ctes['decaimiento_concentracion'] = L_p
 
 # Guardo el dataframe de las ctes en un archivo csv
 df_ctes.to_csv('Init_data/simulation_constants.csv', index=False)

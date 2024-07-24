@@ -1,8 +1,8 @@
 import math
 import numpy as np
 
+from RRAM import Constants as cte
 from scipy.constants import elementary_charge
-from RRAM import Constants as cte, Representate
 from .Constants import t_0, k_b_ev, E_m, gamma_drift
 
 
@@ -114,7 +114,7 @@ def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float
     return oxygen_state, oxigen_velocity, displacement, senoh
 
 
-def Recombine(actual_state: np.array, oxygen_state: np.array):
+def Recombine(actual_state: np.array, oxygen_state: np.array, paso_temp: float, velocidad: float, temp: float, **kwargs) -> np.array:
     """
     Recombines oxygen and actual states based on certain conditions.
 
@@ -136,13 +136,42 @@ def Recombine(actual_state: np.array, oxygen_state: np.array):
             # Si hay oxígeno en la posición de la matriz de oxígeno y hay un hueco en la matriz de estado actual
             if oxygen_state_before[i, j] == 1 and actual_state_before[i, j] == 1:
                 # Si hay un hueco, calculo la probabilidad de recombinación
-                prob_recom = np.random.rand()
-                # Si la probabilidad es menor a 0.5, recombinan:
+                random_number = np.random.rand()
+                prob_recom = Prob_Recombination(paso_temp, velocidad, j, temp, **kwargs)
+
                 if prob_recom < 0.5:  # Cambiar luego a la probabilidad en equilibrio que menciona en el paper original
                     actual_state[i, j] = 0
                     oxygen_state[i, j] = 0
 
     return (actual_state, oxygen_state)
+
+
+def Prob_Recombination(paso_temporal: float, velocidad: float, pos_x: int, temp: float, **kwargs) -> float:
+
+    # Obtengo las constantes necesarias para el cálculo
+    if kwargs:
+        # Obtengo el valor de las constantes que necesita la función
+        t_0 = float(kwargs.get('vibration_frequency'))
+        beta_0 = float(kwargs.get('recom_enchancement_factor'))
+        E_a = float(kwargs.get('migration_energy'))
+        cte_red = float(kwargs.get('cte_red'))
+        L_p = float(kwargs.get('decaimiento_concentracion'))
+    else:
+        t_0 = cte.t_0
+        beta_0 = cte.beta_0
+        E_a = cte.E_a
+        cte_red = cte.cte_red
+        L_p = cte.L_p
+
+    # Calculo la probabilidad de recombinación en equilibrio
+    prob_in_equilibrio = (paso_temporal * t_0) * (math.exp(-E_a / (k_b_ev * temp)))
+    funcion_trozos = cte.DifussiveBehaviour(pos_x, velocidad, paso_temporal, cte_red)
+    exp_beta = math.exp(-(paso_temporal * velocidad) / L_p) * beta_0 * funcion_trozos
+
+    prob_recom = prob_in_equilibrio * exp_beta
+
+    return prob_recom
+
 
 # |----------------------------------------------------------------------------------------------------------------------|
 # | Esta función es la original del paper: On the Switching Parameter Variation of Metal-Oxide RRAM—Part I:              |
