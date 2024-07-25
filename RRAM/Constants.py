@@ -25,7 +25,7 @@ L_p = 1e-9
 gamma_drift = 9
 
 # Potencial de migración de los iones de oxígeno en eV
-E_m = 0.91
+E_m = 0.89
 
 # Constante de resistencia térmica en K/W
 resistencia_termica = 7e5

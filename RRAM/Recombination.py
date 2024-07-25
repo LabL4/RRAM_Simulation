@@ -136,14 +136,17 @@ def Recombine(actual_state: np.array, oxygen_state: np.array, paso_temp: float, 
             # Si hay oxígeno en la posición de la matriz de oxígeno y hay un hueco en la matriz de estado actual
             if oxygen_state_before[i, j] == 1 and actual_state_before[i, j] == 1:
                 # Si hay un hueco, calculo la probabilidad de recombinación
-                random_number = np.random.rand()
+                random_number = np.random.rand()    # Genero un número aleatorio
+                # Calculo la probabilidad de recombinación
                 prob_recom = Prob_Recombination(paso_temp, velocidad, j, temp, **kwargs)
-
-                if prob_recom < 0.5:  # Cambiar luego a la probabilidad en equilibrio que menciona en el paper original
+                if random_number < prob_recom:  # Cambiar luego a la probabilidad en equilibrio que menciona en el paper original
                     actual_state[i, j] = 0
                     oxygen_state[i, j] = 0
+                # if random_number > 0.5:  # Cambiar luego a la probabilidad en equilibrio que menciona en el paper original
+                #     actual_state[i, j] = 0
+                #     oxygen_state[i, j] = 0
 
-    return (actual_state, oxygen_state)
+    return (actual_state, oxygen_state, prob_recom)
 
 
 def Prob_Recombination(paso_temporal: float, velocidad: float, pos_x: int, temp: float, **kwargs) -> float:

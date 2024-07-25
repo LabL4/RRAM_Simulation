@@ -73,7 +73,7 @@ for num_simulation in range(len(sim_parmtrs)):
     data = np.zeros((num_pasos, colunm_number))
     # Creo el excel donde voy a sacar todos los datos
     df = pd.DataFrame(columns=['Tiempo simulacion', 'velocidad', 'desplazamiento',
-                      'prob_generacion', 'sinh'])
+                      'prob_generacion', 'probabilidad_recombinacion'])
 
     # Comienzo la simulación
     for k in tqdm(range(1, num_pasos+1)):
@@ -127,10 +127,11 @@ for num_simulation in range(len(sim_parmtrs)):
         oxygen_state, velocidad, desplazamiento, senh = Recombination.Move_OxygenIons(
             paso_temporal, oxygen_state, temperatura, E_field, atom_size, **sim_ctes[num_simulation])
 
-        data[k-1] = np.array([simulation_time, velocidad, desplazamiento, prob_generacion, senh])
-
         # Obtengo la nueva configuración
-        actual_state, oxygen_state = Recombination.Recombine(actual_state, oxygen_state)
+        actual_state, oxygen_statem, pro_recombination = Recombination.Recombine(
+            actual_state, oxygen_state, paso_temporal, velocidad, temperatura, **sim_ctes[num_simulation])
+
+        data[k-1] = np.array([simulation_time, velocidad, desplazamiento, prob_generacion, pro_recombination])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
