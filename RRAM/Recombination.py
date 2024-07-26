@@ -145,7 +145,8 @@ def Recombine(actual_state: np.array, oxygen_state: np.array, paso_temp: float, 
                 # if random_number > 0.5:  # Cambiar luego a la probabilidad en equilibrio que menciona en el paper original
                 #     actual_state[i, j] = 0
                 #     oxygen_state[i, j] = 0
-
+            else:
+                prob_recom = 0
     return (actual_state, oxygen_state, prob_recom)
 
 
@@ -166,10 +167,11 @@ def Prob_Recombination(paso_temporal: float, velocidad: float, pos_x: int, temp:
         cte_red = cte.cte_red
         L_p = cte.L_p
 
-    # Calculo la probabilidad de recombinación en equilibrio
+    # Calculo la  probabilidad de recombinación en equilibrio
     prob_in_equilibrio = (paso_temporal * t_0) * (math.exp(-E_a / (k_b_ev * temp)))
-    funcion_trozos = cte.DifussiveBehaviour(pos_x, velocidad, paso_temporal, cte_red)
-    exp_beta = math.exp(-(paso_temporal * velocidad) / L_p) * beta_0 * funcion_trozos
+    # funcion_trozos = cte.DifussiveBehaviour(pos_x, velocidad, paso_temporal, cte_red)
+    # * funcion_trozos le quito lo de la funcion a trozos
+    exp_beta = math.exp(-(paso_temporal * velocidad) / L_p) * beta_0
 
     prob_recom = prob_in_equilibrio * exp_beta
 
