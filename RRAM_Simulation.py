@@ -117,7 +117,7 @@ for num_simulation in range(len(sim_parmtrs)):
                     if random_number < prob_generacion:
                         actual_state[i, j] = 1  # Generación de una vacante
 
-        if (simulation_time > 8.5) and (simulation_time < 8.7):
+        if (simulation_time > 9) and (simulation_time < 9.2):
             pass
 
         # Genero los oxígenos

@@ -13,7 +13,7 @@ E_a = 1
 
 # Tiene distintos valores dependiendo si el estado es FORMING/SET y RESET
 # La estoy modificando a mano para que el campo eléctrico tmb tenga algún papel en la dinámica
-gamma = 0.95e-10
+gamma = 3
 
 # Factor de recombinación debido a la presencia de exceso de iones de oxígeno
 beta_0 = 3e3
@@ -22,10 +22,10 @@ beta_0 = 3e3
 L_p = 1e-9
 
 # Coeficiente de deriva de los iones de oxígeno debido a la presencia de un campo eléctrico externo
-gamma_drift = 8
+gamma_drift = 9
 
 # Potencial de migración de los iones de oxígeno en eV
-E_m = 0.89
+E_m = 0.9
 
 # Constante de resistencia térmica en K/W
 resistencia_termica = 7e5

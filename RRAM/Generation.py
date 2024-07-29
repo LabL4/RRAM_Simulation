@@ -1,6 +1,8 @@
 import math
 import numpy as np
+
 from icecream import ic
+from RRAM import Constants as cte
 
 from .Constants import *
 from scipy.constants import elementary_charge
@@ -72,8 +74,7 @@ def initial_state_priv(Eje_x: int, Eje_y: int, num_trampas: int, regiones_pesos:
     return InitialState
 
 
-def generation(paso_temporal: float, electric_field: float,
-               temperature: float, carga_vacante: float = 2) -> float:
+def generation(time_stp: float, electric_field: float, temp: float, **kwargs) -> float:
     """
     Calculate the generation rate of charge carriers in a RRAM device.
 
@@ -87,7 +88,21 @@ def generation(paso_temporal: float, electric_field: float,
     - float: The generation rate of charge carriers.
 
     """
-    exponente = (E_a - (gamma * carga_vacante * np.abs(electric_field))) / (k_b_ev * temperature)
-    prob_generacion = paso_temporal * t_0 * (np.exp(-exponente))
+
+    # Obtengo las constantes necesarias para el cálculo
+    if kwargs:
+        # Obtengo el valor de las constantes que necesita la función
+        t_0 = float(kwargs.get('vibration_frequency'))
+        E_a = float(kwargs.get('activation_energy'))
+        cte_red = float(kwargs.get('cte_red'))
+        gamma = float(kwargs.get('gamma'))
+    else:
+        t_0 = cte.t_0
+        E_a = cte.E_a
+        cte_red = cte.cte_red
+        gamma = cte.gamma
+
+    exponente = (E_a - (gamma * cte_red * electric_field)) / (k_b_ev * temp)
+    prob_generacion = time_stp * t_0 * (np.exp(-exponente))
 
     return prob_generacion

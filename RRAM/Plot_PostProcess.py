@@ -54,7 +54,7 @@ def Plot_panel(data_path: str, title: str = None) -> None:
 
     # añado una etiqueta al eje x
     ax2.set_xlabel('Tiempo [s]')
-    ax2.set_ylabel('Desplazamiento [m]')
+    ax2.set_ylabel('Desplazamiento [casillas]')
 
     # Creo el tercer subplot
     ax3.plot(x, y[:, 2])
@@ -65,7 +65,7 @@ def Plot_panel(data_path: str, title: str = None) -> None:
 
     # Creo el cuarto subplot
     ax4.plot(x, y[:, 3])
-    ax4.set_title('sinh')
+    ax4.set_title('Probabilidad recombinacion')
 
     # añado una etiqueta al eje x
     ax4.set_xlabel('Tiempo [s]')
