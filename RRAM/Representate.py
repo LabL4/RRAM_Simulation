@@ -212,6 +212,48 @@ def RepresentateStateOptAnto(matriz: np.ndarray, fig, ax, im=None, filename: str
     return im
 
 
+def RepresentateStateOxygen(matriz: np.ndarray, fig, ax, im=None, filename: str = "grafica.png") -> None:
+    """
+    Represent the state of a matrix as a colored plot. Es la misma funcion que arriba solo que pinta
+    en rojo los oxigenos (solo los soxigenos pinta) para diferenciarlos de las trampas
+
+    Parameters:
+    - matriz (np.ndarray): The input matrix to be represented.
+    - filename (str, optional): The name of the file to save the plot. Default is "grafica.png".
+
+    Returns:
+    None
+    """
+    # Crear una figura y un eje con plt.subplots()
+
+    # Crear un mapa de colores personalizado
+    colors = [
+        (1, 1, 1),                      # Color para el valor 0 que representa que No hay trampa
+        (0.9922, 0.2157, 0.2157),       # Color para el valor 1 que representa que hay oxigeno (rojo)
+    ]
+    if np.all(matriz == 1):
+        colors = list(reversed(colors))
+
+    if False:
+        im.set_data(matriz)
+    else:
+        cmap_name = "my_list"
+        cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=2)
+
+        # Usar imshow en lugar de pcolormesh para una representación más eficiente
+        im = ax.imshow(matriz, cmap=cmap, origin='upper')
+
+        # Establecer la relación de aspecto para que las celdas sean cuadradas
+        ax.set_aspect('equal')
+
+    # Colocar las etiquetas del eje x en la parte superior
+    # ax.xaxis.tick_top()
+
+    plt.title("Iteracion {}".format(filename.split("_")[1].split(".")[0]))
+
+    return im
+
+
 def plot_regions(Eje_x: int, Eje_y: int, regiones_pesos: list):
     """
     Plot the regions with privileged probability.

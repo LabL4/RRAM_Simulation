@@ -22,7 +22,7 @@ beta_0 = 3e3
 L_p = 1e-9
 
 # Coeficiente de deriva de los iones de oxígeno debido a la presencia de un campo eléctrico externo
-gamma_drift = 9
+gamma_drift = 8
 
 # Potencial de migración de los iones de oxígeno en eV
 E_m = 0.89
