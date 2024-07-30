@@ -1,10 +1,7 @@
 import math
 import numpy as np
 
-from icecream import ic
 from RRAM import Constants as cte
-
-from .Constants import *
 from scipy.constants import elementary_charge
 from .Representate import RepresentateStateOpt
 
@@ -102,7 +99,7 @@ def generation(time_stp: float, electric_field: float, temp: float, **kwargs) ->
         cte_red = cte.cte_red
         gamma = cte.gamma
 
-    exponente = (E_a - (gamma * cte_red * electric_field)) / (k_b_ev * temp)
+    exponente = (E_a - (gamma * cte_red * electric_field)) / (cte.k_b_ev * temp)
     prob_generacion = time_stp * t_0 * (np.exp(-exponente))
 
     return prob_generacion

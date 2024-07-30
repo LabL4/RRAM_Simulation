@@ -139,8 +139,8 @@ for num_simulation in range(len(sim_parmtrs)):
             oxygen_matrix[int(k / paso_guardar) - 1] = oxygen_state
 
     # Elimino de la matriz config_matrix las filas que no se han completado que ocurre cuando percola
-    # config_matrix = np.array([fila for fila in config_matrix if fila.sum() != 0.0])
-    # oxygen_matrix = np.array([fila for fila in oxygen_matrix if fila.sum() != 0.0])
+    config_matrix = np.array([fila for fila in config_matrix if fila.sum() != 0.0])
+    oxygen_matrix = np.array([fila for fila in oxygen_matrix if fila.sum() != 0.0])
 
     # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
     with open(f'Results/Configurations_{num_simulation}.pkl', 'wb') as f:
@@ -150,10 +150,10 @@ for num_simulation in range(len(sim_parmtrs)):
 
     # Cuando percola no se completa la matriz de datos, por lo que la recorto
     data_filtrados = np.array([fila for fila in data if fila[-1] != 0.0])
-    np.savetxt(f'Results/resultados_{num_simulation}.csv', data, header='tiempo simulacion, velocidad, desplazamiento, prob_generacion, sinh',
+    np.savetxt(f'Results/resultados_{num_simulation}.csv', data_filtrados, header='tiempo simulacion, velocidad, desplazamiento, prob_generacion, sinh',
                comments=' ', delimiter=', ')
 
     # Represento los datos de la simulación
 
-    Plot_PostProcess.Plot_panel(f'Results/resultados_{num_simulation}.csv',
-                                title=fr'$\gamma^{{drift}}$ = {sim_ctes[num_simulation]["drift_coefficient"]}, $E_m$ = {sim_ctes[num_simulation]["migration_energy"]}')
+    Plot_PostProcess.Plot_2panel(f'Results/resultados_{num_simulation}.csv',
+                                 title=fr'$\gamma^{{drift}}$ = {sim_ctes[num_simulation]["drift_coefficient"]}, $E_m$ = {sim_ctes[num_simulation]["migration_energy"]} eV')
