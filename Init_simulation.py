@@ -8,7 +8,7 @@ from RRAM import Recombination
 from RRAM import Constants as cte
 
 # Número de simulaciones que realizo
-num_simulations = 48
+num_simulations = 1
 
 # Defino la carpeta donde se guardan los datos iniciales de la simulación
 carpeta = 'Init_data'
@@ -110,9 +110,9 @@ for i in range(num_simulations):
 t_0 = np.ones(num_simulations) * cte.t_0  # Characteristic vibration frequency of oxygen ions in HfOx
 
 # Migration energy of oxygen ions in HfOx
-E_m = np.linspace(0.85, 1.0, 16)  # Migration energy of oxygen ions in HfOx
-E_m = np.tile(E_m, 3)
-# E_m = np.ones(num_simulations) * cte.E_m
+# E_m = np.linspace(0.85, 1.0, 16)  # Migration energy of oxygen ions in HfOx
+# E_m = np.tile(E_m, 3)
+E_m = np.ones(num_simulations) * cte.E_m
 
 
 cte_red = np.ones(num_simulations) * cte.cte_red  # Constante de red, el paper original propone 0.25 nm
@@ -121,9 +121,9 @@ cte_red = np.ones(num_simulations) * cte.cte_red  # Constante de red, el paper o
 E_a = np.ones(num_simulations) * cte.E_a
 
 # Drift coefficient of oxygen ions due to an external field
-gamma_drift = np.array([8, 9, 10])  # Migration energy of oxygen ions in HfOx
-gamma_drift = np.repeat(gamma_drift, 16)
-# gamma_drift = np.ones(num_simulations) * cte.gamma_drift
+# gamma_drift = np.array([8, 9, 10])  # Migration energy of oxygen ions in HfOx
+# gamma_drift = np.repeat(gamma_drift, 16)
+gamma_drift = np.ones(num_simulations) * cte.gamma_drift
 
 # Recombination enhancement factor due to the presence of excessive oxygen ions
 beta_0 = np.ones(num_simulations) * cte.beta_0

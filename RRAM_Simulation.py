@@ -150,7 +150,7 @@ for num_simulation in range(len(sim_parmtrs)):
 
     # Cuando percola no se completa la matriz de datos, por lo que la recorto
     data_filtrados = np.array([fila for fila in data if fila[-1] != 0.0])
-    np.savetxt(f'Results/resultados_{num_simulation}.csv', data_filtrados, header='tiempo simulacion, velocidad, desplazamiento, prob_generacion, sinh',
+    np.savetxt(f'Results/resultados_{num_simulation}.csv', data_filtrados, header='tiempo simulacion, velocidad, desplazamiento, prob_generacion, prob recombinacion',
                comments=' ', delimiter=', ')
 
     # Represento los datos de la simulación

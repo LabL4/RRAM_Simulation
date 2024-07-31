@@ -161,7 +161,7 @@ def Plot_2panel(data_path: str, title: str = None) -> None:
 
     # Extraigo la variable independiente y las dos primeras variables dependientes
     x = data.iloc[:, 0]
-    y = data.iloc[:, 1:3]  # Solo las dos primeras columnas dependientes
+    y = data.iloc[:, 1:4]  # Solo las dos primeras columnas dependientes
 
     # Creo la figura y los subplots
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 6))
@@ -179,12 +179,12 @@ def Plot_2panel(data_path: str, title: str = None) -> None:
     ax1.set_ylabel('Velocidad [m/s]')
 
     # Creo el segundo subplot
-    ax2.plot(x, y.iloc[:, 1])
-    ax2.set_title('desplazamiento')
+    ax2.plot(x, y.iloc[:, 3])
+    ax2.set_title('Probabilidad de recombinación')
 
     # añado una etiqueta al eje x
     ax2.set_xlabel('Tiempo [s]')
-    ax2.set_ylabel('Desplazamiento [casillas]')
+    ax2.set_ylabel('Probabilidad de recombinación')
 
     # Ajustamos el espacio entre los plots
     fig.tight_layout()
