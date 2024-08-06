@@ -155,5 +155,5 @@ for num_simulation in range(len(sim_parmtrs)):
 
     # Represento los datos de la simulación
 
-    Plot_PostProcess.Plot_2panel(f'Results/resultados_{num_simulation}.csv',
-                                 title=fr'$\gamma^{{drift}}$ = {sim_ctes[num_simulation]["drift_coefficient"]}, $E_m$ = {sim_ctes[num_simulation]["migration_energy"]} eV')
+    Plot_PostProcess.Plot_panel(f'Results/resultados_{num_simulation}.csv',
+                                title=fr'$\gamma^{{drift}}$ = {sim_ctes[num_simulation]["drift_coefficient"]}, $E_m$ = {sim_ctes[num_simulation]["migration_energy"]} eV')

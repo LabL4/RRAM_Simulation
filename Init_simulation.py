@@ -38,7 +38,9 @@ priv_x_left = np.ones(num_simulations, dtype=int) * 0
 
 total_simulation_time = np.ones(num_simulations) * 10
 num_pasos = np.ones(num_simulations, dtype=int) * 10000
-voltaje_final = np.ones(num_simulations) * 3
+voltaje_final = np.ones(num_simulations) * 7
+# Esto puede ser mas alto puede ser de hasta 7 V
+# time step de mili segundo y milivoltios de step voltaje incluso de 0.01
 paso_guardar = np.ones(num_simulations, dtype=int) * 1
 
 init_temp = np.ones(num_simulations) * 300
