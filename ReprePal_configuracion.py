@@ -50,7 +50,7 @@ def process_matrix(args):
 
 if __name__ == '__main__':
 
-    NUM_PARALLEL_PROCESSES = 8
+    NUM_PARALLEL_PROCESSES = 12
     start = time.time()
     args = [(Oxigeno[i], i) for i in range(len(Oxigeno))]
     buffers = process_map(process_matrix, args, max_workers=NUM_PARALLEL_PROCESSES, chunksize=50)
@@ -65,7 +65,7 @@ if __name__ == '__main__':
 
     start = time.time()
     # Crear un escritor de video
-    writer = imageio.get_writer('Configuracion.mp4', fps=24)
+    writer = imageio.get_writer('Configuracion.mp4', fps=12)
 
     # Cargar y procesar las imágenes una por una
     for img in images:

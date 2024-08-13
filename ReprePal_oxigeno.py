@@ -65,7 +65,7 @@ if __name__ == '__main__':
 
     start = time.time()
     # Crear un escritor de video
-    writer = imageio.get_writer('Oxygen.mp4', fps=24)
+    writer = imageio.get_writer('Oxygen.mp4', fps=12)
 
     # Cargar y procesar las imágenes una por una
     for img in images:

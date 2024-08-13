@@ -2,7 +2,6 @@ import math
 import numpy as np
 
 from RRAM import Constants as cte
-from scipy.constants import elementary_charge
 from .Representate import RepresentateStateOpt
 
 
@@ -71,19 +70,21 @@ def initial_state_priv(Eje_x: int, Eje_y: int, num_trampas: int, regiones_pesos:
     return InitialState
 
 
-def generation(time_stp: float, electric_field: float, temp: float, **kwargs) -> float:
+def Generate(time_stp: float, electric_field: float, temp: float, **kwargs) -> float:
     """
-    Calculate the generation rate of charge carriers in a RRAM device.
-
-    Parameters:
-    - paso_temporal (float): The time step for the simulation.
-    - electric_field (float): The electric field applied to the device.
-    - temperature (float): The temperature of the device.
-    - carga_vacante (float, optional): The vacancy charge. Default is 2.
-
+    Calculates the generation probability of RRAM devices.
+    Args:
+        time_stp (float): The time step for the calculation.
+        electric_field (float): The electric field applied to the device.
+        temp (float): The temperature of the device.
+        **kwargs: Contains the constants needed for the calculation.
+    Keyword Args:
+        vibration_frequency (float): The vibration frequency constant. Required if kwargs is provided.
+        activation_energy (float): The activation energy constant. Required if kwargs is provided.
+        cte_red (float): The reduction constant. Required if kwargs is provided.
+        gamma (float): The gamma constant. Required if kwargs is provided.
     Returns:
-    - float: The generation rate of charge carriers.
-
+        float: The generation probability of generate a vancancy.
     """
 
     # Obtengo las constantes necesarias para el cálculo

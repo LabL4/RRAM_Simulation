@@ -5,6 +5,7 @@ import pandas as pd
 
 from RRAM import *
 from RRAM import Recombination
+from RRAM import Generation as gn
 from RRAM import Constants as cte
 
 # Número de simulaciones que realizo
@@ -38,7 +39,7 @@ priv_x_left = np.ones(num_simulations, dtype=int) * 0
 
 total_simulation_time = np.ones(num_simulations) * 10
 num_pasos = np.ones(num_simulations, dtype=int) * 10000
-voltaje_final = np.ones(num_simulations) * 7
+voltaje_final = np.ones(num_simulations) * 3
 # Esto puede ser mas alto puede ser de hasta 7 V
 # time step de mili segundo y milivoltios de step voltaje incluso de 0.01
 paso_guardar = np.ones(num_simulations, dtype=int) * 1
@@ -94,7 +95,7 @@ for i in range(num_simulations):
     ]
 
     # Estado inicial de la simulación para los oxígenos y el sistema
-    init_state = Generation.initial_state_priv(eje_x[i], eje_y[i], num_trampas[i], regiones_pesos)
+    init_state = gn.initial_state_priv(eje_x[i], eje_y[i], num_trampas[i], regiones_pesos)
     RepresentateState(init_state, 'Init_data/init_state_' + str(i))
     oxygen_state = Recombination.Init_OxygenState(device_size[i], atom_size[i])
 

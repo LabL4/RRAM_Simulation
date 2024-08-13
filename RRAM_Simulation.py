@@ -1,14 +1,30 @@
 import os
 import pickle
 import shutil
-from re import A
 import time as time
 import pandas as pd
 
 from RRAM import *
 from tqdm import tqdm
 from RRAM import Recombination
+from RRAM import Generation as gn
 from RRAM import Plot_PostProcess
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------------
+# Funcion temporarl para contar el numero de vacantes en cada paso
+# ------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+def contar_vacantes(matriz):
+    contador = 0
+    for fila in matriz:
+        for elemento in fila:
+            if elemento == 1:
+                contador += 1
+    return contador
+
+# ------------------------------------------------------------------------------------------------------------------------------------------------------
+
 
 # comienzo leyendo los datos de la simulación almacenados en un archivo csv dentro de la carpeta Init y los guardo en sus respectivas variables
 sim_parmtrs = Montecarlo.read_csv_to_dic("Init_data/simulation_parameters.csv")
@@ -69,14 +85,20 @@ for num_simulation in range(len(sim_parmtrs)):
     vector_ddp = np.linspace(0, voltaje_final, num_pasos + 1)
 
     # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias (x,y,probabilidad recombionacion, velocidad)
-    colunm_number = 5
+    colunm_number = 7
     data = np.zeros((num_pasos, colunm_number))
+
     # Creo el excel donde voy a sacar todos los datos
     df = pd.DataFrame(columns=['Tiempo simulacion', 'velocidad', 'desplazamiento',
-                      'prob_generacion', 'probabilidad_recombinacion'])
+                      'prob_generacion', 'prob_recombinacion', "vancates generadas", "vacantes totales"])
 
     # Comienzo la simulación
     for k in tqdm(range(1, num_pasos+1)):
+
+        num_vacantes = contar_vacantes(actual_state)
+        # Inicializo las vacantes generadas
+        vancantes_generadas = 0
+
         # Guardo el estado anterior
         last_state = actual_state
 
@@ -106,7 +128,7 @@ for num_simulation in range(len(sim_parmtrs)):
 
         # TODO: REVISAR PROBABILIDAD QUE A VECES SALE MAYOR DE 1
         # TODO: HACER UN REESCALADO DE LOS VALORES PARA EVITAR TENER QUE TRABAJAR CON NUMEROS TAN GRANDES
-        prob_generacion = Generation.generation(paso_temporal, E_field, temperatura)
+        prob_generacion = gn.Generate(paso_temporal, E_field, temperatura, **sim_ctes[num_simulation])
 
         # TODO: Revisa COMO SE GENERA LA PROBABILIDAD DE GENERACIÓN
         # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
@@ -116,6 +138,7 @@ for num_simulation in range(len(sim_parmtrs)):
                     random_number = np.random.rand()
                     if random_number < prob_generacion:
                         actual_state[i, j] = 1  # Generación de una vacante
+                        vancantes_generadas = vancantes_generadas + 1
 
         if (simulation_time > 9) and (simulation_time < 9.2):
             pass
@@ -131,7 +154,8 @@ for num_simulation in range(len(sim_parmtrs)):
         actual_state, oxygen_statem, pro_recombination = Recombination.Recombine(
             actual_state, oxygen_state, paso_temporal, velocidad, temperatura, **sim_ctes[num_simulation])
 
-        data[k-1] = np.array([simulation_time, velocidad, desplazamiento, prob_generacion, pro_recombination])
+        data[k-1] = np.array([simulation_time, velocidad, desplazamiento,
+                             prob_generacion, pro_recombination, vancantes_generadas, num_vacantes])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
@@ -139,8 +163,8 @@ for num_simulation in range(len(sim_parmtrs)):
             oxygen_matrix[int(k / paso_guardar) - 1] = oxygen_state
 
     # Elimino de la matriz config_matrix las filas que no se han completado que ocurre cuando percola
-    config_matrix = np.array([fila for fila in config_matrix if fila.sum() != 0.0])
-    oxygen_matrix = np.array([fila for fila in oxygen_matrix if fila.sum() != 0.0])
+    # config_matrix = np.array([fila for fila in config_matrix if fila.sum() != 0.0])
+    # oxygen_matrix = np.array([fila for fila in oxygen_matrix if fila.sum() != 0.0])
 
     # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
     with open(f'Results/Configurations_{num_simulation}.pkl', 'wb') as f:
@@ -149,8 +173,9 @@ for num_simulation in range(len(sim_parmtrs)):
         pickle.dump(oxygen_matrix, f)
 
     # Cuando percola no se completa la matriz de datos, por lo que la recorto
-    data_filtrados = np.array([fila for fila in data if fila[-1] != 0.0])
-    np.savetxt(f'Results/resultados_{num_simulation}.csv', data_filtrados, header='tiempo simulacion, velocidad, desplazamiento, prob_generacion, prob recombinacion',
+    # data_filtrados = np.array([fila for fila in data if fila[-1] != 0.0])
+    np.savetxt(f'Results/resultados_{num_simulation}.csv', data,
+               header='tiempo simulacion, velocidad, desplazamiento, prob generacion, prob recombinacion, vancantes generadas, vacantes totales',
                comments=' ', delimiter=', ')
 
     # Represento los datos de la simulación
