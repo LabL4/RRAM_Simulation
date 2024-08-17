@@ -115,8 +115,9 @@ for num_simulation in range(len(sim_parmtrs)):
         if Percolation.is_path(actual_state):
             # Si ha percolado uso la corriente de percolación
             # Corriente = CurentSolver.OmhCurrent(Temperatura, Campo_Electrico)
-            print(f"\n Ha percolado")
-            break
+            # print(f"\n Ha percolado")
+            # break
+            variable = True  # Eeto es simplemente para que no se pare cuando eprcole y no de error en la corriente
         else:
             # Si no ha percolado uso la corriente de campo
             # TODO: REVISAR QUE LA CORRIENTE TIENE LAS UNIDADES CORRECTAS PORQUE NO CUADRAN VALORES.
