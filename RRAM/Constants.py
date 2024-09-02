@@ -31,7 +31,7 @@ E_m = 0.9
 resistencia_termica = 7e5
 
 # Constante de resistencia térmica en ohmios
-resistencia_ohmica = 1e6
+ohm_resistence = 1e6
 
 # Constante de red, el paper original propone 0.25 nm
 cte_red = 0.25e-9

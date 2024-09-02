@@ -11,7 +11,7 @@ from RRAM import Generation as gn
 from RRAM import Plot_PostProcess
 
 # ------------------------------------------------------------------------------------------------------------------------------------------------------
-# Funcion temporarl para contar el numero de vacantes en cada paso
+# Funcion temporal para contar el numero de vacantes en cada paso
 # ------------------------------------------------------------------------------------------------------------------------------------------------------
 
 
@@ -105,19 +105,15 @@ for num_simulation in range(len(sim_parmtrs)):
         # Actualizo el tiempo de simulación
         simulation_time = paso_temporal * k
 
-        # Calculo la corriente TODO: asasasasasa
+        # Actualizo el voltaje
         voltaje = vector_ddp[k]
 
         # voltaje += voltaje_final / paso_temporal
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
-        # TODO: Revisar la corriente óhmica que no funciona
         if Percolation.is_path(actual_state):
             # Si ha percolado uso la corriente de percolación
-            # Corriente = CurentSolver.OmhCurrent(Temperatura, Campo_Electrico)
-            # print(f"\n Ha percolado")
-            # break
-            variable = True  # Eeto es simplemente para que no se pare cuando eprcole y no de error en la corriente
+            Corriente = CurentSolver.OmhCurrent(voltaje, temperatura)
         else:
             # Si no ha percolado uso la corriente de campo
             # TODO: REVISAR QUE LA CORRIENTE TIENE LAS UNIDADES CORRECTAS PORQUE NO CUADRAN VALORES.
@@ -127,11 +123,8 @@ for num_simulation in range(len(sim_parmtrs)):
         E_field = SimpleElectricField(voltaje, device_size)
         # temperatura = Temperature_Joule(voltaje, Corriente, T_0=350) TODO: Estoy usando la temperatura constante
 
-        # TODO: REVISAR PROBABILIDAD QUE A VECES SALE MAYOR DE 1
-        # TODO: HACER UN REESCALADO DE LOS VALORES PARA EVITAR TENER QUE TRABAJAR CON NUMEROS TAN GRANDES
         prob_generacion = gn.Generate(paso_temporal, E_field, temperatura, **sim_ctes[num_simulation])
 
-        # TODO: Revisa COMO SE GENERA LA PROBABILIDAD DE GENERACIÓN
         # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
         for i in range(x_size):
             for j in range(y_size):

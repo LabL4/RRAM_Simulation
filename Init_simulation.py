@@ -28,7 +28,7 @@ os.makedirs(carpeta)
 device_size = np.ones(num_simulations) * 10e-9  # m
 atom_size = np.ones(num_simulations) * 0.25e-9  # m TODO: Esto se deberia llamar tamaño del grid mejor
 # atom_size = np.linspace(0.15e-9, 0.24e-9, num_simulations)  # m
-num_trampas = np.ones(num_simulations, dtype=int) * 10
+num_trampas = np.ones(num_simulations, dtype=int) * 300
 
 priv_y_sup_right = np.ones(num_simulations, dtype=int) * 0
 priv_y_inf_right = np.ones(num_simulations, dtype=int) * 0
@@ -113,7 +113,7 @@ for i in range(num_simulations):
 t_0 = np.ones(num_simulations) * cte.t_0  # Characteristic vibration frequency of oxygen ions in HfOx
 
 # Migration energy of oxygen ions in HfOx
-# E_m = np.linspace(0.85, 1.0, 16)  # Migration energy of oxygen ions in HfOx
+# E_m = np.linspace(0.85, 1.0, 16)
 # E_m = np.tile(E_m, 3)
 E_m = np.ones(num_simulations) * cte.E_m
 
@@ -124,7 +124,7 @@ cte_red = np.ones(num_simulations) * cte.cte_red  # Constante de red, el paper o
 E_a = np.ones(num_simulations) * cte.E_a
 
 # Drift coefficient of oxygen ions due to an external field
-# gamma_drift = np.array([8, 9, 10])  # Migration energy of oxygen ions in HfOx
+# gamma_drift = np.array([8, 9, 10])
 # gamma_drift = np.repeat(gamma_drift, 16)
 gamma_drift = np.ones(num_simulations) * cte.gamma_drift
 
@@ -137,9 +137,13 @@ L_p = np.ones(num_simulations) * cte.L_p
 # Coefficient representing the local enhancement factor due to the electric field
 gamma = np.ones(num_simulations) * cte.gamma
 
+# Resistance ohmic of the device
+ohm_resistence = np.ones(num_simulations) * cte.ohm_resistence
+
 # Creo un dataframe nuevo con las constantes de la simulación
-df_ctes = pd.DataFrame(columns=['vibration_frequency', 'migration_energy',
-                       'drift_coefficient', 'cte_red', 'recom_enchancement_factor', 'decaimiento_concentracion', 'activation_energy', 'gamma'])
+df_ctes = pd.DataFrame(columns=['vibration_frequency', 'migration_energy', 'drift_coefficient',
+                                'cte_red', 'recom_enchancement_factor', 'decaimiento_concentracion',
+                                'activation_energy', 'gamma', 'ohm_resistence'])
 
 df_ctes['vibration_frequency'] = t_0
 df_ctes['migration_energy'] = E_m
@@ -149,6 +153,7 @@ df_ctes['recom_enchancement_factor'] = beta_0
 df_ctes['decaimiento_concentracion'] = L_p
 df_ctes['activation_energy'] = E_a
 df_ctes['gamma'] = gamma
+df_ctes['ohm_resistence'] = ohm_resistence
 
 # Guardo el dataframe de las ctes en un archivo csv
 df_ctes.to_csv('Init_data/simulation_constants.csv', index=False)
