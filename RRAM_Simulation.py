@@ -116,7 +116,7 @@ for num_simulation in range(len(sim_parmtrs)):
         else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
             # TODO: REVISAR QUE LA CORRIENTE TIENE LAS UNIDADES CORRECTAS PORQUE NO CUADRAN VALORES.
-            Corriente = CurentSolver.poole_frenkel(temperatura, E_field)/(1e-10)
+            Corriente = CurentSolver.poole_frenkel(temperatura, E_field)*(device_size)
 
         # Obtengo los valores del campo eléctrico y la temperatura
         E_field = SimpleElectricField(voltaje, device_size)
