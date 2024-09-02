@@ -10,9 +10,9 @@ from RRAM import Recombination
 from RRAM import Generation as gn
 from RRAM import Plot_PostProcess
 
-# ------------------------------------------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------------------
 # Funcion temporal para contar el numero de vacantes en cada paso
-# ------------------------------------------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------------------
 
 
 def contar_vacantes(matriz):
@@ -22,8 +22,7 @@ def contar_vacantes(matriz):
             if elemento == 1:
                 contador += 1
     return contador
-
-# ------------------------------------------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------------------
 
 
 # comienzo leyendo los datos de la simulación almacenados en un archivo csv dentro de la carpeta Init y los guardo en sus respectivas variables
@@ -85,12 +84,12 @@ for num_simulation in range(len(sim_parmtrs)):
     vector_ddp = np.linspace(0, voltaje_final, num_pasos + 1)
 
     # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias (x,y,probabilidad recombionacion, velocidad)
-    colunm_number = 7
+    colunm_number = 9
     data = np.zeros((num_pasos, colunm_number))
 
     # Creo el excel donde voy a sacar todos los datos
-    df = pd.DataFrame(columns=['Tiempo simulacion', 'velocidad', 'desplazamiento',
-                      'prob_generacion', 'prob_recombinacion', "vancates generadas", "vacantes totales"])
+    df = pd.DataFrame(columns=['Tiempo simulacion', 'Voltaje', 'velocidad', 'desplazamiento',
+                      'prob_generacion', 'prob_recombinacion', "vancates generadas", "vacantes totales", 'Intensidad'])
 
     # Comienzo la simulación
     for k in tqdm(range(1, num_pasos+1)):
@@ -112,10 +111,10 @@ for num_simulation in range(len(sim_parmtrs)):
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
-            # Si ha percolado uso la corriente de percolación
-            Corriente = CurentSolver.OmhCurrent(voltaje, temperatura)
+            # Si ha percolado uso la corriente de Ohm
+            Corriente = CurentSolver.OmhCurrent(voltaje, actual_state)
         else:
-            # Si no ha percolado uso la corriente de campo
+            # Si no ha percolado uso la corriente de Poole-Frenkel
             # TODO: REVISAR QUE LA CORRIENTE TIENE LAS UNIDADES CORRECTAS PORQUE NO CUADRAN VALORES.
             Corriente = CurentSolver.poole_frenkel(temperatura, E_field)/(1e-10)
 
@@ -148,17 +147,13 @@ for num_simulation in range(len(sim_parmtrs)):
         actual_state, oxygen_statem, pro_recombination = Recombination.Recombine(
             actual_state, oxygen_state, paso_temporal, velocidad, temperatura, **sim_ctes[num_simulation])
 
-        data[k-1] = np.array([simulation_time, velocidad, desplazamiento,
-                             prob_generacion, pro_recombination, vancantes_generadas, num_vacantes])
+        data[k-1] = np.array([simulation_time, voltaje, velocidad, desplazamiento,
+                             prob_generacion, pro_recombination, vancantes_generadas, num_vacantes, Corriente])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
             config_matrix[int(k / paso_guardar) - 1] = actual_state
             oxygen_matrix[int(k / paso_guardar) - 1] = oxygen_state
-
-    # Elimino de la matriz config_matrix las filas que no se han completado que ocurre cuando percola
-    # config_matrix = np.array([fila for fila in config_matrix if fila.sum() != 0.0])
-    # oxygen_matrix = np.array([fila for fila in oxygen_matrix if fila.sum() != 0.0])
 
     # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
     with open(f'Results/Configurations_{num_simulation}.pkl', 'wb') as f:
@@ -169,10 +164,9 @@ for num_simulation in range(len(sim_parmtrs)):
     # Cuando percola no se completa la matriz de datos, por lo que la recorto
     # data_filtrados = np.array([fila for fila in data if fila[-1] != 0.0])
     np.savetxt(f'Results/resultados_{num_simulation}.csv', data,
-               header='tiempo simulacion, velocidad, desplazamiento, prob generacion, prob recombinacion, vancantes generadas, vacantes totales',
+               header='tiempo simulacion, voltaje, velocidad, desplazamiento, prob generacion, prob recombinacion, vancantes generadas, vacantes totales, intensidad',
                comments=' ', delimiter=', ')
 
-    # Represento los datos de la simulación
-
-    Plot_PostProcess.Plot_panel(f'Results/resultados_{num_simulation}.csv',
-                                title=fr'$\gamma^{{drift}}$ = {sim_ctes[num_simulation]["drift_coefficient"]}, $E_m$ = {sim_ctes[num_simulation]["migration_energy"]} eV')
+    # # Represento los datos de la simulación
+    # Plot_PostProcess.Plot_panel(f'Results/resultados_{num_simulation}.csv',
+    #                             title=fr'$\gamma^{{drift}}$ = {sim_ctes[num_simulation]["drift_coefficient"]}, $E_m$ = {sim_ctes[num_simulation]["migration_energy"]} eV')

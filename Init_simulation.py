@@ -22,13 +22,14 @@ if os.path.exists(carpeta):
 # Crea la carpeta de nuevo
 os.makedirs(carpeta)
 
-# ------------------------------------------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------------------
 # Defino los parámetros de la simulación
-# ------------------------------------------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------------------
+
 device_size = np.ones(num_simulations) * 10e-9  # m
 atom_size = np.ones(num_simulations) * 0.25e-9  # m TODO: Esto se deberia llamar tamaño del grid mejor
 # atom_size = np.linspace(0.15e-9, 0.24e-9, num_simulations)  # m
-num_trampas = np.ones(num_simulations, dtype=int) * 300
+num_trampas = np.ones(num_simulations, dtype=int) * 100
 
 priv_y_sup_right = np.ones(num_simulations, dtype=int) * 0
 priv_y_inf_right = np.ones(num_simulations, dtype=int) * 0
@@ -38,10 +39,10 @@ priv_y_inf_left = np.ones(num_simulations, dtype=int) * 0
 priv_x_left = np.ones(num_simulations, dtype=int) * 0
 
 total_simulation_time = np.ones(num_simulations) * 10
-num_pasos = np.ones(num_simulations, dtype=int) * 10000
-voltaje_final = np.ones(num_simulations) * 3
-# Esto puede ser mas alto puede ser de hasta 7 V
 # time step de mili segundo y milivoltios de step voltaje incluso de 0.01
+num_pasos = np.ones(num_simulations, dtype=int) * 10000
+voltaje_final = np.ones(num_simulations) * 5        # Esto puede ser mas alto puede ser de hasta 7 V
+
 paso_guardar = np.ones(num_simulations, dtype=int) * 1
 
 init_temp = np.ones(num_simulations) * 300
