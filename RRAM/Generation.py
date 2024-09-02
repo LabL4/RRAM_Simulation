@@ -1,9 +1,7 @@
 import math
 import numpy as np
-from icecream import ic
 
-from .Constants import *
-from scipy.constants import elementary_charge
+from RRAM import Constants as cte
 from .Representate import RepresentateStateOpt
 
 
@@ -72,22 +70,37 @@ def initial_state_priv(Eje_x: int, Eje_y: int, num_trampas: int, regiones_pesos:
     return InitialState
 
 
-def generation(paso_temporal: float, electric_field: float,
-               temperature: float, carga_vacante: float = 2) -> float:
+def Generate(time_stp: float, electric_field: float, temp: float, **kwargs) -> float:
     """
-    Calculate the generation rate of charge carriers in a RRAM device.
-
-    Parameters:
-    - paso_temporal (float): The time step for the simulation.
-    - electric_field (float): The electric field applied to the device.
-    - temperature (float): The temperature of the device.
-    - carga_vacante (float, optional): The vacancy charge. Default is 2.
-
+    Calculates the generation probability of RRAM devices.
+    Args:
+        time_stp (float): The time step for the calculation.
+        electric_field (float): The electric field applied to the device.
+        temp (float): The temperature of the device.
+        **kwargs: Contains the constants needed for the calculation.
+    Keyword Args:
+        vibration_frequency (float): The vibration frequency constant. Required if kwargs is provided.
+        activation_energy (float): The activation energy constant. Required if kwargs is provided.
+        cte_red (float): The reduction constant. Required if kwargs is provided.
+        gamma (float): The gamma constant. Required if kwargs is provided.
     Returns:
-    - float: The generation rate of charge carriers.
-
+        float: The generation probability of generate a vancancy.
     """
-    exponente = (E_a - (gamma * carga_vacante * np.abs(electric_field))) / (k_b_ev * temperature)
-    prob_generacion = paso_temporal * t_0 * (np.exp(-exponente))
+
+    # Obtengo las constantes necesarias para el cálculo
+    if kwargs:
+        # Obtengo el valor de las constantes que necesita la función
+        t_0 = float(kwargs.get('vibration_frequency'))
+        E_a = float(kwargs.get('activation_energy'))
+        cte_red = float(kwargs.get('cte_red'))
+        gamma = float(kwargs.get('gamma'))
+    else:
+        t_0 = cte.t_0
+        E_a = cte.E_a
+        cte_red = cte.cte_red
+        gamma = cte.gamma
+
+    exponente = (E_a - (gamma * cte_red * electric_field)) / (cte.k_b_ev * temp)
+    prob_generacion = time_stp * t_0 * (np.exp(-exponente))
 
     return prob_generacion

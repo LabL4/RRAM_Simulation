@@ -1,8 +1,8 @@
 import math
 import numpy as np
 
+from RRAM import Constants as cte
 from scipy.constants import elementary_charge
-from RRAM import Constants as cte, Representate
 from .Constants import t_0, k_b_ev, E_m, gamma_drift
 
 
@@ -54,7 +54,7 @@ def Generate_Oxigen(oxygen_state: np.array, num_oxygen: int):
     return oxygen_state
 
 
-def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float, E_field: float, atom_size: float, **kwargs):
+def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float, E_field: float, grid_size: float, **kwargs):
     """
     Move the oxygen ions in the simulation based on the given parameters.
 
@@ -75,24 +75,26 @@ def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float
         t_0 = float(kwargs.get('vibration_frequency'))
         gamma_drift = float(kwargs.get('drift_coefficient'))
         E_m = float(kwargs.get('migration_energy'))
+        cte_red = float(kwargs.get('cte_red'))
     else:
         t_0 = cte.t_0
         gamma_drift = cte.gamma_drift
         E_m = cte.E_m
+        cte_red = cte.cte_red
 
     # Duplico la matriz de oxígeno para no modificar la original
     oxygen_state_before = np.copy(oxygen_state)
 
     # Obtengo la velocidad de los iones de oxígeno v = ((2 * a)/t0)*exp(−Em/kT) sinh((d * γ_drift * F)/2kT)
-    senoh = math.sinh((atom_size * E_field * gamma_drift) / (2 * k_b_ev * temperature))
+    senoh = math.sinh((cte_red * E_field * gamma_drift)/(2 * k_b_ev * temperature))
     exp_velocity = math.exp(-E_m / (k_b_ev * temperature))
 
     # el t_0 es el valor de 1/t_0 que lo pongo directamente y "factor" es algo que introduzco a mano para ajustar la velocidad
     # En la expresión original se multiplica por 2 lo he quitado para ver si sale algo mejor
-    oxigen_velocity = 2 * t_0 * atom_size * (senoh * exp_velocity)
+    oxigen_velocity = 2 * t_0 * cte_red * (senoh * exp_velocity)
 
     # Calculo la cantidad de "casillas" que se moverá el ion de oxígeno
-    displacement = int(round((oxigen_velocity * paso_temp) / atom_size))
+    displacement = int(round((oxigen_velocity * paso_temp) / grid_size))
 
     if displacement == 0:
         pass
@@ -108,10 +110,11 @@ def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float
                         oxygen_state[j, i] = 0
                     else:  # Si se sale de la matriz, lo elimino
                         oxygen_state[j, i] = 0
+
     return oxygen_state, oxigen_velocity, displacement, senoh
 
 
-def Recombine(actual_state: np.array, oxygen_state: np.array):
+def Recombine(actual_state: np.array, oxygen_state: np.array, paso_temp: float, velocidad: float, temp: float, **kwargs) -> np.array:
     """
     Recombines oxygen and actual states based on certain conditions.
 
@@ -127,19 +130,56 @@ def Recombine(actual_state: np.array, oxygen_state: np.array):
     oxygen_state_before = np.copy(oxygen_state)
     actual_state_before = np.copy(actual_state)
 
+    # Calculo la probabilidad de recombinación. Esto debería ir dentro de los ciclos for pero
+    # lo he sacado para tener siempre el valor aunque no haya recombinción
+    j = 1  # No estoy empleando la variable j (que serviria para la funcion a trozos) para no cambiar el codigo original
+    # dejo este valor
+    prob_recom = Prob_Recombination(paso_temp, velocidad, j, temp, **kwargs)
+
     # Recorro la matriz de oxígeno para saber en qué posiciones hay oxígeno
     for i in range(oxygen_state_before.shape[0]):
         for j in range(oxygen_state_before.shape[1]):
             # Si hay oxígeno en la posición de la matriz de oxígeno y hay un hueco en la matriz de estado actual
             if oxygen_state_before[i, j] == 1 and actual_state_before[i, j] == 1:
                 # Si hay un hueco, calculo la probabilidad de recombinación
-                prob_recom = np.random.rand()
-                # Si la probabilidad es menor a 0.5, recombinan:
-                if prob_recom < 0.5:  # Cambiar luego a la probabilidad en equilibrio que menciona en el paper original
+                random_number = np.random.rand()    # Genero un número aleatorio
+                if random_number < prob_recom:  # Cambiar luego a la probabilidad en equilibrio que menciona en el paper original
                     actual_state[i, j] = 0
                     oxygen_state[i, j] = 0
+                # if random_number > 0.5:  # Cambiar luego a la probabilidad en equilibrio que menciona en el paper original
+                #     actual_state[i, j] = 0
+                #     oxygen_state[i, j] = 0
 
-    return (actual_state, oxygen_state)
+    return (actual_state, oxygen_state, prob_recom)
+
+
+def Prob_Recombination(paso_temporal: float, velocidad: float, pos_x: int, temp: float, **kwargs) -> float:
+
+    # Obtengo las constantes necesarias para el cálculo
+    if kwargs:
+        # Obtengo el valor de las constantes que necesita la función
+        t_0 = float(kwargs.get('vibration_frequency'))
+        beta_0 = float(kwargs.get('recom_enchancement_factor'))
+        E_a = float(kwargs.get('activation_energy'))
+        cte_red = float(kwargs.get('cte_red'))
+        L_p = float(kwargs.get('decaimiento_concentracion'))
+    else:
+        t_0 = cte.t_0
+        beta_0 = cte.beta_0
+        E_a = cte.E_a
+        cte_red = cte.cte_red
+        L_p = cte.L_p
+
+    # Calculo la  probabilidad de recombinación en equilibrio
+    prob_in_equilibrio = (paso_temporal * t_0) * (math.exp(-E_a / (k_b_ev * temp)))  # Compruebado es correcto
+    # funcion_trozos = cte.DifussiveBehaviour(pos_x, velocidad, paso_temporal, cte_red)
+    # * funcion_trozos le quito lo de la funcion a trozos
+    exp_beta = math.exp(-(paso_temporal * velocidad) / L_p) * beta_0  # Compruebado es correcto
+
+    prob_recom = prob_in_equilibrio * exp_beta  # Compruebado es correcto
+
+    return prob_recom
+
 
 # |----------------------------------------------------------------------------------------------------------------------|
 # | Esta función es la original del paper: On the Switching Parameter Variation of Metal-Oxide RRAM—Part I:              |

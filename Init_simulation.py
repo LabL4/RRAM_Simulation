@@ -5,10 +5,11 @@ import pandas as pd
 
 from RRAM import *
 from RRAM import Recombination
+from RRAM import Generation as gn
 from RRAM import Constants as cte
 
 # Número de simulaciones que realizo
-num_simulations = 10
+num_simulations = 1
 
 # Defino la carpeta donde se guardan los datos iniciales de la simulación
 carpeta = 'Init_data'
@@ -21,24 +22,27 @@ if os.path.exists(carpeta):
 # Crea la carpeta de nuevo
 os.makedirs(carpeta)
 
-# ------------------------------------------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------------------
 # Defino los parámetros de la simulación
-# ------------------------------------------------------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------------------
+
 device_size = np.ones(num_simulations) * 10e-9  # m
-atom_size = np.linspace(0.15e-9, 0.24e-9, num_simulations)  # m
-# atom_size = np.ones(num_simulations) * 0.25e-9  # m
+atom_size = np.ones(num_simulations) * 0.25e-9  # m TODO: Esto se deberia llamar tamaño del grid mejor
+# atom_size = np.linspace(0.15e-9, 0.24e-9, num_simulations)  # m
 num_trampas = np.ones(num_simulations, dtype=int) * 100
 
-priv_y_sup_right = np.ones(num_simulations, dtype=int) * 10
-priv_y_inf_right = np.ones(num_simulations, dtype=int) * 10
-priv_x_right = np.ones(num_simulations, dtype=int) * 10
-priv_y_sup_left = np.ones(num_simulations, dtype=int) * 10
-priv_y_inf_left = np.ones(num_simulations, dtype=int) * 10
-priv_x_left = np.ones(num_simulations, dtype=int) * 10
+priv_y_sup_right = np.ones(num_simulations, dtype=int) * 0
+priv_y_inf_right = np.ones(num_simulations, dtype=int) * 0
+priv_x_right = np.ones(num_simulations, dtype=int) * 0
+priv_y_sup_left = np.ones(num_simulations, dtype=int) * 0
+priv_y_inf_left = np.ones(num_simulations, dtype=int) * 0
+priv_x_left = np.ones(num_simulations, dtype=int) * 0
 
 total_simulation_time = np.ones(num_simulations) * 10
+# time step de mili segundo y milivoltios de step voltaje incluso de 0.01
 num_pasos = np.ones(num_simulations, dtype=int) * 10000
-voltaje_final = np.ones(num_simulations) * 3
+voltaje_final = np.ones(num_simulations) * 5        # Esto puede ser mas alto puede ser de hasta 7 V
+
 paso_guardar = np.ones(num_simulations, dtype=int) * 1
 
 init_temp = np.ones(num_simulations) * 300
@@ -92,7 +96,7 @@ for i in range(num_simulations):
     ]
 
     # Estado inicial de la simulación para los oxígenos y el sistema
-    init_state = Generation.initial_state_priv(eje_x[i], eje_y[i], num_trampas[i], regiones_pesos)
+    init_state = gn.initial_state_priv(eje_x[i], eje_y[i], num_trampas[i], regiones_pesos)
     RepresentateState(init_state, 'Init_data/init_state_' + str(i))
     oxygen_state = Recombination.Init_OxygenState(device_size[i], atom_size[i])
 
@@ -108,19 +112,49 @@ for i in range(num_simulations):
 # # ------------------------------------------------------------------------------------------------------------------------------------------------------
 
 t_0 = np.ones(num_simulations) * cte.t_0  # Characteristic vibration frequency of oxygen ions in HfOx
-E_m = np.ones(num_simulations) * cte.E_m  # Migration energy of oxygen ions in HfOx
-# E_m = np.linspace(0.8, 1.0, num_simulations)  # Migration energy of oxygen ions in HfOx
+
+# Migration energy of oxygen ions in HfOx
+# E_m = np.linspace(0.85, 1.0, 16)
+# E_m = np.tile(E_m, 3)
+E_m = np.ones(num_simulations) * cte.E_m
+
+
+cte_red = np.ones(num_simulations) * cte.cte_red  # Constante de red, el paper original propone 0.25 nm
+
+# eV Energía de activación
+E_a = np.ones(num_simulations) * cte.E_a
 
 # Drift coefficient of oxygen ions due to an external field
-gamma_drift = np.ones(num_simulations) * 8
-# gamma_drift = np.ones(num_simulations) * cte.gamma_drift  # Drift coefficient of oxygen ions due to an external field
+# gamma_drift = np.array([8, 9, 10])
+# gamma_drift = np.repeat(gamma_drift, 16)
+gamma_drift = np.ones(num_simulations) * cte.gamma_drift
+
+# Recombination enhancement factor due to the presence of excessive oxygen ions
+beta_0 = np.ones(num_simulations) * cte.beta_0
+
+# Decay length of the oxygen concentration
+L_p = np.ones(num_simulations) * cte.L_p
+
+# Coefficient representing the local enhancement factor due to the electric field
+gamma = np.ones(num_simulations) * cte.gamma
+
+# Resistance ohmic of the device
+ohm_resistence = np.ones(num_simulations) * cte.ohm_resistence
 
 # Creo un dataframe nuevo con las constantes de la simulación
-df_ctes = pd.DataFrame(columns=['vibration_frequency', 'migration_energy', 'drift_coefficient'])
+df_ctes = pd.DataFrame(columns=['vibration_frequency', 'migration_energy', 'drift_coefficient',
+                                'cte_red', 'recom_enchancement_factor', 'decaimiento_concentracion',
+                                'activation_energy', 'gamma', 'ohm_resistence'])
 
 df_ctes['vibration_frequency'] = t_0
 df_ctes['migration_energy'] = E_m
 df_ctes['drift_coefficient'] = gamma_drift
+df_ctes['cte_red'] = cte_red
+df_ctes['recom_enchancement_factor'] = beta_0
+df_ctes['decaimiento_concentracion'] = L_p
+df_ctes['activation_energy'] = E_a
+df_ctes['gamma'] = gamma
+df_ctes['ohm_resistence'] = ohm_resistence
 
 # Guardo el dataframe de las ctes en un archivo csv
 df_ctes.to_csv('Init_data/simulation_constants.csv', index=False)

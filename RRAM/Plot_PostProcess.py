@@ -34,11 +34,11 @@ def Plot_panel(data_path: str, title: str = None) -> None:
     y = data[:, 1:]
 
     # Creo la figura que será un panel con 4 subplots
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(9, 7))
 
     # Establezco el título del conjunto de figuras si se ha proporcionado uno
     if title is not None:
-        fig.suptitle(title)
+        fig.suptitle(title, fontsize=16)
 
     # Creo el primer subplot
     ax1.plot(x, y[:, 0])
@@ -54,7 +54,7 @@ def Plot_panel(data_path: str, title: str = None) -> None:
 
     # añado una etiqueta al eje x
     ax2.set_xlabel('Tiempo [s]')
-    ax2.set_ylabel('Desplazamiento [m]')
+    ax2.set_ylabel('Desplazamiento [casillas]')
 
     # Creo el tercer subplot
     ax3.plot(x, y[:, 2])
@@ -65,7 +65,7 @@ def Plot_panel(data_path: str, title: str = None) -> None:
 
     # Creo el cuarto subplot
     ax4.plot(x, y[:, 3])
-    ax4.set_title('sinh')
+    ax4.set_title('Probabilidad recombinacion')
 
     # añado una etiqueta al eje x
     ax4.set_xlabel('Tiempo [s]')
@@ -77,11 +77,14 @@ def Plot_panel(data_path: str, title: str = None) -> None:
     if title is not None:
         fig.subplots_adjust(top=0.88)
 
+    # TODO: Cambiar esto por si no le pongo titulo
     # Elimino la extensión del archivo
     data_path = (data_path.split('/')[1]).split('.')[0]
+    partes = title.split(',')
 
     # Guardo la figura
-    plt.savefig('Results/Panel_' + data_path + '.png')
+    plt.savefig('Results/Panel_' + data_path + '_' + partes[0].split('=')
+                [1].strip() + '-' + partes[1].split('=')[1].strip() + '.png')
 
     # Cierro la figura
     plt.close(fig)
@@ -135,6 +138,71 @@ def RepresentateALLState(state_matrix: np.ndarray, oxygen_matrix: np.ndarray, fi
 
     # Close the figure and save it to a file
     plt.savefig(filename)
+    plt.close(fig)
+
+    return None
+
+
+def Plot_2panel(data_path: str, title: str = None) -> None:
+    """
+    Función que representa los datos obtenidos de la simulación en un panel con 2 subplots.
+    Los subplots están dispuestos en una columna (uno sobre el otro).
+
+    Args:
+    data_path: Ruta del archivo CSV con los datos. La primera columna contiene la variable independiente y las siguientes columnas las variables dependientes.
+    title: Título opcional para la figura.
+
+    Returns:
+        None
+    """
+
+    # Leo los datos desde el CSV
+    data = pd.read_csv(data_path)
+
+    # Extraigo la variable independiente y las dos primeras variables dependientes
+    x = data.iloc[:, 0]
+    y = data.iloc[:, 1:4]  # Solo las dos primeras columnas dependientes
+
+    # Creo la figura y los subplots
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 6))
+
+    # Establezco el título del conjunto de figuras si se ha proporcionado uno
+    if title is not None:
+        fig.suptitle(title, fontsize=16)
+
+    # Creo el primer subplot
+    ax1.plot(x, y.iloc[:, 0])
+    ax1.set_title('Velocidad')
+
+    # añado una etiqueta al eje x
+    ax1.set_xlabel('Tiempo [s]')
+    ax1.set_ylabel('Velocidad [m/s]')
+
+    # Creo el segundo subplot
+    ax2.plot(x, y.iloc[:, 3])
+    ax2.set_title('Probabilidad de recombinación')
+
+    # añado una etiqueta al eje x
+    ax2.set_xlabel('Tiempo [s]')
+    ax2.set_ylabel('Probabilidad de recombinación')
+
+    # Ajustamos el espacio entre los plots
+    fig.tight_layout()
+
+    # Ajusto el espacio para el título principal si se ha proporcionado uno
+    if title is not None:
+        fig.subplots_adjust(top=0.88)
+
+    # Guardo la figura
+    if title is not None:
+        partes = title.split(',')
+        filename = f"Results/Panel_{data_path.split('/')[-1].split('.')[0]}_{partes[0].split('=')[1].strip()}-{partes[1].split('=')[1].strip()}.png"
+    else:
+        filename = f"Results/Panel_{data_path.split('/')[-1].split('.')[0]}.png"
+
+    plt.savefig(filename)
+
+    # Cierro la figura
     plt.close(fig)
 
     return None

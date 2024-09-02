@@ -1,6 +1,6 @@
 import glob
 import pandas as pd
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as pltimport matplotlib.pyplot as pltimport matplotlib.pyplot as pltimport matplotlib.pyplot as plt
 
 from re import T
 from RRAM import *
@@ -25,7 +25,7 @@ eje_y = round(espesor_dispositivo / atom_size)
 num_trampas = 20
 
 # FIXME: Hay una zona donde nunca se ponen trampas
-actual_state = Generation.initial_state_priv(eje_x, eje_y, num_trampas)
+actual_state = Generate.initial_state_priv(eje_x, eje_y, num_trampas)
 
 
 # Guardo la gráfica en el esritorio con el nombre grafica 2
@@ -81,7 +81,7 @@ for k in tqdm(range(0, num_pasos)):
             if actual_state[i, j] == 0:
                 # TODO: REVISAR PROBABILIDAD QUE A VECES SALE MAYOR DE 1
                 # TODO: HACER UN REESCALADO DE LOS VALORES PARA EVITAR TENER QUE TRABAJAR CON NUMEROS TAN GRANDES
-                prob_generacion = Generation.generation(paso_temporal, Campo_Electrico, Temperatura)
+                prob_generacion = Generate.Generation(paso_temporal, Campo_Electrico, Temperatura)
                 if (i == 0 and j == 0):
                     # genero un número aleatorio entre 0 y 1
                     random_number = np.random.rand()

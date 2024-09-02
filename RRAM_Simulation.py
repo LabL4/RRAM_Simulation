@@ -1,15 +1,29 @@
 import os
 import pickle
 import shutil
-
-import pandas as pd
 import time as time
-from sympy import E
-from tqdm import tqdm
+import pandas as pd
 
 from RRAM import *
+from tqdm import tqdm
 from RRAM import Recombination
+from RRAM import Generation as gn
 from RRAM import Plot_PostProcess
+
+# ----------------------------------------------------------------------------------------------------------------------------------
+# Funcion temporal para contar el numero de vacantes en cada paso
+# ----------------------------------------------------------------------------------------------------------------------------------
+
+
+def contar_vacantes(matriz):
+    contador = 0
+    for fila in matriz:
+        for elemento in fila:
+            if elemento == 1:
+                contador += 1
+    return contador
+# ----------------------------------------------------------------------------------------------------------------------------------
+
 
 # comienzo leyendo los datos de la simulación almacenados en un archivo csv dentro de la carpeta Init y los guardo en sus respectivas variables
 sim_parmtrs = Montecarlo.read_csv_to_dic("Init_data/simulation_parameters.csv")
@@ -30,7 +44,7 @@ os.makedirs(carpeta)
 
 for num_simulation in range(len(sim_parmtrs)):
 
-    # POngo el nombre de la simulación y un salto de línea
+    # Pongo el nombre de la simulación y un salto de línea
     print(f"\n Simulación {num_simulation + 1}")
 
     # Asigno los valores de los datos de la simulación a las variables correspondientes
@@ -70,45 +84,46 @@ for num_simulation in range(len(sim_parmtrs)):
     vector_ddp = np.linspace(0, voltaje_final, num_pasos + 1)
 
     # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias (x,y,probabilidad recombionacion, velocidad)
-    colunm_number = 5
+    colunm_number = 9
     data = np.zeros((num_pasos, colunm_number))
+
     # Creo el excel donde voy a sacar todos los datos
-    df = pd.DataFrame(columns=['Tiempo simulacion', 'velocidad', 'desplazamiento',
-                      'prob_generacion', 'sinh'])
+    df = pd.DataFrame(columns=['Tiempo simulacion', 'Voltaje', 'velocidad', 'desplazamiento',
+                      'prob_generacion', 'prob_recombinacion', "vancates generadas", "vacantes totales", 'Intensidad'])
 
     # Comienzo la simulación
     for k in tqdm(range(1, num_pasos+1)):
+
+        num_vacantes = contar_vacantes(actual_state)
+        # Inicializo las vacantes generadas
+        vancantes_generadas = 0
+
         # Guardo el estado anterior
         last_state = actual_state
 
         # Actualizo el tiempo de simulación
         simulation_time = paso_temporal * k
 
-        # Calculo la corriente
+        # Actualizo el voltaje
         voltaje = vector_ddp[k]
+
         # voltaje += voltaje_final / paso_temporal
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
-        # TODO: Revisar la corriente óhmica que no funciona
         if Percolation.is_path(actual_state):
-            # Si ha percolado uso la corriente de percolación
-            # Corriente = CurentSolver.OmhCurrent(Temperatura, Campo_Electrico)
-            print(f"\n Ha percolado")
-            break
+            # Si ha percolado uso la corriente de Ohm
+            Corriente = CurentSolver.OmhCurrent(voltaje, actual_state)
         else:
-            # Si no ha percolado uso la corriente de campo
+            # Si no ha percolado uso la corriente de Poole-Frenkel
             # TODO: REVISAR QUE LA CORRIENTE TIENE LAS UNIDADES CORRECTAS PORQUE NO CUADRAN VALORES.
-            Corriente = CurentSolver.poole_frenkel(temperatura, E_field)/(1e-10)
+            Corriente = CurentSolver.poole_frenkel(temperatura, E_field)*(device_size)
 
         # Obtengo los valores del campo eléctrico y la temperatura
         E_field = SimpleElectricField(voltaje, device_size)
         # temperatura = Temperature_Joule(voltaje, Corriente, T_0=350) TODO: Estoy usando la temperatura constante
 
-        # TODO: REVISAR PROBABILIDAD QUE A VECES SALE MAYOR DE 1
-        # TODO: HACER UN REESCALADO DE LOS VALORES PARA EVITAR TENER QUE TRABAJAR CON NUMEROS TAN GRANDES
-        prob_generacion = Generation.generation(paso_temporal, E_field, temperatura)
+        prob_generacion = gn.Generate(paso_temporal, E_field, temperatura, **sim_ctes[num_simulation])
 
-        # TODO: Revisa COMO SE GENERA LA PROBABILIDAD DE GENERACIÓN
         # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
         for i in range(x_size):
             for j in range(y_size):
@@ -116,8 +131,9 @@ for num_simulation in range(len(sim_parmtrs)):
                     random_number = np.random.rand()
                     if random_number < prob_generacion:
                         actual_state[i, j] = 1  # Generación de una vacante
+                        vancantes_generadas = vancantes_generadas + 1
 
-        if (simulation_time > 7.9) and (simulation_time < 8.0):
+        if (simulation_time > 9) and (simulation_time < 9.2):
             pass
 
         # Genero los oxígenos
@@ -127,19 +143,17 @@ for num_simulation in range(len(sim_parmtrs)):
         oxygen_state, velocidad, desplazamiento, senh = Recombination.Move_OxygenIons(
             paso_temporal, oxygen_state, temperatura, E_field, atom_size, **sim_ctes[num_simulation])
 
-        data[k-1] = np.array([simulation_time, velocidad, desplazamiento, prob_generacion, senh])
-
         # Obtengo la nueva configuración
-        actual_state, oxygen_state = Recombination.Recombine(actual_state, oxygen_state)
+        actual_state, oxygen_statem, pro_recombination = Recombination.Recombine(
+            actual_state, oxygen_state, paso_temporal, velocidad, temperatura, **sim_ctes[num_simulation])
+
+        data[k-1] = np.array([simulation_time, voltaje, velocidad, desplazamiento,
+                             prob_generacion, pro_recombination, vancantes_generadas, num_vacantes, Corriente])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
             config_matrix[int(k / paso_guardar) - 1] = actual_state
             oxygen_matrix[int(k / paso_guardar) - 1] = oxygen_state
-
-    # Elimino de la matriz config_matrix las filas que no se han completado que ocurre cuando percola
-    # config_matrix = np.array([fila for fila in config_matrix if fila.sum() != 0.0])
-    # oxygen_matrix = np.array([fila for fila in oxygen_matrix if fila.sum() != 0.0])
 
     # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
     with open(f'Results/Configurations_{num_simulation}.pkl', 'wb') as f:
@@ -148,10 +162,11 @@ for num_simulation in range(len(sim_parmtrs)):
         pickle.dump(oxygen_matrix, f)
 
     # Cuando percola no se completa la matriz de datos, por lo que la recorto
-    data_filtrados = np.array([fila for fila in data if fila[-1] != 0.0])
-    np.savetxt(f'Results/resultados_{num_simulation}.csv', data_filtrados, header='tiempo simulacion, velocidad, desplazamiento, prob_generacion, sinh',
+    # data_filtrados = np.array([fila for fila in data if fila[-1] != 0.0])
+    np.savetxt(f'Results/resultados_{num_simulation}.csv', data,
+               header='tiempo simulacion, voltaje, velocidad, desplazamiento, prob generacion, prob recombinacion, vancantes generadas, vacantes totales, intensidad',
                comments=' ', delimiter=', ')
 
-    # Represento los datos de la simulación
-    Plot_PostProcess.Plot_panel(f'Results/resultados_{num_simulation}.csv',
-                                title=f'Simulación {num_simulation + 1} valor de espaciado $a_0$ = {sim_parmtrs[num_simulation]["atom_size"]}',)
+    # # Represento los datos de la simulación
+    # Plot_PostProcess.Plot_panel(f'Results/resultados_{num_simulation}.csv',
+    #                             title=fr'$\gamma^{{drift}}$ = {sim_ctes[num_simulation]["drift_coefficient"]}, $E_m$ = {sim_ctes[num_simulation]["migration_energy"]} eV')

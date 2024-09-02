@@ -25,7 +25,7 @@ regiones_pesos = [
     ((10, eje_x-10, 0, 15), 50),                       # First three columns with higher weight
 ]
 
-actual_state = Generation.initial_state_priv(eje_x, eje_y, num_trampas, regiones_pesos)
+actual_state = Generate.initial_state_priv(eje_x, eje_y, num_trampas, regiones_pesos)
 
 oxygen_state = Recombination.Init_OxygenState(espesor_dispositivo, atom_size)
 
@@ -87,7 +87,7 @@ for k in tqdm(range(1, num_pasos+1)):
             if actual_state[i, j] == 0:
                 # TODO: REVISAR PROBABILIDAD QUE A VECES SALE MAYOR DE 1
                 # TODO: HACER UN REESCALADO DE LOS VALORES PARA EVITAR TENER QUE TRABAJAR CON NUMEROS TAN GRANDES
-                prob_generacion = Generation.generation(paso_temporal, Campo_Electrico, temperatura)
+                prob_generacion = Generate.Generation(paso_temporal, Campo_Electrico, temperatura)
                 random_number = np.random.rand()
                 if random_number < prob_generacion:
                     actual_state[i, j] = 1  # Generación
