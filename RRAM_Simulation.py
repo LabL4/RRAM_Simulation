@@ -62,7 +62,7 @@ for num_simulation in range(len(sim_parmtrs)):
     voltaje_final = float(sim_parmtrs[num_simulation]['voltaje_final'])
 
     voltaje = float(sim_parmtrs[num_simulation]['initial_voltaje'])
-    Corriente = float(sim_parmtrs[num_simulation]['initial_current'])
+    corriente = float(sim_parmtrs[num_simulation]['initial_current'])
     temperatura = float(sim_parmtrs[num_simulation]['init_temp'])
     E_field = float(sim_parmtrs[num_simulation]['initial_elec_field'])
 
@@ -84,12 +84,12 @@ for num_simulation in range(len(sim_parmtrs)):
     vector_ddp = np.linspace(0, voltaje_final, num_pasos + 1)
 
     # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias (x,y,probabilidad recombionacion, velocidad)
-    colunm_number = 9
+    colunm_number = 10
     data = np.zeros((num_pasos, colunm_number))
 
     # Creo el excel donde voy a sacar todos los datos
     df = pd.DataFrame(columns=['Tiempo simulacion', 'Voltaje', 'velocidad', 'desplazamiento',
-                      'prob_generacion', 'prob_recombinacion', "vancates generadas", "vacantes totales", 'Intensidad'])
+                      'prob_generacion', 'prob_recombinacion', "vancates generadas", "vacantes totales", 'Intensidad', 'Temperatura'])
 
     # Comienzo la simulación
     for k in tqdm(range(1, num_pasos+1)):
@@ -112,17 +112,18 @@ for num_simulation in range(len(sim_parmtrs)):
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
             # Si ha percolado uso la corriente de Ohm
-            Corriente = CurentSolver.OmhCurrent(voltaje, actual_state)
+            corriente = CurentSolver.OmhCurrent(voltaje, actual_state)
         else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
             # TODO: REVISAR QUE LA CORRIENTE TIENE LAS UNIDADES CORRECTAS PORQUE NO CUADRAN VALORES.
-            Corriente = CurentSolver.poole_frenkel(temperatura, E_field)*(device_size)
+            corriente = CurentSolver.poole_frenkel(temperatura, E_field)*(device_size)
 
         # Obtengo los valores del campo eléctrico y la temperatura
         E_field = SimpleElectricField(voltaje, device_size)
-        # temperatura = Temperature_Joule(voltaje, Corriente, T_0=350) TODO: Estoy usando la temperatura constante
+        # TODO: Estoy usando la temperatura constante
+        # temperatura = Temperature_Joule(voltaje, corriente, T_0=float(sim_parmtrs[num_simulation]['init_temp']))
 
-        prob_generacion = gn.Generate(paso_temporal, E_field, temperatura, **sim_ctes[num_simulation])
+        prob_generacion = Generate(paso_temporal, E_field, temperatura, **sim_ctes[num_simulation])
 
         # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
         for i in range(x_size):
@@ -132,9 +133,6 @@ for num_simulation in range(len(sim_parmtrs)):
                     if random_number < prob_generacion:
                         actual_state[i, j] = 1  # Generación de una vacante
                         vancantes_generadas = vancantes_generadas + 1
-
-        if (simulation_time > 9) and (simulation_time < 9.2):
-            pass
 
         # Genero los oxígenos
         oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 5)
@@ -148,7 +146,7 @@ for num_simulation in range(len(sim_parmtrs)):
             actual_state, oxygen_state, paso_temporal, velocidad, temperatura, **sim_ctes[num_simulation])
 
         data[k-1] = np.array([simulation_time, voltaje, velocidad, desplazamiento,
-                             prob_generacion, pro_recombination, vancantes_generadas, num_vacantes, Corriente])
+                             prob_generacion, pro_recombination, vancantes_generadas, num_vacantes, corriente, temperatura])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
@@ -164,7 +162,7 @@ for num_simulation in range(len(sim_parmtrs)):
     # Cuando percola no se completa la matriz de datos, por lo que la recorto
     # data_filtrados = np.array([fila for fila in data if fila[-1] != 0.0])
     np.savetxt(f'Results/resultados_{num_simulation}.csv', data,
-               header='tiempo simulacion, voltaje, velocidad, desplazamiento, prob generacion, prob recombinacion, vancantes generadas, vacantes totales, intensidad',
+               header='tiempo simulacion, voltaje, velocidad, desplazamiento, prob generacion, prob recombinacion, vancantes generadas, vacantes totales, intensidad, temperatura',
                comments=' ', delimiter=', ')
 
     # # Represento los datos de la simulación

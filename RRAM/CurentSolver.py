@@ -45,7 +45,7 @@ def OmhCurrent(potential: float, config_state: np.array, **kwargs) -> float:
 
 
 def poole_frenkel(temperature: float, electric_field: float,
-                  barrera: float = 0.9, beta: float = 1.697035E-5, I_0: float = 1e-12) -> float:
+                  barrera: float = 0.9, beta: float = 1.697035E-5, I_0: float = 1e2) -> float:
     """
     Calculates the current using the Poole-Frenkel equation.
 
@@ -62,7 +62,7 @@ def poole_frenkel(temperature: float, electric_field: float,
 
     k_b_ev = Boltzmann / elementary_charge
 
-    exponencial = np.exp((beta * np.sqrt(electric_field) - barrera) / (k_b_ev * temperature))
+    exponencial = np.exp(elementary_charge * (beta * np.sqrt(electric_field) - barrera) / (k_b_ev * temperature))
 
     I_poole_frenkel = electric_field * exponencial
 

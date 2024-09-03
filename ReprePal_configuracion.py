@@ -50,10 +50,10 @@ def process_matrix(args):
 
 if __name__ == '__main__':
 
-    NUM_PARALLEL_PROCESSES = 12
+    NUM_PARALLEL_PROCESSES = 8
     start = time.time()
     args = [(Oxigeno[i], i) for i in range(len(Oxigeno))]
-    buffers = process_map(process_matrix, args, max_workers=NUM_PARALLEL_PROCESSES, chunksize=50)
+    buffers = process_map(process_matrix, args, max_workers=NUM_PARALLEL_PROCESSES, chunksize=25)
     images = [Image.open(buffer) for buffer in buffers]
     end = time.time()
 
