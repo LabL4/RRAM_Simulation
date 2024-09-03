@@ -36,31 +36,40 @@ ohm_resistence = 1e6
 # Constante de red, el paper original propone 0.25 nm
 cte_red = 0.25e-9
 
+# the potential barrier at the metal and insulator interface [eV]
+pb_metal_insul = 0.9
 
-def DifussiveBehaviour(pos_x: int, oxigen_velocity: float, paso_temp: float, grid_size: float) -> float:
-    """
-    Calculates the diffusion behavior based on the given parameters.
+# Permitividad relativa del material HfOx
+permitividad_relativa = 20
 
-    Parameters:
-    - pos_x (int): The position of the diffusion event.
-    - Oxigen_Ion_velocity (float): The velocity of the oxygen ion.
-    - Simulation_time (float): The simulation time.
-    - grid_size (float, optional): The size of the grid. Default is 0.25e-9.
+# Término inicial de la ecuación de Poole-Frenkel
+I_0 = 1
 
-    Returns:
-    - float: The diffusion value based on the given conditions.
-    """
 
-    vt = oxigen_velocity*paso_temp
-    pos_x = pos_x*grid_size
+# def DifussiveBehaviour(pos_x: int, oxigen_velocity: float, paso_temp: float, grid_size: float) -> float:
+#     """
+#     Calculates the diffusion behavior based on the given parameters.
 
-    condiciones = [pos_x <= vt,
-                   (vt < pos_x) and (pos_x <= vt + grid_size),
-                   (vt + grid_size < pos_x) and (pos_x <= vt + 3 * grid_size),
-                   (pos_x > vt + 3 * grid_size)
-                   ]
+#     Parameters:
+#     - pos_x (int): The position of the diffusion event.
+#     - Oxigen_Ion_velocity (float): The velocity of the oxygen ion.
+#     - Simulation_time (float): The simulation time.
+#     - grid_size (float, optional): The size of the grid. Default is 0.25e-9.
 
-    valores_Difusion = [1, 0.3, 0.1, 0]
-    valor_elegido = np.piecewise(pos_x, condiciones, valores_Difusion).item()
+#     Returns:
+#     - float: The diffusion value based on the given conditions.
+#     """
 
-    return valor_elegido
+#     vt = oxigen_velocity*paso_temp
+#     pos_x = pos_x*grid_size
+
+#     condiciones = [pos_x <= vt,
+#                    (vt < pos_x) and (pos_x <= vt + grid_size),
+#                    (vt + grid_size < pos_x) and (pos_x <= vt + 3 * grid_size),
+#                    (pos_x > vt + 3 * grid_size)
+#                    ]
+
+#     valores_Difusion = [1, 0.3, 0.1, 0]
+#     valor_elegido = np.piecewise(pos_x, condiciones, valores_Difusion).item()
+
+#     return valor_elegido

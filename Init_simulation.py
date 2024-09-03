@@ -9,7 +9,7 @@ from RRAM import Generation as gn
 from RRAM import Constants as cte
 
 # Número de simulaciones que realizo
-num_simulations = 1
+num_simulations = 171
 
 # Defino la carpeta donde se guardan los datos iniciales de la simulación
 carpeta = 'Init_data'
@@ -41,7 +41,7 @@ priv_x_left = np.ones(num_simulations, dtype=int) * 0
 total_simulation_time = np.ones(num_simulations) * 10
 # time step de mili segundo y milivoltios de step voltaje incluso de 0.01
 num_pasos = np.ones(num_simulations, dtype=int) * 10000
-voltaje_final = np.ones(num_simulations) * 5        # Esto puede ser mas alto puede ser de hasta 7 V
+voltaje_final = np.ones(num_simulations) * 4      # Esto puede ser mas alto puede ser de hasta 7 V
 
 paso_guardar = np.ones(num_simulations, dtype=int) * 1
 
@@ -141,10 +141,25 @@ gamma = np.ones(num_simulations) * cte.gamma
 # Resistance ohmic of the device
 ohm_resistence = np.ones(num_simulations) * cte.ohm_resistence
 
+# Potential barrier at the metal and insulator interface
+pb_metal_insul = np.linspace(0.1, 0.9, 9)
+pb_metal_insul = np.tile(pb_metal_insul, 19)
+# potential_barrier_metal_insul = np.ones(num_simulations) * cte.potential_barrier_metal_insul
+
+# Permitividad relativa del material HfOx
+permitividad_relativa = np.linspace(20, 200, 19)
+permitividad_relativa = np.repeat(permitividad_relativa, 9)
+# permitividad_relativa = np.ones(num_simulations) * cte.permitividad_relativa
+
+# Término inicial de la ecuación de Poole-Frenkel
+I_0 = np.ones(num_simulations) * cte.I_0
+
+
 # Creo un dataframe nuevo con las constantes de la simulación
 df_ctes = pd.DataFrame(columns=['vibration_frequency', 'migration_energy', 'drift_coefficient',
                                 'cte_red', 'recom_enchancement_factor', 'decaimiento_concentracion',
-                                'activation_energy', 'gamma', 'ohm_resistence'])
+                                'activation_energy', 'gamma', 'ohm_resistence',
+                                'pb_metal_insul', 'permitividad_relativa', 'I_0'])
 
 df_ctes['vibration_frequency'] = t_0
 df_ctes['migration_energy'] = E_m
@@ -155,6 +170,9 @@ df_ctes['decaimiento_concentracion'] = L_p
 df_ctes['activation_energy'] = E_a
 df_ctes['gamma'] = gamma
 df_ctes['ohm_resistence'] = ohm_resistence
+df_ctes['pb_metal_insul'] = pb_metal_insul
+df_ctes['permitividad_relativa'] = permitividad_relativa
+df_ctes['I_0'] = I_0
 
 # Guardo el dataframe de las ctes en un archivo csv
 df_ctes.to_csv('Init_data/simulation_constants.csv', index=False)

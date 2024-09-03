@@ -1,5 +1,6 @@
-# Description: This file contains the code to generate the mesh of the RRAM.
 import numpy as np
+# Description: This file contains the code to generate the mesh of the RRAM.
+import pandas as pd
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches

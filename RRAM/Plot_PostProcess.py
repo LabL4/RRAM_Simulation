@@ -143,66 +143,67 @@ def RepresentateALLState(state_matrix: np.ndarray, oxygen_matrix: np.ndarray, fi
     return None
 
 
-def Plot_2panel(data_path: str, title: str = None) -> None:
-    """
-    Función que representa los datos obtenidos de la simulación en un panel con 2 subplots.
-    Los subplots están dispuestos en una columna (uno sobre el otro).
+def Plot_2panel(data_path: str, col_indices_x: list, col_indices_y: list, save_path: str, global_tittle: str = None,
+                titles: list = None, eje_x: list = None, eje_y: list = None, log_scale: list = [None, None]) -> None:
+    """Plot_2panel Representate the data from a CSV file in a 2-panel plot.
 
     Args:
-    data_path: Ruta del archivo CSV con los datos. La primera columna contiene la variable independiente y las siguientes columnas las variables dependientes.
-    title: Título opcional para la figura.
-
-    Returns:
-        None
+        data_path (str): the path to the CSV file with the data.
+        col_indices_x (list): the indices of the columns to use as the x-axis.
+        col_indices_y (list): the indices of the columns to use as the y-axis.
+        global_tittle (str, optional): the tittle of the all figure. Defaults to None.
+        titles (list, optional): the titles of each figure. Defaults to None.
+        eje_x (list, optional): the x axis names. Defaults to None.
+        eje_y (list, optional): the y axis names. Defaults to None.
+        log_scale (list, optional): activate or not log plot in each plot, 'x' for x axis 'y' for y axis an 'both' for xy axis. Defaults to [None, None].
     """
-
-    # Leo los datos desde el CSV
+    # Leer los datos desde el CSV
     data = pd.read_csv(data_path)
 
-    # Extraigo la variable independiente y las dos primeras variables dependientes
-    x = data.iloc[:, 0]
-    y = data.iloc[:, 1:4]  # Solo las dos primeras columnas dependientes
+    # for i, column in enumerate(data.columns):
+    #     print(f"Columna {i}: {column}")
 
-    # Creo la figura y los subplots
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(6, 6))
+    print("\n")
+    x1, x2 = data.iloc[:, col_indices_x[0]], data.iloc[:, col_indices_x[1]]
+    y1, y2 = data.iloc[:, col_indices_y[0]], data.iloc[:, col_indices_y[1]]
 
-    # Establezco el título del conjunto de figuras si se ha proporcionado uno
-    if title is not None:
-        fig.suptitle(title, fontsize=16)
+    # # Imprimir los nombres de las columnas
+    # print("x1 pertenece a la columna:", data.columns[col_indices_x[0]])
+    # print("y1 pertenece a la columna:", data.columns[col_indices_y[0]])
+    # print("x2 pertenece a la columna:", data.columns[col_indices_x[1]])
+    # print("y2 pertenece a la columna:", data.columns[col_indices_y[1]])
 
-    # Creo el primer subplot
-    ax1.plot(x, y.iloc[:, 0])
-    ax1.set_title('Velocidad')
+    # Crear la figura y los subplots
+    fig, axes = plt.subplots(2, 1, figsize=(6, 6))
 
-    # añado una etiqueta al eje x
-    ax1.set_xlabel('Tiempo [s]')
-    ax1.set_ylabel('Velocidad [m/s]')
+    # Asignar datos y títulos/etiquetas si se proporcionan
+    for i, (ax, x, y) in enumerate(zip(axes, [x1, x2], [y1, y2])):
+        ax.scatter(x, y, s=5)
+        if titles and len(titles) > i:
+            ax.set_title(titles[i])
+        if eje_x and len(eje_x) > i:
+            ax.set_xlabel(eje_x[i])
+        else:
+            ax.set_xlabel(data.columns[col_indices_x[i]])
+        if eje_y and len(eje_y) > i:
+            ax.set_ylabel(eje_y[i])
+        else:
+            ax.set_ylabel(data.columns[col_indices_y[i]])
+        if log_scale and len(log_scale) > i:
+            if log_scale[i] == 'x':
+                ax.set_xscale('log')
+            elif log_scale[i] == 'y':
+                ax.set_yscale('log')
+            elif log_scale[i] == 'both':
+                ax.set_xscale('log')
+                ax.set_yscale('log')
 
-    # Creo el segundo subplot
-    ax2.plot(x, y.iloc[:, 3])
-    ax2.set_title('Probabilidad de recombinación')
-
-    # añado una etiqueta al eje x
-    ax2.set_xlabel('Tiempo [s]')
-    ax2.set_ylabel('Probabilidad de recombinación')
-
-    # Ajustamos el espacio entre los plots
-    fig.tight_layout()
-
-    # Ajusto el espacio para el título principal si se ha proporcionado uno
-    if title is not None:
+    # Título general
+    if global_tittle:
+        fig.suptitle(global_tittle, fontsize=16)
         fig.subplots_adjust(top=0.88)
 
-    # Guardo la figura
-    if title is not None:
-        partes = title.split(',')
-        filename = f"Results/Panel_{data_path.split('/')[-1].split('.')[0]}_{partes[0].split('=')[1].strip()}-{partes[1].split('=')[1].strip()}.png"
-    else:
-        filename = f"Results/Panel_{data_path.split('/')[-1].split('.')[0]}.png"
+    # Ajustar diseño y guardar la figura
+    fig.tight_layout()
 
-    plt.savefig(filename)
-
-    # Cierro la figura
-    plt.close(fig)
-
-    return None
+    plt.savefig(f'{save_path}')

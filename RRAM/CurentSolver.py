@@ -2,7 +2,8 @@ import math
 import numpy as np
 
 from RRAM import Constants as cte
-from scipy.constants import elementary_charge, Boltzmann
+
+from scipy.constants import elementary_charge, Boltzmann, epsilon_0
 
 
 def OmhCurrent(potential: float, config_state: np.array, **kwargs) -> float:
@@ -44,26 +45,37 @@ def OmhCurrent(potential: float, config_state: np.array, **kwargs) -> float:
     return potential / total_resistance
 
 
+<<<<<<< Updated upstream
 def poole_frenkel(temperature: float, electric_field: float,
                   barrera: float = 0.9, beta: float = 1.697035E-5, I_0: float = 1e-12) -> float:
     """
     Calculates the current using the Poole-Frenkel equation.
+=======
+def poole_frenkel(temperature: float, E_field: float, **kwargs) -> float:
+>>>>>>> Stashed changes
 
-    Args:
-        temperature (float): The temperature in Kelvin.
-        electric_field (float): The electric field strength in V/m.
-        barrera (float, optional): The barrier height in eV. Defaults to 0.895.
-        beta (float, optional): The Poole-Frenkel constant. Defaults to 1.697035E-5.
-        I_0 (float, optional): The saturation current in A. Defaults to 1e-12.
-
-    Returns:
-        float: The calculated current in A/m^2.
-    """
+    # Obtengo los valores de las constantes si las estoy pasando como argumentos
+    if kwargs:
+        # Obtengo el valor de las constantes que necesita la función
+        potential_barrier = float(kwargs.get('potential_barrier_metal_insul'))
+        epsilon_r = float(kwargs.get('permitividad_relativa'))
+        I_0 = float(kwargs.get('I_0'))
+    else:
+        potential_barrier = cte.pb_metal_insul
+        epsilon_r = cte.permitividad_relativa
+        I_0 = cte.I_0
 
     k_b_ev = Boltzmann / elementary_charge
 
+<<<<<<< Updated upstream
     exponencial = np.exp((beta * np.sqrt(electric_field) - barrera) / (k_b_ev * temperature))
+=======
+    beta = math.sqrt(elementary_charge / (epsilon_0 * epsilon_r * math.pi))
+>>>>>>> Stashed changes
 
-    I_poole_frenkel = electric_field * exponencial
+    exponencial = math.exp(elementary_charge * (beta * math.sqrt(E_field) -
+                                                potential_barrier) / (k_b_ev * temperature))
+
+    I_poole_frenkel = I_0 * E_field * exponencial
 
     return I_poole_frenkel

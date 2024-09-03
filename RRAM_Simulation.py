@@ -3,11 +3,12 @@ import pickle
 import shutil
 import time as time
 import pandas as pd
+from numpy import save
 
 from RRAM import *
 from tqdm import tqdm
+from RRAM import Generation
 from RRAM import Recombination
-from RRAM import Generation as gn
 from RRAM import Plot_PostProcess
 
 # ----------------------------------------------------------------------------------------------------------------------------------
@@ -167,6 +168,12 @@ for num_simulation in range(len(sim_parmtrs)):
                header='tiempo simulacion, voltaje, velocidad, desplazamiento, prob generacion, prob recombinacion, vancantes generadas, vacantes totales, intensidad',
                comments=' ', delimiter=', ')
 
-    # # Represento los datos de la simulación
-    # Plot_PostProcess.Plot_panel(f'Results/resultados_{num_simulation}.csv',
-    #                             title=fr'$\gamma^{{drift}}$ = {sim_ctes[num_simulation]["drift_coefficient"]}, $E_m$ = {sim_ctes[num_simulation]["migration_energy"]} eV')
+    # Represento los datos de la simulación
+    Plot_PostProcess.Plot_2panel(f'Results/resultados_{num_simulation}.csv',
+                                 col_indices_x=[0, 1],
+                                 col_indices_y=[8, 8],
+                                 save_path=f'Results/resultados_{num_simulation}.png',
+                                 global_tittle=fr'$\phi_{{B}}$ = {sim_ctes[num_simulation]["pb_metal_insul"]} eV, $\varepsilon_r$ = {sim_ctes[num_simulation]["permitividad_relativa"]}',
+                                 log_scale=['y', 'y'])
+
+    #
