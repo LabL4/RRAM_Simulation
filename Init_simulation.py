@@ -41,7 +41,7 @@ priv_x_left = np.ones(num_simulations, dtype=int) * 0
 total_simulation_time = np.ones(num_simulations) * 10
 # time step de mili segundo y milivoltios de step voltaje incluso de 0.01
 num_pasos = np.ones(num_simulations, dtype=int) * 10000
-voltaje_final = np.ones(num_simulations) * 5        # Esto puede ser mas alto puede ser de hasta 7 V
+voltaje_final = np.ones(num_simulations) * 4      # Esto puede ser mas alto puede ser de hasta 7 V
 
 paso_guardar = np.ones(num_simulations, dtype=int) * 1
 
@@ -97,7 +97,7 @@ for i in range(num_simulations):
 
     # Estado inicial de la simulación para los oxígenos y el sistema
     init_state = gn.initial_state_priv(eje_x[i], eje_y[i], num_trampas[i], regiones_pesos)
-    RepresentateState(init_state, 'Init_data/init_state_' + str(i))
+    # RepresentateState(init_state, 'Init_data/init_state_' + str(i))
     oxygen_state = Recombination.Init_OxygenState(device_size[i], atom_size[i])
 
     # Guardo el estado inicial con el nombre estado inicial mas el número de simulación
@@ -141,10 +141,37 @@ gamma = np.ones(num_simulations) * cte.gamma
 # Resistance ohmic of the device
 ohm_resistence = np.ones(num_simulations) * cte.ohm_resistence
 
+# # Crear los vectores
+# permitividad_relativa = np.arange(20, 200, 80)
+# pb_metal_insul = [0.1, 0.5, 0.9]
+# I_0 = np.arange(1e-7, 9e-7, 2e-7)  # TODO: Revisar este valor
+
+# # Crear los tríos
+# trios = [(v1, v2, v3) for v3 in I_0 for v2 in pb_metal_insul for v1 in permitividad_relativa]
+
+# # Convertir la lista de tríos en un array de NumPy y asignarlo a una variable
+# trios_array = np.array(trios)
+
+# permitividad_relativa = trios_array[:, 0]
+# pb_metal_insul = trios_array[:, 1]
+# I_0 = trios_array[:, 2]
+
+
+# Potential barrier at the metal and insulator interface
+potential_barrier_metal_insul = np.ones(num_simulations) * cte.pb_metal_insul
+
+# Permitividad relativa del material HfOx
+permitividad_relativa = np.ones(num_simulations) * cte.permitividad_relativa
+
+# Término inicial de la ecuación de Poole-Frenkel
+I_0 = np.ones(num_simulations) * cte.I_0
+
+
 # Creo un dataframe nuevo con las constantes de la simulación
 df_ctes = pd.DataFrame(columns=['vibration_frequency', 'migration_energy', 'drift_coefficient',
                                 'cte_red', 'recom_enchancement_factor', 'decaimiento_concentracion',
-                                'activation_energy', 'gamma', 'ohm_resistence'])
+                                'activation_energy', 'gamma', 'ohm_resistence',
+                                'pb_metal_insul', 'permitividad_relativa', 'I_0'])
 
 df_ctes['vibration_frequency'] = t_0
 df_ctes['migration_energy'] = E_m
@@ -155,6 +182,9 @@ df_ctes['decaimiento_concentracion'] = L_p
 df_ctes['activation_energy'] = E_a
 df_ctes['gamma'] = gamma
 df_ctes['ohm_resistence'] = ohm_resistence
+df_ctes['pb_metal_insul'] = pb_metal_insul
+df_ctes['permitividad_relativa'] = permitividad_relativa
+df_ctes['I_0'] = I_0
 
 # Guardo el dataframe de las ctes en un archivo csv
 df_ctes.to_csv('Init_data/simulation_constants.csv', index=False)
