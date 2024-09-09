@@ -37,14 +37,13 @@ ohm_resistence = 1e6
 cte_red = 0.25e-9
 
 # the potential barrier at the metal and insulator interface [eV]
-pb_metal_insul = 0.9
+pb_metal_insul = 0.5
 
 # Permitividad relativa del material HfOx
 permitividad_relativa = 20
 
 # Término inicial de la ecuación de Poole-Frenkel
-I_0 = 1
-
+I_0 = 5e-07
 
 # def DifussiveBehaviour(pos_x: int, oxigen_velocity: float, paso_temp: float, grid_size: float) -> float:
 #     """

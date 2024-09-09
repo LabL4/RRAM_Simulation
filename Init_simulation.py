@@ -9,7 +9,7 @@ from RRAM import Generation as gn
 from RRAM import Constants as cte
 
 # Número de simulaciones que realizo
-num_simulations = 171
+num_simulations = 1
 
 # Defino la carpeta donde se guardan los datos iniciales de la simulación
 carpeta = 'Init_data'
@@ -97,7 +97,7 @@ for i in range(num_simulations):
 
     # Estado inicial de la simulación para los oxígenos y el sistema
     init_state = gn.initial_state_priv(eje_x[i], eje_y[i], num_trampas[i], regiones_pesos)
-    RepresentateState(init_state, 'Init_data/init_state_' + str(i))
+    # RepresentateState(init_state, 'Init_data/init_state_' + str(i))
     oxygen_state = Recombination.Init_OxygenState(device_size[i], atom_size[i])
 
     # Guardo el estado inicial con el nombre estado inicial mas el número de simulación
@@ -141,15 +141,27 @@ gamma = np.ones(num_simulations) * cte.gamma
 # Resistance ohmic of the device
 ohm_resistence = np.ones(num_simulations) * cte.ohm_resistence
 
+# # Crear los vectores
+# permitividad_relativa = np.arange(20, 200, 80)
+# pb_metal_insul = [0.1, 0.5, 0.9]
+# I_0 = np.arange(1e-7, 9e-7, 2e-7)  # TODO: Revisar este valor
+
+# # Crear los tríos
+# trios = [(v1, v2, v3) for v3 in I_0 for v2 in pb_metal_insul for v1 in permitividad_relativa]
+
+# # Convertir la lista de tríos en un array de NumPy y asignarlo a una variable
+# trios_array = np.array(trios)
+
+# permitividad_relativa = trios_array[:, 0]
+# pb_metal_insul = trios_array[:, 1]
+# I_0 = trios_array[:, 2]
+
+
 # Potential barrier at the metal and insulator interface
-pb_metal_insul = np.linspace(0.1, 0.9, 9)
-pb_metal_insul = np.tile(pb_metal_insul, 19)
-# potential_barrier_metal_insul = np.ones(num_simulations) * cte.potential_barrier_metal_insul
+potential_barrier_metal_insul = np.ones(num_simulations) * cte.pb_metal_insul
 
 # Permitividad relativa del material HfOx
-permitividad_relativa = np.linspace(20, 200, 19)
-permitividad_relativa = np.repeat(permitividad_relativa, 9)
-# permitividad_relativa = np.ones(num_simulations) * cte.permitividad_relativa
+permitividad_relativa = np.ones(num_simulations) * cte.permitividad_relativa
 
 # Término inicial de la ecuación de Poole-Frenkel
 I_0 = np.ones(num_simulations) * cte.I_0

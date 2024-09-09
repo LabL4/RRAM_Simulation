@@ -45,19 +45,12 @@ def OmhCurrent(potential: float, config_state: np.array, **kwargs) -> float:
     return potential / total_resistance
 
 
-<<<<<<< Updated upstream
-def poole_frenkel(temperature: float, electric_field: float,
-                  barrera: float = 0.9, beta: float = 1.697035E-5, I_0: float = 1e-12) -> float:
-    """
-    Calculates the current using the Poole-Frenkel equation.
-=======
 def poole_frenkel(temperature: float, E_field: float, **kwargs) -> float:
->>>>>>> Stashed changes
 
     # Obtengo los valores de las constantes si las estoy pasando como argumentos
     if kwargs:
         # Obtengo el valor de las constantes que necesita la función
-        potential_barrier = float(kwargs.get('potential_barrier_metal_insul'))
+        potential_barrier = float(kwargs.get('pb_metal_insul'))
         epsilon_r = float(kwargs.get('permitividad_relativa'))
         I_0 = float(kwargs.get('I_0'))
     else:
@@ -67,11 +60,7 @@ def poole_frenkel(temperature: float, E_field: float, **kwargs) -> float:
 
     k_b_ev = Boltzmann / elementary_charge
 
-<<<<<<< Updated upstream
-    exponencial = np.exp((beta * np.sqrt(electric_field) - barrera) / (k_b_ev * temperature))
-=======
     beta = math.sqrt(elementary_charge / (epsilon_0 * epsilon_r * math.pi))
->>>>>>> Stashed changes
 
     exponencial = math.exp(elementary_charge * (beta * math.sqrt(E_field) -
                                                 potential_barrier) / (k_b_ev * temperature))

@@ -207,3 +207,4 @@ def Plot_2panel(data_path: str, col_indices_x: list, col_indices_y: list, save_p
     fig.tight_layout()
 
     plt.savefig(f'{save_path}')
+    plt.close(fig)
