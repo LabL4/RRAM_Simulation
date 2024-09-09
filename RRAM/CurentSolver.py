@@ -44,7 +44,7 @@ def OmhCurrent(potential: float, config_state: np.array, **kwargs) -> float:
     # Se calcula la corriente Ohmica
     return potential / total_resistance
 
-
+  
 def poole_frenkel(temperature: float, E_field: float, **kwargs) -> float:
 
     # Obtengo los valores de las constantes si las estoy pasando como argumentos

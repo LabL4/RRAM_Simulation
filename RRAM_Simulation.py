@@ -61,7 +61,7 @@ for num_simulation in range(len(sim_parmtrs)):
     voltaje_final = float(sim_parmtrs[num_simulation]['voltaje_final'])
 
     voltaje = float(sim_parmtrs[num_simulation]['initial_voltaje'])
-    Corriente = float(sim_parmtrs[num_simulation]['initial_current'])
+    corriente = float(sim_parmtrs[num_simulation]['initial_current'])
     temperatura = float(sim_parmtrs[num_simulation]['init_temp'])
     E_field = float(sim_parmtrs[num_simulation]['initial_elec_field'])
 
