@@ -1,9 +1,8 @@
 import math
 import numpy as np
 
+from .Constants import k_b_ev
 from RRAM import Constants as cte
-from scipy.constants import elementary_charge
-from .Constants import t_0, k_b_ev, E_m, gamma_drift
 
 
 def Init_OxygenState(espesor_dispositivo: float, atom_size: float):
@@ -134,7 +133,7 @@ def Recombine(actual_state: np.array, oxygen_state: np.array, paso_temp: float, 
     # lo he sacado para tener siempre el valor aunque no haya recombinción
     j = 1  # No estoy empleando la variable j (que serviria para la funcion a trozos) para no cambiar el codigo original
     # dejo este valor
-    prob_recom = Prob_Recombination(paso_temp, velocidad, j, temp, **kwargs)
+    prob_recom, prob_in_equilibrio = Prob_Recombination(paso_temp, velocidad, j, temp, **kwargs)
 
     # Recorro la matriz de oxígeno para saber en qué posiciones hay oxígeno
     for i in range(oxygen_state_before.shape[0]):
@@ -143,14 +142,11 @@ def Recombine(actual_state: np.array, oxygen_state: np.array, paso_temp: float, 
             if oxygen_state_before[i, j] == 1 and actual_state_before[i, j] == 1:
                 # Si hay un hueco, calculo la probabilidad de recombinación
                 random_number = np.random.rand()    # Genero un número aleatorio
-                if random_number < prob_recom:  # Cambiar luego a la probabilidad en equilibrio que menciona en el paper original
+                if random_number < prob_recom:      # Cambiar luego a la probabilidad en equilibrio que menciona en el paper original
                     actual_state[i, j] = 0
                     oxygen_state[i, j] = 0
-                # if random_number > 0.5:  # Cambiar luego a la probabilidad en equilibrio que menciona en el paper original
-                #     actual_state[i, j] = 0
-                #     oxygen_state[i, j] = 0
 
-    return (actual_state, oxygen_state, prob_recom)
+    return (actual_state, oxygen_state, prob_recom, prob_in_equilibrio)
 
 
 def Prob_Recombination(paso_temporal: float, velocidad: float, pos_x: int, temp: float, **kwargs) -> float:
@@ -161,24 +157,24 @@ def Prob_Recombination(paso_temporal: float, velocidad: float, pos_x: int, temp:
         t_0 = float(kwargs.get('vibration_frequency'))
         beta_0 = float(kwargs.get('recom_enchancement_factor'))
         E_a = float(kwargs.get('activation_energy'))
-        cte_red = float(kwargs.get('cte_red'))
         L_p = float(kwargs.get('decaimiento_concentracion'))
+        # cte_red = float(kwargs.get('cte_red'))
     else:
         t_0 = cte.t_0
         beta_0 = cte.beta_0
         E_a = cte.E_a
-        cte_red = cte.cte_red
         L_p = cte.L_p
+        # cte_red = cte.cte_red
 
     # Calculo la  probabilidad de recombinación en equilibrio
-    prob_in_equilibrio = (paso_temporal * t_0) * (math.exp(-E_a / (k_b_ev * temp)))  # Compruebado es correcto
+    prob_in_equilibrio = (paso_temporal * t_0) * (math.exp(-E_a / (k_b_ev * temp)))
     # funcion_trozos = cte.DifussiveBehaviour(pos_x, velocidad, paso_temporal, cte_red)
     # * funcion_trozos le quito lo de la funcion a trozos
-    exp_beta = math.exp(-(paso_temporal * velocidad) / L_p) * beta_0  # Compruebado es correcto
+    exp_beta = math.exp(-(paso_temporal * velocidad) / L_p) * beta_0
 
-    prob_recom = prob_in_equilibrio * exp_beta  # Compruebado es correcto
+    prob_recom = prob_in_equilibrio * exp_beta
 
-    return prob_recom
+    return prob_recom, prob_in_equilibrio
 
 
 # |----------------------------------------------------------------------------------------------------------------------|

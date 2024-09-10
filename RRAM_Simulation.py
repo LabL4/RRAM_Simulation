@@ -83,11 +83,12 @@ for num_simulation in range(len(sim_parmtrs)):
     vector_ddp = np.linspace(0, voltaje_final, num_pasos + 1)
 
     # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias (x,y,probabilidad recombionacion, velocidad)
-    colunm_number = 4
+    colunm_number = 7
     data = np.zeros((num_pasos, colunm_number))
 
     # Creo el excel donde voy a sacar todos los datos
-    df = pd.DataFrame(columns=['Tiempo simulacion [s]', 'Voltaje [V] ', 'Intensidad [A]', 'Temperatura [K]'])
+    df = pd.DataFrame(columns=['Tiempo simulacion [s]', 'Voltaje [V] ',
+                      'Intensidad [A]', 'Temperatura [K], Prob recombionacion', 'Velocidad [m/s]'])
 
     # Comienzo la simulación
     for k in tqdm(range(1, num_pasos+1)):
@@ -110,14 +111,15 @@ for num_simulation in range(len(sim_parmtrs)):
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
             # Si ha percolado uso la corriente de Ohm
-            Corriente = CurentSolver.OmhCurrent(voltaje, actual_state, **sim_ctes[num_simulation])
+            corriente = CurentSolver.OmhCurrent(voltaje, actual_state, **sim_ctes[num_simulation])
         else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
-            Corriente = CurentSolver.poole_frenkel(temperatura, E_field, **sim_ctes[num_simulation])*(device_size)
+            corriente = CurentSolver.poole_frenkel(temperatura, E_field, **sim_ctes[num_simulation])*(device_size)
 
         # Obtengo los valores del campo eléctrico y la temperatura
         E_field = SimpleElectricField(voltaje, device_size)
-        temperatura = Temperature_Joule(voltaje, Corriente, T_0=350)  # TODO: Estoy usando la temperatura constante
+        temperatura = Temperature_Joule(
+            voltaje, corriente, T_0=float(sim_parmtrs[num_simulation]['init_temp']), **sim_ctes[num_simulation])
 
         prob_generacion = Generation.Generate(paso_temporal, E_field, temperatura, **sim_ctes[num_simulation])
         # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
@@ -137,26 +139,27 @@ for num_simulation in range(len(sim_parmtrs)):
             paso_temporal, oxygen_state, temperatura, E_field, atom_size, **sim_ctes[num_simulation])
 
         # Obtengo la nueva configuración
-        actual_state, oxygen_statem, pro_recombination = Recombination.Recombine(
+        actual_state, oxygen_statem, pro_recombination, prob_in_equilibrio = Recombination.Recombine(
             actual_state, oxygen_state, paso_temporal, velocidad, temperatura, **sim_ctes[num_simulation])
 
-        data[k-1] = np.array([simulation_time, voltaje, Corriente, temperatura])
+        data[k-1] = np.array([simulation_time, voltaje, corriente, temperatura,
+                             pro_recombination, velocidad])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
             config_matrix[int(k / paso_guardar) - 1] = actual_state
             oxygen_matrix[int(k / paso_guardar) - 1] = oxygen_state
 
-    # # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
-    # with open(f'Results/Configurations_{num_simulation}.pkl', 'wb') as f:
-    #     pickle.dump(config_matrix, f)
-    # with open(f'Results/Oxygen_{num_simulation}.pkl', 'wb') as f:
-    #     pickle.dump(oxygen_matrix, f)
+    # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
+    with open(f'Results/Configurations_{num_simulation}.pkl', 'wb') as f:
+        pickle.dump(config_matrix, f)
+    with open(f'Results/Oxygen_{num_simulation}.pkl', 'wb') as f:
+        pickle.dump(oxygen_matrix, f)
 
     # Cuando percola no se completa la matriz de datos, por lo que la recorto
     # data_filtrados = np.array([fila for fila in data if fila[-1] != 0.0])
     np.savetxt(f'Results/resultados_{num_simulation}.csv', data,
-               header='Tiempo simulacion [s], Voltaje [V], Intensidad [A] , Temperatura [K]',
+               header='Tiempo simulacion [s], Voltaje [V], Intensidad [A] , Temperatura [K], Prob recombionacion, velocidad [m/s]',
                comments=' ', delimiter=', ')
 
     potencial = float(sim_ctes[num_simulation]["pb_metal_insul"])

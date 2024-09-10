@@ -87,7 +87,7 @@ def Plot_panel(data_path: str, title: str = None) -> None:
                 [1].strip() + '-' + partes[1].split('=')[1].strip() + '.png')
 
     # Cierro la figura
-    plt.close(fig)
+    # plt.close(fig)
 
     return None
 

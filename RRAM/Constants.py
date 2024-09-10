@@ -1,5 +1,6 @@
 # Módulo que contiene todas las constantes que usa el paquete
 import numpy as np
+
 from scipy.constants import Boltzmann, elementary_charge
 
 # Valor de la constante de Boltzmann en eV/K
@@ -22,13 +23,13 @@ beta_0 = 3e3
 L_p = 1e-9
 
 # Coeficiente de deriva de los iones de oxígeno debido a la presencia de un campo eléctrico externo
-gamma_drift = 9
+gamma_drift = 5
 
 # Potencial de migración de los iones de oxígeno en eV
-E_m = 0.9
+E_m = 1.0
 
 # Constante de resistencia térmica en K/W
-resistencia_termica = 7e5
+r_termica = 7e5
 
 # Constante de resistencia térmica en ohmios
 ohm_resistence = 1e6
@@ -44,6 +45,7 @@ permitividad_relativa = 20
 
 # Término inicial de la ecuación de Poole-Frenkel
 I_0 = 5e-07
+
 
 # def DifussiveBehaviour(pos_x: int, oxigen_velocity: float, paso_temp: float, grid_size: float) -> float:
 #     """
