@@ -117,7 +117,7 @@ for num_simulation in range(len(sim_parmtrs)):
             corriente = CurentSolver.poole_frenkel(temperatura, E_field, **sim_ctes[num_simulation])*(device_size)
 
         # Obtengo los valores del campo eléctrico y la temperatura
-        E_field = SimpleElectricField(voltaje, device_size)
+        E_field = GapElectricField(voltaje, device_size)
         temperatura = Temperature_Joule(
             voltaje, corriente, T_0=float(sim_parmtrs[num_simulation]['init_temp']), **sim_ctes[num_simulation])
 
@@ -135,6 +135,7 @@ for num_simulation in range(len(sim_parmtrs)):
         oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 5)
 
         # Muevo los oxígenos
+        
         oxygen_state, velocidad, desplazamiento, senh = Recombination.Move_OxygenIons(
             paso_temporal, oxygen_state, temperatura, E_field, atom_size, **sim_ctes[num_simulation])
 
