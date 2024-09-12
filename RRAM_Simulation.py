@@ -83,12 +83,15 @@ for num_simulation in range(len(sim_parmtrs)):
     vector_ddp = np.linspace(0, voltaje_final, num_pasos + 1)
 
     # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias (x,y,probabilidad recombionacion, velocidad)
-    colunm_number = 7
+    colunm_number = 6
     data = np.zeros((num_pasos, colunm_number))
 
     # Creo el excel donde voy a sacar todos los datos
     df = pd.DataFrame(columns=['Tiempo simulacion [s]', 'Voltaje [V] ',
                       'Intensidad [A]', 'Temperatura [K], Prob recombionacion', 'Velocidad [m/s]'])
+
+    # Inicializo el campo eléctrico
+    E_field_vector = np.zeros((actual_state.shape[0]))
 
     # Comienzo la simulación
     for k in tqdm(range(1, num_pasos+1)):
@@ -114,16 +117,22 @@ for num_simulation in range(len(sim_parmtrs)):
             corriente = CurentSolver.OmhCurrent(voltaje, actual_state, **sim_ctes[num_simulation])
         else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
-            corriente = CurentSolver.poole_frenkel(temperatura, E_field, **sim_ctes[num_simulation])*(device_size)
+            corriente = CurentSolver.poole_frenkel(temperatura, np.mean(
+                E_field_vector), **sim_ctes[num_simulation])*(device_size)
 
         # Obtengo los valores del campo eléctrico y la temperatura
-        E_field = GapElectricField(voltaje, device_size)
+        E_field = SimpleElectricField(voltaje, device_size)
         temperatura = Temperature_Joule(
             voltaje, corriente, T_0=float(sim_parmtrs[num_simulation]['init_temp']), **sim_ctes[num_simulation])
 
-        prob_generacion = Generation.Generate(paso_temporal, E_field, temperatura, **sim_ctes[num_simulation])
+        # Genero el vector campo eléctrico
+        for i in range(0, actual_state.shape[0]):
+            E_field_vector[i] = GapElectricField(voltaje, i, actual_state, **sim_parmtrs[num_simulation])
+
         # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
         for i in range(x_size):
+            prob_generacion = Generation.Generate(
+                paso_temporal, E_field_vector[i], temperatura, **sim_ctes[num_simulation])
             for j in range(y_size):
                 if actual_state[i, j] == 0:
                     random_number = np.random.rand()
@@ -135,7 +144,6 @@ for num_simulation in range(len(sim_parmtrs)):
         oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 5)
 
         # Muevo los oxígenos
-        
         oxygen_state, velocidad, desplazamiento, senh = Recombination.Move_OxygenIons(
             paso_temporal, oxygen_state, temperatura, E_field, atom_size, **sim_ctes[num_simulation])
 
