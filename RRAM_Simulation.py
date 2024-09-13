@@ -83,7 +83,7 @@ for num_simulation in range(len(sim_parmtrs)):
     vector_ddp = np.linspace(0, voltaje_final, num_pasos + 1)
 
     # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias (x,y,probabilidad recombionacion, velocidad)
-    colunm_number = 7
+    colunm_number = 6
     data = np.zeros((num_pasos, colunm_number))
 
     # Creo el excel donde voy a sacar todos los datos
@@ -117,9 +117,9 @@ for num_simulation in range(len(sim_parmtrs)):
             corriente = CurentSolver.poole_frenkel(temperatura, E_field, **sim_ctes[num_simulation])*(device_size)
 
         # Obtengo los valores del campo eléctrico y la temperatura
-        E_field = GapElectricField(voltaje, device_size)
-        temperatura = Temperature_Joule(
-            voltaje, corriente, T_0=float(sim_parmtrs[num_simulation]['init_temp']), **sim_ctes[num_simulation])
+        E_field = SimpleElectricField(voltaje, device_size)
+        # temperatura = Temperature_Joule(
+        # voltaje, corriente, T_0=float(sim_parmtrs[num_simulation]['init_temp']), **sim_ctes[num_simulation])
 
         prob_generacion = Generation.Generate(paso_temporal, E_field, temperatura, **sim_ctes[num_simulation])
         # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
@@ -135,7 +135,7 @@ for num_simulation in range(len(sim_parmtrs)):
         oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 5)
 
         # Muevo los oxígenos
-        
+
         oxygen_state, velocidad, desplazamiento, senh = Recombination.Move_OxygenIons(
             paso_temporal, oxygen_state, temperatura, E_field, atom_size, **sim_ctes[num_simulation])
 
@@ -160,7 +160,7 @@ for num_simulation in range(len(sim_parmtrs)):
     # Cuando percola no se completa la matriz de datos, por lo que la recorto
     # data_filtrados = np.array([fila for fila in data if fila[-1] != 0.0])
     np.savetxt(f'Results/resultados_{num_simulation}.csv', data,
-               header='Tiempo simulacion [s], Voltaje [V], Intensidad [A] , Temperatura [K], Prob recombionacion, velocidad [m/s]',
+               header='Tiempo simulacion [s], Voltaje [V], Intensidad [A] , Temperatura [K], Prob recombionacion, Velocidad [m/s]',
                comments=' ', delimiter=', ')
 
     potencial = float(sim_ctes[num_simulation]["pb_metal_insul"])
@@ -168,9 +168,9 @@ for num_simulation in range(len(sim_parmtrs)):
     I0 = float(sim_ctes[num_simulation]["I_0"])
 
     # Represento los datos de la simulación
-    Plot_PostProcess.Plot_2panel(f'Results/resultados_{num_simulation}.csv',
-                                 col_indices_x=[1, 0],
-                                 col_indices_y=[2, 3],
-                                 save_path=f'Results/resultados_{num_simulation}.png',
-                                 global_tittle=fr'$\phi_{{B}}$ = {potencial} eV, $\varepsilon_r$ = {permitividad}, $I_0$ = {I0:.1e} A, $T_0$ = 300 K',
-                                 log_scale=[None, None])
+    Plot_PostProcess.Plot_paneles(f'Results/resultados_{num_simulation}.csv',
+                                  col_indices_x=[1, 0],
+                                  col_indices_y=[2, 3],
+                                  save_path=f'Results/resultados_{num_simulation}',
+                                  global_tittle=fr'$\phi_{{B}}$ = {potencial} eV, $\varepsilon_r$ = {permitividad}, $I_0$ = {I0:.1e} A, $T_0$ = 300 K',
+                                  log_scale=[None, None])

@@ -45,7 +45,7 @@ voltaje_final = np.ones(num_simulations) * 4      # Esto puede ser mas alto pued
 
 paso_guardar = np.ones(num_simulations, dtype=int) * 1
 
-init_temp = np.ones(num_simulations) * 350
+init_temp = np.ones(num_simulations) * 300
 initial_elec_field = np.ones(num_simulations) * 0
 initial_voltaje = np.ones(num_simulations) * 0
 initial_current = np.ones(num_simulations) * 0

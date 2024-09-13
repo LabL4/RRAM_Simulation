@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from turtle import setup
 import matplotlib.pyplot as plt
 
 from matplotlib.colors import LinearSegmentedColormap
@@ -143,42 +144,55 @@ def RepresentateALLState(state_matrix: np.ndarray, oxygen_matrix: np.ndarray, fi
     return None
 
 
-def Plot_2panel(data_path: str, col_indices_x: list, col_indices_y: list, save_path: str, global_tittle: str = None,
-                titles: list = None, eje_x: list = None, eje_y: list = None, log_scale: list = [None, None]) -> None:
-    """Plot_2panel Representate the data from a CSV file in a 2-panel plot.
+def Plot_paneles(data_path: str, col_indices_x: list, col_indices_y: list, save_path: str, global_tittle: str = None,
+                 titles: list = None, eje_x: list = None, eje_y: list = None, log_scale: list = None) -> None:
+    """Plot_paneles Representa los datos de un archivo CSV en un máximo de 4 paneles.
 
     Args:
-        data_path (str): the path to the CSV file with the data.
-        col_indices_x (list): the indices of the columns to use as the x-axis.
-        col_indices_y (list): the indices of the columns to use as the y-axis.
-        global_tittle (str, optional): the tittle of the all figure. Defaults to None.
-        titles (list, optional): the titles of each figure. Defaults to None.
-        eje_x (list, optional): the x axis names. Defaults to None.
-        eje_y (list, optional): the y axis names. Defaults to None.
-        log_scale (list, optional): activate or not log plot in each plot, 'x' for x axis 'y' for y axis an 'both' for xy axis. Defaults to [None, None].
+        data_path (str): la ruta al archivo CSV con los datos.
+        col_indices_x (list): los índices de las columnas a usar como eje x.
+        col_indices_y (list): los índices de las columnas a usar como eje y.
+        global_tittle (str, optional): el título de toda la figura. Defaults a None.
+        titles (list, optional): los títulos de cada subgráfico. Defaults a None.
+        eje_x (list, optional): los nombres de los ejes x. Defaults a None.
+        eje_y (list, optional): los nombres de los ejes y. Defaults a None.
+        log_scale (list, optional): activar o no escala logarítmica en cada gráfico, 'x' para el eje x, 'y' para el eje y, 'both' para ambos ejes. Defaults a None.
     """
-    # Leer los datos desde el CSV
+
+    # Limitar el número máximo de gráficos a 4
+    max_plots = 4
+    num_plots = min(len(col_indices_x), len(col_indices_y), max_plots)
+
+    if num_plots == 0:
+        print("No hay datos suficientes para graficar.")
+        return
+
+    # Leer los datos desde el archivo CSV
     data = pd.read_csv(data_path)
 
-    # for i, column in enumerate(data.columns):
-    #     print(f"Columna {i}: {column}")
+    # Determinar la disposición de los subplots
+    if num_plots == 1:
+        fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(6, 6))
+        axes = [axes]  # Convertir en lista para consistencia
+    elif num_plots == 2:
+        fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(6, 8))  # 2 filas y 1 columna
+    else:
+        fig, axes = plt.subplots(nrows=(num_plots + 1) // 2, ncols=2)  # Hasta 4 gráficos, 2x2 como máximo
 
-    print("\n")
-    x1, x2 = data.iloc[:, col_indices_x[0]], data.iloc[:, col_indices_x[1]]
-    y1, y2 = data.iloc[:, col_indices_y[0]], data.iloc[:, col_indices_y[1]]
+    # Si hay más de un gráfico, ravel para convertir el array en una lista
+    if num_plots > 1:
+        axes = axes.ravel()
 
-    # # Imprimir los nombres de las columnas
-    # print("x1 pertenece a la columna:", data.columns[col_indices_x[0]])
-    # print("y1 pertenece a la columna:", data.columns[col_indices_y[0]])
-    # print("x2 pertenece a la columna:", data.columns[col_indices_x[1]])
-    # print("y2 pertenece a la columna:", data.columns[col_indices_y[1]])
+    # Asignar los datos y realizar las gráficas
+    for i in range(num_plots):
+        x = data.iloc[:, col_indices_x[i]]
+        y = data.iloc[:, col_indices_y[i]]
 
-    # Crear la figura y los subplots
-    fig, axes = plt.subplots(2, 1, figsize=(6, 6))
+        ax = axes[i]
+        config_ax(ax)
+        ax.scatter(x, y, s=5, zorder=10)
 
-    # Asignar datos y títulos/etiquetas si se proporcionan
-    for i, (ax, x, y) in enumerate(zip(axes, [x1, x2], [y1, y2])):
-        ax.scatter(x, y, s=5)
+        # Asignar títulos y etiquetas de ejes si se proporcionan
         if titles and len(titles) > i:
             ax.set_title(titles[i])
         if eje_x and len(eje_x) > i:
@@ -189,6 +203,8 @@ def Plot_2panel(data_path: str, col_indices_x: list, col_indices_y: list, save_p
             ax.set_ylabel(eje_y[i])
         else:
             ax.set_ylabel(data.columns[col_indices_y[i]])
+
+        # Escala logarítmica si se solicita
         if log_scale and len(log_scale) > i:
             if log_scale[i] == 'x':
                 ax.set_xscale('log')
@@ -198,13 +214,58 @@ def Plot_2panel(data_path: str, col_indices_x: list, col_indices_y: list, save_p
                 ax.set_xscale('log')
                 ax.set_yscale('log')
 
-    # Título general
+    # Eliminar subplots vacíos si el número de gráficos es menor a 4
+    for j in range(num_plots, len(axes)):
+        fig.delaxes(axes[j])
+
+    # Título global
     if global_tittle:
         fig.suptitle(global_tittle, fontsize=16)
         fig.subplots_adjust(top=0.88)
 
-    # Ajustar diseño y guardar la figura
+    # Ajustar el diseño y guardar la figura
     fig.tight_layout()
-
-    plt.savefig(f'{save_path}')
+    plt.savefig(f'{save_path}.pdf')
     plt.close(fig)
+
+
+def config_ax(ax):
+    ax.grid(which='major', color='#DDDDDD', linewidth=0.8, zorder=-1)
+    # Show the minor grid as well. Style it in very light gray as a thin,
+    # dotted line.
+    ax.grid(which='minor', color='#DEDEDE', linestyle=':', linewidth=0.5, zorder=-1)
+    # Make the minor ticks and gridlines show.
+    ax.minorticks_on()
+
+    ax.tick_params(axis='both', which='both', direction='in', top=True, right=True)
+
+
+def setup_plt(plt, latex=True, scaling=1):
+
+    plt.rcParams.update(
+        {
+            "pgf.texsystem": "pdflatex",
+            "text.usetex": latex,
+            "font.family": "fourier",
+            "text.latex.preamble": "\n".join([  # plots will use this preamble
+                r"\usepackage[utf8]{inputenc}",
+                r"\usepackage[T1]{fontenc}",
+                r"\usepackage{siunitx}",
+            ])
+        }
+    )
+
+    SMALL_SIZE = 8 * scaling
+    MEDIUM_SIZE = 10 * scaling
+    BIGGER_SIZE = 12 * scaling
+
+    plt.rc('font', size=SMALL_SIZE)  # controls default text sizes
+    plt.rc('axes', titlesize=SMALL_SIZE)  # fontsize of the axes title
+    plt.rc('axes', labelsize=MEDIUM_SIZE)  # fontsize of the x and y labels
+    plt.rc('xtick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
+    plt.rc('ytick', labelsize=SMALL_SIZE)  # fontsize of the tick labels
+    plt.rc('legend', fontsize=SMALL_SIZE)  # legend fontsize
+    plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+
+
+setup_plt(plt, latex=True, scaling=1.5)
