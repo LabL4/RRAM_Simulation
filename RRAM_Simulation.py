@@ -3,11 +3,12 @@ import pickle
 import shutil
 import time as time
 import pandas as pd
+from colorama import init
 
 from RRAM import *
 from tqdm import tqdm
 from RRAM import Recombination
-from RRAM import Plot_PostProcess
+from RRAM import Plot_PostProcess as pplt
 
 # ----------------------------------------------------------------------------------------------------------------------------------
 # Funcion temporal para contar el numero de vacantes en cada paso
@@ -118,8 +119,8 @@ for num_simulation in range(len(sim_parmtrs)):
 
         # Obtengo los valores del campo eléctrico y la temperatura
         E_field = SimpleElectricField(voltaje, device_size)
-        # temperatura = Temperature_Joule(
-        # voltaje, corriente, T_0=float(sim_parmtrs[num_simulation]['init_temp']), **sim_ctes[num_simulation])
+        temperatura = Temperature_Joule(voltaje, corriente,
+                                        T_0=float(sim_parmtrs[num_simulation]['init_temp']), **sim_ctes[num_simulation])
 
         prob_generacion = Generation.Generate(paso_temporal, E_field, temperatura, **sim_ctes[num_simulation])
         # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
@@ -135,7 +136,6 @@ for num_simulation in range(len(sim_parmtrs)):
         oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 5)
 
         # Muevo los oxígenos
-
         oxygen_state, velocidad, desplazamiento, senh = Recombination.Move_OxygenIons(
             paso_temporal, oxygen_state, temperatura, E_field, atom_size, **sim_ctes[num_simulation])
 
@@ -166,11 +166,12 @@ for num_simulation in range(len(sim_parmtrs)):
     potencial = float(sim_ctes[num_simulation]["pb_metal_insul"])
     permitividad = float(sim_ctes[num_simulation]["permitividad_relativa"])
     I0 = float(sim_ctes[num_simulation]["I_0"])
+    init_temp = float(sim_parmtrs[num_simulation]["init_temp"])
 
     # Represento los datos de la simulación
-    Plot_PostProcess.Plot_paneles(f'Results/resultados_{num_simulation}.csv',
-                                  col_indices_x=[1, 0],
-                                  col_indices_y=[2, 3],
-                                  save_path=f'Results/resultados_{num_simulation}',
-                                  global_tittle=fr'$\phi_{{B}}$ = {potencial} eV, $\varepsilon_r$ = {permitividad}, $I_0$ = {I0:.1e} A, $T_0$ = 300 K',
-                                  log_scale=[None, None])
+    pplt.Plot_paneles(f'Results/resultados_{num_simulation}.csv',
+                      col_indices_x=[1],
+                      col_indices_y=[2],
+                      save_path=f'Results/resultados_panel_{num_simulation}',
+                      global_tittle=fr'$\phi_{{B}}$ = {potencial} eV, $\varepsilon_r$ = {permitividad}, $I_0$ = {I0:.1e} A, $T_0$ = {init_temp} K',
+                      log_scale=['y'])

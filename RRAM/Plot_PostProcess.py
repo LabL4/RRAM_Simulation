@@ -172,7 +172,7 @@ def Plot_paneles(data_path: str, col_indices_x: list, col_indices_y: list, save_
 
     # Determinar la disposición de los subplots
     if num_plots == 1:
-        fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(6, 6))
+        fig, axes = plt.subplots(nrows=1, ncols=1, figsize=(10, 5))
         axes = [axes]  # Convertir en lista para consistencia
     elif num_plots == 2:
         fig, axes = plt.subplots(nrows=2, ncols=1, figsize=(6, 8))  # 2 filas y 1 columna
@@ -268,4 +268,4 @@ def setup_plt(plt, latex=True, scaling=1):
     plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 
-setup_plt(plt, latex=True, scaling=1.5)
+setup_plt(plt, latex=True, scaling=2)
