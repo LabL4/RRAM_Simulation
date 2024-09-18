@@ -83,20 +83,23 @@ for num_simulation in range(len(sim_parmtrs)):
     vector_ddp = np.linspace(0, voltaje_final, num_pasos + 1)
 
     # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias (x,y,probabilidad recombionacion, velocidad)
-    colunm_number = 6
+    colunm_number = 8
     data = np.zeros((num_pasos, colunm_number))
 
     # Creo el excel donde voy a sacar todos los datos
     df = pd.DataFrame(columns=['Tiempo simulacion [s]', 'Voltaje [V] ',
-                      'Intensidad [A]', 'Temperatura [K], Prob recombionacion', 'Velocidad [m/s]'])
+                      'Intensidad [A]', 'Temperatura [K], Prob recombinacion', 'Velocidad [m/s]', 'Campo Simple [V/m]', 'Campo Gap medio [V/m]'])
 
     # Inicializo el campo eléctrico
     E_field_vector = np.zeros((actual_state.shape[0]))
 
+    T_0 = float(sim_parmtrs[num_simulation]['init_temp'])
+
     # Comienzo la simulación
     for k in tqdm(range(1, num_pasos+1)):
 
-        num_vacantes = contar_vacantes(actual_state)
+        # num_vacantes = contar_vacantes(actual_state)
+
         # Inicializo las vacantes generadas
         vancantes_generadas = 0
 
@@ -123,7 +126,7 @@ for num_simulation in range(len(sim_parmtrs)):
         # Obtengo los valores del campo eléctrico y la temperatura
         E_field = SimpleElectricField(voltaje, device_size)
         temperatura = Temperature_Joule(
-            voltaje, corriente, T_0=float(sim_parmtrs[num_simulation]['init_temp']), **sim_ctes[num_simulation])
+            voltaje, corriente, T_0, **sim_ctes[num_simulation])
 
         # Genero el vector campo eléctrico
         for i in range(0, actual_state.shape[0]):
@@ -141,10 +144,10 @@ for num_simulation in range(len(sim_parmtrs)):
                         vancantes_generadas = vancantes_generadas + 1
 
         # Genero los oxígenos
-        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 5)
+        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 10)
 
         # Muevo los oxígenos
-        oxygen_state, velocidad, desplazamiento, senh = Recombination.Move_OxygenIons(
+        oxygen_state, velocidad = Recombination.Move_OxygenIons(
             paso_temporal, oxygen_state, temperatura, E_field, atom_size, **sim_ctes[num_simulation])
 
         # Obtengo la nueva configuración
@@ -152,7 +155,7 @@ for num_simulation in range(len(sim_parmtrs)):
             actual_state, oxygen_state, paso_temporal, velocidad, temperatura, **sim_ctes[num_simulation])
 
         data[k-1] = np.array([simulation_time, voltaje, corriente, temperatura,
-                             pro_recombination, velocidad])
+                             pro_recombination, velocidad, E_field, np.mean(E_field_vector)])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
@@ -168,7 +171,7 @@ for num_simulation in range(len(sim_parmtrs)):
     # Cuando percola no se completa la matriz de datos, por lo que la recorto
     # data_filtrados = np.array([fila for fila in data if fila[-1] != 0.0])
     np.savetxt(f'Results/resultados_{num_simulation}.csv', data,
-               header='Tiempo simulacion [s], Voltaje [V], Intensidad [A] , Temperatura [K], Probabilidad recombinacion, velocidad [m/s]',
+               header='Tiempo simulacion [s], Voltaje [V], Intensidad [A] , Temperatura [K], Probabilidad Recombinacion, velocidad [m/s], Campo Simple[V/m], Campo Gap medio[V/m]',
                comments=' ', delimiter=', ')
 
     potencial = float(sim_ctes[num_simulation]["pb_metal_insul"])
@@ -178,7 +181,7 @@ for num_simulation in range(len(sim_parmtrs)):
     # Represento los datos de la simulación
     Plot_PostProcess.Plot_paneles(f'Results/resultados_{num_simulation}.csv',
                                   col_indices_x=[1],
-                                  col_indices_y=[2],
+                                  col_indices_y=[7],
                                   save_path=f'Results/resultados_{num_simulation}.png',
                                   global_tittle=fr'$\phi_{{B}}$ = {potencial} eV, $\varepsilon_r$ = {permitividad}, $I_0$ = {I0:.1e} A, $T_0$ = 300 K',
                                   log_scale=[None, None])

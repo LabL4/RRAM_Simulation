@@ -23,16 +23,15 @@ beta_0 = 3e3
 L_p = 1e-9
 
 # Coeficiente de deriva de los iones de oxígeno debido a la presencia de un campo eléctrico externo
-gamma_drift = 12
+gamma_drift = 9
 
 # Potencial de migración de los iones de oxígeno en eV
-E_m = 0.9
-
+E_m = 1.0
 # Constante de resistencia térmica en K/W
 r_termica = 7e5
 
 # Constante de resistencia térmica en ohmios
-ohm_resistence = 1e6
+ohm_resistence = 5e6
 
 # Constante de red, el paper original propone 0.25 nm
 cte_red = 0.25e-9
@@ -44,7 +43,7 @@ pb_metal_insul = 0.5
 permitividad_relativa = 20
 
 # Término inicial de la ecuación de Poole-Frenkel
-I_0 = 5e-07
+I_0 = 2e-07
 
 
 # def DifussiveBehaviour(pos_x: int, oxigen_velocity: float, paso_temp: float, grid_size: float) -> float:
