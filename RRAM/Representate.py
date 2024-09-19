@@ -1,10 +1,10 @@
 import numpy as np
-# Description: This file contains the code to generate the mesh of the RRAM.
 import pandas as pd
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
+from RRAM import Montecarlo
 from matplotlib.colors import LinearSegmentedColormap
 
 
@@ -208,7 +208,19 @@ def RepresentateStateOptAnto(matriz: np.ndarray, fig, ax, im=None, filename: str
     # Colocar las etiquetas del eje x en la parte superior
     # ax.xaxis.tick_top()
 
-    plt.title("Iteracion {}".format(filename.split("_")[1].split(".")[0]))
+    sim_parmtrs = Montecarlo.read_csv_to_dic("Init_data/simulation_parameters.csv")
+    num_simulation = 0
+
+    num_pasos = int(sim_parmtrs[num_simulation]['num_pasos'])
+    voltaje_final = float(sim_parmtrs[num_simulation]['voltaje_final'])
+
+    vector_ddp = np.linspace(0, voltaje_final, num_pasos + 1)
+    iteracion = int(filename.split("_")[1].split(".")[0])
+    potencial = vector_ddp[iteracion-1]
+
+    plt.title(f"{potencial:.4f} V, iteracion {iteracion}")
+
+    # plt.title("Iteracion {}".format(filename.split("_")[1].split(".")[0]))
 
     return im
 
