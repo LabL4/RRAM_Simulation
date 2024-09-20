@@ -129,16 +129,13 @@ def Recombine(actual_state: np.array, oxygen_state: np.array, paso_temp: float, 
     oxygen_state_before = np.copy(oxygen_state)
     actual_state_before = np.copy(actual_state)
 
-    # Calculo la probabilidad de recombinación. Esto debería ir dentro de los ciclos for pero
-    # lo he sacado para tener siempre el valor aunque no haya recombinción
-    j = 1  # No estoy empleando la variable j (que serviria para la funcion a trozos) para no cambiar el codigo original
-    # dejo este valor
-    prob_recom, prob_in_equilibrio = Prob_Recombination(paso_temp, velocidad, j, temp, **kwargs)
+    # Calculo la probabilidad de recombinación.
+    prob_recom = Prob_Recombination(paso_temp, velocidad, temp, **kwargs)
 
     # Recorro la matriz de oxígeno para saber en qué posiciones hay oxígeno
     for i in range(oxygen_state_before.shape[0]):
         for j in range(oxygen_state_before.shape[1]):
-            # Si hay oxígeno en la posición de la matriz de oxígeno y hay un hueco en la matriz de estado actual
+            # Si hay oxígeno en la posición de la matriz de oxígeno y hay una vacante en la matriz de estado actual
             if oxygen_state_before[i, j] == 1 and actual_state_before[i, j] == 1:
                 # Si hay un hueco, calculo la probabilidad de recombinación
                 random_number = np.random.rand()    # Genero un número aleatorio
@@ -146,10 +143,10 @@ def Recombine(actual_state: np.array, oxygen_state: np.array, paso_temp: float, 
                     actual_state[i, j] = 0
                     oxygen_state[i, j] = 0
 
-    return (actual_state, oxygen_state, prob_recom, prob_in_equilibrio)
+    return (actual_state, oxygen_state, prob_recom)
 
 
-def Prob_Recombination(paso_temporal: float, velocidad: float, pos_x: int, temp: float, **kwargs) -> float:
+def Prob_Recombination(paso_temporal: float, velocidad: float, temp: float, **kwargs) -> float:
 
     # Obtengo las constantes necesarias para el cálculo
     if kwargs:
@@ -168,13 +165,11 @@ def Prob_Recombination(paso_temporal: float, velocidad: float, pos_x: int, temp:
 
     # Calculo la  probabilidad de recombinación en equilibrio
     prob_in_equilibrio = (paso_temporal * t_0) * (math.exp(-E_a / (k_b_ev * temp)))
-    # funcion_trozos = cte.DifussiveBehaviour(pos_x, velocidad, paso_temporal, cte_red)
-    # * funcion_trozos le quito lo de la funcion a trozos
     exp_beta = math.exp(-(paso_temporal * velocidad) / L_p) * beta_0
 
     prob_recom = prob_in_equilibrio * exp_beta
 
-    return prob_recom, prob_in_equilibrio
+    return prob_recom
 
 
 # |----------------------------------------------------------------------------------------------------------------------|

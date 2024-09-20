@@ -172,7 +172,7 @@ def RepresentatePoints(matriz: np.ndarray, filename: str = "grafica.png") -> Non
     return None
 
 
-def RepresentateStateOptAnto(matriz: np.ndarray, fig, ax, im=None, filename: str = "grafica.png") -> None:
+def RepresentateStateOptAnto(matriz: np.ndarray, fig, ax, im=None, color=(0.478, 0.627, 0.870), filename: str = "grafica.png") -> None:
     """
     Represent the state of a matrix as a colored plot.
 
@@ -188,7 +188,7 @@ def RepresentateStateOptAnto(matriz: np.ndarray, fig, ax, im=None, filename: str
     # Crear un mapa de colores personalizado
     colors = [
         (1, 1, 1),                  # Color para el valor 0 que representa que No hay trampa
-        (0.478, 0.627, 0.870),      # Color para el valor 1 que representa que hay trampa (azul)
+        color,                      # Color para el valor 1 que representa que hay trampa (azul por defeto)
     ]
     if np.all(matriz == 1):
         colors = list(reversed(colors))

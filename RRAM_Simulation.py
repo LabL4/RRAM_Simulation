@@ -151,7 +151,7 @@ for num_simulation in range(len(sim_parmtrs)):
             paso_temporal, oxygen_state, temperatura, E_field, atom_size, **sim_ctes[num_simulation])
 
         # Obtengo la nueva configuración
-        actual_state, oxygen_statem, pro_recombination, prob_in_equilibrio = Recombination.Recombine(
+        actual_state, oxygen_state, pro_recombination = Recombination.Recombine(
             actual_state, oxygen_state, paso_temporal, velocidad, temperatura, **sim_ctes[num_simulation])
 
         data[k-1] = np.array([simulation_time, voltaje, corriente, temperatura,

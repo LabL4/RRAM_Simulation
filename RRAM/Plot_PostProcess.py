@@ -8,91 +8,6 @@ from matplotlib.colors import LinearSegmentedColormap
 # Varias funciones para representar los datos obtenidos de la simulación
 
 
-def Plot_panel(data_path: str, title: str = None) -> None:
-    """
-    Función que representa los datos obtenidos de la simulación en un panel con 4 subplots, acepta un archivo csv con los datos con la siguiente estructura:
-        - La primera columna contiene la variable independiente
-        - Las siguientes columnas contienen las variables dependientes
-
-    Args:
-    data_path: contiene la ruta del archivo de datos, se encuentra en la primera columna la variable independiente 
-               y en las siguientes columnas las variables dependientes
-
-    Returns:
-        La figura con los 4 subplots representando los datos
-    """
-
-    # leo los datos desde el csv
-    data = pd.read_csv(data_path)
-
-    # Elimino la primera fila que son los nombres de las columnas
-    data = data.values[1:, :]
-
-    # Extraigo la variable independiente
-    x = data[:, 0]
-
-    # Extraigo las variables dependientes
-    y = data[:, 1:]
-
-    # Creo la figura que será un panel con 4 subplots
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(9, 7))
-
-    # Establezco el título del conjunto de figuras si se ha proporcionado uno
-    if title is not None:
-        fig.suptitle(title, fontsize=16)
-
-    # Creo el primer subplot
-    ax1.plot(x, y[:, 0])
-    ax1.set_title('Velocidad')
-
-    # añado una etiqueta al eje x
-    ax1.set_xlabel('Tiempo [s]')
-    ax1.set_ylabel('Velocidad [m/s]')
-
-    # Creo el segundo subplot
-    ax2.plot(x, y[:, 1])
-    ax2.set_title('desplazamiento')
-
-    # añado una etiqueta al eje x
-    ax2.set_xlabel('Tiempo [s]')
-    ax2.set_ylabel('Desplazamiento [casillas]')
-
-    # Creo el tercer subplot
-    ax3.plot(x, y[:, 2])
-    ax3.set_title('Probabilidad generacion')
-
-    # añado una etiqueta al eje x
-    ax3.set_xlabel('Tiempo [s]')
-
-    # Creo el cuarto subplot
-    ax4.plot(x, y[:, 3])
-    ax4.set_title('Probabilidad recombinacion')
-
-    # añado una etiqueta al eje x
-    ax4.set_xlabel('Tiempo [s]')
-
-    # Ajustamos el espacio entre los plots
-    fig.tight_layout()
-
-    # Ajusto el espacio para el título principal si se ha proporcionado uno
-    if title is not None:
-        fig.subplots_adjust(top=0.88)
-
-    # TODO: Cambiar esto por si no le pongo titulo
-    # Elimino la extensión del archivo
-    data_path = (data_path.split('/')[1]).split('.')[0]
-    partes = title.split(',')
-
-    # Guardo la figura
-    plt.savefig('Results/Panel_' + data_path + '_' + partes[0].split('=')
-                [1].strip() + '-' + partes[1].split('=')[1].strip() + '.png')
-
-    # Cierro la figura
-    # plt.close(fig)
-
-    return None
-
-
 def RepresentateALLState(state_matrix: np.ndarray, oxygen_matrix: np.ndarray, fig, ax, filename: str = "grafica.png") -> None:
     """
     Representates the state and oxygen matrices using a custom colormap and saves the plot as an image.
@@ -225,6 +140,8 @@ def Plot_paneles(data_path: str, col_indices_x: list, col_indices_y: list, save_
 
     # Ajustar el diseño y guardar la figura
     fig.tight_layout()
+
+    # Guardar la figura
     plt.savefig(f'{save_path}.pdf')
     plt.close(fig)
 
