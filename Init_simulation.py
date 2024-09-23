@@ -9,7 +9,7 @@ from RRAM import Generation as gn
 from RRAM import Constants as cte
 
 # Número de simulaciones que realizo
-num_simulations = 1
+num_simulations = 5
 
 # Defino la carpeta donde se guardan los datos iniciales de la simulación
 carpeta = 'Init_data'
@@ -163,7 +163,8 @@ potential_barrier_metal_insul = np.ones(num_simulations) * cte.pb_metal_insul
 permitividad_relativa = np.ones(num_simulations) * cte.permitividad_relativa
 
 # Término inicial de la ecuación de Poole-Frenkel
-I_0 = np.ones(num_simulations) * cte.I_0
+I_0 = [5e-07, 4e-07, 3e-07, 2e-07, 1e-07]
+# I_0 = np.ones(num_simulations) * cte.I_0
 
 # Constante de resistencia térmica en K/W
 r_termica = np.ones(num_simulations) * cte.r_termica

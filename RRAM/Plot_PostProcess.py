@@ -1,4 +1,5 @@
 import numpy as np
+from cv2 import log
 import pandas as pd
 from turtle import setup
 import matplotlib.pyplot as plt
@@ -142,7 +143,106 @@ def Plot_paneles(data_path: str, col_indices_x: list, col_indices_y: list, save_
     fig.tight_layout()
 
     # Guardar la figura
-    plt.savefig(f'{save_path}.pdf')
+    plt.savefig(f'{save_path}.pdf', bbox_inches='tight')
+    # plt.close(fig)
+
+
+def plot_DifAxes(data_path: str,
+                 col_indices_x: int,
+                 col_indices_y: list,
+                 save_path: str,
+                 global_tittle: str = ' '
+                 ) -> None:
+
+    # leo los datos desde el csv
+    data = pd.read_csv(data_path)
+
+    # Extraigo la variable independiente
+    x1 = data.iloc[:, col_indices_x]
+
+    # Extraigo las variables dependientes
+    y1 = data.iloc[:, col_indices_y[0]]
+
+    # Extraigo la variable independiente
+    x2 = data.iloc[:, col_indices_x]
+
+    # Extraigo las variables dependientes
+    y2 = data.iloc[:, col_indices_y[1]]
+
+    print(data.columns[col_indices_x])
+    print(data.columns[col_indices_y[0]])
+    print(data.columns[col_indices_y[1]])
+
+    fig, axes = plt.subplots()
+    config_ax(axes)
+
+    axes.set_xlabel(data.columns[col_indices_x])
+    axes.set_ylabel(data.columns[col_indices_y[0]], color='blue')
+
+    axes.set_title(global_tittle, fontsize=16, pad=15)
+
+    axes.scatter(x1, y1, s=1.5, color='blue')
+
+    twin_axes = axes.twinx()
+    twin_axes.scatter(x2, y2, s=1.5, color='r')
+    twin_axes.set_ylabel(data.columns[col_indices_y[1]], color='r')
+
+    plt.show()
+    fig.savefig(save_path + '.pdf', bbox_inches='tight')
+    plt.close(fig)
+
+
+def plot_both(data_path: str,
+              col_indices_x: int,
+              col_indices_y: list,
+              y_label: str,
+              save_path: str,
+              global_tittle: str = ' ',
+              log_scale: list = None
+              ) -> None:
+
+    # leo los datos desde el csv
+    data = pd.read_csv(data_path)
+
+    # Extraigo la variable independiente
+    x1 = data.iloc[:, col_indices_x]
+
+    # Extraigo las variables dependientes
+    y1 = data.iloc[:, col_indices_y[0]]
+
+    # Extraigo la variable independiente
+    x2 = data.iloc[:, col_indices_x]
+
+    # Extraigo las variables dependientes
+    y2 = data.iloc[:, col_indices_y[1]]
+
+    # print(data.columns[col_indices_x])
+    # print(data.columns[col_indices_y[0]])
+    # print(data.columns[col_indices_y[1]])
+
+    fig, axes = plt.subplots()
+    config_ax(axes)
+
+    axes.set_xlabel(data.columns[col_indices_x])
+    axes.set_ylabel(y_label)
+
+    # Escala logarítmica si se solicita
+    if log_scale and len(log_scale) > 0:
+        if log_scale[0] == 'x':
+            axes.set_xscale('log')
+        elif log_scale[0] == 'y':
+            axes.set_yscale('log')
+        elif log_scale[0] == 'both':
+            axes.set_xscale('log')
+            axes.set_yscale('log')
+
+    axes.set_title(global_tittle, fontsize=18, pad=15)
+
+    axes.scatter(x1, y1, s=1.5)
+    axes.scatter(x2, y2, s=1.5)
+
+    plt.show()
+    fig.savefig(save_path + '.pdf', bbox_inches='tight')
     plt.close(fig)
 
 
@@ -185,4 +285,4 @@ def setup_plt(plt, latex=True, scaling=1):
     plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 
-setup_plt(plt, latex=True, scaling=2)
+setup_plt(plt, latex=True, scaling=1.5)

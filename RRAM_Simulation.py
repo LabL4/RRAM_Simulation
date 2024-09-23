@@ -7,7 +7,7 @@ import pandas as pd
 from RRAM import *
 from tqdm import tqdm
 from RRAM import Recombination
-from RRAM import Plot_PostProcess
+from RRAM import Plot_PostProcess as pplt
 
 # ----------------------------------------------------------------------------------------------------------------------------------
 # Funcion temporal para contar el numero de vacantes en cada paso
@@ -171,7 +171,9 @@ for num_simulation in range(len(sim_parmtrs)):
     # Cuando percola no se completa la matriz de datos, por lo que la recorto
     # data_filtrados = np.array([fila for fila in data if fila[-1] != 0.0])
     np.savetxt(f'Results/resultados_{num_simulation}.csv', data,
-               header='Tiempo simulacion [s], Voltaje [V], Intensidad [A] , Temperatura [K], Probabilidad Recombinacion, velocidad [m/s], Campo Simple[V/m], Campo Gap medio[V/m]',
+               header='Tiempo simulacion [s], Voltaje [V], Intensidad [A], \
+                        Temperatura [K], Probabilidad Recombinacion, velocidad [m/s], \
+                        Campo Simple [V/m], Campo Gap medio [V/m]',
                comments=' ', delimiter=', ')
 
     potencial = float(sim_ctes[num_simulation]["pb_metal_insul"])
@@ -179,9 +181,12 @@ for num_simulation in range(len(sim_parmtrs)):
     I0 = float(sim_ctes[num_simulation]["I_0"])
 
     # Represento los datos de la simulación
-    Plot_PostProcess.Plot_paneles(f'Results/resultados_{num_simulation}.csv',
-                                  col_indices_x=[1],
-                                  col_indices_y=[7],
-                                  save_path=f'Results/resultados_{num_simulation}.png',
-                                  global_tittle=fr'$\phi_{{B}}$ = {potencial} eV, $\varepsilon_r$ = {permitividad}, $I_0$ = {I0:.1e} A, $T_0$ = 300 K',
-                                  log_scale=[None, None])
+    pplt.plot_both(f'Results/resultados_{num_simulation}.csv',
+                   col_indices_x=1,
+                   col_indices_y=[2, 2],
+                   y_label='Intensidad [A]',
+                   save_path=f'Results/resultados_intensidada_{num_simulation}',
+                   global_tittle=fr'$I_0$ = {I0:.2e} eV',
+                   log_scale='y')
+
+    #   global_tittle = fr'$\phi_{{B}}$ = {potencial} eV, $\varepsilon_r$ = {permitividad}, $I_0$ = {I0:.1e} A, $T_0$ = {T_0} K',
