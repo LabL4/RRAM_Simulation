@@ -83,7 +83,7 @@ for num_simulation in range(len(sim_parmtrs)):
     vector_ddp = np.linspace(0, voltaje_final, num_pasos + 1)
 
     # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias (x,y,probabilidad recombionacion, velocidad)
-    colunm_number = 8
+    colunm_number = 9
     data = np.zeros((num_pasos, colunm_number))
 
     # Creo el excel donde voy a sacar todos los datos
@@ -118,15 +118,17 @@ for num_simulation in range(len(sim_parmtrs)):
         if Percolation.is_path(actual_state):
             # Si ha percolado uso la corriente de Ohm
             corriente = CurentSolver.OmhCurrent(voltaje, actual_state, **sim_ctes[num_simulation])
+            sim_ctes[num_simulation]['gamma'] = '0.3'
         else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
             corriente = CurentSolver.poole_frenkel(temperatura, np.mean(
                 E_field_vector), **sim_ctes[num_simulation])*(device_size)
 
+            sim_ctes[num_simulation]['gamma'] = '3'
+
         # Obtengo los valores del campo eléctrico y la temperatura
         E_field = SimpleElectricField(voltaje, device_size)
-        temperatura = Temperature_Joule(
-            voltaje, corriente, T_0, **sim_ctes[num_simulation])
+        temperatura = Temperature_Joule(voltaje, corriente, T_0, **sim_ctes[num_simulation])
 
         # Genero el vector campo eléctrico
         for i in range(0, actual_state.shape[0]):
@@ -147,7 +149,7 @@ for num_simulation in range(len(sim_parmtrs)):
         oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 10)
 
         # Muevo los oxígenos
-        oxygen_state, velocidad = Recombination.Move_OxygenIons(
+        oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
             paso_temporal, oxygen_state, temperatura, E_field, atom_size, **sim_ctes[num_simulation])
 
         # Obtengo la nueva configuración
@@ -155,7 +157,7 @@ for num_simulation in range(len(sim_parmtrs)):
             actual_state, oxygen_state, paso_temporal, velocidad, temperatura, **sim_ctes[num_simulation])
 
         data[k-1] = np.array([simulation_time, voltaje, corriente, temperatura,
-                             pro_recombination, velocidad, E_field, np.mean(E_field_vector)])
+                             pro_recombination, velocidad, E_field, np.mean(E_field_vector), desplazamiento])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
@@ -173,20 +175,20 @@ for num_simulation in range(len(sim_parmtrs)):
     np.savetxt(f'Results/resultados_{num_simulation}.csv', data,
                header='Tiempo simulacion [s], Voltaje [V], Intensidad [A], \
                         Temperatura [K], Probabilidad Recombinacion, velocidad [m/s], \
-                        Campo Simple [V/m], Campo Gap medio [V/m]',
+                        Campo Simple [V/m], Campo Gap medio [V/m], Desplazamiento [0.25 nm]',
                comments=' ', delimiter=', ')
 
-    potencial = float(sim_ctes[num_simulation]["pb_metal_insul"])
-    permitividad = float(sim_ctes[num_simulation]["permitividad_relativa"])
-    I0 = float(sim_ctes[num_simulation]["I_0"])
+    # potencial = float(sim_ctes[num_simulation]["pb_metal_insul"])
+    # ohm_resistence = float(sim_ctes[num_simulation]["ohm_resistence"])
+    # I0 = float(sim_ctes[num_simulation]["I_0"])
 
     # Represento los datos de la simulación
-    pplt.plot_both(f'Results/resultados_{num_simulation}.csv',
-                   col_indices_x=1,
-                   col_indices_y=[2, 2],
-                   y_label='Intensidad [A]',
-                   save_path=f'Results/resultados_intensidada_{num_simulation}',
-                   global_tittle=fr'$I_0$ = {I0:.2e} eV',
-                   log_scale='y')
+    # pplt.plot_both(f'Results/resultados_{num_simulation}.csv',
+    #                col_indices_x=1,
+    #                col_indices_y=[2, 2],
+    #                y_label='Intensidad [A]',
+    #                save_path=f'Results/resultados_intensidad_{num_simulation}',
+    #                global_tittle=fr'$I_0$ = {I0:.2e} A $R = ${ohm_resistence:.2e} $\Omega$',
+    #                log_scale='y')
 
     #   global_tittle = fr'$\phi_{{B}}$ = {potencial} eV, $\varepsilon_r$ = {permitividad}, $I_0$ = {I0:.1e} A, $T_0$ = {T_0} K',

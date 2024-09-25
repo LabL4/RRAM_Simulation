@@ -9,7 +9,7 @@ from RRAM import Generation as gn
 from RRAM import Constants as cte
 
 # Número de simulaciones que realizo
-num_simulations = 5
+num_simulations = 1
 
 # Defino la carpeta donde se guardan los datos iniciales de la simulación
 carpeta = 'Init_data'
@@ -125,8 +125,7 @@ cte_red = np.ones(num_simulations) * cte.cte_red
 E_a = np.ones(num_simulations) * cte.E_a
 
 # Drift coefficient of oxygen ions due to an external field
-# gamma_drift = np.array([8, 9, 10])
-# gamma_drift = np.repeat(gamma_drift, 16)
+# gamma_drift = np.array([8, 9, 10, 11, 12, 13, 14, 15, 16])
 gamma_drift = np.ones(num_simulations) * cte.gamma_drift
 
 # Recombination enhancement factor due to the presence of excessive oxygen ions
@@ -138,23 +137,19 @@ L_p = np.ones(num_simulations) * cte.L_p
 # Coefficient representing the local enhancement factor due to the electric field
 gamma = np.ones(num_simulations) * cte.gamma
 
+# ohm_resistence = [1e5, 2e5]
+# I_0 = [9e-07, 8e-07, 7e-07, 6e-07, 5e-07, 4e-07, 3e-07, 2e-07, 1e-07]
+
+# Crear las parejas
+# duos = [(v1, v2) for v2 in ohm_resistence for v1 in I_0]
+
+# duos_array = np.array(duos)
+
+# ohm_resistence = duos_array[:, 1]
+# I_0 = duos_array[:, 0]
+
 # Resistance ohmic of the device
 ohm_resistence = np.ones(num_simulations) * cte.ohm_resistence
-
-# # Crear los vectores
-# permitividad_relativa = np.arange(20, 200, 80)
-# pb_metal_insul = [0.1, 0.5, 0.9]
-# I_0 = np.arange(1e-7, 9e-7, 2e-7)
-
-# # Crear los tríos
-# trios = [(v1, v2, v3) for v3 in I_0 for v2 in pb_metal_insul for v1 in permitividad_relativa]
-
-# # Convertir la lista de tríos en un array de NumPy y asignarlo a una variable
-# trios_array = np.array(trios)
-
-# permitividad_relativa = trios_array[:, 0]
-# pb_metal_insul = trios_array[:, 1]
-# I_0 = trios_array[:, 2]
 
 # Potential barrier at the metal and insulator interface
 potential_barrier_metal_insul = np.ones(num_simulations) * cte.pb_metal_insul
@@ -163,8 +158,8 @@ potential_barrier_metal_insul = np.ones(num_simulations) * cte.pb_metal_insul
 permitividad_relativa = np.ones(num_simulations) * cte.permitividad_relativa
 
 # Término inicial de la ecuación de Poole-Frenkel
-I_0 = [5e-07, 4e-07, 3e-07, 2e-07, 1e-07]
-# I_0 = np.ones(num_simulations) * cte.I_0
+# I_0 = [9e-08, 8e-08, 7e-08, 6e-08, 5e-08, 4e-08, 3e-08, 2e-08, 1e-08]
+I_0 = np.ones(num_simulations) * cte.I_0
 
 # Constante de resistencia térmica en K/W
 r_termica = np.ones(num_simulations) * cte.r_termica

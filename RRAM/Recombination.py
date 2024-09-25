@@ -110,7 +110,7 @@ def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float
                     else:  # Si se sale de la matriz, lo elimino
                         oxygen_state[j, i] = 0
 
-    return oxygen_state, oxigen_velocity
+    return oxygen_state, oxigen_velocity, displacement
 
 
 def Recombine(actual_state: np.array, oxygen_state: np.array, paso_temp: float, velocidad: float, temp: float, **kwargs) -> np.array:
@@ -130,7 +130,7 @@ def Recombine(actual_state: np.array, oxygen_state: np.array, paso_temp: float, 
     actual_state_before = np.copy(actual_state)
 
     # Calculo la probabilidad de recombinación.
-    prob_recom = Prob_Recombination(paso_temp, velocidad, temp, **kwargs)
+    prob_recom = 50*Prob_Recombination(paso_temp, velocidad, temp, **kwargs)
 
     # Recorro la matriz de oxígeno para saber en qué posiciones hay oxígeno
     for i in range(oxygen_state_before.shape[0]):
@@ -139,9 +139,23 @@ def Recombine(actual_state: np.array, oxygen_state: np.array, paso_temp: float, 
             if oxygen_state_before[i, j] == 1 and actual_state_before[i, j] == 1:
                 # Si hay un hueco, calculo la probabilidad de recombinación
                 random_number = np.random.rand()    # Genero un número aleatorio
-                if random_number < prob_recom:      # Cambiar luego a la probabilidad en equilibrio que menciona en el paper original
+                if random_number < prob_recom:
                     actual_state[i, j] = 0
                     oxygen_state[i, j] = 0
+
+    # # Otra forma de hacerlo es con máscaras dado por copilot
+    # # Crear una máscara para las posiciones donde hay oxígeno y una vacante
+    # mask = (oxygen_state_before == 1) & (actual_state_before == 1)
+
+    # # Generar una matriz de números aleatorios del mismo tamaño que la máscara
+    # random_numbers = np.random.rand(*mask.shape)
+
+    # # Crear una máscara para las posiciones donde ocurre la recombinación
+    # recombination_mask = mask & (random_numbers < prob_recom)
+
+    # # Actualizar los estados según la máscara de recombinación
+    # actual_state[recombination_mask] = 0
+    # oxygen_state[recombination_mask] = 0
 
     return (actual_state, oxygen_state, prob_recom)
 
