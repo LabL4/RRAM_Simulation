@@ -51,6 +51,9 @@ def GapElectricField(potential: float, pos_y: int, actual_state: np.array, **kwa
 
     L = size_device - gap
 
-    E_field = potential / L
+    if L == 0:
+        E_field = potential / size_device
+    else:
+        E_field = potential / L
 
     return E_field

@@ -40,7 +40,8 @@ def process_matrix(args):
     else:
         fig, ax = plt.gcf(), plt.gca()
 
-    im = RepresentateStateOxygen(matrix, fig, ax, im, filename="Figuras/grafica_" + str(idx+1) + ".png")
+    im = RepresentateStateOptAnto(matrix, fig, ax,  im, color=(0.878, 0.227, 0.370),
+                                  filename="Figuras/grafica_" + str(idx+1) + ".png")
 
     plt.savefig((buffer := BytesIO()), format='png')
     plt.clf()
@@ -65,7 +66,7 @@ if __name__ == '__main__':
 
     start = time.time()
     # Crear un escritor de video
-    writer = imageio.get_writer('Oxygen.mp4', fps=12)
+    writer = imageio.get_writer('Videos/Oxygen.mp4', fps=24)
 
     # Cargar y procesar las imágenes una por una
     for img in images:

@@ -1,10 +1,10 @@
 import numpy as np
-# Description: This file contains the code to generate the mesh of the RRAM.
 import pandas as pd
 
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
 
+from RRAM import Montecarlo
 from matplotlib.colors import LinearSegmentedColormap
 
 
@@ -172,7 +172,7 @@ def RepresentatePoints(matriz: np.ndarray, filename: str = "grafica.png") -> Non
     return None
 
 
-def RepresentateStateOptAnto(matriz: np.ndarray, fig, ax, im=None, filename: str = "grafica.png") -> None:
+def RepresentateStateOptAnto(matriz: np.ndarray, fig, ax, im=None, color=(0.478, 0.627, 0.870), filename: str = "grafica.png") -> None:
     """
     Represent the state of a matrix as a colored plot.
 
@@ -188,7 +188,7 @@ def RepresentateStateOptAnto(matriz: np.ndarray, fig, ax, im=None, filename: str
     # Crear un mapa de colores personalizado
     colors = [
         (1, 1, 1),                  # Color para el valor 0 que representa que No hay trampa
-        (0.478, 0.627, 0.870),      # Color para el valor 1 que representa que hay trampa (azul)
+        color,                      # Color para el valor 1 que representa que hay trampa (azul por defeto)
     ]
     if np.all(matriz == 1):
         colors = list(reversed(colors))
@@ -208,7 +208,19 @@ def RepresentateStateOptAnto(matriz: np.ndarray, fig, ax, im=None, filename: str
     # Colocar las etiquetas del eje x en la parte superior
     # ax.xaxis.tick_top()
 
-    plt.title("Iteracion {}".format(filename.split("_")[1].split(".")[0]))
+    sim_parmtrs = Montecarlo.read_csv_to_dic("Init_data/simulation_parameters.csv")
+    num_simulation = 0
+
+    num_pasos = int(sim_parmtrs[num_simulation]['num_pasos'])
+    voltaje_final = float(sim_parmtrs[num_simulation]['voltaje_final'])
+
+    vector_ddp = np.linspace(0, voltaje_final, num_pasos + 1)
+    iteracion = int(filename.split("_")[1].split(".")[0])
+    potencial = vector_ddp[iteracion-1]
+
+    plt.title(f"{potencial:.4f} V, iteracion {iteracion}")
+
+    # plt.title("Iteracion {}".format(filename.split("_")[1].split(".")[0]))
 
     return im
 
