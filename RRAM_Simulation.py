@@ -3,7 +3,6 @@ import pickle
 import shutil
 import time as time
 import pandas as pd
-from colorama import init
 
 from RRAM import *
 from tqdm import tqdm
@@ -43,6 +42,8 @@ os.makedirs(carpeta)
 # quiero un bucle que recorra todas las simulaciones desde 0 hasta la longitud de sim_parmtrs-1
 
 for num_simulation in range(len(sim_parmtrs)):
+
+    # region Definición de variables
 
     # Pongo el nombre de la simulación y un salto de línea
     print(f"\n Simulación {num_simulation + 1}")
@@ -98,9 +99,12 @@ for num_simulation in range(len(sim_parmtrs)):
 
     T_0 = float(sim_parmtrs[num_simulation]['init_temp'])
 
+    # endregion
+
+    # region Forming
+
     # Comienzo la simulación
     for k in tqdm(range(1, num_pasos+1)):
-
         # num_vacantes = contar_vacantes(actual_state)
 
         # Inicializo las vacantes generadas
@@ -154,7 +158,7 @@ for num_simulation in range(len(sim_parmtrs)):
 
         # Muevo los oxígenos
         oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
-
+            paso_temporal, oxygen_state, temperatura, E_field, atom_size, **sim_ctes[num_simulation])
 
         # Obtengo la nueva configuración
         actual_state, oxygen_state, pro_recombination = Recombination.Recombine(
@@ -168,14 +172,109 @@ for num_simulation in range(len(sim_parmtrs)):
             config_matrix[int(k / paso_guardar) - 1] = actual_state
             oxygen_matrix[int(k / paso_guardar) - 1] = oxygen_state
 
+    # endregion
+
+    # Cuando acaba la simulacion guardo los estados de las matrices de configuracion y oxigenos
+    with open(f'Results/Last_Configuration_{num_simulation}.pkl', 'wb') as f:
+        pickle.dump(actual_state, f)
+    with open(f'Results/Last_OxygenState_{num_simulation}.pkl', 'wb') as f:
+        pickle.dump(oxygen_state, f)
+
     # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
     with open(f'Results/Configurations_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(config_matrix, f)
     with open(f'Results/Oxygen_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(oxygen_matrix, f)
 
-    # Cuando percola no se completa la matriz de datos, por lo que la recorto
-    # data_filtrados = np.array([fila for fila in data if fila[-1] != 0.0])
+    # region reset
+
+    # Estado inicial de la simulación reset para las vacantes
+    with open(f'Results/Last_Configuration_{num_simulation}.pkl', 'rb') as file:
+        # Carga el contenido del archivo
+        initial_configuration = pickle.load(file)
+
+    # Estado inicial de la simulación reset para los oxígenos
+    with open(f'Results/Last_Configuration_{num_simulation}.pkl', 'rb') as file:
+        # Carga el contenido del archivo
+        initial_oxygenstate = pickle.load(file)
+
+    # Defino el paso temporal
+    paso_temporal = total_simulation_time / num_pasos
+
+    # Creo el vector de diferencias de potencial
+    vector_ddp = np.linspace(voltaje_final, 0, num_pasos + 1)
+
+    # Estado iniciales de la simulación para el reset
+    actual_state = initial_configuration
+    oxygen_state = initial_oxygenstate
+
+    for k in tqdm(range(1, num_pasos+1)):
+
+        # num_vacantes = contar_vacantes(actual_state)
+
+        # Guardo el estado anterior
+        last_state = actual_state
+
+        # Actualizo el tiempo de simulación
+        simulation_time = paso_temporal * k
+
+        # Actualizo el voltaje
+        voltaje = vector_ddp[k]
+
+        # voltaje += voltaje_final / paso_temporal
+
+        # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
+        if Percolation.is_path(actual_state):
+            # Si ha percolado uso la corriente de Ohm
+            corriente = CurentSolver.OmhCurrent(voltaje, actual_state, **sim_ctes[num_simulation])
+            sim_ctes[num_simulation]['gamma'] = '0.3'
+        else:
+            # Si no ha percolado uso la corriente de Poole-Frenkel
+            corriente = CurentSolver.poole_frenkel(temperatura, np.mean(
+                E_field_vector), **sim_ctes[num_simulation])*(device_size)
+
+            sim_ctes[num_simulation]['gamma'] = '3'
+
+        # Obtengo los valores del campo eléctrico y la temperatura
+        E_field = SimpleElectricField(voltaje, device_size)
+
+        temperatura = Temperature_Joule(voltaje, corriente, T_0, **sim_ctes[num_simulation])
+
+        # Genero el vector campo eléctrico
+        for i in range(0, actual_state.shape[0]):
+            E_field_vector[i] = GapElectricField(voltaje, i, actual_state, **sim_parmtrs[num_simulation])
+
+        # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
+        for i in range(x_size):
+            prob_generacion = Generation.Generate(
+                paso_temporal, E_field_vector[i], temperatura, **sim_ctes[num_simulation])
+            for j in range(y_size):
+                if actual_state[i, j] == 0:
+                    random_number = np.random.rand()
+                    if random_number < prob_generacion:
+                        actual_state[i, j] = 1  # Generación de una vacante
+                        vancantes_generadas = vancantes_generadas + 1
+
+        # Genero los oxígenos
+        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 10)
+
+        # Muevo los oxígenos
+        oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
+            paso_temporal, oxygen_state, temperatura, E_field, atom_size, **sim_ctes[num_simulation])
+
+        # Obtengo la nueva configuración
+        actual_state, oxygen_state, pro_recombination = Recombination.Recombine(
+            actual_state, oxygen_state, paso_temporal, velocidad, temperatura, **sim_ctes[num_simulation])
+
+        data[k-1] = np.array([simulation_time, voltaje, corriente, temperatura,
+                             pro_recombination, velocidad, E_field, np.mean(E_field_vector), desplazamiento])
+
+        # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
+        if k % paso_guardar == 0:
+            config_matrix[int(k / paso_guardar) - 1] = actual_state
+            oxygen_matrix[int(k / paso_guardar) - 1] = oxygen_state
+
+    # endregion
     np.savetxt(f'Results/resultados_{num_simulation}.csv', data,
                header='Tiempo simulacion [s], Voltaje [V], Intensidad [A], \
                         Temperatura [K], Probabilidad Recombinacion, velocidad [m/s], \
@@ -196,4 +295,3 @@ for num_simulation in range(len(sim_parmtrs)):
     #                log_scale='y')
 
     #   global_tittle = fr'$\phi_{{B}}$ = {potencial} eV, $\varepsilon_r$ = {permitividad}, $I_0$ = {I0:.1e} A, $T_0$ = {T_0} K',
-
