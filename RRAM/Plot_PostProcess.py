@@ -142,6 +142,7 @@ def Plot_paneles(data_path: str, col_indices_x: list, col_indices_y: list, save_
     # Ajustar el diseño y guardar la figura
     fig.tight_layout()
 
+
     # Guardar la figura
     plt.savefig(f'{save_path}.pdf', bbox_inches='tight')
     # plt.close(fig)
@@ -284,5 +285,5 @@ def setup_plt(plt, latex=True, scaling=1):
     plt.rc('legend', fontsize=SMALL_SIZE)  # legend fontsize
     plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
-
 setup_plt(plt, latex=True, scaling=1.5)
+

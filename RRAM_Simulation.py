@@ -3,6 +3,7 @@ import pickle
 import shutil
 import time as time
 import pandas as pd
+from colorama import init
 
 from RRAM import *
 from tqdm import tqdm
@@ -83,7 +84,9 @@ for num_simulation in range(len(sim_parmtrs)):
     vector_ddp = np.linspace(0, voltaje_final, num_pasos + 1)
 
     # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias (x,y,probabilidad recombionacion, velocidad)
+
     colunm_number = 9
+
     data = np.zeros((num_pasos, colunm_number))
 
     # Creo el excel donde voy a sacar todos los datos
@@ -128,6 +131,7 @@ for num_simulation in range(len(sim_parmtrs)):
 
         # Obtengo los valores del campo eléctrico y la temperatura
         E_field = SimpleElectricField(voltaje, device_size)
+
         temperatura = Temperature_Joule(voltaje, corriente, T_0, **sim_ctes[num_simulation])
 
         # Genero el vector campo eléctrico
@@ -150,7 +154,7 @@ for num_simulation in range(len(sim_parmtrs)):
 
         # Muevo los oxígenos
         oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
-            paso_temporal, oxygen_state, temperatura, E_field, atom_size, **sim_ctes[num_simulation])
+
 
         # Obtengo la nueva configuración
         actual_state, oxygen_state, pro_recombination = Recombination.Recombine(
@@ -192,3 +196,4 @@ for num_simulation in range(len(sim_parmtrs)):
     #                log_scale='y')
 
     #   global_tittle = fr'$\phi_{{B}}$ = {potencial} eV, $\varepsilon_r$ = {permitividad}, $I_0$ = {I0:.1e} A, $T_0$ = {T_0} K',
+

@@ -28,8 +28,9 @@ gamma_drift = 10
 # Potencial de migración de los iones de oxígeno en eV
 E_m = 1
 
+
 # Constante de resistencia térmica en K/W
-r_termica = 7e5
+r_termica = 5e5
 
 # Constante de resistencia térmica en ohmios
 ohm_resistence = 1e5
@@ -44,6 +45,7 @@ pb_metal_insul = 0.5
 permitividad_relativa = 20
 
 # Término inicial de la ecuación de Poole-Frenkel
+
 I_0 = 7e-7
 
 
