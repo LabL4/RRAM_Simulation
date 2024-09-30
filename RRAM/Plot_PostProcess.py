@@ -1,7 +1,7 @@
 import numpy as np
 from cv2 import log
 import pandas as pd
-from turtle import setup
+from turtle import setup, title
 import matplotlib.pyplot as plt
 
 from matplotlib.colors import LinearSegmentedColormap
@@ -61,7 +61,7 @@ def RepresentateALLState(state_matrix: np.ndarray, oxygen_matrix: np.ndarray, fi
 
 
 def Plot_paneles(data_path: str, col_indices_x: list, col_indices_y: list, save_path: str, global_tittle: str = None,
-                 titles: list = None, eje_x: list = None, eje_y: list = None, log_scale: list = None) -> None:
+                 titles: list = None, eje_x: list = None, eje_y: list = None, log_scale: list = None, ) -> None:
     """Plot_paneles Representa los datos de un archivo CSV en un máximo de 4 paneles.
 
     Args:
@@ -151,7 +151,7 @@ def plot_DifAxes(data_path: str,
                  col_indices_x: int,
                  col_indices_y: list,
                  save_path: str,
-                 global_tittle: str = ' '
+                 global_tittle: str = ' ',
                  ) -> None:
 
     # leo los datos desde el csv
@@ -198,6 +198,7 @@ def plot_both(data_path: str,
               y_label: str,
               save_path: str,
               global_tittle: str = ' ',
+              leyend: list = [' ', ' '],
               log_scale: list = None
               ) -> None:
 
@@ -238,8 +239,11 @@ def plot_both(data_path: str,
 
     axes.set_title(global_tittle, fontsize=18, pad=15)
 
-    axes.scatter(x1, y1, s=1.5)
-    axes.scatter(x2, y2, s=1.5)
+    axes.scatter(x1, y1, s=1.5, label=leyend[0])
+    axes.scatter(x2, y2, s=1.5, label=leyend[1])
+
+    # Añadir la leyenda
+    plt.legend()
 
     plt.show()
     fig.savefig(save_path + '.pdf', bbox_inches='tight')

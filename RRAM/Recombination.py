@@ -130,7 +130,7 @@ def Recombine(actual_state: np.array, oxygen_state: np.array, paso_temp: float, 
     actual_state_before = np.copy(actual_state)
 
     # Calculo la probabilidad de recombinación.
-    prob_recom = 50*Prob_Recombination(paso_temp, velocidad, temp, **kwargs)
+    prob_recom = Prob_Recombination(paso_temp, velocidad, temp, **kwargs)
 
     # Recorro la matriz de oxígeno para saber en qué posiciones hay oxígeno
     for i in range(oxygen_state_before.shape[0]):
