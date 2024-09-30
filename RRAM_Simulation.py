@@ -121,13 +121,10 @@ for num_simulation in range(len(sim_parmtrs)):
         if Percolation.is_path(actual_state):
             # Si ha percolado uso la corriente de Ohm
             corriente = CurentSolver.OmhCurrent(voltaje, actual_state, **sim_ctes[num_simulation])
-            sim_ctes[num_simulation]['gamma'] = '0.3'
         else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
             corriente = CurentSolver.poole_frenkel(temperatura, np.mean(
                 E_field_vector), **sim_ctes[num_simulation])*(device_size)
-
-            sim_ctes[num_simulation]['gamma'] = '3'
 
         # Obtengo los valores del campo eléctrico y la temperatura
         E_field = SimpleElectricField(voltaje, device_size)
@@ -154,14 +151,14 @@ for num_simulation in range(len(sim_parmtrs)):
 
         # Muevo los oxígenos
         oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
-
+            paso_temporal, oxygen_state, temperatura, E_field, float(sim_parmtrs[num_simulation]['atom_size']), ** sim_ctes[num_simulation])
 
         # Obtengo la nueva configuración
         actual_state, oxygen_state, pro_recombination = Recombination.Recombine(
             actual_state, oxygen_state, paso_temporal, velocidad, temperatura, **sim_ctes[num_simulation])
 
         data[k-1] = np.array([simulation_time, voltaje, corriente, temperatura,
-                             pro_recombination, velocidad, E_field, np.mean(E_field_vector), desplazamiento])
+                              pro_recombination, velocidad, E_field, np.mean(E_field_vector), desplazamiento])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
@@ -196,4 +193,3 @@ for num_simulation in range(len(sim_parmtrs)):
     #                log_scale='y')
 
     #   global_tittle = fr'$\phi_{{B}}$ = {potencial} eV, $\varepsilon_r$ = {permitividad}, $I_0$ = {I0:.1e} A, $T_0$ = {T_0} K',
-
