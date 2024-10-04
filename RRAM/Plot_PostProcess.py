@@ -142,7 +142,6 @@ def Plot_paneles(data_path: str, col_indices_x: list, col_indices_y: list, save_
     # Ajustar el diseño y guardar la figura
     fig.tight_layout()
 
-
     # Guardar la figura
     plt.savefig(f'{save_path}.pdf', bbox_inches='tight')
     # plt.close(fig)
@@ -247,6 +246,62 @@ def plot_both(data_path: str,
     plt.close(fig)
 
 
+def plot_simple(data_path: str,
+                col_indices_x: int,
+                col_indices_y: int,
+                save_path: str,
+                global_tittle: str = ' ',
+                x_label: str = ' ',
+                y_label: str = ' ',
+                log_scale: list = None
+                ) -> None:
+
+    # leo los datos desde el csv
+    data = pd.read_csv(data_path)
+
+    # Extraigo la variable independiente
+    x1 = data.iloc[:, col_indices_x]
+
+    # Extraigo las variables dependientes
+    y1 = data.iloc[:, col_indices_y]
+
+    # print(data.columns[col_indices_x])
+    # print(data.columns[col_indices_y[0]])
+    # print(data.columns[col_indices_y[1]])
+
+    fig, axes = plt.subplots()
+    config_ax(axes)
+
+    axes.set_xlabel(x_label)
+    if x_label == ' ':  # Si no se proporciona etiqueta para el eje x, usar el nombre de la columna
+        axes.set_xlabel(data.columns[col_indices_x])
+    else:
+        axes.set_xlabel(x_label)
+
+    if y_label == ' ':  # Si no se proporciona etiqueta para el eje y, usar el nombre de la columna
+        axes.set_ylabel(data.columns[col_indices_y])
+    else:
+        axes.set_ylabel(y_label)
+
+    # Escala logarítmica si se solicita
+    if log_scale and len(log_scale) > 0:
+        if log_scale[0] == 'x':
+            axes.set_xscale('log')
+        elif log_scale[0] == 'y':
+            axes.set_yscale('log')
+        elif log_scale[0] == 'both':
+            axes.set_xscale('log')
+            axes.set_yscale('log')
+
+    axes.set_title(global_tittle, fontsize=18, pad=15)
+
+    axes.scatter(x1, y1, s=1.5)
+
+    plt.show()
+    fig.savefig(save_path + '.pdf', bbox_inches='tight')
+    plt.close(fig)
+
+
 def config_ax(ax):
     ax.grid(which='major', color='#DDDDDD', linewidth=0.8, zorder=-1)
     # Show the minor grid as well. Style it in very light gray as a thin,
@@ -285,5 +340,5 @@ def setup_plt(plt, latex=True, scaling=1):
     plt.rc('legend', fontsize=SMALL_SIZE)  # legend fontsize
     plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
-setup_plt(plt, latex=True, scaling=1.5)
 
+setup_plt(plt, latex=True, scaling=1.5)

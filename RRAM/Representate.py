@@ -215,10 +215,12 @@ def RepresentateStateOptAnto(matriz: np.ndarray, fig, ax, im=None, color=(0.478,
     voltaje_final = float(sim_parmtrs[num_simulation]['voltaje_final'])
 
     vector_ddp = np.linspace(0, voltaje_final, num_pasos + 1)
+    # vector_ddp = np.linspace(voltaje_final, 0, num_pasos + 1)
     iteracion = int(filename.split("_")[1].split(".")[0])
     potencial = vector_ddp[iteracion-1]
 
-    plt.title(f"{potencial:.4f} V, iteracion {iteracion}")
+    # plt.title(f"{potencial:.4f} V, iteracion {iteracion}")
+    plt.title(f"potencial: {potencial:.2f}, iteracion {iteracion}")
 
     # plt.title("Iteracion {}".format(filename.split("_")[1].split(".")[0]))
 

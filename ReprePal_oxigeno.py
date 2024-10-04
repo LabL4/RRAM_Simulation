@@ -12,7 +12,7 @@ from tqdm.contrib.concurrent import process_map
 global im
 
 # Cargo el fichero con las configuraciones
-with open('Results/Oxygen_0.pkl', 'rb') as f:
+with open('Results/Oxygen_forming_0.pkl', 'rb') as f:
     Oxigeno = pickle.load(f)
 
 # Supongamos que las imágenes están en el subdirectorio "Figuras" y tienen nombres de archivo que siguen el patrón "image*.png"

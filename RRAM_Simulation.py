@@ -102,7 +102,6 @@ for num_simulation in range(len(sim_parmtrs)):
     # endregion
 
     # region Forming
-
     # Comienzo la simulación
     for k in tqdm(range(1, num_pasos+1)):
         # num_vacantes = contar_vacantes(actual_state)
@@ -125,13 +124,14 @@ for num_simulation in range(len(sim_parmtrs)):
         if Percolation.is_path(actual_state):
             # Si ha percolado uso la corriente de Ohm
             corriente = CurentSolver.OmhCurrent(voltaje, actual_state, **sim_ctes[num_simulation])
-            sim_ctes[num_simulation]['gamma'] = '0.3'
         else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
             corriente = CurentSolver.poole_frenkel(temperatura, np.mean(
                 E_field_vector), **sim_ctes[num_simulation])*(device_size)
 
-            sim_ctes[num_simulation]['gamma'] = '3'
+            # if voltaje > 2.15:
+            #     # cambio el valor de la probabilidad de generar vacantes
+            #     sim_ctes[num_simulation]['gamma'] = '0.3'
 
         # Obtengo los valores del campo eléctrico y la temperatura
         E_field = SimpleElectricField(voltaje, device_size)
@@ -181,10 +181,14 @@ for num_simulation in range(len(sim_parmtrs)):
         pickle.dump(oxygen_state, f)
 
     # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
-    with open(f'Results/Configurations_{num_simulation}.pkl', 'wb') as f:
+    with open(f'Results/Configurations_forming_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(config_matrix, f)
-    with open(f'Results/Oxygen_{num_simulation}.pkl', 'wb') as f:
+    with open(f'Results/Oxygen_forming_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(oxygen_matrix, f)
+
+    np.savetxt(f'Results/resultados_{num_simulation}.csv', data,
+               header='Tiempo simulacion [s], Voltaje [V], Intensidad [A], Temperatura [K], Probabilidad Recombinacion, velocidad [m/s], Campo Simple [V/m], Campo Gap medio [V/m], Desplazamiento [0.25 nm]',
+               comments=' ', delimiter=', ')
 
     # region reset
 
@@ -198,8 +202,13 @@ for num_simulation in range(len(sim_parmtrs)):
         # Carga el contenido del archivo
         initial_oxygenstate = pickle.load(file)
 
+    data = np.zeros((num_pasos, colunm_number))
+
+    # Cmabio la probabilidad del forming
+    sim_ctes[num_simulation]['gamma'] = '0.3'
+
     # Defino el paso temporal
-    paso_temporal = total_simulation_time / num_pasos
+    # paso_temporal = total_simulation_time / num_pasos
 
     # Creo el vector de diferencias de potencial
     vector_ddp = np.linspace(voltaje_final, 0, num_pasos + 1)
@@ -209,31 +218,20 @@ for num_simulation in range(len(sim_parmtrs)):
     oxygen_state = initial_oxygenstate
 
     for k in tqdm(range(1, num_pasos+1)):
-
-        # num_vacantes = contar_vacantes(actual_state)
-
-        # Guardo el estado anterior
-        last_state = actual_state
-
         # Actualizo el tiempo de simulación
         simulation_time = paso_temporal * k
 
         # Actualizo el voltaje
         voltaje = vector_ddp[k]
 
-        # voltaje += voltaje_final / paso_temporal
-
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
             # Si ha percolado uso la corriente de Ohm
             corriente = CurentSolver.OmhCurrent(voltaje, actual_state, **sim_ctes[num_simulation])
-            sim_ctes[num_simulation]['gamma'] = '0.3'
         else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
             corriente = CurentSolver.poole_frenkel(temperatura, np.mean(
                 E_field_vector), **sim_ctes[num_simulation])*(device_size)
-
-            sim_ctes[num_simulation]['gamma'] = '3'
 
         # Obtengo los valores del campo eléctrico y la temperatura
         E_field = SimpleElectricField(voltaje, device_size)
@@ -256,17 +254,20 @@ for num_simulation in range(len(sim_parmtrs)):
                         vancantes_generadas = vancantes_generadas + 1
 
         # Genero los oxígenos
-        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 10)
+        # oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 10)
 
         # Muevo los oxígenos
-        oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
+        oxygen_state, velocidad = Recombination.Move_OxygenIonsReset(
             paso_temporal, oxygen_state, temperatura, E_field, atom_size, **sim_ctes[num_simulation])
 
         # Obtengo la nueva configuración
         actual_state, oxygen_state, pro_recombination = Recombination.Recombine(
             actual_state, oxygen_state, paso_temporal, velocidad, temperatura, **sim_ctes[num_simulation])
 
-        data[k-1] = np.array([simulation_time, voltaje, corriente, temperatura,
+        # Tiempo total de la simulacion
+        tiempo_total = simulation_time + float(sim_parmtrs[num_simulation]['total_simulation_time'])
+
+        data[k-1] = np.array([tiempo_total, voltaje, corriente, temperatura,
                              pro_recombination, velocidad, E_field, np.mean(E_field_vector), desplazamiento])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
@@ -274,12 +275,23 @@ for num_simulation in range(len(sim_parmtrs)):
             config_matrix[int(k / paso_guardar) - 1] = actual_state
             oxygen_matrix[int(k / paso_guardar) - 1] = oxygen_state
 
+    # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
+    with open(f'Results/Configurations_reset_{num_simulation}.pkl', 'wb') as f:
+        pickle.dump(config_matrix, f)
+    with open(f'Results/Oxygen_reset_{num_simulation}.pkl', 'wb') as f:
+        pickle.dump(oxygen_matrix, f)
     # endregion
-    np.savetxt(f'Results/resultados_{num_simulation}.csv', data,
-               header='Tiempo simulacion [s], Voltaje [V], Intensidad [A], \
-                        Temperatura [K], Probabilidad Recombinacion, velocidad [m/s], \
-                        Campo Simple [V/m], Campo Gap medio [V/m], Desplazamiento [0.25 nm]',
-               comments=' ', delimiter=', ')
+
+    with open(f'Results/resultados_reset_{num_simulation}.csv', 'a') as f:  # Modo append 'a'
+        np.savetxt(f, data,
+                   delimiter=', ',
+                   comments=' ')
+
+    merge_pickles_to_array(f'Results/Oxygen_forming_{num_simulation}.pkl', f'Results/Oxygen_reset_{num_simulation}.pkl',
+                           f'Results/Oxygen_{num_simulation}.pkl')
+
+    merge_pickles_to_array(f'Results/Configurations_forming_{num_simulation}.pkl', f'Results/Configurations_reset_{num_simulation}.pkl',
+                           f'Results/Configurations_{num_simulation}.pkl')
 
     # potencial = float(sim_ctes[num_simulation]["pb_metal_insul"])
     # ohm_resistence = float(sim_ctes[num_simulation]["ohm_resistence"])

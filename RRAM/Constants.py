@@ -14,7 +14,7 @@ E_a = 1
 
 # Tiene distintos valores dependiendo si el estado es FORMING/SET y RESET
 # La estoy modificando a mano para que el campo eléctrico tmb tenga algún papel en la dinámica
-gamma = 0.3
+gamma = 3
 
 # Factor de recombinación debido a la presencia de exceso de iones de oxígeno
 beta_0 = 3e3
@@ -26,7 +26,7 @@ L_p = 1e-9
 gamma_drift = 10
 
 # Potencial de migración de los iones de oxígeno en eV
-E_m = 1
+E_m = 0.8
 
 
 # Constante de resistencia térmica en K/W
@@ -45,7 +45,6 @@ pb_metal_insul = 0.5
 permitividad_relativa = 20
 
 # Término inicial de la ecuación de Poole-Frenkel
-
 I_0 = 7e-7
 
 
