@@ -94,6 +94,8 @@ def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float
 
     # Calculo la cantidad de "casillas" que se moverá el ion de oxígeno
     displacement = int(round((oxigen_velocity * paso_temp) / grid_size))
+    if displacement > 3:
+        displacement = 3
 
     if displacement == 0:
         pass
@@ -152,8 +154,13 @@ def Move_OxygenIonsReset(paso_temp: float, oxygen_state: np.array, temperature: 
     # En la expresión original se multiplica por 2 lo he quitado para ver si sale algo mejor
     oxigen_velocity = 2 * t_0 * cte_red * (senoh * exp_velocity)
 
+    if oxigen_velocity > 75-8:
+        oxigen_velocity = 8e-7
+
     # Calculo la cantidad de "casillas" que se moverá el ion de oxígeno
     displacement = int(round((oxigen_velocity * paso_temp) / grid_size))
+    if displacement > 3:
+        displacement = 3
 
     if displacement == 0:
         pass
@@ -190,7 +197,7 @@ def Recombine(actual_state: np.array, oxygen_state: np.array, paso_temp: float, 
     actual_state_before = np.copy(actual_state)
 
     # Calculo la probabilidad de recombinación.
-    prob_recom = 50*Prob_Recombination(paso_temp, velocidad, temp, **kwargs)
+    prob_recom = Prob_Recombination(paso_temp, velocidad, temp, **kwargs)
 
     # Recorro la matriz de oxígeno para saber en qué posiciones hay oxígeno
     for i in range(oxygen_state_before.shape[0]):

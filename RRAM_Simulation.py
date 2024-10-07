@@ -118,8 +118,6 @@ for num_simulation in range(len(sim_parmtrs)):
         # Actualizo el voltaje
         voltaje = vector_ddp[k]
 
-        # voltaje += voltaje_final / paso_temporal
-
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
             # Si ha percolado uso la corriente de Ohm
@@ -129,9 +127,9 @@ for num_simulation in range(len(sim_parmtrs)):
             corriente = CurentSolver.poole_frenkel(temperatura, np.mean(
                 E_field_vector), **sim_ctes[num_simulation])*(device_size)
 
-            # if voltaje > 2.15:
-            #     # cambio el valor de la probabilidad de generar vacantes
-            #     sim_ctes[num_simulation]['gamma'] = '0.3'
+            if voltaje > 2.25:
+                # cambio el valor de la probabilidad de generar vacantes
+                sim_ctes[num_simulation]['gamma'] = '0.3'
 
         # Obtengo los valores del campo eléctrico y la temperatura
         E_field = SimpleElectricField(voltaje, device_size)
@@ -154,7 +152,7 @@ for num_simulation in range(len(sim_parmtrs)):
                         vancantes_generadas = vancantes_generadas + 1
 
         # Genero los oxígenos
-        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 10)
+        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 20)
 
         # Muevo los oxígenos
         oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
@@ -177,8 +175,11 @@ for num_simulation in range(len(sim_parmtrs)):
     # Cuando acaba la simulacion guardo los estados de las matrices de configuracion y oxigenos
     with open(f'Results/Last_Configuration_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(actual_state, f)
+
     with open(f'Results/Last_OxygenState_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(oxygen_state, f)
+
+    RepresentateState(oxygen_state, f'Results/Last_oxygen_{num_simulation}.png')
 
     # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
     with open(f'Results/Configurations_forming_{num_simulation}.pkl', 'wb') as f:

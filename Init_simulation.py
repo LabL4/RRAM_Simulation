@@ -125,7 +125,7 @@ cte_red = np.ones(num_simulations) * cte.cte_red
 E_a = np.ones(num_simulations) * cte.E_a
 
 # Drift coefficient of oxygen ions due to an external field
-# gamma_drift = np.array([8, 9, 10, 11, 12, 13, 14, 15, 16])
+# gamma_drift = np.array([7, 8, 9, 10, 11, 12])
 gamma_drift = np.ones(num_simulations) * cte.gamma_drift
 
 # Recombination enhancement factor due to the presence of excessive oxygen ions
