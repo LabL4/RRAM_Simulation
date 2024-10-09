@@ -172,7 +172,7 @@ def RepresentatePoints(matriz: np.ndarray, filename: str = "grafica.png") -> Non
     return None
 
 
-def RepresentateStateOptAnto(matriz: np.ndarray, fig, ax, im=None, color=(0.478, 0.627, 0.870), filename: str = "grafica.png") -> None:
+def RepresentateState_parall(matriz: np.ndarray, fig, ax, im=None, color=(0.478, 0.627, 0.870), filename: str = "grafica.png") -> None:
     """
     Represent the state of a matrix as a colored plot.
 
@@ -208,19 +208,19 @@ def RepresentateStateOptAnto(matriz: np.ndarray, fig, ax, im=None, color=(0.478,
     # Colocar las etiquetas del eje x en la parte superior
     # ax.xaxis.tick_top()
 
-    sim_parmtrs = Montecarlo.read_csv_to_dic("Init_data/simulation_parameters.csv")
-    num_simulation = 0
+    # sim_parmtrs = Montecarlo.read_csv_to_dic("Init_data/simulation_parameters.csv")
+    # num_simulation = 0
 
-    num_pasos = int(sim_parmtrs[num_simulation]['num_pasos'])
-    voltaje_final = float(sim_parmtrs[num_simulation]['voltaje_final'])
+    # num_pasos = int(sim_parmtrs[num_simulation]['num_pasos'])
+    # voltaje_final = float(sim_parmtrs[num_simulation]['voltaje_final'])
 
-    vector_ddp = np.linspace(0, voltaje_final, num_pasos + 1)
-    # vector_ddp = np.linspace(voltaje_final, 0, num_pasos + 1)
+    # vector_ddp = np.linspace(0, voltaje_final, num_pasos + 1)
+    # # vector_ddp = np.linspace(voltaje_final, 0, num_pasos + 1)
     iteracion = int(filename.split("_")[1].split(".")[0])
-    potencial = vector_ddp[iteracion-1]
+    # potencial = vector_ddp[iteracion-1]
 
-    # plt.title(f"{potencial:.4f} V, iteracion {iteracion}")
-    plt.title(f"potencial: {potencial:.2f}, iteracion {iteracion}")
+    plt.title(f"iteracion {iteracion}")
+    # plt.title(f"potencial: {potencial:.4f} V, iteracion {iteracion}")
 
     # plt.title("Iteracion {}".format(filename.split("_")[1].split(".")[0]))
 

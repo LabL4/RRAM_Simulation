@@ -9,20 +9,6 @@ from tqdm import tqdm
 from RRAM import Recombination
 from RRAM import Plot_PostProcess as pplt
 
-# ----------------------------------------------------------------------------------------------------------------------------------
-# Funcion temporal para contar el numero de vacantes en cada paso
-# ----------------------------------------------------------------------------------------------------------------------------------
-
-
-def contar_vacantes(matriz):
-    contador = 0
-    for fila in matriz:
-        for elemento in fila:
-            if elemento == 1:
-                contador += 1
-    return contador
-# ----------------------------------------------------------------------------------------------------------------------------------
-
 
 # comienzo leyendo los datos de la simulación almacenados en un archivo csv dentro de la carpeta Init y los guardo en sus respectivas variables
 sim_parmtrs = Montecarlo.read_csv_to_dic("Init_data/simulation_parameters.csv")
@@ -86,7 +72,7 @@ for num_simulation in range(len(sim_parmtrs)):
 
     # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias (x,y,probabilidad recombionacion, velocidad)
 
-    colunm_number = 9
+    colunm_number = 8
 
     data = np.zeros((num_pasos, colunm_number))
 
@@ -102,13 +88,8 @@ for num_simulation in range(len(sim_parmtrs)):
     # endregion
 
     # region Forming
-    # Comienzo la simulación
+
     for k in tqdm(range(1, num_pasos+1)):
-        # num_vacantes = contar_vacantes(actual_state)
-
-        # Inicializo las vacantes generadas
-        vancantes_generadas = 0
-
         # Guardo el estado anterior
         last_state = actual_state
 
@@ -117,6 +98,12 @@ for num_simulation in range(len(sim_parmtrs)):
 
         # Actualizo el voltaje
         voltaje = vector_ddp[k]
+
+        if voltaje > 2.25:
+            print("Se ha superado el voltaje de ruptura", k)
+            k_ruptura = k
+            voltaje_final_forming = voltaje
+            break
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
@@ -151,19 +138,8 @@ for num_simulation in range(len(sim_parmtrs)):
                         actual_state[i, j] = 1  # Generación de una vacante
                         vancantes_generadas = vancantes_generadas + 1
 
-        # Genero los oxígenos
-        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 20)
-
-        # Muevo los oxígenos
-        oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
-            paso_temporal, oxygen_state, temperatura, E_field, atom_size, **sim_ctes[num_simulation])
-
-        # Obtengo la nueva configuración
-        actual_state, oxygen_state, pro_recombination = Recombination.Recombine(
-            actual_state, oxygen_state, paso_temporal, velocidad, temperatura, **sim_ctes[num_simulation])
-
         data[k-1] = np.array([simulation_time, voltaje, corriente, temperatura,
-                             pro_recombination, velocidad, E_field, np.mean(E_field_vector), desplazamiento])
+                             pro_recombination, velocidad, E_field, np.mean(E_field_vector)])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
@@ -176,19 +152,20 @@ for num_simulation in range(len(sim_parmtrs)):
     with open(f'Results/Last_Configuration_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(actual_state, f)
 
-    with open(f'Results/Last_OxygenState_{num_simulation}.pkl', 'wb') as f:
-        pickle.dump(oxygen_state, f)
+    # with open(f'Results/Last_OxygenState_{num_simulation}.pkl', 'wb') as f:
+    #     pickle.dump(oxygen_state, f)
 
-    RepresentateState(oxygen_state, f'Results/Last_oxygen_{num_simulation}.png')
+    # RepresentateState(oxygen_state, f'Results/Last_oxygen_{num_simulation}.png')
+    RepresentateState(actual_state, f'Results/Last_configuration_{num_simulation}.png')
 
     # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
     with open(f'Results/Configurations_forming_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(config_matrix, f)
-    with open(f'Results/Oxygen_forming_{num_simulation}.pkl', 'wb') as f:
-        pickle.dump(oxygen_matrix, f)
+    # with open(f'Results/Oxygen_forming_{num_simulation}.pkl', 'wb') as f:
+        # pickle.dump(oxygen_matrix, f)
 
     np.savetxt(f'Results/resultados_{num_simulation}.csv', data,
-               header='Tiempo simulacion [s], Voltaje [V], Intensidad [A], Temperatura [K], Probabilidad Recombinacion, velocidad [m/s], Campo Simple [V/m], Campo Gap medio [V/m], Desplazamiento [0.25 nm]',
+               header='Tiempo simulacion [s], Voltaje [V], Intensidad [A], Temperatura [K], Probabilidad Recombinacion, velocidad [m/s], Campo Simple [V/m], Campo Gap medio [V/m]',
                comments=' ', delimiter=', ')
 
     # region reset
@@ -198,10 +175,13 @@ for num_simulation in range(len(sim_parmtrs)):
         # Carga el contenido del archivo
         initial_configuration = pickle.load(file)
 
-    # Estado inicial de la simulación reset para los oxígenos
-    with open(f'Results/Last_Configuration_{num_simulation}.pkl', 'rb') as file:
-        # Carga el contenido del archivo
-        initial_oxygenstate = pickle.load(file)
+    # # Estado inicial de la simulación reset para los oxígenos
+    # with open(f'Results/Last_Configuration_{num_simulation}.pkl', 'rb') as file:
+    #     # Carga el contenido del archivo
+    #     initial_oxygenstate = pickle.load(file)
+
+    # NUMERO DE PASOS QUE SE HA dado en el forming. Lo pongo igual en el reset para que los potenciales sean los mismos
+    num_pasos = k_ruptura
 
     data = np.zeros((num_pasos, colunm_number))
 
@@ -211,14 +191,15 @@ for num_simulation in range(len(sim_parmtrs)):
     # Defino el paso temporal
     # paso_temporal = total_simulation_time / num_pasos
 
+    voltaje_final = voltaje_final
     # Creo el vector de diferencias de potencial
-    vector_ddp = np.linspace(voltaje_final, 0, num_pasos + 1)
+    vector_ddp = np.linspace(voltaje_final, 0, num_pasos)
 
     # Estado iniciales de la simulación para el reset
     actual_state = initial_configuration
-    oxygen_state = initial_oxygenstate
+    # oxygen_state = initial_oxygenstate
 
-    for k in tqdm(range(1, num_pasos+1)):
+    for k in tqdm(range(1, num_pasos)):
         # Actualizo el tiempo de simulación
         simulation_time = paso_temporal * k
 
@@ -255,10 +236,10 @@ for num_simulation in range(len(sim_parmtrs)):
                         vancantes_generadas = vancantes_generadas + 1
 
         # Genero los oxígenos
-        # oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 10)
+        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 10)
 
         # Muevo los oxígenos
-        oxygen_state, velocidad = Recombination.Move_OxygenIonsReset(
+        oxygen_state, velocidad = Recombination.Move_OxygenIons(
             paso_temporal, oxygen_state, temperatura, E_field, atom_size, **sim_ctes[num_simulation])
 
         # Obtengo la nueva configuración
@@ -269,7 +250,7 @@ for num_simulation in range(len(sim_parmtrs)):
         tiempo_total = simulation_time + float(sim_parmtrs[num_simulation]['total_simulation_time'])
 
         data[k-1] = np.array([tiempo_total, voltaje, corriente, temperatura,
-                             pro_recombination, velocidad, E_field, np.mean(E_field_vector), desplazamiento])
+                             pro_recombination, velocidad, E_field, np.mean(E_field_vector)])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:

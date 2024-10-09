@@ -1,3 +1,4 @@
+import sys
 import glob
 import pickle
 import imageio
@@ -11,8 +12,16 @@ from tqdm.contrib.concurrent import process_map
 
 global im
 
+# Asegúrate de que se ha pasado un parámetro
+if len(sys.argv) > 1:
+    parametro_recibido = sys.argv[1]
+    print(f"Parámetro recibido: {parametro_recibido}")
+else:
+    print("No se ha pasado ningún parámetro.")
+
+
 # Cargo el fichero con las configuraciones
-with open('Results/Oxygen_forming_0.pkl', 'rb') as f:
+with open(parametro_recibido, 'rb') as f:
     Oxigeno = pickle.load(f)
 
 # Supongamos que las imágenes están en el subdirectorio "Figuras" y tienen nombres de archivo que siguen el patrón "image*.png"
@@ -40,7 +49,7 @@ def process_matrix(args):
     else:
         fig, ax = plt.gcf(), plt.gca()
 
-    im = RepresentateStateOptAnto(matrix, fig, ax,  im, color=(0.878, 0.227, 0.370),
+    im = RepresentateState_parall(matrix, fig, ax,  im, color=(0.878, 0.227, 0.370),
                                   filename="Figuras/grafica_" + str(idx+1) + ".png")
 
     plt.savefig((buffer := BytesIO()), format='png')
@@ -51,7 +60,7 @@ def process_matrix(args):
 
 if __name__ == '__main__':
 
-    NUM_PARALLEL_PROCESSES = 10
+    NUM_PARALLEL_PROCESSES = 8
     start = time.time()
     args = [(Oxigeno[i], i) for i in range(len(Oxigeno))]
     buffers = process_map(process_matrix, args, max_workers=NUM_PARALLEL_PROCESSES, chunksize=25)
@@ -66,7 +75,7 @@ if __name__ == '__main__':
 
     start = time.time()
     # Crear un escritor de video
-    writer = imageio.get_writer('Videos/Oxygen.mp4', fps=24)
+    writer = imageio.get_writer('Videos/Oxygen.mp4', fps=12)
 
     # Cargar y procesar las imágenes una por una
     for img in images:
