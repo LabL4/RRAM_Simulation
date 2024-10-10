@@ -112,7 +112,7 @@ def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float
                     else:  # Si se sale de la matriz, lo elimino
                         oxygen_state[j, i] = 0
 
-    return oxygen_state, oxigen_velocity, displacement
+    return oxygen_state, oxigen_velocity
 
 
 def Move_OxygenIonsReset(paso_temp: float, oxygen_state: np.array, temperature: float, E_field: float, grid_size: float, **kwargs):
