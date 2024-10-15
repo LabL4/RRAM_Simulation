@@ -15,14 +15,15 @@ global im
 
 # Asegúrate de que se ha pasado un parámetro
 if len(sys.argv) > 1:
-    parametro_recibido = sys.argv[1]
-    print(f"Parámetro recibido: {parametro_recibido}")
+    data_path = sys.argv[1]
+    save_path = sys.argv[2]
+    print(f"Parámetro recibido: {data_path}")
 else:
     print("No se ha pasado ningún parámetro.")
 
 
 # Cargo el fichero con las configuraciones
-with open(parametro_recibido, 'rb') as f:
+with open(data_path, 'rb') as f:
     configuration = pickle.load(f)
 
 # Supongamos que las imágenes están en el subdirectorio "Figuras" y tienen nombres de archivo que siguen el patrón "image*.png"
@@ -75,7 +76,7 @@ if __name__ == '__main__':
 
     start = time.time()
     # Crear un escritor de video
-    writer = imageio.get_writer('Videos/Configuracion.mp4', fps=12)
+    writer = imageio.get_writer(save_path, fps=12)
 
     # Cargar y procesar las imágenes una por una
     for img in images:

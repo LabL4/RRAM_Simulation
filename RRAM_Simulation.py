@@ -107,6 +107,12 @@ for num_simulation in range(len(sim_parmtrs)):
             voltaje_inicial_reset = vector_ddp[k]
             simulation_time_forming = simulation_time
             print("Voltaje final forming", voltaje_inicial_reset, 'en el tiempo ', simulation_time_forming)
+
+            # Crear un array de ejemplo
+            data[k:] = np.nan  # Añadir valores nulos a partir de la fila k
+
+            # Eliminar filas con valores nulos
+            data = data[~np.isnan(data).any(axis=1)]
             break
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
@@ -174,11 +180,6 @@ for num_simulation in range(len(sim_parmtrs)):
         # Carga el contenido del archivo
         initial_configuration = pickle.load(file)
 
-    # # Estado inicial de la simulación reset para los oxígenos
-    # with open(f'Results/Last_Configuration_{num_simulation}.pkl', 'rb') as file:
-    #     # Carga el contenido del archivo
-    #     initial_oxygenstate = pickle.load(file)
-
     # NUMERO DE PASOS QUE SE HA dado en el forming. Lo pongo igual en el reset para que los potenciales sean los mismos
     num_pasos = k_ruptura
 
@@ -186,7 +187,11 @@ for num_simulation in range(len(sim_parmtrs)):
     colunm_number = 7
     data_reset = np.zeros((num_pasos, colunm_number))
 
+    # Defino las matrices donde guardo las configuración del sistema y la de los oxígenos
+    config_matrix_reset = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
+    oxygen_matrix_reset = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
     # Creo el excel donde voy a sacar todos los datos
+
     # df_reset = pd.DataFrame(columns=['Tiempo simulacion [s]', 'Voltaje [V] ',
     #  'Intensidad [A]', 'Temperatura [K]', 'Campo Simple [V/m]', 'Campo Gap medio [V/m]'])
 
@@ -215,7 +220,7 @@ for num_simulation in range(len(sim_parmtrs)):
         if Percolation.is_path(actual_state):
             # Si ha percolado uso la corriente de Ohm
             corriente = CurentSolver.OmhCurrent(voltaje, actual_state, **sim_ctes[num_simulation])
-            print("Corriente Ohm", corriente)
+            # print("Corriente Ohm", corriente)
         else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
             corriente = CurentSolver.poole_frenkel(temperatura, np.mean(
@@ -259,8 +264,8 @@ for num_simulation in range(len(sim_parmtrs)):
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
-            config_matrix[int(k / paso_guardar) - 1] = actual_state
-            oxygen_matrix[int(k / paso_guardar) - 1] = oxygen_state
+            config_matrix_reset[int(k / paso_guardar) - 1] = actual_state
+            oxygen_matrix_reset[int(k / paso_guardar) - 1] = oxygen_state
 
     # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
     with open(f'Results/Configurations_reset_{num_simulation}.pkl', 'wb') as f:
