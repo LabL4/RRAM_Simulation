@@ -265,9 +265,8 @@ def plot_simple(data_path: str,
     # Extraigo las variables dependientes
     y1 = data.iloc[:, col_indices_y]
 
-    # print(data.columns[col_indices_x])
-    # print(data.columns[col_indices_y[0]])
-    # print(data.columns[col_indices_y[1]])
+    print(data.columns[col_indices_x])
+    print(data.columns[col_indices_y])
 
     fig, axes = plt.subplots()
     config_ax(axes)
@@ -294,7 +293,6 @@ def plot_simple(data_path: str,
             axes.set_yscale('log')
 
     axes.set_title(global_tittle, fontsize=18, pad=15)
-
     axes.scatter(x1, y1, s=1.5)
 
     plt.show()

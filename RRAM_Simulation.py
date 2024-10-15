@@ -4,8 +4,9 @@ import shutil
 import time as time
 import pandas as pd
 
-from RRAM import *
 from tqdm import tqdm
+
+from RRAM import *
 from RRAM import Recombination
 from RRAM import Plot_PostProcess as pplt
 
@@ -49,7 +50,7 @@ for num_simulation in range(len(sim_parmtrs)):
     num_pasos = int(sim_parmtrs[num_simulation]['num_pasos'])
     paso_guardar = int(sim_parmtrs[num_simulation]['paso_guardar'])
 
-    voltaje_final = float(sim_parmtrs[num_simulation]['voltaje_final'])
+    voltaje_reset = float(sim_parmtrs[num_simulation]['voltaje_final'])
 
     voltaje = float(sim_parmtrs[num_simulation]['initial_voltaje'])
     corriente = float(sim_parmtrs[num_simulation]['initial_current'])
@@ -71,7 +72,7 @@ for num_simulation in range(len(sim_parmtrs)):
     paso_temporal = total_simulation_time / num_pasos
 
     # Creo el vector de diferencias de potencial
-    vector_ddp = np.linspace(0, voltaje_final, num_pasos + 1)
+    vector_ddp = np.linspace(0, voltaje_reset, num_pasos + 1)
 
     # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias
     colunm_number = 6
@@ -100,10 +101,12 @@ for num_simulation in range(len(sim_parmtrs)):
         # Actualizo el voltaje
         voltaje = vector_ddp[k]
 
-        if voltaje > 2.20:
+        if voltaje > 2.25:
             print("Se ha superado el voltaje de ruptura", k)
             k_ruptura = k
-            voltaje_final_forming = voltaje
+            voltaje_inicial_reset = vector_ddp[k]
+            simulation_time_forming = simulation_time
+            print("Voltaje final forming", voltaje_inicial_reset, 'en el tiempo ', simulation_time_forming)
             break
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
@@ -134,7 +137,7 @@ for num_simulation in range(len(sim_parmtrs)):
                     if random_number < prob_generacion:
                         actual_state[i, j] = 1  # Generación de una vacante
 
-        data[k-1] = np.array([simulation_time, voltaje, corriente, temperatura, E_field, np.mean(E_field_vector)])
+        data[k] = np.array([simulation_time, voltaje, corriente, temperatura, E_field, np.mean(E_field_vector)])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
@@ -143,7 +146,7 @@ for num_simulation in range(len(sim_parmtrs)):
 
     # endregion
 
-    # region Guardar dartos del forming
+    # region Guardar datos del forming
 
     # Cuando acaba la simulacion guardo los estados de las matrices de configuracion y oxigenos
     with open(f'Results/Last_Configuration_{num_simulation}.pkl', 'wb') as f:
@@ -152,18 +155,16 @@ for num_simulation in range(len(sim_parmtrs)):
     # with open(f'Results/Last_OxygenState_{num_simulation}.pkl', 'wb') as f:
     #     pickle.dump(oxygen_state, f)
 
-    # RepresentateState(oxygen_state, f'Results/Last_oxygen_{num_simulation}.png')
-    RepresentateState(actual_state, f'Results/Last_forming_configuration_{num_simulation}.png')
-
     # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
     with open(f'Results/Configurations_forming_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(config_matrix, f)
     # with open(f'Results/Oxygen_forming_{num_simulation}.pkl', 'wb') as f:
         # pickle.dump(oxygen_matrix, f)
 
-    np.savetxt(f'Results/resultados_{num_simulation}.csv', data,
-               header='Tiempo simulacion [s], Voltaje [V], Intensidad [A], Temperatura [K], Probabilidad Recombinacion, velocidad [m/s], Campo Simple [V/m], Campo Gap medio [V/m]',
+    np.savetxt(f'Results/resultados_forming_{num_simulation}.csv', data,
+               header='Tiempo simulacion [s], Voltaje [V] , Intensidad [A], Temperatura [K], Campo Simple [V/m], Campo Gap medio [V/m]',
                comments=' ', delimiter=', ')
+
     # endregion
 
     # region reset
@@ -186,8 +187,8 @@ for num_simulation in range(len(sim_parmtrs)):
     data_reset = np.zeros((num_pasos, colunm_number))
 
     # Creo el excel donde voy a sacar todos los datos
-    df = pd.DataFrame(columns=['Tiempo simulacion [s]', 'Voltaje [V] ',
-                      'Intensidad [A]', 'Temperatura [K]', 'Campo Simple [V/m]', 'Campo Gap medio [V/m]'])
+    # df_reset = pd.DataFrame(columns=['Tiempo simulacion [s]', 'Voltaje [V] ',
+    #  'Intensidad [A]', 'Temperatura [K]', 'Campo Simple [V/m]', 'Campo Gap medio [V/m]'])
 
     # Cmabio la probabilidad del forming
     sim_ctes[num_simulation]['gamma'] = '0.3'
@@ -195,13 +196,13 @@ for num_simulation in range(len(sim_parmtrs)):
     # Defino el paso temporal
     # paso_temporal = total_simulation_time / num_pasos
 
-    voltaje_final = voltaje_final
     # Creo el vector de diferencias de potencial
-    vector_ddp = np.linspace(voltaje_final, 0, num_pasos)
+    vector_ddp = np.linspace(voltaje_inicial_reset, 0, num_pasos)
 
     # Estado iniciales de la simulación para el reset
     actual_state = initial_configuration
-    # oxygen_state = initial_oxygenstate
+
+    RepresentateState(actual_state, f'Results/Initial_reset_configuration_{num_simulation}.png')
 
     for k in tqdm(range(1, num_pasos)):
         # Actualizo el tiempo de simulación
@@ -214,6 +215,7 @@ for num_simulation in range(len(sim_parmtrs)):
         if Percolation.is_path(actual_state):
             # Si ha percolado uso la corriente de Ohm
             corriente = CurentSolver.OmhCurrent(voltaje, actual_state, **sim_ctes[num_simulation])
+            print("Corriente Ohm", corriente)
         else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
             corriente = CurentSolver.poole_frenkel(temperatura, np.mean(
@@ -250,7 +252,7 @@ for num_simulation in range(len(sim_parmtrs)):
             actual_state, oxygen_state, paso_temporal, velocidad, temperatura, **sim_ctes[num_simulation])
 
         # Tiempo total de la simulacion
-        tiempo_total = simulation_time + float(sim_parmtrs[num_simulation]['total_simulation_time'])
+        tiempo_total = simulation_time + simulation_time_forming
 
         data_reset[k-1] = np.array([tiempo_total, voltaje, corriente, temperatura,
                                     velocidad, E_field, np.mean(E_field_vector)])
@@ -268,10 +270,9 @@ for num_simulation in range(len(sim_parmtrs)):
     # endregion
 
     # region Guardar datos del reset
-    with open(f'Results/resultados_reset_{num_simulation}.csv', 'a') as f:  # Modo append 'a'
-        np.savetxt(f, data_reset,
-                   delimiter=', ',
-                   comments=' ')
+    np.savetxt(f'Results/resultados_reset_{num_simulation}.csv', data_reset,
+               header='Tiempo simulacion [s], Voltaje [V] , Intensidad [A], Temperatura [K], velocidad [m/s], Campo Simple [V/m], Campo Gap medio [V/m]',
+               comments=' ', delimiter=', ')
 
     # merge_pickles_to_array(f'Results/Oxygen_forming_{num_simulation}.pkl', f'Results/Oxygen_reset_{num_simulation}.pkl',
     #                        f'Results/Oxygen_{num_simulation}.pkl')
