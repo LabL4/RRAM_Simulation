@@ -184,7 +184,7 @@ for num_simulation in range(len(sim_parmtrs)):
     num_pasos = k_ruptura
 
     # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias
-    colunm_number = 7
+    colunm_number = 6
     data_reset = np.zeros((num_pasos, colunm_number))
 
     # Defino las matrices donde guardo las configuración del sistema y la de los oxígenos
@@ -259,8 +259,7 @@ for num_simulation in range(len(sim_parmtrs)):
         # Tiempo total de la simulacion
         tiempo_total = simulation_time + simulation_time_forming
 
-        data_reset[k-1] = np.array([tiempo_total, voltaje, corriente, temperatura,
-                                    velocidad, E_field, np.mean(E_field_vector)])
+        data_reset[k-1] = np.array([tiempo_total, voltaje, corriente, temperatura, E_field, np.mean(E_field_vector)])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
@@ -276,28 +275,40 @@ for num_simulation in range(len(sim_parmtrs)):
 
     # region Guardar datos del reset
     np.savetxt(f'Results/resultados_reset_{num_simulation}.csv', data_reset,
-               header='Tiempo simulacion [s], Voltaje [V] , Intensidad [A], Temperatura [K], velocidad [m/s], Campo Simple [V/m], Campo Gap medio [V/m]',
+               header='Tiempo simulacion [s], Voltaje [V] , Intensidad [A], Temperatura [K], Campo Simple [V/m], Campo Gap medio [V/m]',
                comments=' ', delimiter=', ')
 
-    # merge_pickles_to_array(f'Results/Oxygen_forming_{num_simulation}.pkl', f'Results/Oxygen_reset_{num_simulation}.pkl',
-    #                        f'Results/Oxygen_{num_simulation}.pkl')
+    # Lee el primer archivo CSV
+    df1 = pd.read_csv(f'Results/resultados_forming_{num_simulation}.csv')
 
-    # merge_pickles_to_array(f'Results/Configurations_forming_{num_simulation}.pkl', f'Results/Configurations_reset_{num_simulation}.pkl',
-    #                        f'Results/Configurations_{num_simulation}.pkl')
+    # Lee el segundo archivo CSV y omite la primera fila
+    df2 = pd.read_csv(f'Results/resultados_reset_{num_simulation}.csv', skiprows=1)
 
-    # endregion
+    # Une los DataFrames
+    df_unido = pd.concat([df1, df2])
 
-    # potencial = float(sim_ctes[num_simulation]["pb_metal_insul"])
-    # ohm_resistence = float(sim_ctes[num_simulation]["ohm_resistence"])
-    # I0 = float(sim_ctes[num_simulation]["I_0"])
+    # Guarda el DataFrame unido en un nuevo archivo CSV
+    df_unido.to_csv(f'Results/resultados_set_{num_simulation}.csv', index=False)
 
-    # Represento los datos de la simulación
-    # pplt.plot_both(f'Results/resultados_{num_simulation}.csv',
-    #                col_indices_x=1,
-    #                col_indices_y=[2, 2],
-    #                y_label='Intensidad [A]',
-    #                save_path=f'Results/resultados_intensidad_{num_simulation}',
-    #                global_tittle=fr'$I_0$ = {I0:.2e} A $R = ${ohm_resistence:.2e} $\Omega$',
-    #                log_scale='y')
+# merge_pickles_to_array(f'Results/Oxygen_forming_{num_simulation}.pkl', f'Results/Oxygen_reset_{num_simulation}.pkl',
+#                        f'Results/Oxygen_{num_simulation}.pkl')
 
-    #   global_tittle = fr'$\phi_{{B}}$ = {potencial} eV, $\varepsilon_r$ = {permitividad}, $I_0$ = {I0:.1e} A, $T_0$ = {T_0} K',
+# merge_pickles_to_array(f'Results/Configurations_forming_{num_simulation}.pkl', f'Results/Configurations_reset_{num_simulation}.pkl',
+#                        f'Results/Configurations_{num_simulation}.pkl')
+
+# endregion
+
+# potencial = float(sim_ctes[num_simulation]["pb_metal_insul"])
+# ohm_resistence = float(sim_ctes[num_simulation]["ohm_resistence"])
+# I0 = float(sim_ctes[num_simulation]["I_0"])
+
+# Represento los datos de la simulación
+# pplt.plot_both(f'Results/resultados_{num_simulation}.csv',
+#                col_indices_x=1,
+#                col_indices_y=[2, 2],
+#                y_label='Intensidad [A]',
+#                save_path=f'Results/resultados_intensidad_{num_simulation}',
+#                global_tittle=fr'$I_0$ = {I0:.2e} A $R = ${ohm_resistence:.2e} $\Omega$',
+#                log_scale='y')
+
+#   global_tittle = fr'$\phi_{{B}}$ = {potencial} eV, $\varepsilon_r$ = {permitividad}, $I_0$ = {I0:.1e} A, $T_0$ = {T_0} K',
