@@ -29,7 +29,6 @@ os.makedirs(carpeta)
 
 # endregion
 
-
 # quiero un bucle que recorra todas las simulaciones desde 0 hasta la longitud de sim_parmtrs-1
 for num_simulation in range(len(sim_parmtrs)):
 
@@ -78,10 +77,6 @@ for num_simulation in range(len(sim_parmtrs)):
     colunm_number = 6
     data = np.zeros((num_pasos, colunm_number))
 
-    # Creo el excel donde voy a sacar todos los datos
-    df = pd.DataFrame(columns=['Tiempo simulacion [s]', 'Voltaje [V] ',
-                      'Intensidad [A]', 'Temperatura [K]', 'Campo Simple [V/m]', 'Campo Gap medio [V/m]'])
-
     # Inicializo el campo eléctrico
     E_field_vector = np.zeros((actual_state.shape[0]))
 
@@ -101,11 +96,12 @@ for num_simulation in range(len(sim_parmtrs)):
         # Actualizo el voltaje
         voltaje = vector_ddp[k]
 
-        if voltaje > 2.25:
+        if voltaje > 2.26:
             print("Se ha superado el voltaje de ruptura", k)
             k_ruptura = k
             voltaje_inicial_reset = vector_ddp[k]
             simulation_time_forming = simulation_time
+            config_matrix_recortada = config_matrix[k, :, :]
             print("Voltaje final forming", voltaje_inicial_reset, 'en el tiempo ', simulation_time_forming)
 
             # Crear un array de ejemplo
@@ -148,35 +144,29 @@ for num_simulation in range(len(sim_parmtrs)):
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
             config_matrix[int(k / paso_guardar) - 1] = actual_state
-            oxygen_matrix[int(k / paso_guardar) - 1] = oxygen_state
 
     # endregion
 
     # region Guardar datos del forming
 
     # Cuando acaba la simulacion guardo los estados de las matrices de configuracion y oxigenos
-    with open(f'Results/Last_Configuration_{num_simulation}.pkl', 'wb') as f:
+    with open(f'Results/Last_Configuration_forming_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(actual_state, f)
-
-    # with open(f'Results/Last_OxygenState_{num_simulation}.pkl', 'wb') as f:
-    #     pickle.dump(oxygen_state, f)
 
     # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
     with open(f'Results/Configurations_forming_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(config_matrix, f)
-    # with open(f'Results/Oxygen_forming_{num_simulation}.pkl', 'wb') as f:
-        # pickle.dump(oxygen_matrix, f)
 
-    np.savetxt(f'Results/resultados_forming_{num_simulation}.csv', data,
-               header='Tiempo simulacion [s], Voltaje [V] , Intensidad [A], Temperatura [K], Campo Simple [V/m], Campo Gap medio [V/m]',
+    np.savetxt(f'Results/Resultados_forming_{num_simulation}.csv', data,
+               header='Tiempo simulacion [s],Voltaje [V],Intensidad [A],Temperatura [K],Campo Simple [V/m],Campo Gap medio [V/m]',
                comments=' ', delimiter=', ')
 
     # endregion
 
-    # region reset
+    # region Segunda parte del Set
 
     # Estado inicial de la simulación reset para las vacantes
-    with open(f'Results/Last_Configuration_{num_simulation}.pkl', 'rb') as file:
+    with open(f'Results/Last_Configuration_forming_{num_simulation}.pkl', 'rb') as file:
         # Carga el contenido del archivo
         initial_configuration = pickle.load(file)
 
@@ -185,11 +175,11 @@ for num_simulation in range(len(sim_parmtrs)):
 
     # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias
     colunm_number = 6
-    data_reset = np.zeros((num_pasos, colunm_number))
+    data_pp_reset = np.zeros((num_pasos, colunm_number))
 
     # Defino las matrices donde guardo las configuración del sistema y la de los oxígenos
-    config_matrix_reset = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
-    oxygen_matrix_reset = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
+    config_matrix_sset = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
+    oxygen_matrix_sset = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
     # Creo el excel donde voy a sacar todos los datos
 
     # df_reset = pd.DataFrame(columns=['Tiempo simulacion [s]', 'Voltaje [V] ',
@@ -207,8 +197,9 @@ for num_simulation in range(len(sim_parmtrs)):
     # Estado iniciales de la simulación para el reset
     actual_state = initial_configuration
 
-    RepresentateState(actual_state, f'Results/Initial_reset_configuration_{num_simulation}.png')
+    RepresentateState(actual_state, f'Results/Initial_SegSet_configuration_{num_simulation}.png')
 
+    # Ciclo para la segunda parte del set
     for k in tqdm(range(1, num_pasos)):
         # Actualizo el tiempo de simulación
         simulation_time = paso_temporal * k
@@ -245,8 +236,120 @@ for num_simulation in range(len(sim_parmtrs)):
                     if random_number < prob_generacion:
                         actual_state[i, j] = 1  # Generación de una vacante
 
+        # # Genero los oxígenos
+        # oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 10)
+
+        # # Muevo los oxígenos
+        # oxygen_state, velocidad = Recombination.Move_OxygenIons(
+        #     paso_temporal, oxygen_state, temperatura, E_field, atom_size, **sim_ctes[num_simulation])
+
+        # # Obtengo la nueva configuración
+        # actual_state, oxygen_state, pro_recombination = Recombination.Recombine(
+        #     actual_state, oxygen_state, paso_temporal, velocidad, temperatura, **sim_ctes[num_simulation])
+
+        # Tiempo total de la simulacion
+        tiempo_total = simulation_time + simulation_time_forming
+
+        data_pp_reset[k-1] = np.array([tiempo_total, voltaje, corriente, temperatura, E_field, np.mean(E_field_vector)])
+
+        # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
+        if k % paso_guardar == 0:
+            config_matrix_sset[int(k / paso_guardar) - 1] = actual_state
+            oxygen_matrix_sset[int(k / paso_guardar) - 1] = oxygen_state
+
+    # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
+    with open(f'Results/Configurations_sset_{num_simulation}.pkl', 'wb') as f:
+        pickle.dump(config_matrix, f)
+    with open(f'Results/Oxygen_sset_{num_simulation}.pkl', 'wb') as f:
+        pickle.dump(oxygen_matrix, f)
+
+    # Guardo el estado final de la simulación
+    with open(f'Results/Last_Set_Configuration_{num_simulation}.pkl', 'wb') as f:
+        pickle.dump(actual_state, f)
+    with open(f'Results/Last_Set_Oxygen_{num_simulation}.pkl', 'wb') as f:
+        pickle.dump(oxygen_state, f)
+
+    # endregion
+
+    # region Guardar datos de la segunda parte del set
+    np.savetxt(f'Results/Resultados_sset_{num_simulation}.csv', data_pp_reset,
+               header='Tiempo simulacion [s], Voltaje [V], Intensidad [A], Temperatura [K], Campo Simple [V/m], Campo Gap medio [V/m]',
+               comments=' ', delimiter=', ')
+
+    # endregion
+
+    # region Región del reset primera parte
+
+    # Estado inicial de la simulación reset para las vacantes
+    with open(f'Results/Last_Set_Configuration_{num_simulation}.pkl', 'rb') as file:
+        initial_configuration = pickle.load(file)
+
+    # Estado inicial para el reset de los oxígenos
+    with open(f'Results/Last_Set_Oxygen_{num_simulation}.pkl', 'rb') as file:
+        initial_oxygen_reset = pickle.load(file)
+
+    # NUMERO DE PASOS QUE SE HA dado en el forming. Lo pongo igual en el reset para que los potenciales sean los mismos
+    num_pasos = k_ruptura
+
+    # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias
+    colunm_number = 6
+
+    # el pp significa primera parte del reset (reset primera parte)
+    data_pp_reset = np.zeros((num_pasos, colunm_number))
+
+    # Defino las matrices donde guardo las configuración del sistema y la de los oxígenos
+    config_matrix_reset = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
+    oxygen_matrix_reset = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
+
+    # Creo el vector de diferencias de potencial
+    vector_ddp = np.linspace(0, -voltaje_inicial_reset, num_pasos)
+
+    # Estado iniciales de la simulación para el reset
+    initial_configuration_reset = actual_state
+    initial_oxygen_reset = oxygen_state
+
+    RepresentateState(initial_configuration_reset, f'Results/Initial_reset_configuration_{num_simulation}.png')
+    RepresentateState(initial_oxygen_reset, f'Results/Initial_reset_oxygen_{num_simulation}.png')
+
+    # Ciclo para laprimera parte del reset
+    for k in tqdm(range(1, num_pasos)):
+        # Actualizo el tiempo de simulación
+        simulation_time = paso_temporal * k
+
+        # Actualizo el voltaje
+        voltaje = vector_ddp[k]
+
+        # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
+        if Percolation.is_path(actual_state):
+            # Si ha percolado uso la corriente de Ohm
+            corriente = abs(CurentSolver.OmhCurrent(voltaje, actual_state, **sim_ctes[num_simulation]))
+            # print("Corriente Ohm", corriente)
+        else:
+            # Si no ha percolado uso la corriente de Poole-Frenkel
+            corriente = CurentSolver.poole_frenkel(temperatura, np.mean(
+                E_field_vector), **sim_ctes[num_simulation])*(device_size)
+
+        # Obtengo los valores del campo eléctrico y la temperatura
+        E_field = abs(SimpleElectricField(voltaje, device_size))
+
+        temperatura = Temperature_Joule(voltaje, corriente, T_0, **sim_ctes[num_simulation])
+
+        # Genero el vector campo eléctrico
+        for i in range(0, actual_state.shape[0]):
+            E_field_vector[i] = abs(GapElectricField(voltaje, i, actual_state, **sim_parmtrs[num_simulation]))
+
+        # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
+        for i in range(x_size):
+            prob_generacion = Generation.Generate(
+                paso_temporal, E_field_vector[i], temperatura, **sim_ctes[num_simulation])
+            for j in range(y_size):
+                if actual_state[i, j] == 0:
+                    random_number = np.random.rand()
+                    if random_number < prob_generacion:
+                        actual_state[i, j] = 1  # Generación de una vacante
+
         # Genero los oxígenos
-        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 10)
+        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 20)
 
         # Muevo los oxígenos
         oxygen_state, velocidad = Recombination.Move_OxygenIons(
@@ -257,38 +360,34 @@ for num_simulation in range(len(sim_parmtrs)):
             actual_state, oxygen_state, paso_temporal, velocidad, temperatura, **sim_ctes[num_simulation])
 
         # Tiempo total de la simulacion
-        tiempo_total = simulation_time + simulation_time_forming
+        tiempo_total = simulation_time + 2 * simulation_time_forming
 
-        data_reset[k-1] = np.array([tiempo_total, voltaje, corriente, temperatura, E_field, np.mean(E_field_vector)])
+        data_pp_reset[k-1] = np.array([tiempo_total, voltaje, corriente, temperatura, E_field, np.mean(E_field_vector)])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
             config_matrix_reset[int(k / paso_guardar) - 1] = actual_state
             oxygen_matrix_reset[int(k / paso_guardar) - 1] = oxygen_state
 
+        RepresentateState(oxygen_state, f'Results/Config_state_pp_reset{k}.png')
+    # endregion
+
+    # region Guardar datos del reset primera parte
+
     # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
     with open(f'Results/Configurations_reset_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(config_matrix, f)
     with open(f'Results/Oxygen_reset_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(oxygen_matrix, f)
-    # endregion
 
-    # region Guardar datos del reset
-    np.savetxt(f'Results/resultados_reset_{num_simulation}.csv', data_reset,
-               header='Tiempo simulacion [s], Voltaje [V] , Intensidad [A], Temperatura [K], Campo Simple [V/m], Campo Gap medio [V/m]',
+    np.savetxt(f'Results/resultados_reset_{num_simulation}.csv', data_pp_reset,
+               header='Tiempo simulacion [s],Voltaje [V],Intensidad [A],Temperatura [K],Campo Simple [V/m],Campo Gap medio [V/m]',
                comments=' ', delimiter=', ')
 
-    # Lee el primer archivo CSV
-    df1 = pd.read_csv(f'Results/resultados_forming_{num_simulation}.csv')
+    RepresentateState(initial_configuration_reset, f'Results/Initial_reset_configuration_{num_simulation}.png')
+    RepresentateState(initial_oxygen_reset, f'Results/Initial_reset_oxygen_{num_simulation}.png')
 
-    # Lee el segundo archivo CSV y omite la primera fila
-    df2 = pd.read_csv(f'Results/resultados_reset_{num_simulation}.csv', skiprows=1)
-
-    # Une los DataFrames
-    df_unido = pd.concat([df1, df2])
-
-    # Guarda el DataFrame unido en un nuevo archivo CSV
-    df_unido.to_csv(f'Results/resultados_set_{num_simulation}.csv', index=False)
+    # endregion
 
 # merge_pickles_to_array(f'Results/Oxygen_forming_{num_simulation}.pkl', f'Results/Oxygen_reset_{num_simulation}.pkl',
 #                        f'Results/Oxygen_{num_simulation}.pkl')

@@ -17,14 +17,21 @@ global im
 if len(sys.argv) > 1:
     data_path = sys.argv[1]
     save_path = sys.argv[2]
-    print(f"Parámetro recibido: {data_path}")
+
+    print(f"Ruta del archivo: {data_path}")
+    print(f"Ruta de guardado: {save_path}")
 else:
     print("No se ha pasado ningún parámetro.")
+    data_path = 'Results/Configurations_reset_0.pkl'
+    save_path = 'Videos/Configuracion_reset.mp4'
 
+    print(f"Ruta del archivo: {data_path}")
+    print(f"Ruta de guardado: {save_path}")
 
 # Cargo el fichero con las configuraciones
-with open(data_path, 'rb') as f:
+with open('Results/Configurations_reset_0.pkl', 'rb') as f:
     configuration = pickle.load(f)
+    print(configuration)
 
 # Supongamos que las imágenes están en el subdirectorio "Figuras" y tienen nombres de archivo que siguen el patrón "image*.png"
 filenames = glob.glob('Figuras/grafica*.png')

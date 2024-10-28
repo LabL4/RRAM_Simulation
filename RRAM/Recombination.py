@@ -154,9 +154,6 @@ def Move_OxygenIonsReset(paso_temp: float, oxygen_state: np.array, temperature: 
     # En la expresión original se multiplica por 2 lo he quitado para ver si sale algo mejor
     oxigen_velocity = 2 * t_0 * cte_red * (senoh * exp_velocity)
 
-    if oxigen_velocity > 75-8:
-        oxigen_velocity = 8e-7
-
     # Calculo la cantidad de "casillas" que se moverá el ion de oxígeno
     displacement = int(round((oxigen_velocity * paso_temp) / grid_size))
     if displacement > 3:

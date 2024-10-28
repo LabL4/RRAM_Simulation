@@ -16,7 +16,8 @@ global im
 if len(sys.argv) > 1:
     data_path = sys.argv[1]
     save_path = sys.argv[2]
-    print(f"Parámetro recibido: {data_path}")
+    print(f"Ruta del archivo: {data_path}")
+    print(f"Ruta de guardado: {save_path}")
 else:
     print("No se ha pasado ningún parámetro.")
 

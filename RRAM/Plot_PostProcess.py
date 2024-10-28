@@ -146,6 +146,8 @@ def Plot_paneles(data_path: str, col_indices_x: list, col_indices_y: list, save_
     plt.savefig(f'{save_path}.pdf', bbox_inches='tight')
     # plt.close(fig)
 
+# region PlotDifAxes
+
 
 def plot_DifAxes(data_path: str,
                  col_indices_x: int,
@@ -190,6 +192,11 @@ def plot_DifAxes(data_path: str,
     plt.show()
     fig.savefig(save_path + '.pdf', bbox_inches='tight')
     plt.close(fig)
+
+# endregion
+
+
+# region Plotboth
 
 
 def plot_both(data_path: str,
@@ -245,6 +252,10 @@ def plot_both(data_path: str,
     fig.savefig(save_path + '.pdf', bbox_inches='tight')
     plt.close(fig)
 
+# endregion
+
+
+# region PlotSimple
 
 def plot_simple(data_path: str,
                 col_indices_x: int,
@@ -298,6 +309,10 @@ def plot_simple(data_path: str,
     plt.show()
     fig.savefig(save_path + '.pdf', bbox_inches='tight')
     plt.close(fig)
+# endregion
+
+
+# region Configuracion del plot
 
 
 def config_ax(ax):
@@ -340,3 +355,5 @@ def setup_plt(plt, latex=True, scaling=1):
 
 
 setup_plt(plt, latex=True, scaling=1.5)
+
+# endregion
