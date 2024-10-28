@@ -96,7 +96,7 @@ for num_simulation in range(len(sim_parmtrs)):
         # Actualizo el voltaje
         voltaje = vector_ddp[k]
 
-        if voltaje > 2.26:
+        if voltaje > 2.22:
             print("Se ha superado el voltaje de ruptura", k)
             k_ruptura = k
             voltaje_inicial_reset = vector_ddp[k]
@@ -140,7 +140,6 @@ for num_simulation in range(len(sim_parmtrs)):
                         actual_state[i, j] = 1  # Generación de una vacante
 
         data[k] = np.array([simulation_time, voltaje, corriente, temperatura, E_field, np.mean(E_field_vector)])
-
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
             config_matrix[int(k / paso_guardar) - 1] = actual_state
@@ -368,8 +367,6 @@ for num_simulation in range(len(sim_parmtrs)):
         if k % paso_guardar == 0:
             config_matrix_reset[int(k / paso_guardar) - 1] = actual_state
             oxygen_matrix_reset[int(k / paso_guardar) - 1] = oxygen_state
-
-        RepresentateState(oxygen_state, f'Results/Config_state_pp_reset{k}.png')
     # endregion
 
     # region Guardar datos del reset primera parte
