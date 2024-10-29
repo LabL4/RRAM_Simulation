@@ -96,7 +96,7 @@ for num_simulation in range(len(sim_parmtrs)):
         # Actualizo el voltaje
         voltaje = vector_ddp[k]
 
-        if voltaje > 2.22:
+        if voltaje > 2.25:
             print("Se ha superado el voltaje de ruptura", k)
             k_ruptura = k
             voltaje_inicial_reset = vector_ddp[k]
