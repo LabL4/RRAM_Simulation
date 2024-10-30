@@ -2,8 +2,27 @@ import math
 import numpy as np
 
 from RRAM import Constants as cte
-
 from scipy.constants import elementary_charge, Boltzmann, epsilon_0
+
+
+def Generate_Resitence_Matrix(configuration_matrix: np.ndarray, paths: list) -> np.ndarray:
+    """
+    Generates a resistance matrix based on the given configuration matrix and percolation paths.
+    Args:
+        configuration_matrix (np.ndarray): The initial configuration matrix.
+        paths (list): A list of percolation paths, where each path is a list of (x, y) tuples representing coordinates.
+    Returns:
+        np.ndarray: A matrix of the same size as the configuration matrix, with positions marked as 1 where percolation paths exist.
+    """
+    # Crear una matriz de ceros del mismo tamaño que la configuración inicial
+    percolation_matrix = np.zeros_like(configuration_matrix)
+
+    # Iterar sobre cada camino de percolación y marcar las posiciones en la matriz
+    for path in paths:
+        for (x, y) in path:
+            percolation_matrix[y, x] = 1
+
+    return percolation_matrix
 
 
 def OmhCurrent(potential: float, config_state: np.array, **kwargs) -> float:
@@ -29,6 +48,7 @@ def OmhCurrent(potential: float, config_state: np.array, **kwargs) -> float:
     # Initialize total resistance
     total_resistance = 0
     parallel_resistance = 0
+
     # Sobre cada columna de la matriz
     for column in config_state.T:
         # Comprobar si la columna es nula completamente
@@ -44,8 +64,21 @@ def OmhCurrent(potential: float, config_state: np.array, **kwargs) -> float:
     # Se calcula la corriente Ohmica
     return potential / total_resistance
 
-  
-def poole_frenkel(temperature: float, E_field: float, **kwargs) -> float:
+
+def Poole_Frenkel(temperature: float, E_field: float, **kwargs) -> float:
+    """
+    Calculate the current using the Poole-Frenkel effect.
+    The Poole-Frenkel effect describes the lowering of the potential barrier in an insulator due to an applied electric field, which increases the current.
+    Parameters:
+    temperature (float): The temperature in Kelvin.
+    E_field (float): The electric field in V/m.
+    **kwargs: Optional keyword arguments for constants:
+        - pb_metal_insul (float): Potential barrier between metal and insulator.
+        - permitividad_relativa (float): Relative permittivity of the material.
+        - I_0 (float): Pre-exponential factor.
+    Returns:
+    float: The current calculated using the Poole-Frenkel effect.
+    """
 
     # Obtengo los valores de las constantes si las estoy pasando como argumentos
     if kwargs:

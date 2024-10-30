@@ -96,7 +96,7 @@ for num_simulation in range(len(sim_parmtrs)):
         # Actualizo el voltaje
         voltaje = vector_ddp[k]
 
-        if voltaje > 2.25:
+        if voltaje > 2.23:
             print("Se ha superado el voltaje de ruptura", k)
             k_ruptura = k
             voltaje_inicial_reset = vector_ddp[k]
@@ -113,11 +113,14 @@ for num_simulation in range(len(sim_parmtrs)):
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
+            percolation_paths = Obtenin_Paths(initial_configuration)
+            resistence_matrix = Generate_Resitence_Matrix(actual_state, percolation_paths)
+
             # Si ha percolado uso la corriente de Ohm
-            corriente = CurentSolver.OmhCurrent(voltaje, actual_state, **sim_ctes[num_simulation])
+            corriente = CurentSolver.OmhCurrent(voltaje, resistence_matrix, **sim_ctes[num_simulation])
         else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
-            corriente = CurentSolver.poole_frenkel(temperatura, np.mean(
+            corriente = CurentSolver.Poole_Frenkel(temperatura, np.mean(
                 E_field_vector), **sim_ctes[num_simulation])*(device_size)
 
         # Obtengo los valores del campo eléctrico y la temperatura
@@ -213,7 +216,7 @@ for num_simulation in range(len(sim_parmtrs)):
             # print("Corriente Ohm", corriente)
         else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
-            corriente = CurentSolver.poole_frenkel(temperatura, np.mean(
+            corriente = CurentSolver.Poole_Frenkel(temperatura, np.mean(
                 E_field_vector), **sim_ctes[num_simulation])*(device_size)
 
         # Obtengo los valores del campo eléctrico y la temperatura
@@ -325,7 +328,7 @@ for num_simulation in range(len(sim_parmtrs)):
             # print("Corriente Ohm", corriente)
         else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
-            corriente = CurentSolver.poole_frenkel(temperatura, np.mean(
+            corriente = CurentSolver.Poole_Frenkel(temperatura, np.mean(
                 E_field_vector), **sim_ctes[num_simulation])*(device_size)
 
         # Obtengo los valores del campo eléctrico y la temperatura

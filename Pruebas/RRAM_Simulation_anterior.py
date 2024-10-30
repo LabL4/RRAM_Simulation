@@ -1,6 +1,6 @@
 import glob
 import pandas as pd
-import matplotlib.pyplot as pltimport matplotlib.pyplot as pltimport matplotlib.pyplot as pltimport matplotlib.pyplot as plt
+import matplotlib.pyplot as pltimport matplotlib.pyplot as pltimport matplotlib.pyplot as pltimport matplotlib.pyplot as pltimport matplotlib.pyplot as pltimport matplotlib.pyplot as pltimport matplotlib.pyplot as pltimport matplotlib.pyplot as plt
 
 from re import T
 from RRAM import *
@@ -69,7 +69,7 @@ for k in tqdm(range(0, num_pasos)):
     else:
         # Si no ha percolado uso la corriente de campo
         # TODO: REVISAR QUE LA CORRIENTE TIENE LAS UNIDADES CORRECTAS PORQUE NO CUADRAN VALORES.
-        Corriente = 1000*CurentSolver.poole_frenkel(Temperatura, Campo_Electrico)
+        Corriente = 1000*CurentSolver.Poole_Frenkel(Temperatura, Campo_Electrico)
 
     # Obtengo los valores del campo eléctrico y la temperatura
     Campo_Electrico = SimpleElectricField(voltaje, espesor_dispositivo*1e-9)

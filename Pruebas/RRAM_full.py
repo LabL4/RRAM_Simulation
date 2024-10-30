@@ -75,7 +75,7 @@ for k in tqdm(range(1, num_pasos+1)):
     else:
         # Si no ha percolado uso la corriente de campo
         # TODO: REVISAR QUE LA CORRIENTE TIENE LAS UNIDADES CORRECTAS PORQUE NO CUADRAN VALORES.
-        Corriente = CurentSolver.poole_frenkel(temperatura, Campo_Electrico)/(1e-10)
+        Corriente = CurentSolver.Poole_Frenkel(temperatura, Campo_Electrico)/(1e-10)
 
     # Obtengo los valores del campo eléctrico y la temperatura
     Campo_Electrico = SimpleElectricField(voltaje, espesor_dispositivo)
