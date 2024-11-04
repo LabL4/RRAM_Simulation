@@ -158,7 +158,6 @@ potential_barrier_metal_insul = np.ones(num_simulations) * cte.pb_metal_insul
 permitividad_relativa = np.ones(num_simulations) * cte.permitividad_relativa
 
 # Término inicial de la ecuación de Poole-Frenkel
-# I_0 = [9e-08, 8e-08, 7e-08, 6e-08, 5e-08, 4e-08, 3e-08, 2e-08, 1e-08]
 I_0 = np.ones(num_simulations) * cte.I_0
 
 # Constante de resistencia térmica en K/W

@@ -10,6 +10,9 @@ from RRAM import *
 from RRAM import Recombination
 from RRAM import Plot_PostProcess as pplt
 
+import warnings
+warnings.filterwarnings("error")
+
 # region Definición de valores iniciales y cosntantes de la simulación
 
 # comienzo leyendo los datos de la simulación almacenados en un archivo csv dentro de la carpeta Init y los guardo en sus respectivas variables
@@ -51,8 +54,8 @@ for num_simulation in range(len(sim_parmtrs)):
 
     voltaje_reset = float(sim_parmtrs[num_simulation]['voltaje_final'])
 
-    voltaje = float(sim_parmtrs[num_simulation]['initial_voltaje'])
-    corriente = float(sim_parmtrs[num_simulation]['initial_current'])
+    voltage = float(sim_parmtrs[num_simulation]['initial_voltaje'])
+    current = float(sim_parmtrs[num_simulation]['initial_current'])
     temperatura = float(sim_parmtrs[num_simulation]['init_temp'])
     E_field = float(sim_parmtrs[num_simulation]['initial_elec_field'])
 
@@ -94,14 +97,15 @@ for num_simulation in range(len(sim_parmtrs)):
         simulation_time = paso_temporal * k
 
         # Actualizo el voltaje
-        voltaje = vector_ddp[k]
+        voltage = vector_ddp[k]
 
-        if voltaje > 2.23:
-            print("Se ha superado el voltaje de ruptura", k)
+        if voltage > 3.24:
+            print("\nSe ha superado el voltaje de ruptura en la iteracion: ", k)
             k_ruptura = k
             voltaje_inicial_reset = vector_ddp[k]
             simulation_time_forming = simulation_time
             config_matrix_recortada = config_matrix[k, :, :]
+
             print("Voltaje final forming", voltaje_inicial_reset, 'en el tiempo ', simulation_time_forming)
 
             # Crear un array de ejemplo
@@ -113,24 +117,32 @@ for num_simulation in range(len(sim_parmtrs)):
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
-            percolation_paths = Obtenin_Paths(initial_configuration)
-            resistence_matrix = Generate_Resitence_Matrix(actual_state, percolation_paths)
+            sim_ctes[num_simulation]['gamma'] = '2'
+
+            ac = actual_state.copy()
+            resistance_matrix = findpath.find_path(ac)
 
             # Si ha percolado uso la corriente de Ohm
-            corriente = CurentSolver.OmhCurrent(voltaje, resistence_matrix, **sim_ctes[num_simulation])
+            try:
+                current = CurentSolver.OmhCurrent(voltage, resistance_matrix, **sim_ctes[num_simulation])
+            except Warning:
+                filename = f'Results/Configuration_Set_{voltage}_null_resistance.pkl'
+                print("Null resistance matrix in ", filename)
+                with open(filename, 'wb') as f:
+                    pickle.dump({"actual_state": ac, "resistance_matrix": resistance_matrix}, f)
         else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
-            corriente = CurentSolver.Poole_Frenkel(temperatura, np.mean(
-                E_field_vector), **sim_ctes[num_simulation])*(device_size)
+            mean_field = np.mean(E_field_vector)
+            current = CurentSolver.Poole_Frenkel(temperatura, mean_field, **sim_ctes[num_simulation])*(device_size)
 
         # Obtengo los valores del campo eléctrico y la temperatura
-        E_field = SimpleElectricField(voltaje, device_size)
+        E_field = SimpleElectricField(voltage, device_size)
 
-        temperatura = Temperature_Joule(voltaje, corriente, T_0, **sim_ctes[num_simulation])
+        temperatura = Temperature_Joule(voltage, current, T_0, **sim_ctes[num_simulation])
 
         # Genero el vector campo eléctrico
         for i in range(0, actual_state.shape[0]):
-            E_field_vector[i] = GapElectricField(voltaje, i, actual_state, **sim_parmtrs[num_simulation])
+            E_field_vector[i] = GapElectricField(voltage, i, actual_state, **sim_parmtrs[num_simulation])
 
         # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
         for i in range(x_size):
@@ -142,14 +154,14 @@ for num_simulation in range(len(sim_parmtrs)):
                     if random_number < prob_generacion:
                         actual_state[i, j] = 1  # Generación de una vacante
 
-        data[k] = np.array([simulation_time, voltaje, corriente, temperatura, E_field, np.mean(E_field_vector)])
+        data[k] = np.array([simulation_time, voltage, current, temperatura, E_field, np.mean(E_field_vector)])
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
             config_matrix[int(k / paso_guardar) - 1] = actual_state
 
     # endregion
 
-    # region Guardar datos del forming
+    # region Guardar datos del forming/Primera parte del set
 
     # Cuando acaba la simulacion guardo los estados de las matrices de configuracion y oxigenos
     with open(f'Results/Last_Configuration_forming_{num_simulation}.pkl', 'wb') as f:
@@ -182,13 +194,14 @@ for num_simulation in range(len(sim_parmtrs)):
     # Defino las matrices donde guardo las configuración del sistema y la de los oxígenos
     config_matrix_sset = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
     oxygen_matrix_sset = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
+
     # Creo el excel donde voy a sacar todos los datos
 
     # df_reset = pd.DataFrame(columns=['Tiempo simulacion [s]', 'Voltaje [V] ',
     #  'Intensidad [A]', 'Temperatura [K]', 'Campo Simple [V/m]', 'Campo Gap medio [V/m]'])
 
-    # Cmabio la probabilidad del forming
-    sim_ctes[num_simulation]['gamma'] = '0.3'
+    # Cambio la probabilidad del forming
+    sim_ctes[num_simulation]['gamma'] = '0.5'
 
     # Defino el paso temporal
     # paso_temporal = total_simulation_time / num_pasos
@@ -207,26 +220,26 @@ for num_simulation in range(len(sim_parmtrs)):
         simulation_time = paso_temporal * k
 
         # Actualizo el voltaje
-        voltaje = vector_ddp[k]
+        voltage = vector_ddp[k]
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
             # Si ha percolado uso la corriente de Ohm
-            corriente = CurentSolver.OmhCurrent(voltaje, actual_state, **sim_ctes[num_simulation])
+            current = CurentSolver.OmhCurrent(voltage, actual_state, **sim_ctes[num_simulation])
             # print("Corriente Ohm", corriente)
         else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
-            corriente = CurentSolver.Poole_Frenkel(temperatura, np.mean(
+            current = CurentSolver.Poole_Frenkel(temperatura, np.mean(
                 E_field_vector), **sim_ctes[num_simulation])*(device_size)
 
         # Obtengo los valores del campo eléctrico y la temperatura
-        E_field = SimpleElectricField(voltaje, device_size)
+        E_field = SimpleElectricField(voltage, device_size)
 
-        temperatura = Temperature_Joule(voltaje, corriente, T_0, **sim_ctes[num_simulation])
+        temperatura = Temperature_Joule(voltage, current, T_0, **sim_ctes[num_simulation])
 
         # Genero el vector campo eléctrico
         for i in range(0, actual_state.shape[0]):
-            E_field_vector[i] = GapElectricField(voltaje, i, actual_state, **sim_parmtrs[num_simulation])
+            E_field_vector[i] = GapElectricField(voltage, i, actual_state, **sim_parmtrs[num_simulation])
 
         # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
         for i in range(x_size):
@@ -252,7 +265,7 @@ for num_simulation in range(len(sim_parmtrs)):
         # Tiempo total de la simulacion
         tiempo_total = simulation_time + simulation_time_forming
 
-        data_pp_reset[k-1] = np.array([tiempo_total, voltaje, corriente, temperatura, E_field, np.mean(E_field_vector)])
+        data_pp_reset[k-1] = np.array([tiempo_total, voltage, current, temperatura, E_field, np.mean(E_field_vector)])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
@@ -311,7 +324,6 @@ for num_simulation in range(len(sim_parmtrs)):
     initial_oxygen_reset = oxygen_state
 
     RepresentateState(initial_configuration_reset, f'Results/Initial_reset_configuration_{num_simulation}.png')
-    RepresentateState(initial_oxygen_reset, f'Results/Initial_reset_oxygen_{num_simulation}.png')
 
     # Ciclo para laprimera parte del reset
     for k in tqdm(range(1, num_pasos)):
@@ -319,26 +331,26 @@ for num_simulation in range(len(sim_parmtrs)):
         simulation_time = paso_temporal * k
 
         # Actualizo el voltaje
-        voltaje = vector_ddp[k]
+        voltage = vector_ddp[k]
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
             # Si ha percolado uso la corriente de Ohm
-            corriente = abs(CurentSolver.OmhCurrent(voltaje, actual_state, **sim_ctes[num_simulation]))
+            current = abs(CurentSolver.OmhCurrent(voltage, actual_state, **sim_ctes[num_simulation]))
             # print("Corriente Ohm", corriente)
         else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
-            corriente = CurentSolver.Poole_Frenkel(temperatura, np.mean(
+            current = CurentSolver.Poole_Frenkel(temperatura, np.mean(
                 E_field_vector), **sim_ctes[num_simulation])*(device_size)
 
         # Obtengo los valores del campo eléctrico y la temperatura
-        E_field = abs(SimpleElectricField(voltaje, device_size))
+        E_field = abs(SimpleElectricField(voltage, device_size))
 
-        temperatura = Temperature_Joule(voltaje, corriente, T_0, **sim_ctes[num_simulation])
+        temperatura = Temperature_Joule(voltage, current, T_0, **sim_ctes[num_simulation])
 
         # Genero el vector campo eléctrico
         for i in range(0, actual_state.shape[0]):
-            E_field_vector[i] = abs(GapElectricField(voltaje, i, actual_state, **sim_parmtrs[num_simulation]))
+            E_field_vector[i] = abs(GapElectricField(voltage, i, actual_state, **sim_parmtrs[num_simulation]))
 
         # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
         for i in range(x_size):
@@ -364,7 +376,7 @@ for num_simulation in range(len(sim_parmtrs)):
         # Tiempo total de la simulacion
         tiempo_total = simulation_time + 2 * simulation_time_forming
 
-        data_pp_reset[k-1] = np.array([tiempo_total, voltaje, corriente, temperatura, E_field, np.mean(E_field_vector)])
+        data_pp_reset[k-1] = np.array([tiempo_total, voltage, current, temperatura, E_field, np.mean(E_field_vector)])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
@@ -385,17 +397,11 @@ for num_simulation in range(len(sim_parmtrs)):
                comments=' ', delimiter=', ')
 
     RepresentateState(initial_configuration_reset, f'Results/Initial_reset_configuration_{num_simulation}.png')
-    RepresentateState(initial_oxygen_reset, f'Results/Initial_reset_oxygen_{num_simulation}.png')
 
     # endregion
 
-# merge_pickles_to_array(f'Results/Oxygen_forming_{num_simulation}.pkl', f'Results/Oxygen_reset_{num_simulation}.pkl',
-#                        f'Results/Oxygen_{num_simulation}.pkl')
-
-# merge_pickles_to_array(f'Results/Configurations_forming_{num_simulation}.pkl', f'Results/Configurations_reset_{num_simulation}.pkl',
-#                        f'Results/Configurations_{num_simulation}.pkl')
-
 # endregion
+
 
 # potencial = float(sim_ctes[num_simulation]["pb_metal_insul"])
 # ohm_resistence = float(sim_ctes[num_simulation]["ohm_resistence"])

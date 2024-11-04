@@ -43,26 +43,26 @@ def OmhCurrent(potential: float, config_state: np.array, **kwargs) -> float:
         # Obtengo el valor de las constantes que necesita la función
         ohm_resistence = float(kwargs.get('ohm_resistence'))
     else:
-        ohm_resistence = cte.ohm_resistence
+        ohm_resistence = 1e7
 
     # Initialize total resistance
     total_resistance = 0
     parallel_resistance = 0
 
     # Sobre cada columna de la matriz
-    for column in config_state.T:
-        # Comprobar si la columna es nula completamente
-        if all(ohm_resistence == 0 for ohm_resistence in column):
-            continue  # Saltar a la siguiente columna si es nula completamente
-
+    for row in config_state.T:
         # Se calcula la resistencia paralela de los elementos de la columna
-        parallel_resistance = sum(1 / ohm_resistence for x in column if x == 1)
+        num_resistence = sum(row)
+        parallel_resistance = 1/(num_resistence/ohm_resistence)
+
+        # for i in range(num_resistence):
+        #     parallel_resistance += 1 / ohm_resistence
 
         # Se suma la resistencia paralela a la resistencia total
-        total_resistance += 1 / parallel_resistance
+        total_resistance += parallel_resistance
 
     # Se calcula la corriente Ohmica
-    return potential / total_resistance
+    return potential/total_resistance
 
 
 def Poole_Frenkel(temperature: float, E_field: float, **kwargs) -> float:
