@@ -1,6 +1,7 @@
 # __init__.py
 
 from . import *
+from .findpath import *
 from .Constants import *
 from .Generation import *
 from .Montecarlo import *

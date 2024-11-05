@@ -22,14 +22,14 @@ if len(sys.argv) > 1:
     print(f"Ruta de guardado: {save_path}")
 else:
     print("No se ha pasado ningún parámetro.")
-    data_path = 'Results/Configurations_reset_0.pkl'
-    save_path = 'Videos/Configuracion_reset.mp4'
+    data_path = 'Results/Configurations_forming_0.pkl'
+    save_path = 'Results/Configuration_forming.mp4'
 
     print(f"Ruta del archivo: {data_path}")
     print(f"Ruta de guardado: {save_path}")
 
 # Cargo el fichero con las configuraciones
-with open('Results/Configurations_reset_0.pkl', 'rb') as f:
+with open(data_path, 'rb') as f:
     configuration = pickle.load(f)
     print(configuration)
 

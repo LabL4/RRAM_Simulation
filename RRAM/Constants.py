@@ -28,12 +28,11 @@ gamma_drift = 10
 # Potencial de migración de los iones de oxígeno en eV
 E_m = 1
 
-
 # Constante de resistencia térmica en K/W
 r_termica = 5e5
 
 # Constante de resistencia térmica en ohmios
-ohm_resistence = 1e5
+ohm_resistence = 1e7
 
 # Constante de red, el paper original propone 0.25 nm
 cte_red = 0.25e-9
