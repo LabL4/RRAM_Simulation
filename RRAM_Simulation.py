@@ -99,7 +99,7 @@ for num_simulation in range(len(sim_parmtrs)):
         # Actualizo el voltaje
         voltage = vector_ddp[k]
 
-        if voltage > 3.24:
+        if voltage > 3.0:
             print("\nSe ha superado el voltaje de ruptura en la iteracion: ", k)
             k_ruptura = k
             voltaje_inicial_reset = vector_ddp[k]
@@ -113,6 +113,9 @@ for num_simulation in range(len(sim_parmtrs)):
 
             # Eliminar filas con valores nulos
             data = data[~np.isnan(data).any(axis=1)]
+
+            RepresentateState(resistance_matrix, f'resistance_matrix_{num_simulation}.png')
+
             break
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
@@ -224,6 +227,18 @@ for num_simulation in range(len(sim_parmtrs)):
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
+            ac = actual_state.copy()
+            resistance_matrix = findpath.find_path(ac)
+
+            # Si ha percolado uso la corriente de Ohm
+            try:
+                current = CurentSolver.OmhCurrent(voltage, resistance_matrix, **sim_ctes[num_simulation])
+            except Warning:
+                filename = f'Results/Configuration_Set_{voltage}_null_resistance.pkl'
+                print("Null resistance matrix in ", filename)
+                with open(filename, 'wb') as f:
+                    pickle.dump({"actual_state": ac, "resistance_matrix": resistance_matrix}, f)
+
             # Si ha percolado uso la corriente de Ohm
             current = CurentSolver.OmhCurrent(voltage, actual_state, **sim_ctes[num_simulation])
             # print("Corriente Ohm", corriente)
@@ -335,9 +350,19 @@ for num_simulation in range(len(sim_parmtrs)):
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
+
+            # Obtengo los caminos de percolación
+            ac = actual_state.copy()
+            resistance_matrix = findpath.find_path(ac)
+
             # Si ha percolado uso la corriente de Ohm
-            current = abs(CurentSolver.OmhCurrent(voltage, actual_state, **sim_ctes[num_simulation]))
-            # print("Corriente Ohm", corriente)
+            try:
+                current = CurentSolver.OmhCurrent(voltage, resistance_matrix, **sim_ctes[num_simulation])
+            except Warning:
+                filename = f'Results/Configuration_Set_{voltage}_null_resistance.pkl'
+                print("Null resistance matrix in ", filename)
+                with open(filename, 'wb') as f:
+                    pickle.dump({"actual_state": ac, "resistance_matrix": resistance_matrix}, f)
         else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
             current = CurentSolver.Poole_Frenkel(temperatura, np.mean(

@@ -1,7 +1,9 @@
+import time
 import numpy as np
 import numpy.typing as npt
 
 from scipy import sparse
+from copy import deepcopy
 
 
 class Tree:
@@ -15,12 +17,12 @@ class Tree:
         self.children.append(child)
 
 
-def neighbours(orig_node: int, adj_matrix: sparse.csr_matrix) -> npt.NDArray:
-    return adj_matrix[orig_node].nonzero()[1]
+def neighbours(orig_node: int, adj_list: list[set]) -> npt.NDArray:
+    return np.array(list(adj_list[orig_node]))
 
 
-def n_neighbours(orig_node: int, adj_matrix: sparse.csr_matrix) -> int:
-    return adj_matrix[orig_node].count_nonzero()
+def n_neighbours(orig_node: int, adj_list: list[set]) -> int:
+    return len(adj_list[orig_node])
 
 
 def ij_to_node(i: int, j: int, n_cols: int) -> int:
@@ -29,12 +31,12 @@ def ij_to_node(i: int, j: int, n_cols: int) -> int:
 # build sparse adjacency matrix
 
 
-def build_adj_matrix(vacancy_matrix: npt.NDArray) -> sparse.csr_matrix:
+def build_adj_list(vacancy_matrix: npt.NDArray) -> list[set]:
     n_rows, n_cols = vacancy_matrix.shape
     # n_
     n_nodes = n_rows * n_cols + 2
 
-    adj_matrix = sparse.lil_matrix((n_nodes, n_nodes), dtype=int)
+    adj_list = [set() for _ in range(n_nodes)]
 
     connections = [None] * 4
     for i in range(n_rows):
@@ -68,53 +70,78 @@ def build_adj_matrix(vacancy_matrix: npt.NDArray) -> sparse.csr_matrix:
 
                 for c in connections:
                     if c is not None:
-                        # add edge to adjacency matrix
-                        adj_matrix[node_idx, c] = 1
-                        adj_matrix[c, node_idx] = 1
+                        adj_list[node_idx].add(c)
+                        adj_list[c].add(node_idx)
 
-    return adj_matrix.tocsr()
+                        # if node_idx == 0 or c == 0:
+                        #     print(f"Adding edge ({node_idx}, {c})")
+
+    return adj_list
 
 
-def remove_edges(edges: list[(int, int)], adj_matrix: sparse.csr_matrix):
+def remove_edge(edge: tuple[int, int], adj_list: list[set]):
+    try:
+        adj_list[edge[0]].remove(edge[1])
+    except:
+        pass
+    try:
+        adj_list[edge[1]].remove(edge[0])
+    except:
+        pass
+
+
+def remove_edges(edges: list[tuple[int, int]], adj_list: list[set]):
     for edge in edges:
-        adj_matrix[edge[0], edge[1]] = 0
-        adj_matrix[edge[1], edge[0]] = 0
+        remove_edge(edge, adj_list)
 
 
-def remove_loose_edges_without_0_or_1(adj_matrix: sparse.csr_matrix):
-    n_nodes = adj_matrix.shape[0]
+def remove_loose_edges_without_0_or_1(adj_list: list[set]):
+    n_nodes = len(adj_list)
 
     while True:
-        loose_nodes = []
-
-        for node in range(n_nodes):
-            if node == 0 or node == 1:
-                continue
+        # loose_nodes = []
+        some_removed = False
+        for node in range(2, n_nodes):
             # get num of neighbors
-            if n_neighbours(node, adj_matrix) == 1:
-                loose_nodes.append(node)
+            if n_neighbours(node, adj_list) == 1:
+                # loose_nodes.append(node)
+                neighs = list(adj_list[node])
+                # adj_list[node].clear()
 
-        if len(loose_nodes) == 0:
+                for neighbour in neighs:
+                    remove_edge((node, neighbour), adj_list)
+
+                some_removed = True
+
+        if not some_removed:
             break
 
-        to_remove = []
-        for node in loose_nodes:
-            neighbours = adj_matrix[node].nonzero()[1]
-            for neighbour in neighbours:
-                to_remove.append((node, neighbour))
+        # if len(loose_nodes) == 0:
+        #     break
 
-        remove_edges(to_remove, adj_matrix)
+        # to_remove = []
+        # for node in loose_nodes:
+            neighbours = adj_list[node].nonzero()[1]
+            adj_list[node, neighbours] = 0
+            adj_list[neighbours, node] = 0
+            # for neighbour in neighbours:
+            #     # to_remove.append((node, neighbour))
+            #     adj_matrix[node, neighbour] = 0
+            #     adj_matrix[neighbour, node] = 0
+
+        # remove_edges(to_remove, adj_matrix)
 
 
-def vacancy_matrix_from_adj_matrix(adj_matrix: sparse.csr_matrix, n_rows: int, n_cols: int) -> npt.NDArray:
+def vacancy_matrix_from_adj_matrix(adj_list: list[int], n_rows: int, n_cols: int, visited: set[int]) -> npt.NDArray:
     n_nodes = n_rows * n_cols
     vacancy_matrix = np.zeros((n_rows, n_cols), dtype=int)
 
     for i in range(n_rows):
         for j in range(n_cols):
             node_idx = ij_to_node(i, j, n_cols)
-            if n_neighbours(node_idx, adj_matrix) > 0:
-                vacancy_matrix[i, j] = 1
+            if node_idx in visited:
+                if n_neighbours(node_idx, adj_list) > 0:
+                    vacancy_matrix[i, j] = 1
 
     return vacancy_matrix
 
@@ -133,15 +160,17 @@ def find_path(vacancy_matrix: npt.NDArray) -> npt.NDArray:
     n_rows, n_cols = vacancy_matrix.shape
     n_nodes = n_rows * n_cols + 2
 
-    adj_matrix = build_adj_matrix(vacancy_matrix)
+    adj_matrix = build_adj_list(vacancy_matrix)
 
+    # t = time.time()
     remove_loose_edges_without_0_or_1(adj_matrix)
+    # print(f"remove_loose_edges_without_0_or_1 took {time.time() - t}s")
 
-    # return vacancy_matrix_from_adj_matrix(adj_matrix, n_rows, n_cols)
+    # return vacancy_matrix_from_adj_matrix(adj_matrix, n_rows, n_cols, set(list(range(2, n_nodes))))
 
-    adj_matrix_aux = adj_matrix.copy()
+    adj_matrix_aux = deepcopy(adj_matrix)
 
-    n_nodes = adj_matrix.shape[0]
+    n_nodes = len(adj_matrix_aux)
 
     start_node = 0
     end_node = 1
@@ -153,6 +182,7 @@ def find_path(vacancy_matrix: npt.NDArray) -> npt.NDArray:
     # tree = [[]] * n_nodes
     start_tree = Tree(start_node)
     trees = {start_node: start_tree}
+    # t = time.time()
     while len(to_visit) > 0:
         node = to_visit.pop()
         tree = trees[node]
@@ -168,9 +198,8 @@ def find_path(vacancy_matrix: npt.NDArray) -> npt.NDArray:
         for neighbour in neighs:
             weights[neighbour] += 1
 
-            if adj_matrix_aux[node, neighbour] == 1:
-                adj_matrix_aux[node, neighbour] = 0
-                adj_matrix_aux[neighbour, node] = 0
+            if neighbour in adj_matrix_aux[node]:
+                remove_edge((node, neighbour), adj_matrix_aux)
 
             # tree[node].append(neighbour)
 
@@ -183,6 +212,8 @@ def find_path(vacancy_matrix: npt.NDArray) -> npt.NDArray:
         if end_node in to_visit:
             to_visit.remove(end_node)
 
+    # print(f"tree_creation took {time.time() - t}s")
+
     for node, weight in enumerate(weights):
         if node in trees:
             trees[node].weight = weight
@@ -192,6 +223,7 @@ def find_path(vacancy_matrix: npt.NDArray) -> npt.NDArray:
     to_visit_reverse = [start_node_reverse]
     visited_reverse = []
 
+    # t = time.time()
     while len(to_visit_reverse) > 0:
         node = to_visit_reverse.pop()
 
@@ -202,34 +234,39 @@ def find_path(vacancy_matrix: npt.NDArray) -> npt.NDArray:
         unvisited_neighbours = neighbours_unvisited(node, visited_reverse, to_visit_reverse, adj_matrix)
         to_visit_reverse.extend(unvisited_neighbours)
 
+    # print(f"reverse took {time.time() - t}s")
+
     visited_reverse = set(visited_reverse)
-    visited = list(set(visited).intersection(visited_reverse))
+    visited = set(visited).intersection(visited_reverse)
 
     # print(f"Visited: {visited}")
 
     edges_to_remove = []
-    for src_node in range(n_nodes):
-        for dest_node in neighbours(src_node, adj_matrix_aux):
-            weights[dest_node] += 1
-            weights[src_node] -= 1
+    # for src_node in range(n_nodes):
+    #     for dest_node in neighbours(src_node, adj_matrix_aux):
+    #         weights[dest_node] += 1
+    #         weights[src_node] -= 1
 
-            # trees[src_node].weight -= 1
-            # trees[dest_node].weight += 1
+    #         # trees[src_node].weight -= 1
+    #         # trees[dest_node].weight += 1
 
-            # edges_to_remove.append((src_node, dest_node))
+    #         # edges_to_remove.append((src_node, dest_node))
 
-            adj_matrix_aux[src_node, dest_node] = 0
-            adj_matrix_aux[dest_node, src_node] = 0
+    #         adj_matrix_aux[src_node, dest_node] = 0
+    #         adj_matrix_aux[dest_node, src_node] = 0
 
     for node, weight in enumerate(weights):
         if node in trees:
             trees[node].weight = weight
 
- # remove_edges(edges_to_remove, adj_matrix_aux)
- # pretty_print_tree(start_tree)
+    # remove_edges(edges_to_remove, adj_matrix_aux)
+    # pretty_print_tree(start_tree)
     deletefrom = []
+    # t = time.time()
     find_loops(0, start_tree, weights, adj_matrix, deletefrom)
+    # print(f"find_loops took {time.time() - t}s")
 
+    # t = time.time()
     for node in deletefrom:
         to_remove = [c.node for c in trees[node].children]
         if not any([n == 0 or n == 1 for n in to_remove]):
@@ -238,19 +275,17 @@ def find_path(vacancy_matrix: npt.NDArray) -> npt.NDArray:
                     for neighbour in neighbours(loop_node, adj_matrix):
                         # if neighbour != node:
                         edges_to_remove.append((loop_node, neighbour))
+    # print(f"edges_to_remove took {time.time() - t}s")
 
     # print(edges_to_remove)
 
     remove_edges(edges_to_remove, adj_matrix)
     remove_loose_edges_without_0_or_1(adj_matrix)
 
-    for node in range(n_nodes):
-        if node not in visited:
-            for neighbour in neighbours(node, adj_matrix):
-                adj_matrix[node, neighbour] = 0
-                adj_matrix[neighbour, node] = 0
-
-    return vacancy_matrix_from_adj_matrix(adj_matrix, n_rows, n_cols)
+    # t = time.time()
+    v = vacancy_matrix_from_adj_matrix(adj_matrix, n_rows, n_cols, visited)
+    # print(f"vacancy_matrix_from_adj_matrix took {time.time() - t}s")
+    return v
 
 
 def neighbours_unvisited(node: int, visited: list[int], to_visit: list[int], adj_matrix: sparse.csr_matrix) -> list[int]:
