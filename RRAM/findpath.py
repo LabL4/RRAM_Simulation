@@ -1,10 +1,11 @@
-import time
 import numpy as np
 import numpy.typing as npt
+import time
 
-from scipy import sparse
 from copy import deepcopy
-
+from scipy import sparse
+from numba import njit
+from collections import OrderedDict
 
 class Tree:
 
@@ -16,50 +17,47 @@ class Tree:
     def add_child(self, child):
         self.children.append(child)
 
-
 def neighbours(orig_node: int, adj_list: list[set]) -> npt.NDArray:
     return np.array(list(adj_list[orig_node]))
-
 
 def n_neighbours(orig_node: int, adj_list: list[set]) -> int:
     return len(adj_list[orig_node])
 
-
+@njit
 def ij_to_node(i: int, j: int, n_cols: int) -> int:
     return (j + i * n_cols) + 2
 
 # build sparse adjacency matrix
-
-
-def build_adj_list(vacancy_matrix: npt.NDArray) -> list[set]:
+@njit
+def build_adj_list(vacancy_matrix: npt.NDArray) -> list[list[int]]:
     n_rows, n_cols = vacancy_matrix.shape
     # n_
     n_nodes = n_rows * n_cols + 2
 
-    adj_list = [set() for _ in range(n_nodes)]
+    adj_list = [[int(0) for _ in range(0)] for _ in range(n_nodes)]
 
-    connections = [None] * 4
+    connections = [-1] * 4
     for i in range(n_rows):
         for j in range(n_cols):
             if vacancy_matrix[i, j] == 1:
                 node_idx = ij_to_node(i, j, n_cols)
                 # check if there is a vacancy to the right
-                connections[0] = None
+                connections[0] = -1
                 if j < n_cols - 1 and vacancy_matrix[i, j + 1] == 1:
                     connections[0] = ij_to_node(i, j + 1, n_cols)
 
                 # check if there is a vacancy to the left
-                connections[1] = None
+                connections[1] = -1
                 if j > 0 and vacancy_matrix[i, j - 1] == 1:
                     connections[1] = ij_to_node(i, j - 1, n_cols)
 
                 # check if there is a vacancy on the node below
-                connections[2] = None
+                connections[2] = -1
                 if i < n_rows - 1 and vacancy_matrix[i + 1, j] == 1:
                     connections[2] = ij_to_node(i + 1, j, n_cols)
 
                 # check if there is a vacancy on the node above
-                connections[3] = None
+                connections[3] = -1
                 if i > 0 and vacancy_matrix[i - 1, j] == 1:
                     connections[3] = ij_to_node(i - 1, j, n_cols)
 
@@ -69,15 +67,17 @@ def build_adj_list(vacancy_matrix: npt.NDArray) -> list[set]:
                     connections[0] = 1
 
                 for c in connections:
-                    if c is not None:
-                        adj_list[node_idx].add(c)
-                        adj_list[c].add(node_idx)
+                    if c != -1:
+                        adj_list[node_idx].append(c)
+                        adj_list[c].append(node_idx)
+                        # adj_list[node_idx].add(c)
+                        # adj_list[c].add(node_idx)
 
                         # if node_idx == 0 or c == 0:
                         #     print(f"Adding edge ({node_idx}, {c})")
 
-    return adj_list
 
+    return adj_list
 
 def remove_edge(edge: tuple[int, int], adj_list: list[set]):
     try:
@@ -89,32 +89,56 @@ def remove_edge(edge: tuple[int, int], adj_list: list[set]):
     except:
         pass
 
-
 def remove_edges(edges: list[tuple[int, int]], adj_list: list[set]):
     for edge in edges:
         remove_edge(edge, adj_list)
+        # adj_list[edge[0]].remove(edge[1])
+        # adj_list[edge[1]].remove(edge[0])
 
-
+# @njit
 def remove_loose_edges_without_0_or_1(adj_list: list[set]):
     n_nodes = len(adj_list)
+    
+    first_iter = True
+    sus_nodes = set()
+    search_list = list(range(2, n_nodes))
 
     while True:
         # loose_nodes = []
         some_removed = False
-        for node in range(2, n_nodes):
+        for node in search_list:
             # get num of neighbors
-            if n_neighbours(node, adj_list) == 1:
+            if len(adj_list[node]) == 1:
                 # loose_nodes.append(node)
+                if first_iter:
+                    sus_nodes.add(node)
+
                 neighs = list(adj_list[node])
                 # adj_list[node].clear()
-
+                    
                 for neighbour in neighs:
-                    remove_edge((node, neighbour), adj_list)
+                    # remove_edge((node, neighbour), adj_list)
+                    try:
+                        adj_list[neighbour].remove(node)
+                    except:
+                        pass
+                    try:
+                        adj_list[node].remove(neighbour)
+                    except:
+                        pass
 
                 some_removed = True
+            else:
+                if not first_iter:
+                    sus_nodes.discard(node)
+        
+        if first_iter:
+            first_iter = False
+            search_list = list(sus_nodes)
 
         if not some_removed:
             break
+
 
         # if len(loose_nodes) == 0:
         #     break
@@ -131,7 +155,6 @@ def remove_loose_edges_without_0_or_1(adj_list: list[set]):
 
         # remove_edges(to_remove, adj_matrix)
 
-
 def vacancy_matrix_from_adj_matrix(adj_list: list[int], n_rows: int, n_cols: int, visited: set[int]) -> npt.NDArray:
     n_nodes = n_rows * n_cols
     vacancy_matrix = np.zeros((n_rows, n_cols), dtype=int)
@@ -145,7 +168,6 @@ def vacancy_matrix_from_adj_matrix(adj_list: list[int], n_rows: int, n_cols: int
 
     return vacancy_matrix
 
-
 def pretty_print_tree(tree: Tree):
 
     def pretty_print_tree_aux(tree: Tree, level: int):
@@ -155,12 +177,14 @@ def pretty_print_tree(tree: Tree):
 
     pretty_print_tree_aux(tree, 0)
 
-
 def find_path(vacancy_matrix: npt.NDArray) -> npt.NDArray:
     n_rows, n_cols = vacancy_matrix.shape
     n_nodes = n_rows * n_cols + 2
 
+    # t = time.time()
     adj_matrix = build_adj_list(vacancy_matrix)
+    adj_matrix = [set(a) for a in adj_matrix]
+    # print(f"Building adjacency list took: {time.time() - t}s")
 
     # t = time.time()
     remove_loose_edges_without_0_or_1(adj_matrix)
@@ -168,49 +192,62 @@ def find_path(vacancy_matrix: npt.NDArray) -> npt.NDArray:
 
     # return vacancy_matrix_from_adj_matrix(adj_matrix, n_rows, n_cols, set(list(range(2, n_nodes))))
 
-    adj_matrix_aux = deepcopy(adj_matrix)
+    # t = time.time()
+    # adj_matrix_aux = deepcopy(adj_matrix)
+    adj_matrix_aux = [set(a) for a in adj_matrix]
+    # print(f"deepcopy took {time.time() - t}s")
 
     n_nodes = len(adj_matrix_aux)
 
     start_node = 0
     end_node = 1
 
-    visited = []
-    to_visit = [start_node]
+    visited = set()
+    # to_visit = set([start_node])
+    to_visit = OrderedDict({start_node: 0})
 
-    weights = np.zeros(n_nodes)
+    weights = [0] * n_nodes
     # tree = [[]] * n_nodes
     start_tree = Tree(start_node)
     trees = {start_node: start_tree}
     # t = time.time()
     while len(to_visit) > 0:
-        node = to_visit.pop()
+        # node = to_visit.pop()
+        node = to_visit.popitem()[0]
         tree = trees[node]
 
-        visited.append(node)
+        visited.add(node)
         if node == end_node:
             continue
 
         # unvisited_neighbours = neighbours_unvisited(node, visited, to_visit, adj_matrix_aux)
-        neighs = neighbours(node, adj_matrix_aux)
+        # neighs = neighbours(node, adj_matrix_aux)
+        neighs = set(adj_matrix_aux[node])
         weights[node] = weights[node] - len(neighs)
 
         for neighbour in neighs:
             weights[neighbour] += 1
-
-            if neighbour in adj_matrix_aux[node]:
-                remove_edge((node, neighbour), adj_matrix_aux)
+            
+            # if neighbour in adj_matrix_aux[node]:
+            #     remove_edge((node, neighbour), adj_matrix_aux)
 
             # tree[node].append(neighbour)
+            
+        adj_matrix_aux[node].clear()
+        for neighbour in neighs:
+            try:
+                adj_matrix_aux[neighbour].remove(node)
+            except:
+                pass
 
-        new_neighbours = list(set(neighs).difference(set(visited)).difference(set(to_visit)))
+        new_neighbours = neighs.difference(visited).difference(to_visit)
         for neighbour in new_neighbours:
             trees[neighbour] = Tree(neighbour)
             tree.add_child(trees[neighbour])
 
-        to_visit.extend(new_neighbours)
+        to_visit.update(OrderedDict({n: 0 for n in new_neighbours}))
         if end_node in to_visit:
-            to_visit.remove(end_node)
+            to_visit.pop(end_node)
 
     # print(f"tree_creation took {time.time() - t}s")
 
@@ -218,26 +255,30 @@ def find_path(vacancy_matrix: npt.NDArray) -> npt.NDArray:
         if node in trees:
             trees[node].weight = weight
 
+
     start_node_reverse = end_node
     end_node_reverse = start_node
-    to_visit_reverse = [start_node_reverse]
-    visited_reverse = []
+    to_visit_reverse = OrderedDict({start_node_reverse: 0})
+    visited_reverse = set()
 
     # t = time.time()
     while len(to_visit_reverse) > 0:
-        node = to_visit_reverse.pop()
+        node = to_visit_reverse.popitem()[0]
 
-        visited_reverse.append(node)
+        visited_reverse.add(node)
         if node == end_node_reverse:
             continue
 
-        unvisited_neighbours = neighbours_unvisited(node, visited_reverse, to_visit_reverse, adj_matrix)
-        to_visit_reverse.extend(unvisited_neighbours)
+        # unvisited_neighbours = neighbours_unvisited(node, visited_reverse, to_visit_reverse, adj_matrix)
+        unvisited_neighbours = adj_matrix[node].difference(visited_reverse).difference(to_visit_reverse)
+        to_visit_reverse.update(OrderedDict({n: 0 for n in unvisited_neighbours}))
 
     # print(f"reverse took {time.time() - t}s")
 
     visited_reverse = set(visited_reverse)
     visited = set(visited).intersection(visited_reverse)
+
+
 
     # print(f"Visited: {visited}")
 
@@ -259,6 +300,7 @@ def find_path(vacancy_matrix: npt.NDArray) -> npt.NDArray:
         if node in trees:
             trees[node].weight = weight
 
+
     # remove_edges(edges_to_remove, adj_matrix_aux)
     # pretty_print_tree(start_tree)
     deletefrom = []
@@ -278,24 +320,24 @@ def find_path(vacancy_matrix: npt.NDArray) -> npt.NDArray:
     # print(f"edges_to_remove took {time.time() - t}s")
 
     # print(edges_to_remove)
-
+    
+    # t = time.time()
     remove_edges(edges_to_remove, adj_matrix)
     remove_loose_edges_without_0_or_1(adj_matrix)
-
+    # print(f"remove_edges took {time.time() - t}s")
+    
     # t = time.time()
     v = vacancy_matrix_from_adj_matrix(adj_matrix, n_rows, n_cols, visited)
     # print(f"vacancy_matrix_from_adj_matrix took {time.time() - t}s")
     return v
-
 
 def neighbours_unvisited(node: int, visited: list[int], to_visit: list[int], adj_matrix: sparse.csr_matrix) -> list[int]:
     neighbours_l = []
     for neighbour in neighbours(node, adj_matrix):
         if neighbour not in visited and neighbour not in to_visit:
             neighbours_l.append(neighbour)
-
+    
     return neighbours_l
-
 
 def find_loops(tree_node: int, tree: Tree, weights: list[int], adj_matrix: sparse.csr_matrix, deletefrom: list[int]) -> int:
 
@@ -318,13 +360,14 @@ def find_loops(tree_node: int, tree: Tree, weights: list[int], adj_matrix: spars
         # if tree_node == 51:
         # print(f"Node {tree_node} has weight {weight} with weights[tree.node] = {weights[tree.node]}")
 
+
         if (weight == 1) and tree_node != 0 and tree_node != 1 and weights[tree.node] < 1.0:
             outside_connections = 0
-
+            
             # childs = [c.node for c in tree.children]
 
             # for child in childs:
-
+                
             #     if child != tree_node and any([(n in childs) for n in neighbours(child, adj_matrix)]):
             #         outside_connections += 1
             #         break
@@ -334,16 +377,16 @@ def find_loops(tree_node: int, tree: Tree, weights: list[int], adj_matrix: spars
 
     return weight
 
-
 def children(tree_node: int, tree: list[list[int]]) -> list[int]:
     this_children = []
     to_visit = [tree_node]
     while len(to_visit) > 0:
         node = to_visit.pop()
-
+        
         this_children.append(node)
 
         for neighbour in tree[node]:
             to_visit.append(neighbour)
 
     return this_children
+

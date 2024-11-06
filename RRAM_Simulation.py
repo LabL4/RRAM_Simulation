@@ -1,4 +1,5 @@
 import os
+import glob
 import pickle
 import shutil
 import time as time
@@ -8,7 +9,6 @@ from tqdm import tqdm
 
 from RRAM import *
 from RRAM import Recombination
-from RRAM import Plot_PostProcess as pplt
 
 import warnings
 warnings.filterwarnings("error")
@@ -29,6 +29,8 @@ if os.path.exists(carpeta):
 
 # Crea la carpeta de nuevo
 os.makedirs(carpeta)
+
+header_files = 'Tiempo simulacion [s],Voltaje [V],Intensidad [A],Temperatura [K],Campo Simple [V/m],Campo Gap medio [V/m],Velocidad [m/s]'
 
 # endregion
 
@@ -77,8 +79,8 @@ for num_simulation in range(len(sim_parmtrs)):
     vector_ddp = np.linspace(0, voltaje_reset, num_pasos + 1)
 
     # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias
-    colunm_number = 6
-    data = np.zeros((num_pasos, colunm_number))
+    colunm_number = 7
+    data_pp_set = np.zeros((num_pasos, colunm_number))
 
     # Inicializo el campo eléctrico
     E_field_vector = np.zeros((actual_state.shape[0]))
@@ -86,6 +88,8 @@ for num_simulation in range(len(sim_parmtrs)):
     T_0 = float(sim_parmtrs[num_simulation]['init_temp'])
 
     # endregion
+
+    data_frame_simulation = pd.DataFrame(columns=[header_files])
 
     # region Forming
 
@@ -109,12 +113,12 @@ for num_simulation in range(len(sim_parmtrs)):
             print("Voltaje final forming", voltaje_inicial_reset, 'en el tiempo ', simulation_time_forming)
 
             # Crear un array de ejemplo
-            data[k:] = np.nan  # Añadir valores nulos a partir de la fila k
+            data_pp_set[k:] = np.nan  # Añadir valores nulos a partir de la fila k
 
             # Eliminar filas con valores nulos
-            data = data[~np.isnan(data).any(axis=1)]
+            data_pp_set = data_pp_set[~np.isnan(data_pp_set).any(axis=1)]
 
-            RepresentateState(resistance_matrix, f'resistance_matrix_{num_simulation}.png')
+            RepresentateState(resistance_matrix, f'Results/resistance_matrix_{num_simulation}.png')
 
             break
 
@@ -157,7 +161,7 @@ for num_simulation in range(len(sim_parmtrs)):
                     if random_number < prob_generacion:
                         actual_state[i, j] = 1  # Generación de una vacante
 
-        data[k] = np.array([simulation_time, voltage, current, temperatura, E_field, np.mean(E_field_vector)])
+        data_pp_set[k] = np.array([simulation_time, voltage, current, temperatura, E_field, np.mean(E_field_vector), 0])
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
             config_matrix[int(k / paso_guardar) - 1] = actual_state
@@ -170,13 +174,13 @@ for num_simulation in range(len(sim_parmtrs)):
     with open(f'Results/Last_Configuration_forming_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(actual_state, f)
 
-    # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
+    # Cuando acaba la simulacion guardo las matrices de configuración
     with open(f'Results/Configurations_forming_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(config_matrix, f)
 
-    np.savetxt(f'Results/Resultados_forming_{num_simulation}.csv', data,
-               header='Tiempo simulacion [s],Voltaje [V],Intensidad [A],Temperatura [K],Campo Simple [V/m],Campo Gap medio [V/m]',
-               comments=' ', delimiter=', ')
+    np.savetxt(f'Results/Resultados_forming_{num_simulation}.csv', data_pp_set,
+               header=header_files,
+               comments=' ', delimiter=',')
 
     # endregion
 
@@ -191,17 +195,11 @@ for num_simulation in range(len(sim_parmtrs)):
     num_pasos = k_ruptura
 
     # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias
-    colunm_number = 6
-    data_pp_reset = np.zeros((num_pasos, colunm_number))
+    data_sset = np.zeros((num_pasos, colunm_number))
 
     # Defino las matrices donde guardo las configuración del sistema y la de los oxígenos
     config_matrix_sset = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
     oxygen_matrix_sset = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
-
-    # Creo el excel donde voy a sacar todos los datos
-
-    # df_reset = pd.DataFrame(columns=['Tiempo simulacion [s]', 'Voltaje [V] ',
-    #  'Intensidad [A]', 'Temperatura [K]', 'Campo Simple [V/m]', 'Campo Gap medio [V/m]'])
 
     # Cambio la probabilidad del forming
     sim_ctes[num_simulation]['gamma'] = '0.5'
@@ -266,21 +264,10 @@ for num_simulation in range(len(sim_parmtrs)):
                     if random_number < prob_generacion:
                         actual_state[i, j] = 1  # Generación de una vacante
 
-        # # Genero los oxígenos
-        # oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 10)
-
-        # # Muevo los oxígenos
-        # oxygen_state, velocidad = Recombination.Move_OxygenIons(
-        #     paso_temporal, oxygen_state, temperatura, E_field, atom_size, **sim_ctes[num_simulation])
-
-        # # Obtengo la nueva configuración
-        # actual_state, oxygen_state, pro_recombination = Recombination.Recombine(
-        #     actual_state, oxygen_state, paso_temporal, velocidad, temperatura, **sim_ctes[num_simulation])
-
         # Tiempo total de la simulacion
         tiempo_total = simulation_time + simulation_time_forming
 
-        data_pp_reset[k-1] = np.array([tiempo_total, voltage, current, temperatura, E_field, np.mean(E_field_vector)])
+        data_sset[k-1] = np.array([tiempo_total, voltage, current, temperatura, E_field, np.mean(E_field_vector), 0])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
@@ -302,9 +289,9 @@ for num_simulation in range(len(sim_parmtrs)):
     # endregion
 
     # region Guardar datos de la segunda parte del set
-    np.savetxt(f'Results/Resultados_sset_{num_simulation}.csv', data_pp_reset,
-               header='Tiempo simulacion [s], Voltaje [V], Intensidad [A], Temperatura [K], Campo Simple [V/m], Campo Gap medio [V/m]',
-               comments=' ', delimiter=', ')
+    np.savetxt(f'Results/Resultados_sset_{num_simulation}.csv', data_sset,
+               header=header_files,
+               comments=' ', delimiter=',')
 
     # endregion
 
@@ -320,9 +307,6 @@ for num_simulation in range(len(sim_parmtrs)):
 
     # NUMERO DE PASOS QUE SE HA dado en el forming. Lo pongo igual en el reset para que los potenciales sean los mismos
     num_pasos = k_ruptura
-
-    # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias
-    colunm_number = 6
 
     # el pp significa primera parte del reset (reset primera parte)
     data_pp_reset = np.zeros((num_pasos, colunm_number))
@@ -401,7 +385,8 @@ for num_simulation in range(len(sim_parmtrs)):
         # Tiempo total de la simulacion
         tiempo_total = simulation_time + 2 * simulation_time_forming
 
-        data_pp_reset[k-1] = np.array([tiempo_total, voltage, current, temperatura, E_field, np.mean(E_field_vector)])
+        data_pp_reset[k-1] = np.array([tiempo_total, voltage, current, temperatura,
+                                      E_field, np.mean(E_field_vector), 0])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
@@ -418,27 +403,31 @@ for num_simulation in range(len(sim_parmtrs)):
         pickle.dump(oxygen_matrix, f)
 
     np.savetxt(f'Results/resultados_reset_{num_simulation}.csv', data_pp_reset,
-               header='Tiempo simulacion [s],Voltaje [V],Intensidad [A],Temperatura [K],Campo Simple [V/m],Campo Gap medio [V/m]',
-               comments=' ', delimiter=', ')
+               header=header_files,
+               comments=' ', delimiter=',')
 
     RepresentateState(initial_configuration_reset, f'Results/Initial_reset_configuration_{num_simulation}.png')
 
     # endregion
 
+# Region Unir todos los datos en un solo archivo csv
+
+# Ruta a los archivos CSV
+path = 'Results/*.csv'
+
+# Asignar los nombres de las columnas
+data_frame_simulation = pd.DataFrame(columns=[header_files])
+
+# Leer todos los archivos CSV en una lista de DataFrames sin cabecera
+all_files = glob.glob(path)
+data_frames = [pd.read_csv(file, header=None) for file in all_files]
+
+# Concatenar todos los DataFrames en uno solo
+data_frame_simulation = pd.concat(data_frames, ignore_index=True)
+
+# Guardar el DataFrame combinado en un archivo CSV
+data_frame_simulation.to_csv('Datos_simulacion_completa.csv', index=False)
+
+print("Todos los archivos CSV se han combinado y guardado exitosamente.")
+
 # endregion
-
-
-# potencial = float(sim_ctes[num_simulation]["pb_metal_insul"])
-# ohm_resistence = float(sim_ctes[num_simulation]["ohm_resistence"])
-# I0 = float(sim_ctes[num_simulation]["I_0"])
-
-# Represento los datos de la simulación
-# pplt.plot_both(f'Results/resultados_{num_simulation}.csv',
-#                col_indices_x=1,
-#                col_indices_y=[2, 2],
-#                y_label='Intensidad [A]',
-#                save_path=f'Results/resultados_intensidad_{num_simulation}',
-#                global_tittle=fr'$I_0$ = {I0:.2e} A $R = ${ohm_resistence:.2e} $\Omega$',
-#                log_scale='y')
-
-#   global_tittle = fr'$\phi_{{B}}$ = {potencial} eV, $\varepsilon_r$ = {permitividad}, $I_0$ = {I0:.1e} A, $T_0$ = {T_0} K',
