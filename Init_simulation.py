@@ -9,7 +9,7 @@ from RRAM import Generation as gn
 from RRAM import Constants as cte
 
 # Número de simulaciones que realizo
-num_simulations = 1
+num_simulations = 5
 
 # Defino la carpeta donde se guardan los datos iniciales de la simulación
 carpeta = 'Init_data'
@@ -149,7 +149,8 @@ gamma = np.ones(num_simulations) * cte.gamma
 # I_0 = duos_array[:, 0]
 
 # Resistance ohmic of the device
-ohm_resistence = np.ones(num_simulations) * cte.ohm_resistence
+ohm_resistence = [1e3, 1e4, 1e5, 1e6, 1e7]
+# ohm_resistence = np.ones(num_simulations) * cte.ohm_resistence
 
 # Potential barrier at the metal and insulator interface
 potential_barrier_metal_insul = np.ones(num_simulations) * cte.pb_metal_insul

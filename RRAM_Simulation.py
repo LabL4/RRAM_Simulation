@@ -89,8 +89,6 @@ for num_simulation in range(len(sim_parmtrs)):
 
     # endregion
 
-    data_frame_simulation = pd.DataFrame(columns=[header_files])
-
     # region Forming
 
     for k in tqdm(range(1, num_pasos+1)):
@@ -103,7 +101,7 @@ for num_simulation in range(len(sim_parmtrs)):
         # Actualizo el voltaje
         voltage = vector_ddp[k]
 
-        if voltage > 3.0:
+        if voltage > 3.05:
             print("\nSe ha superado el voltaje de ruptura en la iteracion: ", k)
             k_ruptura = k
             voltaje_inicial_reset = vector_ddp[k]
@@ -124,7 +122,7 @@ for num_simulation in range(len(sim_parmtrs)):
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
-            sim_ctes[num_simulation]['gamma'] = '2'
+            sim_ctes[num_simulation]['gamma'] = '1.5'
 
             ac = actual_state.copy()
             resistance_matrix = findpath.find_path(ac)
@@ -166,6 +164,9 @@ for num_simulation in range(len(sim_parmtrs)):
         if k % paso_guardar == 0:
             config_matrix[int(k / paso_guardar) - 1] = actual_state
 
+        if k % 100 == 0:
+            RepresentateState(actual_state, f'Results/actual_state_{k}.png')
+
     # endregion
 
     # region Guardar datos del forming/Primera parte del set
@@ -202,7 +203,7 @@ for num_simulation in range(len(sim_parmtrs)):
     oxygen_matrix_sset = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
 
     # Cambio la probabilidad del forming
-    sim_ctes[num_simulation]['gamma'] = '0.5'
+    sim_ctes[num_simulation]['gamma'] = '1'
 
     # Defino el paso temporal
     # paso_temporal = total_simulation_time / num_pasos
@@ -225,6 +226,8 @@ for num_simulation in range(len(sim_parmtrs)):
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
+            sim_ctes[num_simulation]['gamma'] = '0.5'
+
             ac = actual_state.copy()
             resistance_matrix = findpath.find_path(ac)
 
@@ -236,14 +239,10 @@ for num_simulation in range(len(sim_parmtrs)):
                 print("Null resistance matrix in ", filename)
                 with open(filename, 'wb') as f:
                     pickle.dump({"actual_state": ac, "resistance_matrix": resistance_matrix}, f)
-
-            # Si ha percolado uso la corriente de Ohm
-            current = CurentSolver.OmhCurrent(voltage, actual_state, **sim_ctes[num_simulation])
-            # print("Corriente Ohm", corriente)
         else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
-            current = CurentSolver.Poole_Frenkel(temperatura, np.mean(
-                E_field_vector), **sim_ctes[num_simulation])*(device_size)
+            mean_field = np.mean(E_field_vector)
+            current = CurentSolver.Poole_Frenkel(temperatura, mean_field, **sim_ctes[num_simulation])*(device_size)
 
         # Obtengo los valores del campo eléctrico y la temperatura
         E_field = SimpleElectricField(voltage, device_size)
@@ -410,24 +409,25 @@ for num_simulation in range(len(sim_parmtrs)):
 
     # endregion
 
-# Region Unir todos los datos en un solo archivo csv
+    # region Unir todos los datos en un solo archivo csv
 
-# Ruta a los archivos CSV
-path = 'Results/*.csv'
+    header_files = ['Tiempo simulacion [s]', 'Voltaje [V]', 'Intensidad [A]',
+                    'Temperatura [K]', 'Campo Simple [V/m]', 'Campo Gap medio [V/m]', 'Velocidad [m/s]']
 
-# Asignar los nombres de las columnas
-data_frame_simulation = pd.DataFrame(columns=[header_files])
+    df_pset = pd.read_csv('Results/Resultados_forming_0.csv')
+    df_sset = pd.read_csv('Results/Resultados_sset_0.csv')
+    df_preset = pd.read_csv('Results/resultados_reset_0.csv')
 
-# Leer todos los archivos CSV en una lista de DataFrames sin cabecera
-all_files = glob.glob(path)
-data_frames = [pd.read_csv(file, header=None) for file in all_files]
+    # Concatenar los DataFrames sin duplicar el encabezado
+    data_frame_simulation = pd.concat([df_pset, df_sset, df_preset], ignore_index=True)
 
-# Concatenar todos los DataFrames en uno solo
-data_frame_simulation = pd.concat(data_frames, ignore_index=True)
+    # Asignar la cabecera manualmente una vez
+    data_frame_simulation.columns = header_files
 
-# Guardar el DataFrame combinado en un archivo CSV
-data_frame_simulation.to_csv('Datos_simulacion_completa.csv', index=False)
+    # Guardar el DataFrame combinado en un archivo CSV
+    data_frame_simulation.to_csv(f'Results/Datos_simulacion_completa_{num_simulation}.csv', index=True)
+    # print("Los DataFrames se han combinado y guardado exitosamente.")
 
-print("Todos los archivos CSV se han combinado y guardado exitosamente.")
+    print("Todos los archivos CSV se han combinado y guardado exitosamente.")
 
-# endregion
+    # endregion
