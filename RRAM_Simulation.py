@@ -1,3 +1,4 @@
+# region definicion de importaciones
 import os
 import glob
 import pickle
@@ -13,6 +14,8 @@ from RRAM import Recombination
 import warnings
 warnings.filterwarnings("error")
 
+# endregion
+
 # region Definición de valores iniciales y cosntantes de la simulación
 
 # comienzo leyendo los datos de la simulación almacenados en un archivo csv dentro de la carpeta Init y los guardo en sus respectivas variables
@@ -20,15 +23,24 @@ sim_parmtrs = Montecarlo.read_csv_to_dic("Init_data/simulation_parameters.csv")
 sim_ctes = Montecarlo.read_csv_to_dic("Init_data/simulation_constants.csv")
 
 # Defino la carpeta donde se guardan los datos iniciales de la simulación
-carpeta = 'Results'
+carpeta_results = 'Results'
 
 # Verifica si la carpeta existe
-if os.path.exists(carpeta):
+if os.path.exists(carpeta_results):
     # Elimina la carpeta y su contenido
-    shutil.rmtree(carpeta)
+    shutil.rmtree(carpeta_results)
 
 # Crea la carpeta de nuevo
-os.makedirs(carpeta)
+os.makedirs(carpeta_results)
+
+# Ruta de la subcarpeta
+ruta_set = os.path.join(carpeta_results, 'set')
+ruta_reset = os.path.join(carpeta_results, 'reset')
+
+# Crear la subcarpeta s del set y reset
+os.makedirs(ruta_set, exist_ok=True)
+os.makedirs(ruta_reset, exist_ok=True)
+
 
 header_files = 'Tiempo simulacion [s],Voltaje [V],Intensidad [A],Temperatura [K],Campo Simple [V/m],Campo Gap medio [V/m],Velocidad [m/s]'
 
@@ -85,6 +97,9 @@ for num_simulation in range(len(sim_parmtrs)):
     # Inicializo el campo eléctrico
     E_field_vector = np.zeros((actual_state.shape[0]))
 
+    num_vacantes = np.zeros(num_pasos)
+    resistencia = np.zeros(num_pasos)
+
     T_0 = float(sim_parmtrs[num_simulation]['init_temp'])
 
     # endregion
@@ -101,42 +116,53 @@ for num_simulation in range(len(sim_parmtrs)):
         # Actualizo el voltaje
         voltage = vector_ddp[k]
 
-        if voltage > 3.05:
-            print("\nSe ha superado el voltaje de ruptura en la iteracion: ", k)
+        num_vacantes[k] = np.sum(actual_state)
+
+        if voltage > 2.3:
+            print("\nSe ha superado el voltaje de ruptura en la iteracion: ", k, "\n")
             k_ruptura = k
             voltaje_inicial_reset = vector_ddp[k]
             simulation_time_forming = simulation_time
             config_matrix_recortada = config_matrix[k, :, :]
 
-            print("Voltaje final forming", voltaje_inicial_reset, 'en el tiempo ', simulation_time_forming)
+            print("Voltaje final forming", voltaje_inicial_reset, 'en el tiempo ', simulation_time_forming, "\n")
 
             # Crear un array de ejemplo
             data_pp_set[k:] = np.nan  # Añadir valores nulos a partir de la fila k
+            num_vacantes[k:] = np.nan  # Añadir valores nulos a partir de la fila k
+            resistencia[k:] = np.nan  # Añadir valores nulos a partir de la fila k
 
             # Eliminar filas con valores nulos
             data_pp_set = data_pp_set[~np.isnan(data_pp_set).any(axis=1)]
+            num_vacantes = num_vacantes[~np.isnan(num_vacantes)]
+            resistencia = resistencia[~np.isnan(resistencia)]
+            print("Valor de I_0:", sim_ctes[num_simulation]['I_0'], "\n")
 
-            RepresentateState(resistance_matrix, f'Results/resistance_matrix_{num_simulation}.png')
+            RepresentateState(resistance_matrix, f'Results/set/resistance_{num_simulation}_end_pps.png')
 
             break
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
-            sim_ctes[num_simulation]['gamma'] = '1.5'
 
+            # Copio el estado actual
             ac = actual_state.copy()
             resistance_matrix = findpath.find_path(ac)
 
             # Si ha percolado uso la corriente de Ohm
             try:
-                current = CurentSolver.OmhCurrent(voltage, resistance_matrix, **sim_ctes[num_simulation])
+                current, resistencia[k] = CurentSolver.OmhCurrent(
+                    voltage, resistance_matrix, **sim_ctes[num_simulation])
             except Warning:
-                filename = f'Results/Configuration_Set_{voltage}_null_resistance.pkl'
+                filename = f'Results/Null_Resistance/Configuration_Set_{voltage}_null_resistance.pkl'
                 print("Null resistance matrix in ", filename)
+                RepresentateState(resistance_matrix,
+                                  f'Results/Null_Resistance/PS_resistance_matrix_{num_simulation}.png')
                 with open(filename, 'wb') as f:
                     pickle.dump({"actual_state": ac, "resistance_matrix": resistance_matrix}, f)
         else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
+            resistencia[k] = 0
             mean_field = np.mean(E_field_vector)
             current = CurentSolver.Poole_Frenkel(temperatura, mean_field, **sim_ctes[num_simulation])*(device_size)
 
@@ -160,35 +186,52 @@ for num_simulation in range(len(sim_parmtrs)):
                         actual_state[i, j] = 1  # Generación de una vacante
 
         data_pp_set[k] = np.array([simulation_time, voltage, current, temperatura, E_field, np.mean(E_field_vector), 0])
+
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
             config_matrix[int(k / paso_guardar) - 1] = actual_state
 
-        if k % 100 == 0:
-            RepresentateState(actual_state, f'Results/actual_state_{k}.png')
+        # if k % 100 == 0:
+        #     RepresentateState(actual_state, f'Results/actual_state_{k}.png')
 
     # endregion
 
     # region Guardar datos del forming/Primera parte del set
 
     # Cuando acaba la simulacion guardo los estados de las matrices de configuracion y oxigenos
-    with open(f'Results/Last_Configuration_forming_{num_simulation}.pkl', 'wb') as f:
+    with open(f'Results/set/Last_Configuration_forming_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(actual_state, f)
 
     # Cuando acaba la simulacion guardo las matrices de configuración
-    with open(f'Results/Configurations_forming_{num_simulation}.pkl', 'wb') as f:
+    with open(f'Results/set/Configurations_forming_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(config_matrix, f)
 
-    np.savetxt(f'Results/Resultados_forming_{num_simulation}.csv', data_pp_set,
-               header=header_files,
-               comments=' ', delimiter=',')
+    np.savetxt(f'Results/set/Resultados_forming_{num_simulation}.csv', data_pp_set, header=header_files, delimiter=',')
+
+    # Guardo las vacantes generadas en el forming
+    with open(f"Results/set/Vacantes_resitencia_{num_simulation}.txt", "w") as f:
+        for v1, v2, v3, v4 in zip(data_pp_set[:, 0], data_pp_set[:, 1], num_vacantes, resistencia):
+            f.write(f"{v1} {v2} {v3} {v4}\n")
+
+    # Leer el contenido del archivo TXT
+    with open(f"Results/set/Vacantes_resitencia_{num_simulation}.txt", 'r') as file:
+        lines = file.readlines()
+
+    header_files_extra = 'Tiempo simulacion [s],Voltaje [V],Resistencia [Ohm],Numero de vacantes \n'
+
+    # Añadir el texto en la primera fila
+    lines.insert(0, header_files_extra)
+
+    # Escribir el contenido de nuevo en el archivo TXT
+    with open(f"Results/set/Vacantes_resitencia_{num_simulation}.txt", 'w') as file:
+        file.writelines(lines)
 
     # endregion
 
     # region Segunda parte del Set
 
     # Estado inicial de la simulación reset para las vacantes
-    with open(f'Results/Last_Configuration_forming_{num_simulation}.pkl', 'rb') as file:
+    with open(f'Results/set/Last_Configuration_forming_{num_simulation}.pkl', 'rb') as file:
         # Carga el contenido del archivo
         initial_configuration = pickle.load(file)
 
@@ -203,7 +246,7 @@ for num_simulation in range(len(sim_parmtrs)):
     oxygen_matrix_sset = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
 
     # Cambio la probabilidad del forming
-    sim_ctes[num_simulation]['gamma'] = '1'
+    sim_ctes[num_simulation]['gamma'] = '3'
 
     # Defino el paso temporal
     # paso_temporal = total_simulation_time / num_pasos
@@ -214,8 +257,9 @@ for num_simulation in range(len(sim_parmtrs)):
     # Estado iniciales de la simulación para el reset
     actual_state = initial_configuration
 
-    RepresentateState(actual_state, f'Results/Initial_SegSet_configuration_{num_simulation}.png')
+    RepresentateState(actual_state, f'Results/set/Initial_spSet_configuration_{num_simulation}.png')
 
+    print(f"\n Comienza la segunda parte del set \n")
     # Ciclo para la segunda parte del set
     for k in tqdm(range(1, num_pasos)):
         # Actualizo el tiempo de simulación
@@ -226,23 +270,27 @@ for num_simulation in range(len(sim_parmtrs)):
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
-            sim_ctes[num_simulation]['gamma'] = '0.5'
+            sim_ctes[num_simulation]['gamma'] = '0.3'
 
             ac = actual_state.copy()
             resistance_matrix = findpath.find_path(ac)
 
             # Si ha percolado uso la corriente de Ohm
             try:
-                current = CurentSolver.OmhCurrent(voltage, resistance_matrix, **sim_ctes[num_simulation])
+                current, resistencia[k] = CurentSolver.OmhCurrent(
+                    voltage, resistance_matrix, **sim_ctes[num_simulation])
             except Warning:
-                filename = f'Results/Configuration_Set_{voltage}_null_resistance.pkl'
+                filename = f'Results/Null_Resistance/Configuration_Set_{voltage}_null_resistance.pkl'
+                RepresentateState(resistance_matrix,
+                                  f'Results/Null_Resistance/PS_resistance_matrix_{num_simulation}.png')
                 print("Null resistance matrix in ", filename)
                 with open(filename, 'wb') as f:
                     pickle.dump({"actual_state": ac, "resistance_matrix": resistance_matrix}, f)
         else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
             mean_field = np.mean(E_field_vector)
-            current = CurentSolver.Poole_Frenkel(temperatura, mean_field, **sim_ctes[num_simulation])*(device_size)
+            current = CurentSolver.Poole_Frenkel(
+                temperatura, mean_field, **sim_ctes[num_simulation])*(device_size)
 
         # Obtengo los valores del campo eléctrico y la temperatura
         E_field = SimpleElectricField(voltage, device_size)
@@ -274,21 +322,19 @@ for num_simulation in range(len(sim_parmtrs)):
             oxygen_matrix_sset[int(k / paso_guardar) - 1] = oxygen_state
 
     # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
-    with open(f'Results/Configurations_sset_{num_simulation}.pkl', 'wb') as f:
+    with open(f'Results/set/Configurations_sset_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(config_matrix, f)
-    with open(f'Results/Oxygen_sset_{num_simulation}.pkl', 'wb') as f:
-        pickle.dump(oxygen_matrix, f)
 
     # Guardo el estado final de la simulación
-    with open(f'Results/Last_Set_Configuration_{num_simulation}.pkl', 'wb') as f:
+    with open(f'Results/set/Last_Set_Configuration_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(actual_state, f)
-    with open(f'Results/Last_Set_Oxygen_{num_simulation}.pkl', 'wb') as f:
-        pickle.dump(oxygen_state, f)
+    # with open(f'Results/set/Last_Set_Oxygen_{num_simulation}.pkl', 'wb') as f:
+    #     pickle.dump(oxygen_state, f)
 
     # endregion
 
     # region Guardar datos de la segunda parte del set
-    np.savetxt(f'Results/Resultados_sset_{num_simulation}.csv', data_sset,
+    np.savetxt(f'Results/set/Resultados_sset_{num_simulation}.csv', data_sset,
                header=header_files,
                comments=' ', delimiter=',')
 
@@ -297,12 +343,12 @@ for num_simulation in range(len(sim_parmtrs)):
     # region Región del reset primera parte
 
     # Estado inicial de la simulación reset para las vacantes
-    with open(f'Results/Last_Set_Configuration_{num_simulation}.pkl', 'rb') as file:
+    with open(f'Results/set/Last_Set_Configuration_{num_simulation}.pkl', 'rb') as file:
         initial_configuration = pickle.load(file)
 
-    # Estado inicial para el reset de los oxígenos
-    with open(f'Results/Last_Set_Oxygen_{num_simulation}.pkl', 'rb') as file:
-        initial_oxygen_reset = pickle.load(file)
+    # # Estado inicial para el reset de los oxígenos
+    # with open(f'Results/set/Last_Set_Oxygen_{num_simulation}.pkl', 'rb') as file:
+    #     initial_oxygen_reset = pickle.load(file)
 
     # NUMERO DE PASOS QUE SE HA dado en el forming. Lo pongo igual en el reset para que los potenciales sean los mismos
     num_pasos = k_ruptura
@@ -321,7 +367,7 @@ for num_simulation in range(len(sim_parmtrs)):
     initial_configuration_reset = actual_state
     initial_oxygen_reset = oxygen_state
 
-    RepresentateState(initial_configuration_reset, f'Results/Initial_reset_configuration_{num_simulation}.png')
+    RepresentateState(initial_configuration_reset, f'Results/reset/Initial_reset_configuration_{num_simulation}.png')
 
     # Ciclo para laprimera parte del reset
     for k in tqdm(range(1, num_pasos)):
@@ -340,16 +386,21 @@ for num_simulation in range(len(sim_parmtrs)):
 
             # Si ha percolado uso la corriente de Ohm
             try:
-                current = CurentSolver.OmhCurrent(voltage, resistance_matrix, **sim_ctes[num_simulation])
+                current, resistencia[k] = CurentSolver.OmhCurrent(
+                    voltage, resistance_matrix, **sim_ctes[num_simulation])
+
+                current = abs(current)
             except Warning:
-                filename = f'Results/Configuration_Set_{voltage}_null_resistance.pkl'
+                filename = f'Results/reset/Configuration_Set_{voltage}_null_resistance.pkl'
                 print("Null resistance matrix in ", filename)
+                RepresentateState(resistance_matrix,
+                                  f'Results/reset/PR_resistance_matrix_{num_simulation}.png')
                 with open(filename, 'wb') as f:
                     pickle.dump({"actual_state": ac, "resistance_matrix": resistance_matrix}, f)
         else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
-            current = CurentSolver.Poole_Frenkel(temperatura, np.mean(
-                E_field_vector), **sim_ctes[num_simulation])*(device_size)
+            current = abs(CurentSolver.Poole_Frenkel(temperatura, np.mean(
+                E_field_vector), **sim_ctes[num_simulation])*(device_size))
 
         # Obtengo los valores del campo eléctrico y la temperatura
         E_field = abs(SimpleElectricField(voltage, device_size))
@@ -396,38 +447,48 @@ for num_simulation in range(len(sim_parmtrs)):
     # region Guardar datos del reset primera parte
 
     # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
-    with open(f'Results/Configurations_reset_{num_simulation}.pkl', 'wb') as f:
+    with open(f'Results/reset/Configurations_reset_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(config_matrix, f)
-    with open(f'Results/Oxygen_reset_{num_simulation}.pkl', 'wb') as f:
+    with open(f'Results/reset/Oxygen_reset_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(oxygen_matrix, f)
 
-    np.savetxt(f'Results/resultados_reset_{num_simulation}.csv', data_pp_reset,
+    np.savetxt(f'Results/reset/resultados_reset_{num_simulation}.csv', data_pp_reset,
                header=header_files,
                comments=' ', delimiter=',')
 
-    RepresentateState(initial_configuration_reset, f'Results/Initial_reset_configuration_{num_simulation}.png')
+    RepresentateState(initial_configuration_reset, f'Results/reset/Initial_reset_configuration_{num_simulation}.png')
 
     # endregion
 
     # region Unir todos los datos en un solo archivo csv
 
-    header_files = ['Tiempo simulacion [s]', 'Voltaje [V]', 'Intensidad [A]',
-                    'Temperatura [K]', 'Campo Simple [V/m]', 'Campo Gap medio [V/m]', 'Velocidad [m/s]']
-
-    df_pset = pd.read_csv('Results/Resultados_forming_0.csv')
-    df_sset = pd.read_csv('Results/Resultados_sset_0.csv')
-    df_preset = pd.read_csv('Results/resultados_reset_0.csv')
+    df_pset = pd.read_csv('Results/set/Resultados_forming_0.csv')
+    df_sset = pd.read_csv('Results/set/Resultados_sset_0.csv')
+    df_preset = pd.read_csv('Results/reset/resultados_reset_0.csv')
 
     # Concatenar los DataFrames sin duplicar el encabezado
     data_frame_simulation = pd.concat([df_pset, df_sset, df_preset], ignore_index=True)
 
-    # Asignar la cabecera manualmente una vez
-    data_frame_simulation.columns = header_files
-
     # Guardar el DataFrame combinado en un archivo CSV
     data_frame_simulation.to_csv(f'Results/Datos_simulacion_completa_{num_simulation}.csv', index=True)
-    # print("Los DataFrames se han combinado y guardado exitosamente.")
 
     print("Todos los archivos CSV se han combinado y guardado exitosamente.")
 
+    # endregion
+
+    # region Representar datos
+    data_full = f'Results/Datos_simulacion_completa_{num_simulation}.csv'
+
+    df = pd.read_csv(data_full, dtype=float)
+
+    intensidad = np.array(df['Intensidad [A]'])
+    voltaje = np.array(df['Voltaje [V]'])
+
+    plt.semilogy(df['Voltaje [V]'], abs(df['Intensidad [A]']))
+    plt.xlabel("Voltaje")
+    plt.ylabel("Resistencia")
+    plt.title(r"Intensidad en función del voltaje con $I_0 = {}$".format(sim_ctes[num_simulation]['I_0']))
+
+    # guardo la figura
+    plt.savefig(f'Results\Grafico_Intensidad_Voltaje_{num_simulation}.png')
     # endregion

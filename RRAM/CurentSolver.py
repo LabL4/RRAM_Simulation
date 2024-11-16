@@ -62,7 +62,7 @@ def OmhCurrent(potential: float, config_state: np.array, **kwargs) -> float:
         total_resistance += parallel_resistance
 
     # Se calcula la corriente Ohmica
-    return potential/total_resistance
+    return potential/total_resistance, total_resistance
 
 
 def Poole_Frenkel(temperature: float, E_field: float, **kwargs) -> float:
@@ -89,7 +89,7 @@ def Poole_Frenkel(temperature: float, E_field: float, **kwargs) -> float:
     else:
         potential_barrier = cte.pb_metal_insul
         epsilon_r = cte.permitividad_relativa
-        I_0 = cte.I_0
+        # I_0 = cte.I_0
 
     k_b_ev = Boltzmann / elementary_charge
 
