@@ -320,7 +320,7 @@ for num_simulation in range(len(sim_parmtrs)):
             oxygen_matrix_sset[int(k / paso_guardar) - 1] = oxygen_state
     # endregion
 
-    # Region Guardar datos de la segunda parte del set
+    # region Guardar datos de la segunda parte del set
 
     # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
     with open(f'Results/set/Configurations_sp_set_{num_simulation}.pkl', 'wb') as f:
@@ -331,7 +331,6 @@ for num_simulation in range(len(sim_parmtrs)):
     with open(f'Results/set/Last_Configuration_sp_set_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(actual_state, f)
 
-    # region Guardar datos de la segunda parte del set
     np.savetxt(f'Results/set/Resultados_sp_set_{num_simulation}.csv', data_sset,
                header=header_files,
                comments=' ', delimiter=',')

@@ -7,3 +7,4 @@
 *.zip
 *.png
 *.pdf
+env/
