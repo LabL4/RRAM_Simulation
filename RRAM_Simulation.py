@@ -595,7 +595,7 @@ for num_simulation in range(len(sim_parmtrs)):
     df_sreset = pd.read_csv(f'Results/reset/resultados_sp_reset_{num_simulation}.csv')
 
     # Concatenar los DataFrames sin duplicar el encabezado
-    data_frame_simulation = pd.concat([df_pset, df_sset, df_preset, df_sreset], ignore_index=True)
+    data_frame_simulation = pd.concat([df_pset, df_sset, df_preset, df_sreset])
 
     # Guardar el DataFrame combinado en un archivo CSV
     data_frame_simulation.to_csv(f'Results/Datos_simulacion_completa_{num_simulation}.csv', index=False)
