@@ -90,7 +90,7 @@ def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float
 
     # el t_0 es el valor de 1/t_0 que lo pongo directamente y "factor" es algo que introduzco a mano para ajustar la velocidad
     # En la expresión original se multiplica por 2 lo he quitado para ver si sale algo mejor
-    oxigen_velocity = 2 * t_0 * cte_red * (senoh * exp_velocity)
+    oxigen_velocity = 10000000 * 2 * t_0 * cte_red * (senoh * exp_velocity)
 
     # Calculo la cantidad de "casillas" que se moverá el ion de oxígeno
     displacement = int(round((oxigen_velocity * paso_temp) / grid_size))

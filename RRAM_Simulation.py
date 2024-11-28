@@ -207,12 +207,12 @@ for num_simulation in range(len(sim_parmtrs)):
     np.savetxt(f'Results/set/resultados_pp_set_{num_simulation}.csv', data_pp_set, header=header_files, delimiter=',')
 
     # Guardo las vacantes generadas en el forming
-    with open(f"Results/set/Vacantes_resitencia_{num_simulation}.txt", "w") as f:
+    with open(f"Results/set/Vacantes_resistencia_{num_simulation}.txt", "w") as f:
         for v1, v2, v3, v4 in zip(data_pp_set[:, 0], data_pp_set[:, 1], num_vacantes, resistencia):
             f.write(f"{v1} {v2} {v3} {v4}\n")
 
     # Leer el contenido del archivo TXT
-    with open(f"Results/set/Vacantes_resitencia_{num_simulation}.txt", 'r') as file:
+    with open(f"Results/set/Vacantes_resistencia_{num_simulation}.txt", 'r') as file:
         lines = file.readlines()
 
     header_files_extra = 'Tiempo simulacion [s],Voltaje [V],Resistencia [Ohm],Numero de vacantes \n'
@@ -221,7 +221,7 @@ for num_simulation in range(len(sim_parmtrs)):
     lines.insert(0, header_files_extra)
 
     # Escribir el contenido de nuevo en el archivo TXT
-    with open(f"Results/set/Vacantes_resitencia_{num_simulation}.txt", 'w') as file:
+    with open(f"Results/set/Vacantes_resistencia_{num_simulation}.txt", 'w') as file:
         file.writelines(lines)
 
     # endregion
@@ -312,7 +312,7 @@ for num_simulation in range(len(sim_parmtrs)):
         # Tiempo total de la simulacion
         tiempo_total = simulation_time + simulation_time_forming
 
-        data_sset[k-1] = np.array([tiempo_total, voltage, current, temperatura, E_field, np.mean(E_field_vector), 0])
+        data_sset[k] = np.array([tiempo_total, voltage, current, temperatura, E_field, np.mean(E_field_vector), 0])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
@@ -337,7 +337,7 @@ for num_simulation in range(len(sim_parmtrs)):
 
     # endregion
 
-    # region Región de la segunda parte del set
+    # region Región de la primera parte del reset
 
     # Estado inicial de la simulación reset para las vacantes
     with open(f'Results/set/Last_Configuration_sp_set_{num_simulation}.pkl', 'rb') as file:
@@ -363,7 +363,7 @@ for num_simulation in range(len(sim_parmtrs)):
     RepresentateState(initial_configuration_reset, f'Results/reset/Initial_pp_reset_configuration_{num_simulation}.png')
     print(f"\n Comienza la primera parte del reset")
 
-    sim_ctes[num_simulation]['gamma_drift'] = '13'
+    # sim_ctes[num_simulation]['gamma_drift'] = '13'
 
     # Ciclo para la primera parte del reset
     for k in tqdm(range(1, num_pasos)):
@@ -438,6 +438,10 @@ for num_simulation in range(len(sim_parmtrs)):
         if k % paso_guardar == 0:
             config_matrix_reset[int(k / paso_guardar) - 1] = actual_state
             oxygen_matrix_reset[int(k / paso_guardar) - 1] = oxygen_state
+
+        # Reresento el estado de los oxígenos cada 100 pasos
+        if k % 100 == 0:
+            RepresentateState(oxygen_state, f'Results/reset/Oxygen_state_{k}.png')
     # endregion
 
     # region Guardar datos del reset primera parte
@@ -547,7 +551,7 @@ for num_simulation in range(len(sim_parmtrs)):
                         actual_state[i, j] = 1  # Generación de una vacante
 
         # Genero los oxígenos
-        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 20)
+        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 5)
 
         # Muevo los oxígenos
         oxygen_state, velocidad = Recombination.Move_OxygenIons(
@@ -560,13 +564,16 @@ for num_simulation in range(len(sim_parmtrs)):
         # Tiempo total de la simulacion
         tiempo_total = simulation_time + 3 * simulation_time_forming
 
-        data_sp_reset[k-1] = np.array([tiempo_total, voltage, current, temperatura,
-                                      E_field, np.mean(E_field_vector), 0])
+        data_sp_reset[k] = np.array([tiempo_total, voltage, current, temperatura,
+                                     E_field, np.mean(E_field_vector), 0])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
             config_matrix_reset[int(k / paso_guardar) - 1] = actual_state
             oxygen_matrix_reset[int(k / paso_guardar) - 1] = oxygen_state
+
+        if k % 100 == 0:
+            RepresentateState(oxygen_state, f'Results/reset/sp_Oxygen_state_{k}.png')
     # endregion
 
     # region Guardar datos del reset segunda parte
@@ -588,7 +595,7 @@ for num_simulation in range(len(sim_parmtrs)):
 
     # region Unir todos los datos en un solo archivo csv
 
-    df_pset = pd.read_csv(f'Results/set/resultados_pp_set_{num_simulation}.csv')
+    df_pset = pd.read_csv(f'Results/set/Resultados_pp_set_{num_simulation}.csv')
     df_sset = pd.read_csv(f'Results/set/Resultados_sp_set_{num_simulation}.csv')
     df_preset = pd.read_csv(f'Results/reset/resultados_pp_reset_{num_simulation}.csv')
     df_sreset = pd.read_csv(f'Results/reset/resultados_sp_reset_{num_simulation}.csv')
