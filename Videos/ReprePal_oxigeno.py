@@ -1,16 +1,21 @@
+from RRAM import *
 import sys
 import glob
 import pickle
 import imageio
-import time as time
-import matplotlib.pyplot as plt
 
-from RRAM import *
+import time as time
 from PIL import Image
 from io import BytesIO
+import matplotlib.pyplot as plt
 from tqdm.contrib.concurrent import process_map
 
+ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'
+# ruta_raiz = '/Users/antonio_lopez_torres/Documents/GitHub/RRAM_Simulation/' # Ruta en el mac
+sys.path.append(ruta_raiz)
+
 global im
+
 
 # Asegúrate de que se ha pasado un parámetro
 if len(sys.argv) > 1:

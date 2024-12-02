@@ -12,6 +12,10 @@ from tqdm.contrib.concurrent import process_map
 
 global im
 
+ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'
+# ruta_raiz = '/Users/antonio_lopez_torres/Documents/GitHub/RRAM_Simulation/' # Ruta en el mac
+sys.path.append(ruta_raiz)
+
 # Asegúrate de que se ha pasado un parámetro
 if len(sys.argv) > 1:
     data_path = sys.argv[1]
@@ -21,8 +25,8 @@ if len(sys.argv) > 1:
     print(f"Ruta de guardado: {save_path}")
 else:
     print("No se ha pasado ningún parámetro.")
-    data_path = 'Results/Configurations_forming_0.pkl'
-    save_path = 'Results/Configuration_forming.mp4'
+    data_path = ruta_raiz + 'Results/set/resultados_pp_set_0.pkl'
+    save_path = ruta_raiz + 'Videos/Configuration_pp_set.mp4'
 
     print(f"Ruta del archivo: {data_path}")
     print(f"Ruta de guardado: {save_path}")
