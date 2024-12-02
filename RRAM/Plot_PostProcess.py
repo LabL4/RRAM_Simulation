@@ -1,7 +1,7 @@
 import numpy as np
-from cv2 import log
+# from cv2 import log
 import pandas as pd
-from turtle import setup
+# from turtle import setup
 import matplotlib.pyplot as plt
 
 from matplotlib.colors import LinearSegmentedColormap

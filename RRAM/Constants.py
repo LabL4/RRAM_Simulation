@@ -29,9 +29,9 @@ gamma_drift = 10
 E_m = 1
 
 # Constante de resistencia térmica en K/W
-r_termica = 5e5
+r_termica = 5e7
 
-# Constante de resistencia térmica en ohmios
+# Constante de resistencia en ohmios
 ohm_resistence = 1e7
 
 # Constante de red, el paper original propone 0.25 nm

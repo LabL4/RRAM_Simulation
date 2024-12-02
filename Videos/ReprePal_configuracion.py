@@ -10,7 +10,6 @@ from PIL import Image
 from io import BytesIO
 from tqdm.contrib.concurrent import process_map
 
-
 global im
 
 # Asegúrate de que se ha pasado un parámetro

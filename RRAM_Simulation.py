@@ -1,6 +1,5 @@
 # region definicion de importaciones
 import os
-import glob
 import pickle
 import shutil
 import time as time
@@ -92,7 +91,7 @@ for num_simulation in range(len(sim_parmtrs)):
 
     # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias
     colunm_number = 7
-    data_pp_set = np.zeros((num_pasos, colunm_number))
+    data_pp_set = np.zeros((num_pasos-1, colunm_number))
 
     # Inicializo el campo eléctrico
     E_field_vector = np.zeros((actual_state.shape[0]))
@@ -128,7 +127,7 @@ for num_simulation in range(len(sim_parmtrs)):
             print("Voltaje final forming", voltaje_inicial_reset, 'en el tiempo ', simulation_time_forming, "\n")
 
             # Crear un array de ejemplo
-            data_pp_set[k:] = np.nan  # Añadir valores nulos a partir de la fila k
+            data_pp_set[k-1:] = np.nan  # Añadir valores nulos a partir de la fila k
             num_vacantes[k:] = np.nan  # Añadir valores nulos a partir de la fila k
             resistencia[k:] = np.nan  # Añadir valores nulos a partir de la fila k
 
@@ -183,14 +182,12 @@ for num_simulation in range(len(sim_parmtrs)):
                     if random_number < prob_generacion:
                         actual_state[i, j] = 1  # Generación de una vacante
 
-        data_pp_set[k] = np.array([simulation_time, voltage, current, temperatura, E_field, np.mean(E_field_vector), 0])
+        data_pp_set[k-1] = np.array([simulation_time, voltage, current, temperatura,
+                                    E_field, np.mean(E_field_vector), 0])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
             config_matrix[int(k / paso_guardar) - 1] = actual_state
-
-        # if k % 100 == 0:
-        #     RepresentateState(actual_state, f'Results/actual_state_{k}.png')
 
     # endregion
 
@@ -246,9 +243,6 @@ for num_simulation in range(len(sim_parmtrs)):
     # Cambio la probabilidad de generación de vacantes
     sim_ctes[num_simulation]['gamma'] = '3'
 
-    # Defino el paso temporal
-    # paso_temporal = total_simulation_time / num_pasos
-
     # Creo el vector de diferencias de potencial
     vector_ddp = np.linspace(voltaje_inicial_reset, 0, num_pasos)
 
@@ -259,9 +253,9 @@ for num_simulation in range(len(sim_parmtrs)):
 
     print(f"\n Comienza la segunda parte del set")
     # Ciclo para la segunda parte del set
-    for k in tqdm(range(1, num_pasos)):
+    for k in tqdm(range(0, num_pasos)):
         # Actualizo el tiempo de simulación
-        simulation_time = paso_temporal * k
+        simulation_time = paso_temporal * (k+1)
 
         # Actualizo el voltaje
         voltage = vector_ddp[k]
@@ -347,7 +341,7 @@ for num_simulation in range(len(sim_parmtrs)):
     num_pasos = k_ruptura
 
     # el pp significa primera parte del reset (reset primera parte)
-    data_pp_reset = np.zeros((num_pasos, colunm_number))
+    data_pp_reset = np.zeros((num_pasos - 1, colunm_number))
 
     # Defino las matrices donde guardo las configuración del sistema y la de los oxígenos
     config_matrix_reset = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
@@ -363,12 +357,13 @@ for num_simulation in range(len(sim_parmtrs)):
     RepresentateState(initial_configuration_reset, f'Results/reset/Initial_pp_reset_configuration_{num_simulation}.png')
     print(f"\n Comienza la primera parte del reset")
 
-    # sim_ctes[num_simulation]['gamma_drift'] = '13'
+    sim_ctes[num_simulation]['gamma_drift'] = '10'
+    sim_ctes[num_simulation]['gamma'] = '0.3'
 
     # Ciclo para la primera parte del reset
-    for k in tqdm(range(1, num_pasos)):
+    for k in tqdm(range(0, num_pasos-1)):
         # Actualizo el tiempo de simulación
-        simulation_time = paso_temporal * k
+        simulation_time = paso_temporal * (k+1)
 
         # Actualizo el voltaje
         voltage = vector_ddp[k]
@@ -418,7 +413,7 @@ for num_simulation in range(len(sim_parmtrs)):
                         actual_state[i, j] = 1  # Generación de una vacante
 
         # Genero los oxígenos
-        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 20)
+        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 15)
 
         # Muevo los oxígenos
         oxygen_state, velocidad = Recombination.Move_OxygenIons(
@@ -431,17 +426,14 @@ for num_simulation in range(len(sim_parmtrs)):
         # Tiempo total de la simulacion
         tiempo_total = simulation_time + 2 * simulation_time_forming
 
-        data_pp_reset[k-1] = np.array([tiempo_total, voltage, current, temperatura,
-                                      E_field, np.mean(E_field_vector), 0])
+        data_pp_reset[k] = np.array([tiempo_total, voltage, current, temperatura,
+                                     E_field, np.mean(E_field_vector), 0])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
             config_matrix_reset[int(k / paso_guardar) - 1] = actual_state
             oxygen_matrix_reset[int(k / paso_guardar) - 1] = oxygen_state
 
-        # Reresento el estado de los oxígenos cada 100 pasos
-        if k % 100 == 0:
-            RepresentateState(oxygen_state, f'Results/reset/Oxygen_state_{k}.png')
     # endregion
 
     # region Guardar datos del reset primera parte
@@ -482,7 +474,7 @@ for num_simulation in range(len(sim_parmtrs)):
     num_pasos = k_ruptura
 
     # el pp significa primera parte del reset (reset primera parte)
-    data_sp_reset = np.zeros((num_pasos, colunm_number))
+    data_sp_reset = np.zeros((num_pasos - 1, colunm_number))
 
     # Defino las matrices donde guardo las configuración del sistema y la de los oxígenos
     config_matrix_reset = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
@@ -499,9 +491,9 @@ for num_simulation in range(len(sim_parmtrs)):
     RepresentateState(oxygen_state, f'Results/reset/Initial_oxygen_sp_reset_{num_simulation}.png')
 
     # Ciclo para la segunda parte del reset
-    for k in tqdm(range(1, num_pasos)):
+    for k in tqdm(range(0, num_pasos-1)):
         # Actualizo el tiempo de simulación
-        simulation_time = paso_temporal * k
+        simulation_time = paso_temporal * (k + 1)
 
         # Actualizo el voltaje
         voltage = vector_ddp[k]
@@ -551,7 +543,7 @@ for num_simulation in range(len(sim_parmtrs)):
                         actual_state[i, j] = 1  # Generación de una vacante
 
         # Genero los oxígenos
-        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 5)
+        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 15)
 
         # Muevo los oxígenos
         oxygen_state, velocidad = Recombination.Move_OxygenIons(
@@ -571,9 +563,6 @@ for num_simulation in range(len(sim_parmtrs)):
         if k % paso_guardar == 0:
             config_matrix_reset[int(k / paso_guardar) - 1] = actual_state
             oxygen_matrix_reset[int(k / paso_guardar) - 1] = oxygen_state
-
-        if k % 100 == 0:
-            RepresentateState(oxygen_state, f'Results/reset/sp_Oxygen_state_{k}.png')
     # endregion
 
     # region Guardar datos del reset segunda parte
@@ -611,7 +600,6 @@ for num_simulation in range(len(sim_parmtrs)):
     # endregion
 
     # region Representar datos
-
     data_full = f'Results/Datos_simulacion_completa_{num_simulation}.csv'
 
     df = pd.read_csv(data_full, dtype=float)
@@ -625,5 +613,5 @@ for num_simulation in range(len(sim_parmtrs)):
     plt.title(r"Intensidad en función del voltaje con $I_0 = {}$".format(sim_ctes[num_simulation]['I_0']))
 
     # guardo la figura
-    plt.savefig(f'Results\Grafico_Intensidad_Voltaje_{num_simulation}.png')
+    plt.savefig(f'Results/Grafico_Intensidad_Voltaje_{num_simulation}.png')
     # endregion
