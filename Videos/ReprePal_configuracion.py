@@ -1,40 +1,51 @@
-import sys
-import glob
-import pickle
-import imageio
-import time as time
-import matplotlib.pyplot as plt
-
-from RRAM import *
+import os
 from PIL import Image
 from io import BytesIO
 from tqdm.contrib.concurrent import process_map
+import matplotlib.pyplot as plt
+import time as time
+import imageio
+import pickle
+import glob
+import sys
+import numpy as np
 
 global im
-
-ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'
+ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'  # Ruta en el PC
 # ruta_raiz = '/Users/antonio_lopez_torres/Documents/GitHub/RRAM_Simulation/' # Ruta en el mac
+
+
+# Add the directory containing the RRAM module to the Python path
+module_path = os.path.abspath(os.path.join('..', ruta_raiz))
+if module_path not in sys.path:
+    sys.path.append(module_path)
+
+from RRAM import Representate as rp
+
 sys.path.append(ruta_raiz)
+
+
+data_path = ruta_raiz + 'Results/reset/Configurations_pp_reset_0.pkl'
+save_path = ruta_raiz + 'Videos/Configuration_pp_reset.mp4'
 
 # Asegúrate de que se ha pasado un parámetro
 if len(sys.argv) > 1:
     data_path = sys.argv[1]
     save_path = sys.argv[2]
 
-    print(f"Ruta del archivo: {data_path}")
-    print(f"Ruta de guardado: {save_path}")
+    # print(f"Ruta del archivo: {data_path}")
+    # print(f"Ruta de guardado: {save_path}")
 else:
-    print("No se ha pasado ningún parámetro.")
-    data_path = ruta_raiz + 'Results/set/resultados_pp_set_0.pkl'
-    save_path = ruta_raiz + 'Videos/Configuration_pp_set.mp4'
+    # print("No se ha pasado ningún parámetro.")
+    data_path = ruta_raiz + 'Results/reset/Configurations_pp_reset_0.pkl'
+    save_path = ruta_raiz + 'Videos/Configuration_pp_reset.mp4'
 
-    print(f"Ruta del archivo: {data_path}")
-    print(f"Ruta de guardado: {save_path}")
+    # print(f"Ruta del archivo: {data_path}")
+    # print(f"Ruta de guardado: {save_path}")
 
 # Cargo el fichero con las configuraciones
 with open(data_path, 'rb') as f:
     configuration = pickle.load(f)
-    print(configuration)
 
 # Supongamos que las imágenes están en el subdirectorio "Figuras" y tienen nombres de archivo que siguen el patrón "image*.png"
 filenames = glob.glob('Figuras/grafica*.png')
@@ -61,7 +72,7 @@ def process_matrix(args):
     else:
         fig, ax = plt.gcf(), plt.gca()
 
-    im = RepresentateState_parall(matrix, fig, ax, im, filename="Figuras/grafica_" + str(idx+1) + ".png")
+    im = rp.RepresentateState_parall(matrix, fig, ax, im, filename="Figuras/grafica_" + str(idx+1) + ".png")
 
     plt.savefig((buffer := BytesIO()), format='png')
     plt.clf()

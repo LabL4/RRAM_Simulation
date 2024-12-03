@@ -63,7 +63,7 @@ for num_simulation in range(len(sim_parmtrs)):
     init_simulation_time = float(sim_parmtrs[num_simulation]['init_simulation_time'])
     total_simulation_time = float(sim_parmtrs[num_simulation]['total_simulation_time'])
     num_pasos = int(sim_parmtrs[num_simulation]['num_pasos'])
-    paso_guardar = int(sim_parmtrs[num_simulation]['paso_guardar'])
+    paso_guardar = 50 # int(sim_parmtrs[num_simulation]['paso_guardar'])
 
     voltaje_reset = float(sim_parmtrs[num_simulation]['voltaje_final'])
 
@@ -122,7 +122,7 @@ for num_simulation in range(len(sim_parmtrs)):
             k_ruptura = k
             voltaje_inicial_reset = vector_ddp[k]
             simulation_time_forming = simulation_time
-            config_matrix_recortada = config_matrix[k, :, :]
+            # config_matrix_recortada = config_matrix[k, :, :]
 
             print("Voltaje final forming", voltaje_inicial_reset, 'en el tiempo ', simulation_time_forming, "\n")
 
@@ -198,8 +198,8 @@ for num_simulation in range(len(sim_parmtrs)):
         pickle.dump(actual_state, f)
 
     # Cuando acaba la simulacion guardo las matrices de configuración
-    with open(f'Results/set/Configurations_pp_set_{num_simulation}.pkl', 'wb') as f:
-        pickle.dump(config_matrix, f)
+    # with open(f'Results/set/Configurations_pp_set_{num_simulation}.pkl', 'wb') as f:
+    #     pickle.dump(config_matrix_recortada, f)
 
     np.savetxt(f'Results/set/resultados_pp_set_{num_simulation}.csv', data_pp_set, header=header_files, delimiter=',')
 
@@ -434,6 +434,7 @@ for num_simulation in range(len(sim_parmtrs)):
             config_matrix_reset[int(k / paso_guardar) - 1] = actual_state
             oxygen_matrix_reset[int(k / paso_guardar) - 1] = oxygen_state
 
+            RepresentateState(config_matrix_reset[int(k / paso_guardar) - 1], f'Results/reset/Configuration_pp_reset_{k}.png')
     # endregion
 
     # region Guardar datos del reset primera parte
@@ -441,7 +442,7 @@ for num_simulation in range(len(sim_parmtrs)):
     # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
     with open(f'Results/reset/Configurations_pp_reset_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(config_matrix, f)
-    with open(f'Results/reset/Oxygen_ppreset_{num_simulation}.pkl', 'wb') as f:
+    with open(f'Results/reset/Oxygen_pp_reset_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(oxygen_matrix, f)
 
     # Estado inicial de la simulación reset segunda parte para las vacantes
