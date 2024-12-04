@@ -115,7 +115,7 @@ def RepresentateStateOpt(matriz: np.ndarray, filename: str = "grafica.png") -> N
     # plt.title("Iteracion {}".format(filename.split("_")[1].split(".")[0]))
 
     # Guardar la imagen
-    # plt.savefig(filename)
+    plt.savefig(filename)
 
 
 def RepresentatePoints(matriz: np.ndarray, filename: str = "grafica.png") -> None:
