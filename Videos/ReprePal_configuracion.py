@@ -1,18 +1,18 @@
 import os
+import sys
+import glob
+import pickle
+import imageio
+import numpy as np
+import time as time
 from PIL import Image
 from io import BytesIO
-from tqdm.contrib.concurrent import process_map
 import matplotlib.pyplot as plt
-import time as time
-import imageio
-import pickle
-import glob
-import sys
-import numpy as np
+from tqdm.contrib.concurrent import process_map
 
 global im
-ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'  # Ruta en el PC
-# ruta_raiz = '/Users/antonio_lopez_torres/Documents/GitHub/RRAM_Simulation/' # Ruta en el mac
+# ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'  # Ruta en el PC
+ruta_raiz = '/Users/antonio_lopez_torres/Documents/GitHub/RRAM_Simulation/' # Ruta en el mac
 
 # Add the directory containing the RRAM module to the Python path
 module_path = os.path.abspath(os.path.join('..', ruta_raiz))
@@ -81,7 +81,7 @@ def process_matrix(args):
 
 if __name__ == '__main__':
 
-    NUM_PARALLEL_PROCESSES = 8
+    NUM_PARALLEL_PROCESSES = 10
     start = time.time()
     args = [(configuration[i], i) for i in range(len(configuration))]
     buffers = process_map(process_matrix, args, max_workers=NUM_PARALLEL_PROCESSES, chunksize=25)

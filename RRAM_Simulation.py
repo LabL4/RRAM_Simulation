@@ -1,13 +1,13 @@
 # region definicion de importaciones
 import os
+import sys
 import pickle
 import shutil
 import time as time
 import pandas as pd
 
-from tqdm import tqdm
-
 from RRAM import *
+from tqdm import tqdm
 from RRAM import Recombination
 
 import warnings
@@ -43,7 +43,7 @@ os.makedirs(ruta_reset, exist_ok=True)
 os.makedirs(ruta_figures, exist_ok=True)
 
 
-header_files = 'Tiempo simulacion [s],Voltaje [V],Intensidad [A],Temperatura [K],Campo Simple [V/m],Campo Gap medio [V/m],Velocidad [m/s]'
+header_files ='Tiempo simulacion [s],Voltaje [V],Intensidad [A],Temperatura [K],Campo Simple [V/m],Campo Gap medio [V/m],Velocidad [m/s]'
 
 # endregion
 
@@ -87,6 +87,8 @@ for num_simulation in range(len(sim_parmtrs)):
 
     # Defino el paso temporal
     paso_temporal = total_simulation_time / num_pasos
+    
+    print(f"\n El paso temporal es de {paso_temporal} s")
 
     # Creo el vector de diferencias de potencial
     vector_ddp = np.linspace(0, voltaje_reset, num_pasos + 1)
@@ -325,9 +327,7 @@ for num_simulation in range(len(sim_parmtrs)):
     with open(f'Results/set/Last_Configuration_sp_set_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(actual_state, f)
 
-    np.savetxt(f'Results/set/Resultados_sp_set_{num_simulation}.csv', data_sset,
-               header=header_files,
-               comments=' ', delimiter=',')
+    np.savetxt(f'Results/set/Resultados_sp_set_{num_simulation}.csv', data_sset, header=header_files, delimiter=',')
 
     # endregion
 
@@ -370,7 +370,6 @@ for num_simulation in range(len(sim_parmtrs)):
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
-
             # Obtengo los caminos de percolación
             ac = actual_state.copy()
             resistance_matrix = findpath.find_path(ac)
@@ -413,10 +412,10 @@ for num_simulation in range(len(sim_parmtrs)):
                         actual_state[i, j] = 1  # Generación de una vacante
 
         # Genero los oxígenos
-        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 15)
+        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 10)
 
         # Muevo los oxígenos
-        oxygen_state, velocidad = Recombination.Move_OxygenIons(
+        oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
             paso_temporal, oxygen_state, temperatura, E_field, atom_size, **sim_ctes[num_simulation])
 
         # Obtengo la nueva configuración
@@ -427,7 +426,7 @@ for num_simulation in range(len(sim_parmtrs)):
         tiempo_total = simulation_time + 2 * simulation_time_forming
 
         data_pp_reset[k] = np.array([tiempo_total, voltage, current, temperatura,
-                                     E_field, np.mean(E_field_vector), 0])
+                                     E_field, np.mean(E_field_vector), desplazamiento])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
@@ -451,9 +450,7 @@ for num_simulation in range(len(sim_parmtrs)):
     with open(f'Results/reset/Last_Oxygen_pp_reset_{num_simulation}.pkl', 'wb') as file:
         pickle.dump(oxygen_state, file)
 
-    np.savetxt(f'Results/reset/resultados_pp_reset_{num_simulation}.csv', data_pp_reset,
-               header=header_files,
-               comments=' ', delimiter=',')
+    np.savetxt(f'Results/reset/resultados_pp_reset_{num_simulation}.csv', data_pp_reset, header=header_files, delimiter=',')
 
     # endregion
 
@@ -545,7 +542,7 @@ for num_simulation in range(len(sim_parmtrs)):
         oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 15)
 
         # Muevo los oxígenos
-        oxygen_state, velocidad = Recombination.Move_OxygenIons(
+        oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
             paso_temporal, oxygen_state, temperatura, E_field, atom_size, **sim_ctes[num_simulation])
 
         # Obtengo la nueva configuración
@@ -556,7 +553,7 @@ for num_simulation in range(len(sim_parmtrs)):
         tiempo_total = simulation_time + 3 * simulation_time_forming
 
         data_sp_reset[k] = np.array([tiempo_total, voltage, current, temperatura,
-                                     E_field, np.mean(E_field_vector), 0])
+                                     E_field, np.mean(E_field_vector), desplazamiento])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
@@ -572,16 +569,14 @@ for num_simulation in range(len(sim_parmtrs)):
     with open(f'Results/reset/Oxygen_sp_reset_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(oxygen_matrix_sp_reset, f)
 
-    np.savetxt(f'Results/reset/resultados_sp_reset_{num_simulation}.csv', data_sp_reset,
-               header=header_files,
-               comments=' ', delimiter=',')
+    np.savetxt(f'Results/reset/resultados_sp_reset_{num_simulation}.csv', data_sp_reset, header=header_files, delimiter=',')
 
     RepresentateState(actual_state, f'Results/reset/Configuration_final_sp_reset_{num_simulation}.png')
     RepresentateState(oxygen_state, f'Results/reset/Oxygen_final_sp_reset_{num_simulation}.png')
 
     # endregion
 
-    # region Unir todos los datos en un solo archivo csv
+    # region Unir todos los datos en un solo archivo csv TODO: necesita revision cuando se unen los datos
 
     df_pset = pd.read_csv(f'Results/set/Resultados_pp_set_{num_simulation}.csv')
     df_sset = pd.read_csv(f'Results/set/Resultados_sp_set_{num_simulation}.csv')
@@ -611,8 +606,12 @@ for num_simulation in range(len(sim_parmtrs)):
     plt.ylabel("Resistencia")
     plt.title(r"Intensidad en función del voltaje con $I_0 = {}$".format(sim_ctes[num_simulation]['I_0']))
 
+    # ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'
+    ruta_raiz = '/Users/antonio_lopez_torres/Documents/GitHub/RRAM_Simulation/'  # Ruta en el mac
+    sys.path.append(ruta_raiz)
+    
     # guardo la figura
-    plt.savefig(f'Results/Grafico_Intensidad_Voltaje_{num_simulation}.png')
+    plt.savefig(ruta_raiz + f'Results/Grafico_Intensidad_Voltaje_{num_simulation}.png')
 
     # represento el estado de los oxígenos a partir de los pkl
     # with open(f'Results/reset/Oxygen_pp_reset_{num_simulation}.pkl', 'rb') as f:
