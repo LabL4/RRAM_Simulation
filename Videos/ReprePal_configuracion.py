@@ -14,7 +14,6 @@ global im
 ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'  # Ruta en el PC
 # ruta_raiz = '/Users/antonio_lopez_torres/Documents/GitHub/RRAM_Simulation/' # Ruta en el mac
 
-
 # Add the directory containing the RRAM module to the Python path
 module_path = os.path.abspath(os.path.join('..', ruta_raiz))
 if module_path not in sys.path:

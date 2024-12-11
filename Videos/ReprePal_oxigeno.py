@@ -1,21 +1,30 @@
-from RRAM import *
-import sys
-import glob
-import pickle
-import imageio
-
-import time as time
+import os
 from PIL import Image
 from io import BytesIO
-import matplotlib.pyplot as plt
 from tqdm.contrib.concurrent import process_map
-
-ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'
-# ruta_raiz = '/Users/antonio_lopez_torres/Documents/GitHub/RRAM_Simulation/' # Ruta en el mac
-sys.path.append(ruta_raiz)
+import matplotlib.pyplot as plt
+import time as time
+import imageio
+import pickle
+import glob
+import sys
+import numpy as np
 
 global im
+ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'  # Ruta en el PC
+# ruta_raiz = '/Users/antonio_lopez_torres/Documents/GitHub/RRAM_Simulation/' # Ruta en el mac
 
+# Add the directory containing the RRAM module to the Python path
+module_path = os.path.abspath(os.path.join('..', ruta_raiz))
+if module_path not in sys.path:
+    sys.path.append(module_path)
+
+from RRAM import Representate as rp
+
+sys.path.append(ruta_raiz)
+
+data_path = ruta_raiz + 'Results/reset/Oxygen_pp_reset_0.pkl'
+save_path = ruta_raiz + 'Videos/Oxygen_pp_reset.mp4'
 
 # Asegúrate de que se ha pasado un parámetro
 if len(sys.argv) > 1:
@@ -56,7 +65,7 @@ def process_matrix(args):
     else:
         fig, ax = plt.gcf(), plt.gca()
 
-    im = RepresentateState_parall(matrix, fig, ax,  im, color=(0.878, 0.227, 0.370),
+    im = rp.RepresentateState_parall(matrix, fig, ax,  im, color=(0.878, 0.227, 0.370),
                                   filename="Figuras/grafica_" + str(idx+1) + ".png")
 
     plt.savefig((buffer := BytesIO()), format='png')
