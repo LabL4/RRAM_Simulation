@@ -9,13 +9,21 @@ import pandas as pd
 from RRAM import *
 from tqdm import tqdm
 from RRAM import Recombination
+from RRAM import Plot_PostProcess as pplt
+
 
 import warnings
 warnings.filterwarnings("error")
 
+# ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'
+ruta_raiz = '/Users/antonio_lopez_torres/Documents/GitHub/RRAM_Simulation/' # Ruta en el mac
+sys.path.append(ruta_raiz)
+
 # endregion
 
+
 # region Definición de valores iniciales y cosntantes de la simulación
+
 
 # comienzo leyendo los datos de la simulación almacenados en un archivo csv dentro de la carpeta Init y los guardo en sus respectivas variables
 sim_parmtrs = Montecarlo.read_csv_to_dic("Init_data/simulation_parameters.csv")
@@ -357,8 +365,8 @@ for num_simulation in range(len(sim_parmtrs)):
     RepresentateState(initial_configuration_reset, f'Results/reset/Initial_pp_reset_configuration_{num_simulation}.png')
     print(f"\n Comienza la primera parte del reset")
 
-    sim_ctes[num_simulation]['gamma_drift'] = '10'
-    sim_ctes[num_simulation]['gamma'] = '0.3'
+    sim_ctes[num_simulation]['gamma_drift'] = '7'
+    sim_ctes[num_simulation]['gamma'] = '0'
 
     # Ciclo para la primera parte del reset
     for k in tqdm(range(0, num_pasos-1)):
@@ -594,25 +602,48 @@ for num_simulation in range(len(sim_parmtrs)):
     # endregion
 
     # region Representar datos
-    data_full = f'Results/Datos_simulacion_completa_{num_simulation}.csv'
+    data_path_pp_set = ruta_raiz + 'Results/set/resultados_pp_set_0.csv'
+    data_path_sp_set = ruta_raiz + 'Results/set/resultados_sp_set_0.csv'
+    data_path_pp_reset = ruta_raiz + 'Results/reset/resultados_pp_reset_0.csv'
+    data_path_sp_reset = ruta_raiz + 'Results/reset/resultados_sp_reset_0.csv'
 
-    df = pd.read_csv(data_full, dtype=float)
 
-    intensidad = np.array(df['Intensidad [A]'])
-    voltaje = np.array(df['Voltaje [V]'])
+    df_pset = pd.read_csv(data_path_pp_set, dtype=float)
+    df_sset = pd.read_csv(data_path_sp_set, dtype=float)
+    df_preset = pd.read_csv(data_path_pp_reset, dtype=float)
+    df_sreset = pd.read_csv(data_path_sp_reset, dtype=float)
 
-    plt.semilogy(df['Voltaje [V]'], abs(df['Intensidad [A]']))
-    plt.xlabel("Voltaje")
-    plt.ylabel("Resistencia")
-    plt.title(r"Intensidad en función del voltaje con $I_0 = {}$".format(sim_ctes[num_simulation]['I_0']))
+    global_tittle = 'Intensidad vs Voltaje'
+    save_path = ruta_raiz + 'Results\Grafico_Intensidad_Voltaje'
 
-    # ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'
-    ruta_raiz = '/Users/antonio_lopez_torres/Documents/GitHub/RRAM_Simulation/'  # Ruta en el mac
-    sys.path.append(ruta_raiz)
+    i_ps = np.array(df_pset['Intensidad [A]'])
+    i_ss = np.array(df_sset['Intensidad [A]'])
+    i_pr = np.array(df_preset['Intensidad [A]'])
+    i_sr = np.array(df_sreset['Intensidad [A]'])
+
+    v_ps = np.array(df_pset['Voltaje [V]'])
+    v_ss = np.array(df_sset['Voltaje [V]'])
+    v_pr = np.array(df_preset['Voltaje [V]'])
+    v_sr = np.array(df_sreset['Voltaje [V]'])
+
+    fig, axes = plt.subplots()
+    pplt.config_ax(axes)
+
+    axes.set_xlabel('Voltaje [V]')
+    axes.set_ylabel('Intensidad [A]')
+
+    axes.set_yscale('log')
+
+    axes.set_title(global_tittle, fontsize=18, pad=15)
+    axes.plot(v_ps, i_ps, color='blue', label='Primera parte Set')
+    axes.plot(v_ss, i_ss, color='red', label='Segunda parte Set')
+    axes.plot(v_pr, i_pr, color='green', label='Primera parte Reset')
+    axes.plot(v_sr, i_sr, color='pink', label='Segunda parte Reset')
+
+    plt.legend()
+    plt.show()
+    fig.savefig(save_path + '.pdf', bbox_inches='tight')
     
-    # guardo la figura
-    plt.savefig(ruta_raiz + f'Results/Grafico_Intensidad_Voltaje_{num_simulation}.png')
-
     # represento el estado de los oxígenos a partir de los pkl
     # with open(f'Results/reset/Oxygen_pp_reset_{num_simulation}.pkl', 'rb') as f:
         # oxygen_pp_reset = pickle.load(f)
