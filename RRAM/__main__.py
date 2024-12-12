@@ -1,6 +1,3 @@
-from .import SimpleElectricField
-
-
 def main():
     # Aquí puedes escribir el código principal de tu módulo
     print("¡Hola desde el archivo __main__!")

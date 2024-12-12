@@ -29,7 +29,7 @@ os.makedirs(carpeta)
 device_size = np.ones(num_simulations) * 10e-9  # m
 atom_size = np.ones(num_simulations) * 0.25e-9  # m TODO: Esto se deberia llamar tamaño del grid mejor
 # atom_size = np.linspace(0.15e-9, 0.24e-9, num_simulations)  # m
-num_trampas = np.ones(num_simulations, dtype=int) * 10
+num_trampas = np.ones(num_simulations, dtype=int) * 1
 
 priv_y_sup_right = np.ones(num_simulations, dtype=int) * 0
 priv_y_inf_right = np.ones(num_simulations, dtype=int) * 0
@@ -107,9 +107,9 @@ for i in range(num_simulations):
     with open('Init_data/oxygen_state_' + str(i) + '.pkl', 'wb') as f:
         pickle.dump(oxygen_state, f)
 
-# # ------------------------------------------------------------------------------------------------------------------------------------------------------
-# # Defino las constantes de la simulación y las guardo en un archivo
-# # ------------------------------------------------------------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------------------------------------------------------------------------------
+# Defino las constantes de la simulación y las guardo en un archivo
+# ------------------------------------------------------------------------------------------------------------------------------------------------------
 
 t_0 = np.ones(num_simulations) * cte.t_0  # Characteristic vibration frequency of oxygen ions in HfOx
 
@@ -125,7 +125,7 @@ cte_red = np.ones(num_simulations) * cte.cte_red
 E_a = np.ones(num_simulations) * cte.E_a
 
 # Drift coefficient of oxygen ions due to an external field
-# gamma_drift = np.array([8, 9, 10, 11, 12, 13, 14, 15, 16])
+# gamma_drift = np.array([7, 8, 9, 10, 11, 12])
 gamma_drift = np.ones(num_simulations) * cte.gamma_drift
 
 # Recombination enhancement factor due to the presence of excessive oxygen ions
@@ -149,6 +149,7 @@ gamma = np.ones(num_simulations) * cte.gamma
 # I_0 = duos_array[:, 0]
 
 # Resistance ohmic of the device
+# ohm_resistence = [1e5, 1e6, 1e7, 1e8, 1e9, 1e10]
 ohm_resistence = np.ones(num_simulations) * cte.ohm_resistence
 
 # Potential barrier at the metal and insulator interface
@@ -158,7 +159,7 @@ potential_barrier_metal_insul = np.ones(num_simulations) * cte.pb_metal_insul
 permitividad_relativa = np.ones(num_simulations) * cte.permitividad_relativa
 
 # Término inicial de la ecuación de Poole-Frenkel
-# I_0 = [9e-08, 8e-08, 7e-08, 6e-08, 5e-08, 4e-08, 3e-08, 2e-08, 1e-08]
+# I_0 = [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7]
 I_0 = np.ones(num_simulations) * cte.I_0
 
 # Constante de resistencia térmica en K/W

@@ -90,10 +90,12 @@ def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float
 
     # el t_0 es el valor de 1/t_0 que lo pongo directamente y "factor" es algo que introduzco a mano para ajustar la velocidad
     # En la expresión original se multiplica por 2 lo he quitado para ver si sale algo mejor
-    oxigen_velocity = 2 * t_0 * cte_red * (senoh * exp_velocity)
+    oxigen_velocity = 3e-07 #2 * t_0 * cte_red * (senoh * exp_velocity)
 
     # Calculo la cantidad de "casillas" que se moverá el ion de oxígeno
     displacement = int(round((oxigen_velocity * paso_temp) / grid_size))
+    if displacement > 3:
+        displacement = 3
 
     if displacement == 0:
         pass
@@ -111,6 +113,67 @@ def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float
                         oxygen_state[j, i] = 0
 
     return oxygen_state, oxigen_velocity, displacement
+
+
+def Move_OxygenIonsReset(paso_temp: float, oxygen_state: np.array, temperature: float, E_field: float, grid_size: float, **kwargs):
+    """
+    Move the oxygen ions in the simulation based on the given parameters.
+
+    Parameters:
+        - simu_time (float): The simulation time.
+        - oxygen_state (np.array): The matrix representing the state of oxygen ions.
+        - temperature (float): The temperature of the system.
+        - E_field (float): The electric field strength.
+        - atom_size (float): The size of each atom.
+
+    Returns:
+    np.array: The updated matrix representing the state of oxygen ions after the movement.
+    """
+
+    # Obtengo los valores de las constantes si las estoy pasando como argumentos
+    if kwargs:
+        # Obtengo el valor de las constantes que necesita la función
+        t_0 = float(kwargs.get('vibration_frequency'))
+        gamma_drift = float(kwargs.get('drift_coefficient'))
+        E_m = float(kwargs.get('migration_energy'))
+        cte_red = float(kwargs.get('cte_red'))
+    else:
+        t_0 = cte.t_0
+        gamma_drift = cte.gamma_drift
+        E_m = cte.E_m
+        cte_red = cte.cte_red
+
+    # Duplico la matriz de oxígeno para no modificar la original
+    oxygen_state_before = np.copy(oxygen_state)
+
+    # Obtengo la velocidad de los iones de oxígeno v = ((2 * a)/t0)*exp(−Em/kT) sinh((d * γ_drift * F)/2kT)
+    senoh = math.sinh((cte_red * E_field * gamma_drift)/(2 * k_b_ev * temperature))
+    exp_velocity = math.exp(-E_m / (k_b_ev * temperature))
+
+    # el t_0 es el valor de 1/t_0 que lo pongo directamente
+    oxigen_velocity = 2 * t_0 * cte_red * (senoh * exp_velocity)
+
+    # Calculo la cantidad de "casillas" que se moverá el ion de oxígeno
+    displacement = int(round((oxigen_velocity * paso_temp) / grid_size))
+    if displacement > 3:
+        displacement = 3
+
+    if displacement == 0:
+        pass
+        # print("No se mueve")
+    else:
+        # Recorro la matriz de oxígeno para mover los iones
+        for i in range(oxygen_state_before.shape[0]):              # Recorro las filas
+            for j in range(oxygen_state_before.shape[1]):
+                if oxygen_state_before[j, i] == 1:
+                    # Muevo el oxígeno si queda dentro de la matriz
+                    if i - displacement > 0:
+                        oxygen_state[j, i - displacement] = 1
+                        oxygen_state[j, i] = 0
+                    else:  # Si se sale de la matriz, lo elimino
+                        oxygen_state[j, i] = 0
+
+    return oxygen_state, oxigen_velocity
 
 
 def Recombine(actual_state: np.array, oxygen_state: np.array, paso_temp: float, velocidad: float, temp: float, **kwargs) -> np.array:

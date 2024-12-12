@@ -29,10 +29,10 @@ gamma_drift = 10
 E_m = 1
 
 # Constante de resistencia térmica en K/W
-r_termica = 5e5
+r_termica = 5e7
 
-# Constante de resistencia eléctrica en ohmios
-ohm_resistence = 1e5
+# Constante de resistencia en ohmios
+ohm_resistence = 1e7
 
 # Constante de red, el paper original propone 0.25 nm
 cte_red = 0.25e-9
@@ -44,7 +44,7 @@ pb_metal_insul = 0.5
 permitividad_relativa = 20
 
 # Término inicial de la ecuación de Poole-Frenkel
-I_0 = 8e-7
+I_0 = 5e-10
 
 
 # def DifussiveBehaviour(pos_x: int, oxigen_velocity: float, paso_temp: float, grid_size: float) -> float:

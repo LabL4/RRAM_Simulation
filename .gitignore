@@ -7,3 +7,7 @@
 *.zip
 *.png
 *.pdf
+env/
+.venv/
+.DS_Store
+Datos_Experimentales/
