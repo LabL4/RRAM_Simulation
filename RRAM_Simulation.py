@@ -18,12 +18,9 @@ warnings.filterwarnings("error")
 # ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'
 ruta_raiz = '/Users/antonio_lopez_torres/Documents/GitHub/RRAM_Simulation/' # Ruta en el mac
 sys.path.append(ruta_raiz)
-
 # endregion
 
-
 # region Definición de valores iniciales y cosntantes de la simulación
-
 
 # comienzo leyendo los datos de la simulación almacenados en un archivo csv dentro de la carpeta Init y los guardo en sus respectivas variables
 sim_parmtrs = Montecarlo.read_csv_to_dic("Init_data/simulation_parameters.csv")
@@ -148,7 +145,7 @@ for num_simulation in range(len(sim_parmtrs)):
             num_vacantes = num_vacantes[~np.isnan(num_vacantes)]
             resistencia = resistencia[~np.isnan(resistencia)]
 
-            RepresentateState(resistance_matrix, f'Results/set/resistance_{num_simulation}_end_pp_set.png')
+            RepresentateState(resistance_matrix, f'Results/Figures/resistance_{num_simulation}_end_pp_set.png')
 
             break
 
@@ -166,7 +163,7 @@ for num_simulation in range(len(sim_parmtrs)):
                 filename = f'Results/Null_Resistance/Configuration_Set_{voltage}_null_resistance.pkl'
                 print("Null resistance matrix in ", filename)
                 RepresentateState(resistance_matrix,
-                                  f'Results/Null_Resistance/PS_resistance_matrix_{num_simulation}.png')
+                                  f'Results/Figures/Null_Resistance/PS_resistance_matrix_{num_simulation}.png')
                 with open(filename, 'wb') as f:
                     pickle.dump({"actual_state": ac, "resistance_matrix": resistance_matrix}, f)
         else:
@@ -261,7 +258,7 @@ for num_simulation in range(len(sim_parmtrs)):
     # Estado iniciales de la simulación para el reset
     actual_state = initial_configuration
 
-    RepresentateState(actual_state, f'Results/set/Initial_configuration_sp_set_{num_simulation}.png')
+    RepresentateState(actual_state, f'Results/Figures/Initial_configuration_sp_set_{num_simulation}.png')
 
     print(f"\n Comienza la segunda parte del set")
     # Ciclo para la segunda parte del set
@@ -274,7 +271,7 @@ for num_simulation in range(len(sim_parmtrs)):
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
-            sim_ctes[num_simulation]['gamma'] = '0.3'
+            sim_ctes[num_simulation]['gamma'] = '0.5'
 
             ac = actual_state.copy()
             resistance_matrix = findpath.find_path(ac)
@@ -284,9 +281,9 @@ for num_simulation in range(len(sim_parmtrs)):
                 current, resistencia[k] = CurentSolver.OmhCurrent(
                     voltage, resistance_matrix, **sim_ctes[num_simulation])
             except Warning:
-                filename = f'Results/Null_Resistance/Configuration_Set_{voltage}_null_resistance.pkl'
+                filename = f'Results/Figures/Configuration_Set_{voltage}_null_resistance.pkl'
                 RepresentateState(resistance_matrix,
-                                  f'Results/Null_Resistance/PS_resistance_matrix_{num_simulation}.png')
+                                  f'Results/Figures/PS_resistance_matrix_{num_simulation}.png')
                 print("Null resistance matrix in ", filename)
                 with open(filename, 'wb') as f:
                     pickle.dump({"actual_state": ac, "resistance_matrix": resistance_matrix}, f)
@@ -362,11 +359,11 @@ for num_simulation in range(len(sim_parmtrs)):
     initial_configuration_reset = actual_state
     initial_oxygen_reset = oxygen_state
 
-    RepresentateState(initial_configuration_reset, f'Results/reset/Initial_pp_reset_configuration_{num_simulation}.png')
+    RepresentateState(initial_configuration_reset, f'Results/Figures/Initial_pp_reset_configuration_{num_simulation}.png')
     print(f"\n Comienza la primera parte del reset")
 
     sim_ctes[num_simulation]['gamma_drift'] = '7'
-    sim_ctes[num_simulation]['gamma'] = '0'
+    sim_ctes[num_simulation]['gamma'] = '0.1'
 
     # Ciclo para la primera parte del reset
     for k in tqdm(range(0, num_pasos-1)):
@@ -389,10 +386,10 @@ for num_simulation in range(len(sim_parmtrs)):
 
                 current = abs(current)
             except Warning:
-                filename = f'Results/reset/Configuration_Set_{voltage}_null_resistance.pkl'
+                filename = f'Results/Figures/Configuration_Set_{voltage}_null_resistance.pkl'
                 print("Null resistance matrix in ", filename)
                 RepresentateState(resistance_matrix,
-                                  f'Results/reset/PR_resistance_matrix_{num_simulation}.png')
+                                  f'Results/Figures/PR_resistance_matrix_{num_simulation}.png')
                 with open(filename, 'wb') as f:
                     pickle.dump({"actual_state": ac, "resistance_matrix": resistance_matrix}, f)
         else:
@@ -491,8 +488,8 @@ for num_simulation in range(len(sim_parmtrs)):
     # initial_configuration_reset = actual_state
     # initial_oxygen_reset = oxygen_state
 
-    RepresentateState(actual_state, f'Results/reset/Initial_configuration_sp_reset_{num_simulation}.png')
-    RepresentateState(oxygen_state, f'Results/reset/Initial_oxygen_sp_reset_{num_simulation}.png')
+    RepresentateState(actual_state, f'Results/Figures/Initial_configuration_sp_reset_{num_simulation}.png')
+    RepresentateState(oxygen_state, f'Results/Figures/Initial_oxygen_sp_reset_{num_simulation}.png', color=(0.878, 0.227, 0.370))
 
     # Ciclo para la segunda parte del reset
     for k in tqdm(range(0, num_pasos-1)):
@@ -519,7 +516,7 @@ for num_simulation in range(len(sim_parmtrs)):
                 filename = f'Results/reset/Configuration_sp_reset_{voltage}_null_resistance.pkl'
                 print("Null resistance matrix in ", filename)
                 RepresentateState(resistance_matrix,
-                                  f'Results/reset/PR_resistance_matrix_{num_simulation}.png')
+                                  f'Results/Figures/PR_resistance_matrix_{num_simulation}.png')
                 with open(filename, 'wb') as f:
                     pickle.dump({"actual_state": ac, "resistance_matrix": resistance_matrix}, f)
         else:
@@ -579,8 +576,8 @@ for num_simulation in range(len(sim_parmtrs)):
 
     np.savetxt(f'Results/reset/resultados_sp_reset_{num_simulation}.csv', data_sp_reset, header=header_files, delimiter=',')
 
-    RepresentateState(actual_state, f'Results/reset/Configuration_final_sp_reset_{num_simulation}.png')
-    RepresentateState(oxygen_state, f'Results/reset/Oxygen_final_sp_reset_{num_simulation}.png')
+    RepresentateState(actual_state, f'Results/Figures/Configuration_final_sp_reset_{num_simulation}.png')
+    RepresentateState(oxygen_state, f'Results/Figures/Oxygen_final_sp_reset_{num_simulation}.png',color=(0.878, 0.227, 0.370))
 
     # endregion
 
@@ -614,7 +611,7 @@ for num_simulation in range(len(sim_parmtrs)):
     df_sreset = pd.read_csv(data_path_sp_reset, dtype=float)
 
     global_tittle = 'Intensidad vs Voltaje'
-    save_path = ruta_raiz + 'Results\Grafico_Intensidad_Voltaje'
+    save_path = ruta_raiz + 'Results/Figures/Grafico_Intensidad_Voltaje'
 
     i_ps = np.array(df_pset['Intensidad [A]'])
     i_ss = np.array(df_sset['Intensidad [A]'])

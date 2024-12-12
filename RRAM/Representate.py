@@ -8,7 +8,7 @@ from RRAM import Montecarlo
 from matplotlib.colors import LinearSegmentedColormap
 
 
-def RepresentateState(matriz: np.ndarray, filename: str = None) -> None:
+def RepresentateState(matriz: np.ndarray, filename: str = None, color = (0.478, 0.627, 0.870)) -> None:
     """
     Represent the state of a matrix as a colored plot.
 
@@ -29,7 +29,7 @@ def RepresentateState(matriz: np.ndarray, filename: str = None) -> None:
     # Crear un mapa de colores personalizado
     colors = [
         (1, 1, 1),                  # Color para el valor 0 que representa que No hay trampa
-        (0.478, 0.627, 0.870),      # Color para el valor 1 que representa que hay trampa (azul)
+        color,                      # Color para el valor 1 que representa que hay trampa (azul por defeto)
     ]
     if np.all(matriz == 1):
         colors = list(reversed(colors))
@@ -116,60 +116,6 @@ def RepresentateStateOpt(matriz: np.ndarray, filename: str = "grafica.png") -> N
 
     # Guardar la imagen
     plt.savefig(filename)
-
-
-def RepresentatePoints(matriz: np.ndarray, filename: str = "grafica.png") -> None:
-    """
-    Represent the points in a matrix as a scatter plot.
-
-    Parameters:
-    - matriz (np.ndarray): The matrix containing the points.
-    - filename (str): The name of the output file (default is "grafica.png").
-
-    Returns:
-    None
-    """
-
-    n = len(matriz)
-
-    # Inicializamos listas para las coordenadas de los puntos
-    x = []
-    y = []
-
-    x = [j for i in range(n) for j in range(len(matriz[i])) if matriz[i][j] == 1]
-    y = [n - i - 1 for i in range(n) for j in range(len(matriz[i])) if matriz[i][j] == 1]
-
-    # Crear el gráfico
-    fig, ax = plt.subplots()
-
-    plt.scatter(x, y, c='blue', marker='o')  # 'c' define el color y 'marker' define la forma de los puntos
-    plt.title("Iteracion {}".format(filename.split("_")[1].split(".")[0]))
-    plt.xlabel('X')
-    plt.ylabel('Y')
-    plt.grid(True)  # Opcional: para mostrar la cuadrícula
-
-    # Establecer la relación de aspecto para que las celdas sean cuadradas
-    ax.set_aspect('equal')
-
-    # Colocar las etiquetas del eje x en la parte superior
-    ax.xaxis.tick_top()
-    nrows, _ = matriz.shape
-
-    # Configurar las marcas de los ejes
-    major_ticks = np.arange(0, nrows, 1)
-    minor_ticks = np.arange(0, nrows, 0.5)
-    ax.set_xticks(major_ticks)
-    ax.set_xticks(minor_ticks, minor=True)
-    ax.set_yticks(major_ticks)
-    ax.set_yticks(minor_ticks, minor=True)
-
-    # Invertir el eje y para que el punto (0, 0) esté en la esquina superior izquierda
-    ax.invert_yaxis()
-
-    # Añado una leyenda fuera del gráfico
-    plt.legend(['Trampas'], loc='center left', bbox_to_anchor=(1, 0.5))
-
-    return None
 
 
 def RepresentateState_parall(matriz: np.ndarray, fig, ax, im=None, color=(0.478, 0.627, 0.870), filename: str = "grafica.png") -> None:
