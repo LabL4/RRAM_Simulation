@@ -271,7 +271,7 @@ for num_simulation in range(len(sim_parmtrs)):
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
-            sim_ctes[num_simulation]['gamma'] = '0.5'
+            sim_ctes[num_simulation]['gamma'] = '0.4'
 
             ac = actual_state.copy()
             resistance_matrix = findpath.find_path(ac)
@@ -363,7 +363,7 @@ for num_simulation in range(len(sim_parmtrs)):
     print(f"\n Comienza la primera parte del reset")
 
     sim_ctes[num_simulation]['gamma_drift'] = '7'
-    sim_ctes[num_simulation]['gamma'] = '0.1'
+    sim_ctes[num_simulation]['gamma'] = '0.2'
 
     # Ciclo para la primera parte del reset
     for k in tqdm(range(0, num_pasos-1)):
@@ -544,7 +544,7 @@ for num_simulation in range(len(sim_parmtrs)):
                         actual_state[i, j] = 1  # Generación de una vacante
 
         # Genero los oxígenos
-        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 15)
+        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 10)
 
         # Muevo los oxígenos
         oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
