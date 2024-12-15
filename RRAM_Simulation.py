@@ -113,7 +113,6 @@ for num_simulation in range(len(sim_parmtrs)):
     # endregion
 
     # region primera parte del set
-
     for k in tqdm(range(1, num_pasos+1)):
         # Guardo el estado anterior
         last_state = actual_state
@@ -156,14 +155,8 @@ for num_simulation in range(len(sim_parmtrs)):
             resistance_matrix = findpath.find_path(ac)
 
             # Si ha percolado uso la corriente de Ohm
-            corriente = CurentSolver.OmhCurrent(voltaje, actual_state, **sim_ctes[num_simulation])
-        else:
-            # Si no ha percolado uso la corriente de Poole-Frenkel
-            corriente = CurentSolver.poole_frenkel(temperatura, np.mean(
-                E_field_vector), **sim_ctes[num_simulation])*(device_size)
             try:
-                current, resistencia[k] = CurentSolver.OmhCurrent(
-                    voltage, resistance_matrix, **sim_ctes[num_simulation])
+                current, resistencia[k] = CurentSolver.OmhCurrent(voltage, resistance_matrix, **sim_ctes[num_simulation])
             except Warning:
                 filename = f'Results/Null_Resistance/Configuration_Set_{voltage}_null_resistance.pkl'
                 print("Null resistance matrix in ", filename)
@@ -176,10 +169,10 @@ for num_simulation in range(len(sim_parmtrs)):
             resistencia[k] = 0
             mean_field = np.mean(E_field_vector)
             current = CurentSolver.Poole_Frenkel(temperatura, mean_field, **sim_ctes[num_simulation])*(device_size)
-
+            
         # Obtengo los valores del campo eléctrico y la temperatura
         E_field = SimpleElectricField(voltage, device_size)
-
+        
         temperatura = Temperature_Joule(voltage, current, T_0, **sim_ctes[num_simulation])
 
         # Genero el vector campo eléctrico
@@ -190,7 +183,7 @@ for num_simulation in range(len(sim_parmtrs)):
         for i in range(x_size):
             prob_generacion = Generation.Generate(
                 paso_temporal, E_field_vector[i], temperatura, **sim_ctes[num_simulation])
-s            for j in range(y_size):
+            for j in range(y_size):
                 if actual_state[i, j] == 0:
                     random_number = np.random.rand()
                     if random_number < prob_generacion:
