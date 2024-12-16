@@ -72,7 +72,7 @@ for num_simulation in range(len(sim_parmtrs)):
     num_pasos = int(sim_parmtrs[num_simulation]['num_pasos'])
     paso_guardar = int(sim_parmtrs[num_simulation]['paso_guardar'])
 
-    voltaje_reset = float(sim_parmtrs[num_simulation]['voltaje_final'])
+    voltaje_max_simulation = float(sim_parmtrs[num_simulation]['voltaje_final'])
 
     voltage = float(sim_parmtrs[num_simulation]['initial_voltaje'])
     current = float(sim_parmtrs[num_simulation]['initial_current'])
@@ -92,28 +92,29 @@ for num_simulation in range(len(sim_parmtrs)):
 
     # Defino el paso temporal
     paso_temporal = total_simulation_time / num_pasos
+    paso_potencial = voltaje_max_simulation / num_pasos
     
     print(f"\n El paso temporal es de {paso_temporal} s")
 
     # Creo el vector de diferencias de potencial
-    vector_ddp = np.linspace(0, voltaje_reset, num_pasos + 1)
+    vector_ddp = np.arange(0.00, voltaje_max_simulation + paso_potencial, paso_potencial)
 
     # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias
     colunm_number = 7
-    data_pp_set = np.zeros((num_pasos-1, colunm_number))
+    data_pp_set = np.zeros((num_pasos + 1, colunm_number))
 
     # Inicializo el campo eléctrico
     E_field_vector = np.zeros((actual_state.shape[0]))
 
-    num_vacantes = np.zeros(num_pasos)
-    resistencia = np.zeros(num_pasos)
+    num_vacantes = np.zeros(num_pasos+1)
+    resistencia = np.zeros(num_pasos+1)
 
     T_0 = float(sim_parmtrs[num_simulation]['init_temp'])
 
     # endregion
 
     # region primera parte del set
-    for k in tqdm(range(1, num_pasos+1)):
+    for k in tqdm(range(0, num_pasos)):
         # Guardo el estado anterior
         last_state = actual_state
 
@@ -125,19 +126,20 @@ for num_simulation in range(len(sim_parmtrs)):
 
         num_vacantes[k] = np.sum(actual_state)
 
-        if voltage > 2.3:
+        if voltage > 2.7:
             print("\nSe ha superado el voltaje de ruptura en la iteracion: ", k)
             k_ruptura = k
-            voltaje_inicial_reset = vector_ddp[k]
-            simulation_time_forming = simulation_time
+            voltaje_max_set = vector_ddp[k]
             config_matrix_recortada = config_matrix_pp_set[k, :, :]
+            tiempo_pp_set = paso_temporal * (k -1) # Le quitamos un paso porque se ha superado el voltaje de ruptura
 
-            print("Voltaje final forming", voltaje_inicial_reset, 'en el tiempo ', simulation_time_forming, "\n")
+            resistencia_copy = resistencia.copy()
+            print("Voltaje final set", voltaje_max_set, 'en el tiempo ', tiempo_pp_set, "\n")
 
             # Crear un array de ejemplo
-            data_pp_set[k-1:] = np.nan  # Añadir valores nulos a partir de la fila k
-            num_vacantes[k:] = np.nan  # Añadir valores nulos a partir de la fila k
-            resistencia[k:] = np.nan  # Añadir valores nulos a partir de la fila k
+            data_pp_set[k-1:] = np.nan      # Añadir valores nulos a partir de la fila k
+            num_vacantes[k:] = np.nan       # Añadir valores nulos a partir de la fila k
+            resistencia[k:] = np.nan        # Añadir valores nulos a partir de la fila k
 
             # Eliminar filas con valores nulos
             data_pp_set = data_pp_set[~np.isnan(data_pp_set).any(axis=1)]
@@ -145,11 +147,13 @@ for num_simulation in range(len(sim_parmtrs)):
             resistencia = resistencia[~np.isnan(resistencia)]
 
             RepresentateState(resistance_matrix, f'Results/Figures/resistance_{num_simulation}_end_pp_set.png')
-
             break
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
+            # Cambio la probabilidad de generación de vacantes
+            sim_ctes[num_simulation]['gamma'] = '2.2'
+            
             # Copio el estado actual
             ac = actual_state.copy()
             resistance_matrix = findpath.find_path(ac)
@@ -237,22 +241,22 @@ for num_simulation in range(len(sim_parmtrs)):
         # Carga el contenido del archivo
         initial_configuration = pickle.load(file)
 
-    # NUMERO DE PASOS QUE SE HA dado en el forming. Lo pongo igual en el reset para que los potenciales sean los mismos
+    # Defino el paso temporal según donde haya acabado la primera parte del set
     num_pasos = k_ruptura
 
     # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias
-    data_sset = np.zeros((num_pasos, colunm_number))
+    data_sset = np.zeros((num_pasos + 1, colunm_number))
 
-    # Defino las matrices donde guardo las configuración del sistema y la de los oxígenos
+    # Defino las matrices donde guardo las configuración del sistema.
     config_matrix_sp_set = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
-    # oxygen_matrix_sp_set = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
 
     # Cambio la probabilidad de generación de vacantes
     sim_ctes[num_simulation]['gamma'] = '3'
 
     # Creo el vector de diferencias de potencial
-    vector_ddp = np.linspace(voltaje_inicial_reset, 0, num_pasos)
-
+    vector_ddp = np.arange(voltaje_max_set, 0.000, -paso_potencial)
+    print("Voltaje inicial sp set", voltaje_max_set)
+    
     # Estado iniciales de la simulación para el reset
     actual_state = initial_configuration
 
@@ -262,7 +266,7 @@ for num_simulation in range(len(sim_parmtrs)):
     # Ciclo para la segunda parte del set
     for k in tqdm(range(0, num_pasos)):
         # Actualizo el tiempo de simulación
-        simulation_time = paso_temporal * (k+1)
+        simulation_time = paso_temporal * k
 
         # Actualizo el voltaje
         voltage = vector_ddp[k]
@@ -311,7 +315,7 @@ for num_simulation in range(len(sim_parmtrs)):
                         actual_state[i, j] = 1  # Generación de una vacante
 
         # Tiempo total de la simulacion
-        tiempo_total = simulation_time + simulation_time_forming
+        tiempo_total = simulation_time + tiempo_pp_set
 
         data_sset[k] = np.array([tiempo_total, voltage, current, temperatura, E_field, np.mean(E_field_vector), 0])
 
@@ -340,22 +344,25 @@ for num_simulation in range(len(sim_parmtrs)):
     with open(f'Results/set/Last_Configuration_sp_set_{num_simulation}.pkl', 'rb') as file:
         initial_configuration = pickle.load(file)
 
-    # NUMERO DE PASOS QUE SE HA dado en el forming. Lo pongo igual en el reset para que los potenciales sean los mismos
-    num_pasos = k_ruptura
+    # Como los voltajes no son simétricos, vuelvo a emplear el voltaje máximo de la simulación
+    num_pasos = int(sim_parmtrs[num_simulation]['num_pasos'])
 
     # el pp significa primera parte del reset (reset primera parte)
-    data_pp_reset = np.zeros((num_pasos - 1, colunm_number))
+    data_pp_reset = np.zeros((num_pasos, colunm_number))
 
     # Defino las matrices donde guardo las configuración del sistema y la de los oxígenos
     config_matrix_pp_reset = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
     oxygen_matrix_pp_reset = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
 
     # Creo el vector de diferencias de potencial
-    vector_ddp = np.linspace(0, -voltaje_inicial_reset, num_pasos)
+    vector_ddp = np.arange(0.000, -(voltaje_max_simulation + paso_potencial), -paso_potencial)
 
     # Estado iniciales de la simulación para el reset
     initial_configuration_reset = actual_state
     initial_oxygen_reset = oxygen_state
+    
+    # Vuelvo a definir el vector de resistencia total
+    resistencia = np.zeros(num_pasos+1)
 
     RepresentateState(initial_configuration_reset, f'Results/Figures/Initial_pp_reset_configuration_{num_simulation}.png')
     print(f"\n Comienza la primera parte del reset")
@@ -364,9 +371,9 @@ for num_simulation in range(len(sim_parmtrs)):
     sim_ctes[num_simulation]['gamma'] = '0.2'
 
     # Ciclo para la primera parte del reset
-    for k in tqdm(range(0, num_pasos-1)):
+    for k in tqdm(range(0, num_pasos)):
         # Actualizo el tiempo de simulación
-        simulation_time = paso_temporal * (k+1)
+        simulation_time = paso_temporal * k
 
         # Actualizo el voltaje
         voltage = vector_ddp[k]
@@ -426,10 +433,9 @@ for num_simulation in range(len(sim_parmtrs)):
             actual_state, oxygen_state, paso_temporal, velocidad, temperatura, **sim_ctes[num_simulation])
 
         # Tiempo total de la simulacion
-        tiempo_total = simulation_time + 2 * simulation_time_forming
+        tiempo_total = simulation_time + 2 * tiempo_pp_set
 
-        data_pp_reset[k] = np.array([tiempo_total, voltage, current, temperatura,
-                                     E_field, np.mean(E_field_vector), desplazamiento])
+        data_pp_reset[k] = np.array([tiempo_total, voltage, current, temperatura, E_field, np.mean(E_field_vector), desplazamiento])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
@@ -455,9 +461,10 @@ for num_simulation in range(len(sim_parmtrs)):
 
     np.savetxt(f'Results/reset/resultados_pp_reset_{num_simulation}.csv', data_pp_reset, header=header_files, delimiter=',')
 
+    tiempo_pp_reset = simulation_time
     # endregion
 
-    # region Región del reset segunda parte
+    # region Región de la segunda parte del reset
 
     print(f"\n Comienza la segunda parte del reset")
 
@@ -469,18 +476,18 @@ for num_simulation in range(len(sim_parmtrs)):
     with open(f'Results/reset/Last_Oxygen_pp_reset_{num_simulation}.pkl', 'rb') as file:
         initial_oxygen_reset = pickle.load(file)
 
-    # NUMERO DE PASOS QUE SE HA dado en el forming. Lo pongo igual en el reset para que los potenciales sean los mismos
-    num_pasos = k_ruptura
+    # Número de pasos total de la simlación
+    num_pasos = int(sim_parmtrs[num_simulation]['num_pasos'])
 
     # el sp significa segunda parte del reset (reset primera parte)
-    data_sp_reset = np.zeros((num_pasos - 1, colunm_number))
+    data_sp_reset = np.zeros((num_pasos + 1, colunm_number))
 
     # Defino las matrices donde guardo las configuración del sistema y la de los oxígenos
-    config_matrix_sp_reset = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
-    oxygen_matrix_sp_reset = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
+    config_matrix_sp_reset = np.zeros((int((num_pasos + 1 / paso_guardar)), x_size, y_size))
+    oxygen_matrix_sp_reset = np.zeros((int((num_pasos + 1 / paso_guardar)), x_size, y_size))
 
     # Creo el vector de diferencias de potencial
-    vector_ddp = np.linspace(-voltaje_inicial_reset, 0, num_pasos)
+    vector_ddp = np.arange(-voltaje_max_simulation, 0.000 + paso_potencial, paso_potencial)
 
     # Estado iniciales de la simulación para la segunda parte del reset
     # initial_configuration_reset = actual_state
@@ -490,9 +497,9 @@ for num_simulation in range(len(sim_parmtrs)):
     RepresentateState(oxygen_state, f'Results/Figures/Initial_oxygen_sp_reset_{num_simulation}.png', color=(0.878, 0.227, 0.370))
 
     # Ciclo para la segunda parte del reset
-    for k in tqdm(range(0, num_pasos-1)):
+    for k in tqdm(range(0, num_pasos)): # son num_pasos + 1 iteraciones
         # Actualizo el tiempo de simulación
-        simulation_time = paso_temporal * (k + 1)
+        simulation_time = paso_temporal * k
 
         # Actualizo el voltaje
         voltage = vector_ddp[k]
@@ -542,7 +549,7 @@ for num_simulation in range(len(sim_parmtrs)):
                         actual_state[i, j] = 1  # Generación de una vacante
 
         # Genero los oxígenos
-        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 10)
+        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 3)
 
         # Muevo los oxígenos
         oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
@@ -553,7 +560,7 @@ for num_simulation in range(len(sim_parmtrs)):
             actual_state, oxygen_state, paso_temporal, velocidad, temperatura, **sim_ctes[num_simulation])
 
         # Tiempo total de la simulacion
-        tiempo_total = simulation_time + 3 * simulation_time_forming
+        tiempo_total = simulation_time + 2 * tiempo_pp_set + tiempo_pp_reset
 
         data_sp_reset[k] = np.array([tiempo_total, voltage, current, temperatura,
                                      E_field, np.mean(E_field_vector), desplazamiento])
@@ -638,24 +645,3 @@ for num_simulation in range(len(sim_parmtrs)):
     plt.legend()
     plt.show()
     fig.savefig(save_path + '.pdf', bbox_inches='tight')
-    
-    # represento el estado de los oxígenos a partir de los pkl
-    # with open(f'Results/reset/Oxygen_pp_reset_{num_simulation}.pkl', 'rb') as f:
-        # oxygen_pp_reset = pickle.load(f)
-
-    # with open(f'Results/reset/Oxygen_sp_reset_{num_simulation}.pkl', 'rb') as f:
-        # oxygen_sp_reset = pickle.load(f)
-
-    # Represento el estado de los oxígenos cada 50 pasos
-    # num_representar = 50
-    # vector_guardar = np.arange(0, num_pasos, paso_guardar)
-    # print(vector_guardar)
-
-    # print("Representando el estado de los oxígenos")
-
-    # for i in vector_guardar:
-        # RepresentateState(oxygen_pp_reset[i], f'Results/Figures/Oxygen_pp_reset_{num_simulation}_{i}.png')
-        # RepresentateState(oxygen_sp_reset[i], f'Results/Figures/Oxygen_sp_reset_{num_simulation}_{i}.png')
-    # endregion
-    
-    # print("Representados los estado de los oxígenos")
