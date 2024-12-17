@@ -20,7 +20,7 @@ ruta_raiz = '/Users/antonio_lopez_torres/Documents/GitHub/RRAM_Simulation/' # Ru
 sys.path.append(ruta_raiz)
 # endregion
 
-# region Definición de valores iniciales y cosntantes de la simulación
+# region Definición de valores iniciales y constantes de la simulación
 
 # comienzo leyendo los datos de la simulación almacenados en un archivo csv dentro de la carpeta Init y los guardo en sus respectivas variables
 sim_parmtrs = Montecarlo.read_csv_to_dic("Init_data/simulation_parameters.csv")
@@ -422,7 +422,7 @@ for num_simulation in range(len(sim_parmtrs)):
                         actual_state[i, j] = 1  # Generación de una vacante
 
         # Genero los oxígenos
-        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 10)
+        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 5)
 
         # Muevo los oxígenos
         oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
@@ -443,7 +443,7 @@ for num_simulation in range(len(sim_parmtrs)):
             oxygen_matrix_pp_reset[int(k / paso_guardar) - 1] = oxygen_state
     # endregion
 
-    # region Guardar datos del reset primera parte
+    # region Guardar datos de la primera parte del reset
 
     # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
     with open(f'Results/reset/Configurations_pp_reset_{num_simulation}.pkl', 'wb') as f:
@@ -496,6 +496,7 @@ for num_simulation in range(len(sim_parmtrs)):
     RepresentateState(actual_state, f'Results/Figures/Initial_configuration_sp_reset_{num_simulation}.png')
     RepresentateState(oxygen_state, f'Results/Figures/Initial_oxygen_sp_reset_{num_simulation}.png', color=(0.878, 0.227, 0.370))
 
+    sim_ctes[num_simulation]['gamma'] = '0.1'
     # Ciclo para la segunda parte del reset
     for k in tqdm(range(0, num_pasos)): # son num_pasos + 1 iteraciones
         # Actualizo el tiempo de simulación
@@ -549,7 +550,7 @@ for num_simulation in range(len(sim_parmtrs)):
                         actual_state[i, j] = 1  # Generación de una vacante
 
         # Genero los oxígenos
-        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 3)
+        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 10)
 
         # Muevo los oxígenos
         oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
@@ -645,3 +646,5 @@ for num_simulation in range(len(sim_parmtrs)):
     plt.legend()
     plt.show()
     fig.savefig(save_path + '.pdf', bbox_inches='tight')
+    
+    # endregion
