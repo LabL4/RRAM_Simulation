@@ -11,7 +11,6 @@ from tqdm import tqdm
 from RRAM import Recombination
 from RRAM import Plot_PostProcess as pplt
 
-
 import warnings
 warnings.filterwarnings("error")
 
@@ -73,6 +72,7 @@ for num_simulation in range(len(sim_parmtrs)):
     paso_guardar = int(sim_parmtrs[num_simulation]['paso_guardar'])
 
     voltaje_max_simulation = float(sim_parmtrs[num_simulation]['voltaje_final'])
+    voltaje_final_set = float(sim_parmtrs[num_simulation]['voltaje_final_set'])
 
     voltage = float(sim_parmtrs[num_simulation]['initial_voltaje'])
     current = float(sim_parmtrs[num_simulation]['initial_current'])
@@ -101,7 +101,7 @@ for num_simulation in range(len(sim_parmtrs)):
 
     # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias
     colunm_number = 7
-    data_pp_set = np.zeros((num_pasos + 1, colunm_number))
+    data_pp_set = np.zeros((num_pasos, colunm_number))
 
     # Inicializo el campo eléctrico
     E_field_vector = np.zeros((actual_state.shape[0]))
@@ -126,12 +126,12 @@ for num_simulation in range(len(sim_parmtrs)):
 
         num_vacantes[k] = np.sum(actual_state)
 
-        if voltage > 2.7:
+        if voltage > voltaje_final_set:
             print("\nSe ha superado el voltaje de ruptura en la iteracion: ", k)
             k_ruptura = k
             voltaje_max_set = vector_ddp[k]
             config_matrix_recortada = config_matrix_pp_set[k, :, :]
-            tiempo_pp_set = paso_temporal * (k -1) # Le quitamos un paso porque se ha superado el voltaje de ruptura
+            tiempo_pp_set = paso_temporal * (k - 1) # Le quitamos un paso porque se ha superado el voltaje de ruptura
 
             resistencia_copy = resistencia.copy()
             print("Voltaje final set", voltaje_max_set, 'en el tiempo ', tiempo_pp_set, "\n")
@@ -146,7 +146,7 @@ for num_simulation in range(len(sim_parmtrs)):
             num_vacantes = num_vacantes[~np.isnan(num_vacantes)]
             resistencia = resistencia[~np.isnan(resistencia)]
 
-            RepresentateState(resistance_matrix, f'Results/Figures/resistance_{num_simulation}_end_pp_set.png')
+            # RepresentateState(resistance_matrix, f'Results/Figures/resistance_{num_simulation}_end_pp_set.png')
             break
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
@@ -245,7 +245,7 @@ for num_simulation in range(len(sim_parmtrs)):
     num_pasos = k_ruptura
 
     # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias
-    data_sset = np.zeros((num_pasos + 1, colunm_number))
+    data_sp_set = np.zeros((num_pasos, colunm_number))
 
     # Defino las matrices donde guardo las configuración del sistema.
     config_matrix_sp_set = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
@@ -317,7 +317,7 @@ for num_simulation in range(len(sim_parmtrs)):
         # Tiempo total de la simulacion
         tiempo_total = simulation_time + tiempo_pp_set
 
-        data_sset[k] = np.array([tiempo_total, voltage, current, temperatura, E_field, np.mean(E_field_vector), 0])
+        data_sp_set[k] = np.array([tiempo_total, voltage, current, temperatura, E_field, np.mean(E_field_vector), 0])
 
         # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
         if k % paso_guardar == 0:
@@ -334,7 +334,7 @@ for num_simulation in range(len(sim_parmtrs)):
     with open(f'Results/set/Last_Configuration_sp_set_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(actual_state, f)
 
-    np.savetxt(f'Results/set/Resultados_sp_set_{num_simulation}.csv', data_sset, header=header_files, delimiter=',')
+    np.savetxt(f'Results/set/Resultados_sp_set_{num_simulation}.csv', data_sp_set, header=header_files, delimiter=',')
 
     # endregion
 
@@ -413,8 +413,7 @@ for num_simulation in range(len(sim_parmtrs)):
 
         # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
         for i in range(x_size):
-            prob_generacion = Generation.Generate(
-                paso_temporal, E_field_vector[i], temperatura, **sim_ctes[num_simulation])
+            prob_generacion = Generation.Generate(paso_temporal, E_field_vector[i], temperatura, **sim_ctes[num_simulation])
             for j in range(y_size):
                 if actual_state[i, j] == 0:
                     random_number = np.random.rand()
@@ -480,7 +479,7 @@ for num_simulation in range(len(sim_parmtrs)):
     num_pasos = int(sim_parmtrs[num_simulation]['num_pasos'])
 
     # el sp significa segunda parte del reset (reset primera parte)
-    data_sp_reset = np.zeros((num_pasos + 1, colunm_number))
+    data_sp_reset = np.zeros((num_pasos, colunm_number))
 
     # Defino las matrices donde guardo las configuración del sistema y la de los oxígenos
     config_matrix_sp_reset = np.zeros((int((num_pasos + 1 / paso_guardar)), x_size, y_size))
@@ -617,7 +616,7 @@ for num_simulation in range(len(sim_parmtrs)):
     df_sreset = pd.read_csv(data_path_sp_reset, dtype=float)
 
     global_tittle = 'Intensidad vs Voltaje'
-    save_path = ruta_raiz + 'Results/Figures/Grafico_Intensidad_Voltaje'
+    save_path = ruta_raiz + f'Results/Figures/Grafico_Intensidad_Voltaje_simulation_{num_simulation}'
 
     i_ps = np.array(df_pset['Intensidad [A]'])
     i_ss = np.array(df_sset['Intensidad [A]'])
@@ -644,7 +643,30 @@ for num_simulation in range(len(sim_parmtrs)):
     axes.plot(v_sr, i_sr, color='pink', label='Segunda parte Reset')
 
     plt.legend()
-    plt.show()
+    
+    # Ruta proporcionada
+    ruta_exp_data = ruta_raiz + 'Datos_Experimentales/Ciclos_Experimentales'
+    
+    ruta_archivo_set = ruta_exp_data + '/Cycle_p_1000.txt'
+    ruta_archivo_reset = ruta_exp_data + '/Cycle_n_1000.txt'
+
+    # Leer datos del archivo
+    data_set = np.loadtxt(ruta_archivo_set)
+    data_reset = np.loadtxt(ruta_archivo_reset)
+
+    # Asumimos que los datos están en dos columnas: x e y
+    x_set = data_set[:, 0]
+    y_set = data_set[:, 1]
+
+    # Data reset
+    x_reset = data_reset[:, 0]
+    y_reset = abs(data_reset[:, 1])
+
+    # Crear la gráfica scatter
+    axes.plot(x_set, y_set, 'r', label='Set experimental')
+    axes.plot(x_reset, y_reset, 'b', label='Reset experimental')
+    
     fig.savefig(save_path + '.pdf', bbox_inches='tight')
+    # plt.show()
     
     # endregion

@@ -10,6 +10,6 @@ def Temperature_Joule(potencial: float, intensidad: float, T_0: float = 350, **k
     else:
         r_termica = cte.r_termica
 
-    Temperature_Joule = T_0 + potencial * intensidad * r_termica
+    Temperature_Joule = T_0 + abs(potencial * intensidad) * r_termica
 
     return Temperature_Joule

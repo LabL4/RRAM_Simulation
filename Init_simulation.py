@@ -9,7 +9,7 @@ from RRAM import Generation as gn
 from RRAM import Constants as cte
 
 # Número de simulaciones que realizo
-num_simulations = 1
+num_simulations = 8
 
 # Defino la carpeta donde se guardan los datos iniciales de la simulación
 carpeta = 'Init_data'
@@ -27,8 +27,7 @@ os.makedirs(carpeta)
 # ----------------------------------------------------------------------------------------------------------------------------------
 
 device_size = np.ones(num_simulations) * 10e-9  # m
-atom_size = np.ones(num_simulations) * 0.25e-9  # m TODO: Esto se deberia llamar tamaño del grid mejor
-# atom_size = np.linspace(0.15e-9, 0.24e-9, num_simulations)  # m
+atom_size = np.ones(num_simulations) * 0.25e-9  # m TODO: Esto se deberia llamarse tamaño del grid mejor
 num_trampas = np.ones(num_simulations, dtype=int) * 1
 
 priv_y_sup_right = np.ones(num_simulations, dtype=int) * 0
@@ -41,7 +40,8 @@ priv_x_left = np.ones(num_simulations, dtype=int) * 0
 total_simulation_time = np.ones(num_simulations) * 10
 # time step de mili segundo y milivoltios de step voltaje incluso de 0.01
 num_pasos = np.ones(num_simulations, dtype=int) * 10000
-voltaje_final = np.ones(num_simulations) * 4   # Esto puede ser mas alto puede ser de hasta 7 V
+voltaje_final = np.ones(num_simulations) * 1.4   # Esto puede ser mas alto puede ser de hasta 7 V
+voltaje_final_set = np.ones(num_simulations) * 1.1   # Esto puede ser mas alto puede ser de hasta 7 V
 
 paso_guardar = np.ones(num_simulations, dtype=int) * 1
 
@@ -58,7 +58,7 @@ eje_y = np.round(device_size / atom_size).astype(int)
 # Creo un dataframe con los parámetros de la simulación
 df = pd.DataFrame(columns=['device_size', 'atom_size', 'x_size', 'y_size', 'num_trampas',
                            'priv_y_sup_right', 'priv_y_inf_right', 'priv_x_right', 'priv_y_sup_left', 'priv_y_sup_left', 'priv_y_inf_left', 'priv_x_left',
-                           'total_simulation_time', 'num_pasos', 'voltaje_final', 'paso_guardar',
+                           'total_simulation_time', 'num_pasos', 'voltaje_final','voltaje_final_set', 'paso_guardar',
                            'init_temp', 'initial_elec_field', 'initial_voltaje', 'initial_current', 'init_simulation_time'])
 
 df['device_size'] = device_size
@@ -77,6 +77,7 @@ df['priv_x_left'] = priv_x_left
 df['total_simulation_time'] = total_simulation_time
 df['num_pasos'] = num_pasos
 df['voltaje_final'] = voltaje_final
+df['voltaje_final_set'] = voltaje_final_set
 df['paso_guardar'] = paso_guardar
 df['init_temp'] = init_temp
 df['initial_elec_field'] = initial_elec_field
@@ -159,8 +160,8 @@ potential_barrier_metal_insul = np.ones(num_simulations) * cte.pb_metal_insul
 permitividad_relativa = np.ones(num_simulations) * cte.permitividad_relativa
 
 # Término inicial de la ecuación de Poole-Frenkel
-# I_0 = [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7]
-I_0 = np.ones(num_simulations) * cte.I_0
+I_0 = [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7]
+# I_0 = np.ones(num_simulations) * cte.I_0
 
 # Constante de resistencia térmica en K/W
 r_termica = np.ones(num_simulations) * cte.r_termica
