@@ -36,15 +36,15 @@ if os.path.exists(carpeta_results):
 # Crea la carpeta de nuevo
 os.makedirs(carpeta_results)
 
-# Ruta de la subcarpeta
-ruta_set = os.path.join(carpeta_results, 'set')
-ruta_reset = os.path.join(carpeta_results, 'reset')
-ruta_figures = os.path.join(carpeta_results, 'Figures')
+# # Ruta de la subcarpeta
+# ruta_set = os.path.join(carpeta_results, 'set')
+# ruta_reset = os.path.join(carpeta_results, 'reset')
+# ruta_figures = os.path.join(carpeta_results, 'Figures')
 
-# Crear la subcarpeta s del set y reset
-os.makedirs(ruta_set, exist_ok=True)
-os.makedirs(ruta_reset, exist_ok=True)
-os.makedirs(ruta_figures, exist_ok=True)
+# # Crear la subcarpeta s del set y reset
+# os.makedirs(ruta_set, exist_ok=True)
+# os.makedirs(ruta_reset, exist_ok=True)
+# os.makedirs(ruta_figures, exist_ok=True)
 
 # Defino las cabeceras de los archivos csv
 header_files ='Tiempo simulacion [s],Voltaje [V],Intensidad [A],Temperatura [K],Campo Simple [V/m],Campo Gap medio [V/m],Velocidad [m/s]'
@@ -56,7 +56,15 @@ for num_simulation in range(len(sim_parmtrs)):
     # region Definición de variables
 
     # Creo la carpeta de la simulación
-    ruta_simulation = os.path.join(carpeta_results, f'Figures/simulation_{num_simulation}')
+    simulation_path = os.path.join(carpeta_results, f'simulation_{num_simulation}/')
+    os.makedirs(simulation_path, exist_ok=True)
+    os.makedirs(simulation_path + 'Figures', exist_ok=True)
+    
+    set_simulation_path = os.path.join(carpeta_results, f'simulation_{num_simulation}/set/')
+    os.makedirs(set_simulation_path, exist_ok=True)
+    
+    reset_simulation_path = os.path.join(carpeta_results, f'simulation_{num_simulation}/reset/')
+    os.makedirs(reset_simulation_path, exist_ok=True)
     
     # Pongo el nombre de la simulación y un salto de línea
     print(f"\n Simulación {num_simulation + 1}")
@@ -92,6 +100,11 @@ for num_simulation in range(len(sim_parmtrs)):
     # Leo los estados iniciales de la simulación
     with open('Init_data/init_state_' + str(num_simulation) + '.pkl', 'rb') as f:
         actual_state = pickle.load(f)
+        
+    with open('Init_data/oxygen_state_' + str(num_simulation) + '.pkl', 'rb') as f:
+        oxygen_state = pickle.load(f)
+    
+    RepresentateState(actual_state, simulation_path + 'Figures/initial_pp_set_' + str(num_simulation))
 
     # with open('Init_data/oxygen_state_' + str(num_simulation) + '.pkl', 'rb') as f:
     #     oxygen_state = pickle.load(f)
@@ -155,7 +168,7 @@ for num_simulation in range(len(sim_parmtrs)):
             num_vacantes = num_vacantes[~np.isnan(num_vacantes)]
             resistencia = resistencia[~np.isnan(resistencia)]
 
-            RepresentateState(resistance_matrix, ruta_simulation + f'/resistance_{num_simulation}_final_pp_set.png')
+            RepresentateState(resistance_matrix, simulation_path + f'Figures/final_pp_set_resistance_{num_simulation}.png')
             break
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
@@ -171,10 +184,9 @@ for num_simulation in range(len(sim_parmtrs)):
             try:
                 current, resistencia[k] = CurentSolver.OmhCurrent(voltage, resistance_matrix, **sim_ctes[num_simulation])
             except Warning:
-                filename = f'Results/Null_Resistance/Configuration_Set_{voltage}_null_resistance.pkl'
+                filename = simulation_path + f'Null_Resistance/Configuration_Set_{voltage}_null_resistance.pkl'
                 print("Null resistance matrix in ", filename)
-                RepresentateState(resistance_matrix,
-                                  f'Results/Figures/Null_Resistance/PS_resistance_matrix_{num_simulation}.png')
+                RepresentateState(resistance_matrix,simulation_path + f'Figures/Null_Resistance/NULL_resistance_matrix_pp_set_{num_simulation}.png')
                 with open(filename, 'wb') as f:
                     pickle.dump({"actual_state": ac, "resistance_matrix": resistance_matrix}, f)
         else:
@@ -214,22 +226,22 @@ for num_simulation in range(len(sim_parmtrs)):
     # region Guardar datos del Primera parte del set
 
     # Cuando acaba la simulacion guardo ele stado final de configuracion
-    with open(f'Results/set/Last_Configuration_pp_set_{num_simulation}.pkl', 'wb') as f:
+    with open(set_simulation_path + f'Last_Configuration_pp_set_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(actual_state, f)
 
     # Cuando acaba la simulacion guardo las matrices de configuración
-    with open(f'Results/set/Configurations_pp_set_{num_simulation}.pkl', 'wb') as f:
+    with open(set_simulation_path + f'Configurations_pp_set_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(config_matrix_pp_set, f)
 
-    np.savetxt(f'Results/set/resultados_pp_set_{num_simulation}.csv', data_pp_set, header=header_files, delimiter=',')
+    np.savetxt(set_simulation_path + f'resultados_pp_set_{num_simulation}.csv', data_pp_set, header=header_files, delimiter=',')
 
     # Guardo las vacantes generadas en el forming
-    with open(f"Results/set/Vacantes_resistencia_{num_simulation}.txt", "w") as f:
+    with open(set_simulation_path + f"Vacantes_resistencia_{num_simulation}.txt", "w") as f:
         for v1, v2, v3, v4 in zip(data_pp_set[:, 0], data_pp_set[:, 1], num_vacantes, resistencia):
             f.write(f"{v1} {v2} {v3} {v4}\n")
 
     # Leer el contenido del archivo TXT
-    with open(f"Results/set/Vacantes_resistencia_{num_simulation}.txt", 'r') as file:
+    with open(set_simulation_path + f"Vacantes_resistencia_{num_simulation}.txt", 'r') as file:
         lines = file.readlines()
 
     header_files_extra = 'Tiempo simulacion [s],Voltaje [V],Resistencia [Ohm],Numero de vacantes \n'
@@ -238,7 +250,7 @@ for num_simulation in range(len(sim_parmtrs)):
     lines.insert(0, header_files_extra)
 
     # Escribir el contenido de nuevo en el archivo TXT
-    with open(f"Results/set/Vacantes_resistencia_{num_simulation}.txt", 'w') as file:
+    with open(set_simulation_path + f"Vacantes_resistencia_{num_simulation}.txt", 'w') as file:
         file.writelines(lines)
 
     # endregion
@@ -246,7 +258,7 @@ for num_simulation in range(len(sim_parmtrs)):
     # region Segunda parte del Set
 
     # Estado inicial de la simulación reset para las vacantes
-    with open(f'Results/set/Last_Configuration_pp_set_{num_simulation}.pkl', 'rb') as file:
+    with open(set_simulation_path + f'Last_Configuration_pp_set_{num_simulation}.pkl', 'rb') as file:
         # Carga el contenido del archivo
         initial_configuration = pickle.load(file)
 
@@ -266,7 +278,7 @@ for num_simulation in range(len(sim_parmtrs)):
     # Estado iniciales de la simulación para el reset
     actual_state = initial_configuration
 
-    RepresentateState(actual_state, ruta_simulation + f'/Initial_configuration_sp_set_{num_simulation}.png')
+    RepresentateState(actual_state, simulation_path + f'Figures/Initial_configuration_sp_set_{num_simulation}.png')
 
     # Cambio la probabilidad de generación de vacantes
     sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']))
@@ -292,9 +304,9 @@ for num_simulation in range(len(sim_parmtrs)):
                 current, resistencia[k] = CurentSolver.OmhCurrent(
                     voltage, resistance_matrix, **sim_ctes[num_simulation])
             except Warning:
-                filename = f'Results/Figures/Configuration_Set_{voltage}_null_resistance.pkl'
+                filename = simulation_path + f'Figures/Configuration_Set_{voltage}_null_resistance.pkl'
                 RepresentateState(resistance_matrix,
-                                  f'Results/Figures/PS_resistance_matrix_{num_simulation}.png')
+                                  simulation_path + f'Figures/PS_resistance_matrix_{num_simulation}.png')
                 print("Null resistance matrix in ", filename)
                 with open(filename, 'wb') as f:
                     pickle.dump({"actual_state": ac, "resistance_matrix": resistance_matrix}, f)
@@ -336,21 +348,21 @@ for num_simulation in range(len(sim_parmtrs)):
     # region Guardar datos de la segunda parte del set
 
     # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
-    with open(f'Results/set/Configurations_sp_set_{num_simulation}.pkl', 'wb') as f:
+    with open(set_simulation_path + f'Configurations_sp_set_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(config_matrix_sp_set, f)
 
     # Guardo el estado final de la simulación
-    with open(f'Results/set/Last_Configuration_sp_set_{num_simulation}.pkl', 'wb') as f:
+    with open(set_simulation_path + f'Last_Configuration_sp_set_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(actual_state, f)
 
-    np.savetxt(f'Results/set/Resultados_sp_set_{num_simulation}.csv', data_sp_set, header=header_files, delimiter=',')
+    np.savetxt(set_simulation_path + f'Resultados_sp_set_{num_simulation}.csv', data_sp_set, header=header_files, delimiter=',')
 
     # endregion
 
     # region Región de la primera parte del reset
 
     # Estado inicial de la simulación reset para las vacantes
-    with open(f'Results/set/Last_Configuration_sp_set_{num_simulation}.pkl', 'rb') as file:
+    with open(set_simulation_path + f'Last_Configuration_sp_set_{num_simulation}.pkl', 'rb') as file:
         initial_configuration = pickle.load(file)
 
     # Como los voltajes no son simétricos, vuelvo a emplear el voltaje máximo de la simulación
@@ -373,7 +385,7 @@ for num_simulation in range(len(sim_parmtrs)):
     # Vuelvo a definir el vector de resistencia total
     resistencia = np.zeros(num_pasos+1)
 
-    RepresentateState(initial_configuration_reset, ruta_simulation + f'/Initial_pp_reset_configuration_{num_simulation}.png')
+    RepresentateState(initial_configuration_reset, simulation_path + f'Figures/Initial_pp_reset_configuration_{num_simulation}.png')
     print(f"\n Comienza la primera parte del reset")
 
     sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 15)
@@ -399,9 +411,9 @@ for num_simulation in range(len(sim_parmtrs)):
 
                 current = abs(current)
             except Warning:
-                filename = f'Results/Figures/Configuration_Set_{voltage}_null_resistance.pkl'
+                filename = reset_simulation_path + f'Configuration_pp_reset_{voltage}_null_resistance.pkl'
                 print("Null resistance matrix in ", filename)
-                RepresentateState(resistance_matrix,f'Results/Figures/PR_resistance_matrix_{num_simulation}.png')
+                RepresentateState(resistance_matrix, simulation_path + f'Figures/NULL_resistance_pp_reset_{num_simulation}.png')
                 with open(filename, 'wb') as f:
                     pickle.dump({"actual_state": ac, "resistance_matrix": resistance_matrix}, f)
         else:
@@ -451,20 +463,20 @@ for num_simulation in range(len(sim_parmtrs)):
     # region Guardar datos de la primera parte del reset
 
     # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
-    with open(f'Results/reset/Configurations_pp_reset_{num_simulation}.pkl', 'wb') as f:
+    with open(reset_simulation_path + f'Configurations_pp_reset_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(config_matrix_pp_reset, f)
-    with open(f'Results/reset/Oxygen_pp_reset_{num_simulation}.pkl', 'wb') as f:
+    with open(reset_simulation_path + f'Oxygen_pp_reset_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(oxygen_matrix_pp_reset, f)
 
     # Estado inicial de la simulación reset segunda parte para las vacantes
-    with open(f'Results/reset/Last_Configuration_pp_reset_{num_simulation}.pkl', 'wb') as file:
+    with open(reset_simulation_path + f'Last_Configuration_pp_reset_{num_simulation}.pkl', 'wb') as file:
         pickle.dump(actual_state, file)
 
     # Estado inicial para el reset segunda parte de los oxígenos
-    with open(f'Results/reset/Last_Oxygen_pp_reset_{num_simulation}.pkl', 'wb') as file:
+    with open( reset_simulation_path + f'Last_Oxygen_pp_reset_{num_simulation}.pkl', 'wb') as file:
         pickle.dump(oxygen_state, file)
 
-    np.savetxt(f'Results/reset/resultados_pp_reset_{num_simulation}.csv', data_pp_reset, header=header_files, delimiter=',')
+    np.savetxt(reset_simulation_path + f'resultados_pp_reset_{num_simulation}.csv', data_pp_reset, header=header_files, delimiter=',')
 
     tiempo_pp_reset = simulation_time
     # endregion
@@ -474,11 +486,11 @@ for num_simulation in range(len(sim_parmtrs)):
     print(f"\n Comienza la segunda parte del reset")
 
     # Estado inicial de la simulación reset para las vacantes
-    with open(f'Results/reset/Last_Configuration_pp_reset_{num_simulation}.pkl', 'rb') as file:
+    with open( reset_simulation_path + f'Last_Configuration_pp_reset_{num_simulation}.pkl', 'rb') as file:
         initial_configuration = pickle.load(file)
 
     # Estado inicial para el reset de los oxígenos
-    with open(f'Results/reset/Last_Oxygen_pp_reset_{num_simulation}.pkl', 'rb') as file:
+    with open( reset_simulation_path + f'Last_Oxygen_pp_reset_{num_simulation}.pkl', 'rb') as file:
         initial_oxygen_reset = pickle.load(file)
 
     # Número de pasos total de la simlación
@@ -498,8 +510,8 @@ for num_simulation in range(len(sim_parmtrs)):
     # initial_configuration_reset = actual_state
     # initial_oxygen_reset = oxygen_state
 
-    RepresentateState(actual_state, ruta_simulation + f'/Initial_configuration_sp_reset_{num_simulation}.png')
-    RepresentateState(oxygen_state, ruta_simulation + f'/Initial_oxygen_sp_reset_{num_simulation}.png', color=(0.878, 0.227, 0.370))
+    RepresentateState(actual_state, simulation_path + f'Figures/Initial_configuration_sp_reset_{num_simulation}.png')
+    RepresentateState(oxygen_state, simulation_path + f'Figures/Initial_oxygen_sp_reset_{num_simulation}.png', color=(0.878, 0.227, 0.370))
 
     sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 15)
     
@@ -525,10 +537,9 @@ for num_simulation in range(len(sim_parmtrs)):
 
                 current = abs(current)
             except Warning:
-                filename = f'Results/reset/Configuration_sp_reset_{voltage}_null_resistance.pkl'
+                filename = reset_simulation_path + f'Configuration_sp_reset_{voltage}_null_resistance.pkl'
                 print("Null resistance matrix in ", filename)
-                RepresentateState(resistance_matrix,
-                                  f'Results/Figures/PR_resistance_matrix_{num_simulation}.png')
+                RepresentateState(resistance_matrix, simulation_path + f'Figures/PR_resistance_matrix_{num_simulation}.png')
                 with open(filename, 'wb') as f:
                     pickle.dump({"actual_state": ac, "resistance_matrix": resistance_matrix}, f)
         else:
@@ -579,24 +590,24 @@ for num_simulation in range(len(sim_parmtrs)):
     # region Guardar datos del reset segunda parte
 
     # Cuando acaba la simulacion guardo las matrices de configuraciones y oxigenos
-    with open(f'Results/reset/Configurations_sp_reset_{num_simulation}.pkl', 'wb') as f:
+    with open(reset_simulation_path + f'Configurations_sp_reset_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(config_matrix_sp_reset, f)
-    with open(f'Results/reset/Oxygen_sp_reset_{num_simulation}.pkl', 'wb') as f:
+    with open(reset_simulation_path + f'Oxygen_sp_reset_{num_simulation}.pkl', 'wb') as f:
         pickle.dump(oxygen_matrix_sp_reset, f)
 
-    np.savetxt(f'Results/reset/resultados_sp_reset_{num_simulation}.csv', data_sp_reset, header=header_files, delimiter=',')
+    np.savetxt(reset_simulation_path + f'resultados_sp_reset_{num_simulation}.csv', data_sp_reset, header=header_files, delimiter=',')
 
-    RepresentateState(actual_state,ruta_simulation + f'/Configuration_final_sp_reset_{num_simulation}.png')
-    RepresentateState(oxygen_state,ruta_simulation + f'/Oxygen_final_sp_reset_{num_simulation}.png',color=(0.878, 0.227, 0.370))
+    RepresentateState(actual_state,simulation_path + f'Figures/final_Configuration_sp_reset_{num_simulation}.png')
+    RepresentateState(oxygen_state,simulation_path + f'Figures/final_Oxygen_sp_reset_{num_simulation}.png',color=(0.878, 0.227, 0.370))
 
     # endregion
 
     # region Unir todos los datos en un solo archivo csv TODO: necesita revision cuando se unen los datos
 
-    df_pset = pd.read_csv(f'Results/set/Resultados_pp_set_{num_simulation}.csv')
-    df_sset = pd.read_csv(f'Results/set/Resultados_sp_set_{num_simulation}.csv')
-    df_preset = pd.read_csv(f'Results/reset/resultados_pp_reset_{num_simulation}.csv')
-    df_sreset = pd.read_csv(f'Results/reset/resultados_sp_reset_{num_simulation}.csv')
+    df_pset = pd.read_csv(set_simulation_path + f'Resultados_pp_set_{num_simulation}.csv')
+    df_sset = pd.read_csv(set_simulation_path + f'Resultados_sp_set_{num_simulation}.csv')
+    df_preset = pd.read_csv(reset_simulation_path + f'resultados_pp_reset_{num_simulation}.csv')
+    df_sreset = pd.read_csv(reset_simulation_path + f'resultados_sp_reset_{num_simulation}.csv')
 
     # Concatenar los DataFrames sin duplicar el encabezado
     data_frame_simulation = pd.concat([df_pset, df_sset, df_preset, df_sreset])
@@ -609,10 +620,10 @@ for num_simulation in range(len(sim_parmtrs)):
     # endregion
 
     # region Representar datos
-    data_path_pp_set = ruta_raiz + 'Results/set/resultados_pp_set_0.csv'
-    data_path_sp_set = ruta_raiz + 'Results/set/resultados_sp_set_0.csv'
-    data_path_pp_reset = ruta_raiz + 'Results/reset/resultados_pp_reset_0.csv'
-    data_path_sp_reset = ruta_raiz + 'Results/reset/resultados_sp_reset_0.csv'
+    data_path_pp_set = set_simulation_path + 'resultados_pp_set_0.csv'
+    data_path_sp_set = set_simulation_path + 'resultados_sp_set_0.csv'
+    data_path_pp_reset = reset_simulation_path + 'resultados_pp_reset_0.csv'
+    data_path_sp_reset = reset_simulation_path + 'resultados_sp_reset_0.csv'
 
     df_pset = pd.read_csv(data_path_pp_set, dtype=float)
     df_sset = pd.read_csv(data_path_sp_set, dtype=float)
@@ -620,7 +631,7 @@ for num_simulation in range(len(sim_parmtrs)):
     df_sreset = pd.read_csv(data_path_sp_reset, dtype=float)
 
     global_tittle = 'Intensidad vs Voltaje'
-    save_path = ruta_raiz + f'Results/Figures/Grafico_Intensidad_Voltaje_simulation_{num_simulation}'
+    save_path = simulation_path + f'Figures/Intensidad_Voltaje_simulation_{num_simulation}'
 
     i_ps = np.array(df_pset['Intensidad [A]'])
     i_ss = np.array(df_sset['Intensidad [A]'])

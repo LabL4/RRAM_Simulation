@@ -106,7 +106,7 @@ df['initial_voltaje'] = initial_voltaje
 df['initial_current'] = initial_current
 df['init_simulation_time'] = init_simulation_time
 
-carpeta_results = 'Results'
+carpeta_results = ruta_raiz + 'Results/'
 
 # Guardo el dataframe en un archivo csv
 df.to_csv('Init_data/simulation_parameters.csv', index=False)
@@ -120,20 +120,19 @@ for i in range(num_simulations):
     ]
 
     # Ruta de las imagenes de cada simulación
-    ruta_simulation = os.path.join(carpeta_results, f'Figures/simulation_{i}')
+    ruta_simulation = os.path.join(carpeta_results, f'Init_data/simulation_{i}')
     os.makedirs(ruta_simulation, exist_ok=True)
     
     # Estado inicial de la simulación para los oxígenos y el sistema
     init_state = gn.initial_state_priv(eje_x[i], eje_y[i], num_trampas[i], regiones_pesos)
-    RepresentateState(init_state, ruta_simulation + '/initial_pp_set_' + str(i))
     oxygen_state = Recombination.Init_OxygenState(device_size[i], atom_size[i])
 
     # Guardo el estado inicial con el nombre estado inicial mas el número de simulación
     with open('Init_data/init_state_' + str(i) + '.pkl', 'wb') as f:
         pickle.dump(init_state, f)
 
-    # with open('Init_data/oxygen_state_' + str(i) + '.pkl', 'wb') as f:
-    #     pickle.dump(oxygen_state, f)
+    with open('Init_data/oxygen_state_' + str(i) + '.pkl', 'wb') as f:
+        pickle.dump(oxygen_state, f)
 
 # ------------------------------------------------------------------------------------------------------------------------------------------------------
 # Defino las constantes de la simulación y las guardo en un archivo
