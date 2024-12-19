@@ -13,7 +13,7 @@ from tqdm.contrib.concurrent import process_map
 import time
 import numpy as np
 from PIL import Image
-from moviepy import ImageSequenceClip
+from moviepy import ImageSequenceClipquenceClip
 
 global im
 # ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'  # Ruta en el PC
@@ -27,7 +27,6 @@ if module_path not in sys.path:
 from RRAM import Representate as rp
 
 sys.path.append(ruta_raiz)
-
 
 data_path = ruta_raiz + 'Results/reset/Configurations_pp_reset_0.pkl'
 save_path = ruta_raiz + 'Videos/Configuration_pp_reset.mp4'

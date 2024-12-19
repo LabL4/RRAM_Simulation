@@ -46,16 +46,18 @@ os.makedirs(ruta_set, exist_ok=True)
 os.makedirs(ruta_reset, exist_ok=True)
 os.makedirs(ruta_figures, exist_ok=True)
 
-
+# Defino las cabeceras de los archivos csv
 header_files ='Tiempo simulacion [s],Voltaje [V],Intensidad [A],Temperatura [K],Campo Simple [V/m],Campo Gap medio [V/m],Velocidad [m/s]'
 
 # endregion
 
 # quiero un bucle que recorra todas las simulaciones desde 0 hasta la longitud de sim_parmtrs-1
-for num_simulation in range(len(sim_parmtrs)):
-
+for num_simulation in range(len(sim_parmtrs)):  
     # region Definición de variables
 
+    # Creo la carpeta de la simulación
+    ruta_simulation = os.path.join(carpeta_results, f'Figures/simulation_{num_simulation}')
+    
     # Pongo el nombre de la simulación y un salto de línea
     print(f"\n Simulación {num_simulation + 1}")
 
@@ -78,26 +80,34 @@ for num_simulation in range(len(sim_parmtrs)):
     current = float(sim_parmtrs[num_simulation]['initial_current'])
     temperatura = float(sim_parmtrs[num_simulation]['init_temp'])
     E_field = float(sim_parmtrs[num_simulation]['initial_elec_field'])
+    
+    # df_sim_parmtrs = pd.DataFrame(sim_parmtrs[num_simulation])
+    # df_sim_ctes = pd.DataFrame(sim_ctes[num_simulation])
+    
+    # # Guardar los DataFrames en un archivo de Excel con nombres específicos
+    # with pd.ExcelWriter(os.path.join(ruta_simulation, 'simulacion_datos.xlsx')) as writer:
+    #     df_sim_parmtrs.to_excel(writer, sheet_name='sim_parmtrs', index=False)
+    #     df_sim_ctes.to_excel(writer, sheet_name='sim_ctes', index=False)
 
     # Leo los estados iniciales de la simulación
     with open('Init_data/init_state_' + str(num_simulation) + '.pkl', 'rb') as f:
         actual_state = pickle.load(f)
 
-    with open('Init_data/oxygen_state_' + str(num_simulation) + '.pkl', 'rb') as f:
-        oxygen_state = pickle.load(f)
+    # with open('Init_data/oxygen_state_' + str(num_simulation) + '.pkl', 'rb') as f:
+    #     oxygen_state = pickle.load(f)
 
     # Defino las matrices donde guardo las configuración del sistema y la de los oxígenos
     config_matrix_pp_set = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
-    # oxygen_matrix_pp_set = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
 
     # Defino el paso temporal
     paso_temporal = total_simulation_time / num_pasos
     paso_potencial = voltaje_max_simulation / num_pasos
     
     print(f"\n El paso temporal es de {paso_temporal} s")
+    print(f"\n El paso del potencial es de {paso_potencial} s")
 
     # Creo el vector de diferencias de potencial
-    vector_ddp = np.arange(0.00, voltaje_max_simulation + paso_potencial, paso_potencial)
+    vector_ddp = np.arange(0.000, voltaje_max_simulation + paso_potencial, paso_potencial)
 
     # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias
     colunm_number = 7
@@ -110,7 +120,6 @@ for num_simulation in range(len(sim_parmtrs)):
     resistencia = np.zeros(num_pasos+1)
 
     T_0 = float(sim_parmtrs[num_simulation]['init_temp'])
-
     # endregion
 
     # region primera parte del set
@@ -146,13 +155,13 @@ for num_simulation in range(len(sim_parmtrs)):
             num_vacantes = num_vacantes[~np.isnan(num_vacantes)]
             resistencia = resistencia[~np.isnan(resistencia)]
 
-            # RepresentateState(resistance_matrix, f'Results/Figures/resistance_{num_simulation}_end_pp_set.png')
+            RepresentateState(resistance_matrix, ruta_simulation + f'/resistance_{num_simulation}_final_pp_set.png')
             break
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
             # Cambio la probabilidad de generación de vacantes
-            sim_ctes[num_simulation]['gamma'] = '2.2'
+            sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 5)
             
             # Copio el estado actual
             ac = actual_state.copy()
@@ -250,9 +259,6 @@ for num_simulation in range(len(sim_parmtrs)):
     # Defino las matrices donde guardo las configuración del sistema.
     config_matrix_sp_set = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
 
-    # Cambio la probabilidad de generación de vacantes
-    sim_ctes[num_simulation]['gamma'] = '3'
-
     # Creo el vector de diferencias de potencial
     vector_ddp = np.arange(voltaje_max_set, 0.000, -paso_potencial)
     print("Voltaje inicial sp set", voltaje_max_set)
@@ -260,8 +266,11 @@ for num_simulation in range(len(sim_parmtrs)):
     # Estado iniciales de la simulación para el reset
     actual_state = initial_configuration
 
-    RepresentateState(actual_state, f'Results/Figures/Initial_configuration_sp_set_{num_simulation}.png')
+    RepresentateState(actual_state, ruta_simulation + f'/Initial_configuration_sp_set_{num_simulation}.png')
 
+    # Cambio la probabilidad de generación de vacantes
+    sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']))
+    
     print(f"\n Comienza la segunda parte del set")
     # Ciclo para la segunda parte del set
     for k in tqdm(range(0, num_pasos)):
@@ -273,7 +282,7 @@ for num_simulation in range(len(sim_parmtrs)):
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
-            sim_ctes[num_simulation]['gamma'] = '0.4'
+            sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 5)
 
             ac = actual_state.copy()
             resistance_matrix = findpath.find_path(ac)
@@ -364,11 +373,10 @@ for num_simulation in range(len(sim_parmtrs)):
     # Vuelvo a definir el vector de resistencia total
     resistencia = np.zeros(num_pasos+1)
 
-    RepresentateState(initial_configuration_reset, f'Results/Figures/Initial_pp_reset_configuration_{num_simulation}.png')
+    RepresentateState(initial_configuration_reset, ruta_simulation + f'/Initial_pp_reset_configuration_{num_simulation}.png')
     print(f"\n Comienza la primera parte del reset")
 
-    sim_ctes[num_simulation]['gamma_drift'] = '7'
-    sim_ctes[num_simulation]['gamma'] = '0.2'
+    sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 15)
 
     # Ciclo para la primera parte del reset
     for k in tqdm(range(0, num_pasos)):
@@ -393,14 +401,12 @@ for num_simulation in range(len(sim_parmtrs)):
             except Warning:
                 filename = f'Results/Figures/Configuration_Set_{voltage}_null_resistance.pkl'
                 print("Null resistance matrix in ", filename)
-                RepresentateState(resistance_matrix,
-                                  f'Results/Figures/PR_resistance_matrix_{num_simulation}.png')
+                RepresentateState(resistance_matrix,f'Results/Figures/PR_resistance_matrix_{num_simulation}.png')
                 with open(filename, 'wb') as f:
                     pickle.dump({"actual_state": ac, "resistance_matrix": resistance_matrix}, f)
         else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
-            current = abs(CurentSolver.Poole_Frenkel(temperatura, np.mean(
-                E_field_vector), **sim_ctes[num_simulation])*(device_size))
+            current = abs(CurentSolver.Poole_Frenkel(temperatura, np.mean(E_field_vector), **sim_ctes[num_simulation])*(device_size))
 
         # Obtengo los valores del campo eléctrico y la temperatura
         E_field = abs(SimpleElectricField(voltage, device_size))
@@ -492,10 +498,11 @@ for num_simulation in range(len(sim_parmtrs)):
     # initial_configuration_reset = actual_state
     # initial_oxygen_reset = oxygen_state
 
-    RepresentateState(actual_state, f'Results/Figures/Initial_configuration_sp_reset_{num_simulation}.png')
-    RepresentateState(oxygen_state, f'Results/Figures/Initial_oxygen_sp_reset_{num_simulation}.png', color=(0.878, 0.227, 0.370))
+    RepresentateState(actual_state, ruta_simulation + f'/Initial_configuration_sp_reset_{num_simulation}.png')
+    RepresentateState(oxygen_state, ruta_simulation + f'/Initial_oxygen_sp_reset_{num_simulation}.png', color=(0.878, 0.227, 0.370))
 
-    sim_ctes[num_simulation]['gamma'] = '0.1'
+    sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 15)
+    
     # Ciclo para la segunda parte del reset
     for k in tqdm(range(0, num_pasos)): # son num_pasos + 1 iteraciones
         # Actualizo el tiempo de simulación
@@ -526,8 +533,7 @@ for num_simulation in range(len(sim_parmtrs)):
                     pickle.dump({"actual_state": ac, "resistance_matrix": resistance_matrix}, f)
         else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
-            current = abs(CurentSolver.Poole_Frenkel(temperatura, np.mean(
-                E_field_vector), **sim_ctes[num_simulation])*(device_size))
+            current = abs(CurentSolver.Poole_Frenkel(temperatura, np.mean(E_field_vector), **sim_ctes[num_simulation])*(device_size))
 
         # Obtengo los valores del campo eléctrico y la temperatura
         E_field = abs(SimpleElectricField(voltage, device_size))
@@ -552,8 +558,7 @@ for num_simulation in range(len(sim_parmtrs)):
         oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 10)
 
         # Muevo los oxígenos
-        oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
-            paso_temporal, oxygen_state, temperatura, E_field, atom_size, **sim_ctes[num_simulation])
+        oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(paso_temporal, oxygen_state, temperatura, E_field, atom_size, **sim_ctes[num_simulation])
 
         # Obtengo la nueva configuración
         actual_state, oxygen_state, pro_recombination = Recombination.Recombine(
@@ -581,8 +586,8 @@ for num_simulation in range(len(sim_parmtrs)):
 
     np.savetxt(f'Results/reset/resultados_sp_reset_{num_simulation}.csv', data_sp_reset, header=header_files, delimiter=',')
 
-    RepresentateState(actual_state, f'Results/Figures/Configuration_final_sp_reset_{num_simulation}.png')
-    RepresentateState(oxygen_state, f'Results/Figures/Oxygen_final_sp_reset_{num_simulation}.png',color=(0.878, 0.227, 0.370))
+    RepresentateState(actual_state,ruta_simulation + f'/Configuration_final_sp_reset_{num_simulation}.png')
+    RepresentateState(oxygen_state,ruta_simulation + f'/Oxygen_final_sp_reset_{num_simulation}.png',color=(0.878, 0.227, 0.370))
 
     # endregion
 
@@ -608,7 +613,6 @@ for num_simulation in range(len(sim_parmtrs)):
     data_path_sp_set = ruta_raiz + 'Results/set/resultados_sp_set_0.csv'
     data_path_pp_reset = ruta_raiz + 'Results/reset/resultados_pp_reset_0.csv'
     data_path_sp_reset = ruta_raiz + 'Results/reset/resultados_sp_reset_0.csv'
-
 
     df_pset = pd.read_csv(data_path_pp_set, dtype=float)
     df_sset = pd.read_csv(data_path_sp_set, dtype=float)

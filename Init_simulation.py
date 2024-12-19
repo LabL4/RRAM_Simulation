@@ -1,4 +1,5 @@
 import os
+import sys
 import shutil
 import pickle
 import pandas as pd
@@ -8,8 +9,27 @@ from RRAM import Recombination
 from RRAM import Generation as gn
 from RRAM import Constants as cte
 
-# Número de simulaciones que realizo
-num_simulations = 8
+# ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'
+ruta_raiz = '/Users/antonio_lopez_torres/Documents/GitHub/RRAM_Simulation/'  # Ruta en el mac
+sys.path.append(ruta_raiz)
+
+# Asegúrate de que se ha pasado un parámetro
+if len(sys.argv) > 1:
+    data_path = sys.argv[1]
+    num_simulations = int(sys.argv[2])
+
+    print(f"Ruta de los archivos de datos: {data_path}")
+    print(f"El número de simulaciones es: {num_simulations}")
+else:
+    print("No se ha pasado ningún parámetro.")
+    data_path = ruta_raiz + 'Init_data/'
+    num_simulations = 8
+
+    print(f"Ruta de los archivos de datos: {data_path}")
+    print(f"El número de simulaciones es: {num_simulations}")
+
+
+# ----------------------------------------------------------------------------------------------------------------------------------
 
 # Defino la carpeta donde se guardan los datos iniciales de la simulación
 carpeta = 'Init_data'
@@ -28,7 +48,7 @@ os.makedirs(carpeta)
 
 device_size = np.ones(num_simulations) * 10e-9  # m
 atom_size = np.ones(num_simulations) * 0.25e-9  # m TODO: Esto se deberia llamarse tamaño del grid mejor
-num_trampas = np.ones(num_simulations, dtype=int) * 1
+num_trampas = np.ones(num_simulations, dtype=int) * 50
 
 priv_y_sup_right = np.ones(num_simulations, dtype=int) * 0
 priv_y_inf_right = np.ones(num_simulations, dtype=int) * 0
@@ -78,12 +98,15 @@ df['total_simulation_time'] = total_simulation_time
 df['num_pasos'] = num_pasos
 df['voltaje_final'] = voltaje_final
 df['voltaje_final_set'] = voltaje_final_set
+
 df['paso_guardar'] = paso_guardar
 df['init_temp'] = init_temp
 df['initial_elec_field'] = initial_elec_field
 df['initial_voltaje'] = initial_voltaje
 df['initial_current'] = initial_current
 df['init_simulation_time'] = init_simulation_time
+
+carpeta_results = 'Results'
 
 # Guardo el dataframe en un archivo csv
 df.to_csv('Init_data/simulation_parameters.csv', index=False)
@@ -96,27 +119,30 @@ for i in range(num_simulations):
         ((priv_y_sup_left[i], eje_x[i]-priv_y_inf_left[i], 0, priv_x_left[i]), 50),
     ]
 
+    # Ruta de las imagenes de cada simulación
+    ruta_simulation = os.path.join(carpeta_results, f'Figures/simulation_{i}')
+    os.makedirs(ruta_simulation, exist_ok=True)
+    
     # Estado inicial de la simulación para los oxígenos y el sistema
     init_state = gn.initial_state_priv(eje_x[i], eje_y[i], num_trampas[i], regiones_pesos)
-    RepresentateState(init_state, 'Init_data/init_state_' + str(i))
+    RepresentateState(init_state, ruta_simulation + '/initial_pp_set_' + str(i))
     oxygen_state = Recombination.Init_OxygenState(device_size[i], atom_size[i])
 
     # Guardo el estado inicial con el nombre estado inicial mas el número de simulación
     with open('Init_data/init_state_' + str(i) + '.pkl', 'wb') as f:
         pickle.dump(init_state, f)
 
-    with open('Init_data/oxygen_state_' + str(i) + '.pkl', 'wb') as f:
-        pickle.dump(oxygen_state, f)
+    # with open('Init_data/oxygen_state_' + str(i) + '.pkl', 'wb') as f:
+    #     pickle.dump(oxygen_state, f)
 
 # ------------------------------------------------------------------------------------------------------------------------------------------------------
 # Defino las constantes de la simulación y las guardo en un archivo
 # ------------------------------------------------------------------------------------------------------------------------------------------------------
 
-t_0 = np.ones(num_simulations) * cte.t_0  # Characteristic vibration frequency of oxygen ions in HfOx
+# Characteristic vibration frequency of oxygen ions in HfOx
+t_0 = np.ones(num_simulations) * cte.t_0  
 
 # Migration energy of oxygen ions in HfOx
-# E_m = np.linspace(0.85, 1.0, 16)
-# E_m = np.tile(E_m, 3)
 E_m = np.ones(num_simulations) * cte.E_m
 
 # Constante de red, el paper original propone 0.25 nm
@@ -126,8 +152,11 @@ cte_red = np.ones(num_simulations) * cte.cte_red
 E_a = np.ones(num_simulations) * cte.E_a
 
 # Drift coefficient of oxygen ions due to an external field
-# gamma_drift = np.array([7, 8, 9, 10, 11, 12])
-gamma_drift = np.ones(num_simulations) * cte.gamma_drift
+with open(data_path + "drift_coefficient.pkl", 'rb') as f:
+    gamma_drift = pickle.load(f)
+
+print(gamma_drift)
+# gamma_drift = np.ones(num_simulations) * cte.gamma_drift
 
 # Recombination enhancement factor due to the presence of excessive oxygen ions
 beta_0 = np.ones(num_simulations) * cte.beta_0
@@ -136,22 +165,14 @@ beta_0 = np.ones(num_simulations) * cte.beta_0
 L_p = np.ones(num_simulations) * cte.L_p
 
 # Coefficient representing the local enhancement factor due to the electric field
-gamma = np.ones(num_simulations) * cte.gamma
-
-# ohm_resistence = [1e5, 2e5]
-# I_0 = [9e-07, 8e-07, 7e-07, 6e-07, 5e-07, 4e-07, 3e-07, 2e-07, 1e-07]
-
-# Crear las parejas
-# duos = [(v1, v2) for v2 in ohm_resistence for v1 in I_0]
-
-# duos_array = np.array(duos)
-
-# ohm_resistence = duos_array[:, 1]
-# I_0 = duos_array[:, 0]
+with open(data_path + "gamma.pkl", 'rb') as f:
+    gamma = pickle.load(f)
+# gamma = np.ones(num_simulations) * cte.gamma
 
 # Resistance ohmic of the device
-# ohm_resistence = [1e5, 1e6, 1e7, 1e8, 1e9, 1e10]
-ohm_resistence = np.ones(num_simulations) * cte.ohm_resistence
+with open(data_path + "ohm_resistence.pkl", 'rb') as f:
+    ohm_resistence = pickle.load(f)
+# ohm_resistence = np.ones(num_simulations) * cte.ohm_resistence
 
 # Potential barrier at the metal and insulator interface
 potential_barrier_metal_insul = np.ones(num_simulations) * cte.pb_metal_insul
@@ -160,7 +181,8 @@ potential_barrier_metal_insul = np.ones(num_simulations) * cte.pb_metal_insul
 permitividad_relativa = np.ones(num_simulations) * cte.permitividad_relativa
 
 # Término inicial de la ecuación de Poole-Frenkel
-I_0 = [1e-10, 5e-10, 1e-9, 5e-9, 1e-8, 5e-8, 1e-7, 5e-7]
+with open(data_path + "I_0.pkl", 'rb') as f:
+    I_0 = pickle.load(f)
 # I_0 = np.ones(num_simulations) * cte.I_0
 
 # Constante de resistencia térmica en K/W
