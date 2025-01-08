@@ -48,7 +48,7 @@ os.makedirs(carpeta)
 
 device_size = np.ones(num_simulations) * 10e-9  # m
 atom_size = np.ones(num_simulations) * 0.25e-9  # m TODO: Esto se deberia llamarse tamaño del grid mejor
-num_trampas = np.ones(num_simulations, dtype=int) * 50
+num_trampas = np.ones(num_simulations, dtype=int) * 100
 
 priv_y_sup_right = np.ones(num_simulations, dtype=int) * 0
 priv_y_inf_right = np.ones(num_simulations, dtype=int) * 0
@@ -151,11 +151,9 @@ cte_red = np.ones(num_simulations) * cte.cte_red
 E_a = np.ones(num_simulations) * cte.E_a
 
 # Drift coefficient of oxygen ions due to an external field
-with open(data_path + "drift_coefficient.pkl", 'rb') as f:
-    gamma_drift = pickle.load(f)
-
-print(gamma_drift)
-# gamma_drift = np.ones(num_simulations) * cte.gamma_drift
+# with open(data_path + "drift_coefficient.pkl", 'rb') as f:
+#     gamma_drift = pickle.load(f)
+gamma_drift = np.ones(num_simulations) * cte.gamma_drift
 
 # Recombination enhancement factor due to the presence of excessive oxygen ions
 beta_0 = np.ones(num_simulations) * cte.beta_0
@@ -164,13 +162,14 @@ beta_0 = np.ones(num_simulations) * cte.beta_0
 L_p = np.ones(num_simulations) * cte.L_p
 
 # Coefficient representing the local enhancement factor due to the electric field
-with open(data_path + "gamma.pkl", 'rb') as f:
-    gamma = pickle.load(f)
-# gamma = np.ones(num_simulations) * cte.gamma
+# with open(data_path + "gamma.pkl", 'rb') as f:
+#     gamma = pickle.load(f)
+gamma = np.ones(num_simulations) * cte.gamma
 
 # Resistance ohmic of the device
 with open(data_path + "ohm_resistence.pkl", 'rb') as f:
     ohm_resistence = pickle.load(f)
+
 # ohm_resistence = np.ones(num_simulations) * cte.ohm_resistence
 
 # Potential barrier at the metal and insulator interface
@@ -180,9 +179,9 @@ potential_barrier_metal_insul = np.ones(num_simulations) * cte.pb_metal_insul
 permitividad_relativa = np.ones(num_simulations) * cte.permitividad_relativa
 
 # Término inicial de la ecuación de Poole-Frenkel
-with open(data_path + "I_0.pkl", 'rb') as f:
-    I_0 = pickle.load(f)
-# I_0 = np.ones(num_simulations) * cte.I_0
+# with open(data_path + "I_0.pkl", 'rb') as f:
+#     I_0 = pickle.load(f)
+I_0 = np.ones(num_simulations) * cte.I_0
 
 # Constante de resistencia térmica en K/W
 r_termica = np.ones(num_simulations) * cte.r_termica

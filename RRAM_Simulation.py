@@ -168,13 +168,13 @@ for num_simulation in range(len(sim_parmtrs)):
             num_vacantes = num_vacantes[~np.isnan(num_vacantes)]
             resistencia = resistencia[~np.isnan(resistencia)]
 
-            RepresentateState(resistance_matrix, simulation_path + f'Figures/final_pp_set_resistance_{num_simulation}.png')
+            # RepresentateState(resistance_matrix, simulation_path + f'Figures/final_pp_set_resistance_{num_simulation}.png')
             break
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
             # Cambio la probabilidad de generación de vacantes
-            sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 5)
+            sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 10)
             
             # Copio el estado actual
             ac = actual_state.copy()
@@ -281,7 +281,7 @@ for num_simulation in range(len(sim_parmtrs)):
     RepresentateState(actual_state, simulation_path + f'Figures/Initial_configuration_sp_set_{num_simulation}.png')
 
     # Cambio la probabilidad de generación de vacantes
-    sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']))
+    sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 10)
     
     print(f"\n Comienza la segunda parte del set")
     # Ciclo para la segunda parte del set
@@ -294,7 +294,7 @@ for num_simulation in range(len(sim_parmtrs)):
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
-            sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 5)
+            sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 10)
 
             ac = actual_state.copy()
             resistance_matrix = findpath.find_path(ac)
@@ -678,8 +678,8 @@ for num_simulation in range(len(sim_parmtrs)):
     y_reset = abs(data_reset[:, 1])
 
     # Crear la gráfica scatter
-    axes.plot(x_set, y_set, 'r', label='Set experimental')
-    axes.plot(x_reset, y_reset, 'b', label='Reset experimental')
+    axes.plot(x_set, y_set, 'black', label='Set experimental')
+    axes.plot(x_reset, y_reset, 'black', label='Reset experimental')
     
     fig.savefig(save_path + '.pdf', bbox_inches='tight')
     # plt.show()
