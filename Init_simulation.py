@@ -1,13 +1,14 @@
-import os
-import sys
+import pandas as pd
 import shutil
 import pickle
-import pandas as pd
+import sys
+import os
 
-from RRAM import *
-from RRAM import Recombination
+from RRAM import Plot_PostProcess as pplt
 from RRAM import Generation as gn
 from RRAM import Constants as cte
+from RRAM import Recombination
+from RRAM import *
 
 # ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'
 ruta_raiz = '/Users/antonio_lopez_torres/Documents/GitHub/RRAM_Simulation/'  # Ruta en el mac
@@ -20,10 +21,12 @@ if len(sys.argv) > 1:
 
     print(f"Ruta de los archivos de datos: {data_path}")
     print(f"El número de simulaciones es: {num_simulations}")
+
 else:
     print("No se ha pasado ningún parámetro.")
     data_path = ruta_raiz + 'Init_data/'
     num_simulations = 8
+    guardar_datos = False
 
     print(f"Ruta de los archivos de datos: {data_path}")
     print(f"El número de simulaciones es: {num_simulations}")
@@ -78,7 +81,7 @@ eje_y = np.round(device_size / atom_size).astype(int)
 # Creo un dataframe con los parámetros de la simulación
 df = pd.DataFrame(columns=['device_size', 'atom_size', 'x_size', 'y_size', 'num_trampas',
                            'priv_y_sup_right', 'priv_y_inf_right', 'priv_x_right', 'priv_y_sup_left', 'priv_y_sup_left', 'priv_y_inf_left', 'priv_x_left',
-                           'total_simulation_time', 'num_pasos', 'voltaje_final','voltaje_final_set', 'paso_guardar',
+                           'total_simulation_time', 'num_pasos', 'voltaje_final', 'voltaje_final_set', 'paso_guardar',
                            'init_temp', 'initial_elec_field', 'initial_voltaje', 'initial_current', 'init_simulation_time'])
 
 df['device_size'] = device_size
@@ -122,7 +125,7 @@ for i in range(num_simulations):
     # Ruta de las imagenes de cada simulación
     ruta_simulation = os.path.join(carpeta_results, f'Init_data/simulation_{i}')
     os.makedirs(ruta_simulation, exist_ok=True)
-    
+
     # Estado inicial de la simulación para los oxígenos y el sistema
     init_state = gn.initial_state_priv(eje_x[i], eje_y[i], num_trampas[i], regiones_pesos)
     oxygen_state = Recombination.Init_OxygenState(device_size[i], atom_size[i])
@@ -139,7 +142,7 @@ for i in range(num_simulations):
 # ------------------------------------------------------------------------------------------------------------------------------------------------------
 
 # Characteristic vibration frequency of oxygen ions in HfOx
-t_0 = np.ones(num_simulations) * cte.t_0  
+t_0 = np.ones(num_simulations) * cte.t_0
 
 # Migration energy of oxygen ions in HfOx
 E_m = np.ones(num_simulations) * cte.E_m
@@ -162,9 +165,9 @@ beta_0 = np.ones(num_simulations) * cte.beta_0
 L_p = np.ones(num_simulations) * cte.L_p
 
 # Coefficient representing the local enhancement factor due to the electric field
-# with open(data_path + "gamma.pkl", 'rb') as f:
-#     gamma = pickle.load(f)
-gamma = np.ones(num_simulations) * cte.gamma
+with open(data_path + "gamma.pkl", 'rb') as f:
+    gamma = pickle.load(f)
+# gamma = np.ones(num_simulations) * cte.gamma
 
 # Resistance ohmic of the device
 with open(data_path + "ohm_resistence.pkl", 'rb') as f:
@@ -179,19 +182,22 @@ potential_barrier_metal_insul = np.ones(num_simulations) * cte.pb_metal_insul
 permitividad_relativa = np.ones(num_simulations) * cte.permitividad_relativa
 
 # Término inicial de la ecuación de Poole-Frenkel
-# with open(data_path + "I_0.pkl", 'rb') as f:
-#     I_0 = pickle.load(f)
-I_0 = np.ones(num_simulations) * cte.I_0
+with open(data_path + "I_0.pkl", 'rb') as f:
+    I_0 = pickle.load(f)
+# I_0 = np.ones(num_simulations) * cte.I_0
 
-# Constante de resistencia térmica en K/W
-r_termica = np.ones(num_simulations) * cte.r_termica
+# Constante de resistencia térmica en K/W cuando el sistema no percola
+r_termica_no_percola = np.ones(num_simulations) * cte.r_termica_no_percola
+
+# Constante de resistencia térmica en K/W cuando el sistema no percola
+r_termica_percola = np.ones(num_simulations) * cte.r_termica_percola
 
 # Creo un dataframe nuevo con las constantes de la simulación
 df_ctes = pd.DataFrame(columns=['vibration_frequency', 'migration_energy', 'drift_coefficient',
                                 'cte_red', 'recom_enchancement_factor', 'decaimiento_concentracion',
                                 'activation_energy', 'gamma', 'ohm_resistence',
                                 'pb_metal_insul', 'permitividad_relativa', 'I_0',
-                                'r_termica'])
+                                'r_termica_percola', 'r_termica_no_percola'])
 
 df_ctes['vibration_frequency'] = t_0
 df_ctes['migration_energy'] = E_m
@@ -205,7 +211,8 @@ df_ctes['ohm_resistence'] = ohm_resistence
 df_ctes['pb_metal_insul'] = pb_metal_insul
 df_ctes['permitividad_relativa'] = permitividad_relativa
 df_ctes['I_0'] = I_0
-df_ctes['r_termica'] = r_termica
+df_ctes['r_termica_percola'] = r_termica_percola
+df_ctes['r_termica_no_percola'] = r_termica_no_percola
 
 # Guardo el dataframe de las ctes en un archivo csv
 df_ctes.to_csv('Init_data/simulation_constants.csv', index=False)

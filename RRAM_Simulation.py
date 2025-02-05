@@ -8,6 +8,7 @@ import pandas as pd
 
 from RRAM import *
 from tqdm import tqdm
+from RRAM import exceptions
 from RRAM import Recombination
 from RRAM import Plot_PostProcess as pplt
 
@@ -116,9 +117,11 @@ for num_simulation in range(len(sim_parmtrs)):
     paso_temporal = total_simulation_time / num_pasos
     paso_potencial = voltaje_max_simulation / num_pasos
     
-    print(f"\n El paso temporal es de {paso_temporal} s")
-    print(f"\n El paso del potencial es de {paso_potencial} s")
-
+    print(f"\nEl paso temporal es de {paso_temporal} s")
+    print(f"El paso del potencial es de {paso_potencial} s")
+    print("\nEl valor de la resistencia de cada casilla es: ", sim_ctes[num_simulation]['ohm_resistence'])
+    print("El valor de gamma es: ", sim_ctes[num_simulation]['gamma'])
+    
     # Creo el vector de diferencias de potencial
     vector_ddp = np.arange(0.000, voltaje_max_simulation + paso_potencial, paso_potencial)
 
@@ -134,6 +137,8 @@ for num_simulation in range(len(sim_parmtrs)):
 
     T_0 = float(sim_parmtrs[num_simulation]['init_temp'])
     # endregion
+    
+    sistema_percola = False
 
     # region primera parte del set
     for k in tqdm(range(0, num_pasos)):
@@ -150,6 +155,11 @@ for num_simulation in range(len(sim_parmtrs)):
 
         if voltage > voltaje_final_set:
             print("\nSe ha superado el voltaje de ruptura en la iteracion: ", k)
+            
+            # Verifica si el sistema ha percolado    
+            if not sistema_percola:
+                raise exceptions.NoPercolationException()
+
             k_ruptura = k
             voltaje_max_set = vector_ddp[k]
             config_matrix_recortada = config_matrix_pp_set[k, :, :]
@@ -173,6 +183,8 @@ for num_simulation in range(len(sim_parmtrs)):
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
+            sistema_percola = True
+            
             # Cambio la probabilidad de generación de vacantes
             sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 10)
             

@@ -28,11 +28,14 @@ gamma_drift = 10
 # Potencial de migración de los iones de oxígeno en eV
 E_m = 1
 
-# Constante de resistencia térmica en K/W
-r_termica = 5e7
+# Constante de resistencia térmica en K/W cuando el sistema no percola
+r_termica_no_percola = 5        # bajar dos órdenes de magnitud
+
+# Constante de resistencia térmica en K/W cuando el sistema percola
+r_termica_percola = 5e2
 
 # Constante de resistencia en ohmios
-ohm_resistence = 1e7
+ohm_resistence = 2.5  # este valor hay q bajarlo a entorno a 2 2.5 ohmios
 
 # Constante de red, el paper original propone 0.25 nm
 cte_red = 0.25e-9
@@ -44,7 +47,7 @@ pb_metal_insul = 0.5
 permitividad_relativa = 20
 
 # Término inicial de la ecuación de Poole-Frenkel
-I_0 = 5e-7
+I_0 = 5e-4  # 5e-7
 
 
 # def DifussiveBehaviour(pos_x: int, oxigen_velocity: float, paso_temp: float, grid_size: float) -> float:
