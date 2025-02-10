@@ -22,7 +22,7 @@ if len(sys.argv) > 1:
     guardar_datos = sys.argv[2]
 
     guardar_datos = True if guardar_datos == 'True' else False
-    # print(f"El número de simulación es: {num_simulation}")
+    print(f"El número de simulación es: {num_simulation}")
     print(f"Se guardan las configuraciones: {guardar_datos}")
 else:
     num_simulation = 1
@@ -106,7 +106,6 @@ current = float(sim_parmtrs[num_simulation]['initial_current'])
 temperatura = float(sim_parmtrs[num_simulation]['init_temp'])
 E_field = float(sim_parmtrs[num_simulation]['initial_elec_field'])
 
-
 # Leo los estados iniciales de la simulación
 with open('Init_data/init_state_' + str(num_simulation) + '.pkl', 'rb') as f:
     actual_state = pickle.load(f)
@@ -142,8 +141,8 @@ E_field_vector = np.zeros((actual_state.shape[0]))
 num_vacantes = np.zeros(num_pasos+1)
 resistencia = np.zeros(num_pasos+1)
 T_0 = float(sim_parmtrs[num_simulation]['init_temp'])
-
 # endregion
+
 sistema_percola = False
 num_max_vacantes = (device_size/atom_size)**2
 

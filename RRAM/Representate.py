@@ -1,14 +1,14 @@
-import numpy as np
 import pandas as pd
+import numpy as np
 
-import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import matplotlib.pyplot as plt
 
-from RRAM import Montecarlo
 from matplotlib.colors import LinearSegmentedColormap
+from RRAM import Montecarlo
 
 
-def RepresentateState(matriz: np.ndarray, filename: str = None, color = (0.478, 0.627, 0.870)) -> None:
+def RepresentateState(matriz: np.ndarray, filename: str = None, color=(0.478, 0.627, 0.870)) -> None:
     """
     Represent the state of a matrix as a colored plot.
 
@@ -215,7 +215,7 @@ def RepresentateStateOxygen(matriz: np.ndarray, fig, ax, im=None, filename: str 
     return im
 
 
-def plot_regions(Eje_x: int, Eje_y: int, regiones_pesos: list):
+def plot_regions(Eje_x: int, Eje_y: int, regiones_pesos: list, filename: str) -> None:
     """
     Plot the regions with privileged probability.
 
@@ -248,8 +248,51 @@ def plot_regions(Eje_x: int, Eje_y: int, regiones_pesos: list):
 
     plt.gca().set_aspect('equal', adjustable='box')
 
-    filename = "Pruebas/Region_privilegiada.png"
     plt.savefig(filename)
+
+
+def plot_privileged_regions(Eje_x: int, Eje_y: int, regiones_pesos: list, filename: str) -> None:
+    """
+    Plot the privileged regions on a grid.
+
+    Args:
+        Eje_x (int): The size of the x-axis.
+        Eje_y (int): The size of the y-axis.
+        regiones_pesos (list): A list of tuples defining regions and their weights.
+                               Each tuple should be ((x_start, x_end, y_start, y_end), weight).
+        filename (str): The name of the file to save the plot.
+    """
+    fig, ax = plt.subplots()
+
+    # Verificar que los límites no sean iguales
+    if Eje_y == 0:
+        Eje_y = 1
+    if Eje_x == 0:
+        Eje_x = 1
+
+    ax.set_xlim(0, Eje_y)
+    ax.set_ylim(0, Eje_x)
+    ax.invert_yaxis()
+
+    # Draw grid
+    for i in range(Eje_x):
+        for j in range(Eje_y):
+            rect = patches.Rectangle((j, i), 1, 1, edgecolor='grey', facecolor='white', fill=True)
+            ax.add_patch(rect)
+
+    # Highlight privileged regions
+    for (x_start, x_end, y_start, y_end), weight in regiones_pesos:
+        rect = patches.Rectangle((y_start, x_start), y_end - y_start, x_end - x_start,
+                                 linewidth=4, edgecolor='r', facecolor='none')
+        ax.add_patch(rect)
+        # Add text for weight
+        cx = (y_start + y_end) / 2
+        cy = (x_start + x_end) / 2
+        ax.text(cx, cy, f'w={weight}', color='red', ha='center', va='center', fontsize=8)
+
+    plt.gca().set_aspect('equal', adjustable='box')
+    plt.savefig(filename + '.png')
+    plt.close(fig)
 
 
 if __name__ == "__main__":
@@ -270,5 +313,3 @@ if __name__ == "__main__":
     for pos in posiciones_unos:
         fila, columna = divmod(pos, Eje_x)
         InitialState[fila, columna] = 1
-
-    RepresentatePoints(InitialState, 'grafica0.png')

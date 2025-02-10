@@ -1,14 +1,15 @@
 import pandas as pd
+import numpy as np
 import shutil
 import pickle
 import sys
 import os
 
 from RRAM import Plot_PostProcess as pplt
+from RRAM import Representate as rp
 from RRAM import Generation as gn
 from RRAM import Constants as cte
 from RRAM import Recombination
-from RRAM import *
 
 # ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'
 ruta_raiz = '/Users/antonio_lopez_torres/Documents/GitHub/RRAM_Simulation/'  # Ruta en el mac
@@ -26,7 +27,6 @@ else:
     print("No se ha pasado ningún parámetro.")
     data_path = ruta_raiz + 'Init_data/'
     num_simulations = 8
-    guardar_datos = False
 
     print(f"Ruta de los archivos de datos: {data_path}")
     print(f"El número de simulaciones es: {num_simulations}")
@@ -51,14 +51,15 @@ os.makedirs(carpeta)
 
 device_size = np.ones(num_simulations) * 10e-9  # m
 atom_size = np.ones(num_simulations) * 0.25e-9  # m TODO: Esto se deberia llamarse tamaño del grid mejor
-num_trampas = np.ones(num_simulations, dtype=int) * 100
+num_trampas = np.ones(num_simulations, dtype=int) * 150
 
-priv_y_sup_right = np.ones(num_simulations, dtype=int) * 0
-priv_y_inf_right = np.ones(num_simulations, dtype=int) * 0
-priv_x_right = np.ones(num_simulations, dtype=int) * 0
-priv_y_sup_left = np.ones(num_simulations, dtype=int) * 0
-priv_y_inf_left = np.ones(num_simulations, dtype=int) * 0
-priv_x_left = np.ones(num_simulations, dtype=int) * 0
+priv_y_sup_right = np.ones(num_simulations, dtype=int) * 15
+priv_y_inf_right = np.ones(num_simulations, dtype=int) * 15
+priv_y_sup_left = np.ones(num_simulations, dtype=int) * 15
+priv_y_inf_left = np.ones(num_simulations, dtype=int) * 15
+
+priv_x_right = np.ones(num_simulations, dtype=int) * 20
+priv_x_left = np.ones(num_simulations, dtype=int) * 20
 
 total_simulation_time = np.ones(num_simulations) * 10
 # time step de mili segundo y milivoltios de step voltaje incluso de 0.01
@@ -137,6 +138,11 @@ for i in range(num_simulations):
     with open('Init_data/oxygen_state_' + str(i) + '.pkl', 'wb') as f:
         pickle.dump(oxygen_state, f)
 
+    ruta_figuras = carpeta_results + f'/Figures/simulation_{i}'
+
+    # Representar la región privilegiada
+    # rp.plot_privileged_regions(eje_x[i], eje_y[i], regiones_pesos, ruta_figuras)
+
 # ------------------------------------------------------------------------------------------------------------------------------------------------------
 # Defino las constantes de la simulación y las guardo en un archivo
 # ------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -208,7 +214,7 @@ df_ctes['decaimiento_concentracion'] = L_p
 df_ctes['activation_energy'] = E_a
 df_ctes['gamma'] = gamma
 df_ctes['ohm_resistence'] = ohm_resistence
-df_ctes['pb_metal_insul'] = pb_metal_insul
+df_ctes['pb_metal_insul'] = potential_barrier_metal_insul
 df_ctes['permitividad_relativa'] = permitividad_relativa
 df_ctes['I_0'] = I_0
 df_ctes['r_termica_percola'] = r_termica_percola

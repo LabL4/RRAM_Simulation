@@ -26,7 +26,7 @@ L_p = 1e-9
 gamma_drift = 10
 
 # Potencial de migración de los iones de oxígeno en eV
-E_m = 1
+E_m = 1  # puedo cambiar el valor
 
 # Constante de resistencia térmica en K/W cuando el sistema no percola
 r_termica_no_percola = 5        # bajar dos órdenes de magnitud
