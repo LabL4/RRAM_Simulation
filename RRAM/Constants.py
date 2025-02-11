@@ -10,7 +10,7 @@ k_b_ev = Boltzmann / elementary_charge
 t_0 = 1e13
 
 # eV Energía de activación
-E_a = 1
+E_a = 1  # puedo cambiar el valor
 
 # Tiene distintos valores dependiendo si el estado es FORMING/SET y RESET
 # La estoy modificando a mano para que el campo eléctrico tmb tenga algún papel en la dinámica
@@ -26,7 +26,7 @@ L_p = 1e-9
 gamma_drift = 10
 
 # Potencial de migración de los iones de oxígeno en eV
-E_m = 1  # puedo cambiar el valor
+E_m = 1
 
 # Constante de resistencia térmica en K/W cuando el sistema no percola
 r_termica_no_percola = 5        # bajar dos órdenes de magnitud
@@ -47,7 +47,7 @@ pb_metal_insul = 0.5
 permitividad_relativa = 20
 
 # Término inicial de la ecuación de Poole-Frenkel
-I_0 = 5e-4  # 5e-7
+I_0 = 2e-3  # 5e-7
 
 
 # def DifussiveBehaviour(pos_x: int, oxigen_velocity: float, paso_temp: float, grid_size: float) -> float:

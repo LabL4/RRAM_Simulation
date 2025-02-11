@@ -48,26 +48,23 @@ sim_ctes = Montecarlo.read_csv_to_dic("Init_data/simulation_constants.csv")
 
 # Defino la carpeta donde se guardan los datos iniciales de la simulación
 carpeta_results = 'Results'
-
 simulation_path = os.path.join(carpeta_results, f'simulation_{num_simulation + 1}/')
 figures_path = os.path.join(carpeta_results, 'Figures')
 
-# Verifica si la carpeta existe
-if os.path.exists(simulation_path):
-    # Elimina la carpeta y su contenido
-    shutil.rmtree(simulation_path)
+# # Verifica si la carpeta existe, se elimna antes de empezar no es necesario
+# if os.path.exists(simulation_path):
+#     # Elimina la carpeta y su contenido
+#     shutil.rmtree(simulation_path)
 
 # Crea la carpeta de nuevo
 os.makedirs(simulation_path, exist_ok=True)
 os.makedirs(simulation_path + 'Figures', exist_ok=True)
-os.makedirs(carpeta_results + '/Figures', exist_ok=True)  # Carpeta para las figuras generales para tener todas juntas
 
 set_simulation_path = os.path.join(carpeta_results, f'simulation_{num_simulation + 1}/set/')
 os.makedirs(set_simulation_path, exist_ok=True)
 
 reset_simulation_path = os.path.join(carpeta_results, f'simulation_{num_simulation + 1}/reset/')
 os.makedirs(reset_simulation_path, exist_ok=True)
-
 
 # # Ruta de la subcarpeta
 # ruta_set = os.path.join(carpeta_results, 'set')
@@ -81,7 +78,6 @@ os.makedirs(reset_simulation_path, exist_ok=True)
 
 # Defino las cabeceras de los archivos csv
 header_files = 'Tiempo simulacion [s],Voltaje [V],Intensidad [A],Temperatura [K],Campo Simple [V/m],Campo Gap medio [V/m],Velocidad [m/s]'
-
 
 # Pongo el nombre de la simulación y un salto de línea
 print(f"\nSimulación {num_simulation + 1}")
@@ -120,14 +116,16 @@ config_matrix_pp_set = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size
 paso_temporal = total_simulation_time / num_pasos
 paso_potencial = voltaje_max_simulation / num_pasos
 
-print(f"\nEl paso temporal es de {paso_temporal} s")
-print(f"El paso del potencial es de {paso_potencial} s")
+# print(f"\nEl paso temporal es de {paso_temporal} s")
+# print(f"El paso del potencial es de {paso_potencial} s")
 
 print("\nEl valor de la resistencia de cada casilla es: ", sim_ctes[num_simulation]['ohm_resistence'])
 print("El valor de gamma es: ", sim_ctes[num_simulation]['gamma'])
 print("El valor de resistencia termica no percola es: ", sim_ctes[num_simulation]['r_termica_no_percola'])
 print("El valor de resistencia termica percola es: ", sim_ctes[num_simulation]['r_termica_percola'])
 print("El valor de I_0 es: ", sim_ctes[num_simulation]['I_0'])
+print("El valor de E_a es: ", sim_ctes[num_simulation]['activation_energy'])
+print("El valor de E_m es: ", sim_ctes[num_simulation]['migration_energy'])
 
 # Creo el vector de diferencias de potencial
 vector_ddp = np.arange(0.000, voltaje_max_simulation + paso_potencial, paso_potencial)
@@ -337,7 +335,6 @@ sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma'])
 print(f"\n Comienza la segunda parte del set")
 
 # Ciclo para la segunda parte del set
-
 for k in tqdm(range(0, num_pasos)):
     # Actualizo el tiempo de simulación
     simulation_time = paso_temporal * k
@@ -346,7 +343,7 @@ for k in tqdm(range(0, num_pasos)):
     # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
 
     if Percolation.is_path(actual_state):
-        sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 5)
+        sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 1)
         ac = actual_state.copy()
         resistance_matrix = findpath.find_path(ac)
         # Si ha percolado uso la corriente de Ohm
@@ -432,7 +429,7 @@ RepresentateState(initial_configuration_reset, simulation_path +
                   f'Figures/Initial_pp_reset_configuration_{num_simulation}.png')
 print(f"\n Comienza la primera parte del reset")
 
-sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 15)
+sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 5)
 
 # Ciclo para la primera parte del reset
 for k in tqdm(range(0, num_pasos)):
@@ -555,7 +552,7 @@ RepresentateState(actual_state, simulation_path + f'Figures/Initial_configuratio
 RepresentateState(oxygen_state, simulation_path +
                   f'Figures/Initial_oxygen_sp_reset_{num_simulation}.png', color=(0.878, 0.227, 0.370))
 
-sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 15)
+sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 5)
 
 # Ciclo para la segunda parte del reset
 for k in tqdm(range(0, num_pasos)):  # son num_pasos + 1 iteraciones
@@ -604,7 +601,7 @@ for k in tqdm(range(0, num_pasos)):  # son num_pasos + 1 iteraciones
                 if random_number < prob_generacion:
                     actual_state[i, j] = 1  # Generación de una vacante
     # Genero los oxígenos
-    oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 10)
+    oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 5)
 
     # Muevo los oxígenos
     oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
@@ -727,15 +724,27 @@ for filename in os.listdir(init_data_path):
             variables[variable_name] = pickle.load(f)
 
 # Crear el subtítulo con los valores de las variables
-subtitle = '\n'.join([f'{variable_name} = {value[num_simulation]}' for variable_name, value in variables.items()])
-fig.suptitle(subtitle, fontsize=10, y=1.05)  # Ajusta el valor de y según sea necesario
+espacios = ' ' * 3  # Define el número de espacios que deseas añadir
+
+# Construye la lista de subtítulos con espacios y saltos de línea cada tres valores
+subtitles = []
+for i, (variable_name, value) in enumerate(variables.items()):
+    subtitles.append(f'{variable_name} = {value[num_simulation]}')
+    if (i + 1) % 3 == 0:
+        subtitles.append('\n')
+    else:
+        subtitles.append(espacios)
+
+# Une los subtítulos en una sola cadena
+subtitle = ''.join(subtitles).strip()
+fig.suptitle(subtitle, fontsize=11, y=1.05)  # Ajusta el valor de y según sea necesario
 
 # Crear la gráfica scatter
 axes.plot(x_set, y_set, 'black', label='Set experimental')
 axes.plot(x_reset, y_reset, 'black', label='Reset experimental')
 
-fig.savefig(save_path + '.pdf', bbox_inches='tight')
-fig.savefig(figures_path + f'/Intensidad_Voltaje_simulation_{num_simulation + 1}.pdf', bbox_inches='tight')
+# fig.savefig(save_path + '.pdf', bbox_inches='tight')
+# fig.savefig(figures_path + f'/Intensidad_Voltaje_simulation_{num_simulation + 1}.pdf', bbox_inches='tight')
 fig.savefig(figures_path + f'/Intensidad_Voltaje_simulation_{num_simulation + 1}.png', bbox_inches='tight')
 
 

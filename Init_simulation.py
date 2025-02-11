@@ -51,7 +51,7 @@ os.makedirs(carpeta)
 
 device_size = np.ones(num_simulations) * 10e-9  # m
 atom_size = np.ones(num_simulations) * 0.25e-9  # m TODO: Esto se deberia llamarse tamaño del grid mejor
-num_trampas = np.ones(num_simulations, dtype=int) * 150
+num_trampas = np.ones(num_simulations, dtype=int) * 100
 
 priv_y_sup_right = np.ones(num_simulations, dtype=int) * 15
 priv_y_inf_right = np.ones(num_simulations, dtype=int) * 15
@@ -151,13 +151,17 @@ for i in range(num_simulations):
 t_0 = np.ones(num_simulations) * cte.t_0
 
 # Migration energy of oxygen ions in HfOx
+# with open(data_path + "E_m.pkl", 'rb') as f:
+#     E_m = pickle.load(f)
 E_m = np.ones(num_simulations) * cte.E_m
 
 # Constante de red, el paper original propone 0.25 nm
 cte_red = np.ones(num_simulations) * cte.cte_red
 
 # Energía de activación en eV
-E_a = np.ones(num_simulations) * cte.E_a
+with open(data_path + "E_a.pkl", 'rb') as f:
+    E_a = pickle.load(f)
+# E_a = np.ones(num_simulations) * cte.E_a
 
 # Drift coefficient of oxygen ions due to an external field
 # with open(data_path + "drift_coefficient.pkl", 'rb') as f:
