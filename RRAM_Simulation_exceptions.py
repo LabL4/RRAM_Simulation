@@ -35,8 +35,8 @@ else:
 # logging.basicConfig(filename=f"simulation_{num_simulation}.log", level=logging.ERROR,
 #                     format='%(asctime)s - %(levelname)s - %(message)s')
 
-# ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'
-ruta_raiz = '/Users/antonio_lopez_torres/Documents/GitHub/RRAM_Simulation/'  # Ruta en el mac
+ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'
+# ruta_raiz = '/Users/antonio_lopez_torres/Documents/GitHub/RRAM_Simulation/'  # Ruta en el mac
 sys.path.append(ruta_raiz)
 # endregion
 
