@@ -1,18 +1,18 @@
-import pandas as pd
-import numpy as np
-import shutil
-import pickle
-import sys
-import os
-
 from RRAM import Plot_PostProcess as pplt
 from RRAM import Representate as rp
 from RRAM import Generation as gn
 from RRAM import Constants as cte
 from RRAM import Recombination
+import pandas as pd
+import numpy as np
+from RRAM import *
+import shutil
+import pickle
+import sys
+import os
 
-# ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'
-ruta_raiz = '/Users/antonio_lopez_torres/Documents/GitHub/RRAM_Simulation/'  # Ruta en el mac
+ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'
+# ruta_raiz = '/Users/antonio_lopez_torres/Documents/GitHub/RRAM_Simulation/'  # Ruta en el mac
 sys.path.append(ruta_raiz)
 
 # Asegúrate de que se ha pasado un parámetro
@@ -26,7 +26,7 @@ if len(sys.argv) > 1:
 else:
     print("No se ha pasado ningún parámetro.")
     data_path = ruta_raiz + 'Init_data/'
-    num_simulations = 8
+    num_simulations = 10
 
     print(f"Ruta de los archivos de datos: {data_path}")
     print(f"El número de simulaciones es: {num_simulations}")
@@ -51,7 +51,7 @@ os.makedirs(carpeta)
 
 device_size = np.ones(num_simulations) * 10e-9  # m
 atom_size = np.ones(num_simulations) * 0.25e-9  # m TODO: Esto se deberia llamarse tamaño del grid mejor
-num_trampas = np.ones(num_simulations, dtype=int) * 100
+num_trampas = np.ones(num_simulations, dtype=int) * 150
 
 priv_y_sup_right = np.ones(num_simulations, dtype=int) * 15
 priv_y_inf_right = np.ones(num_simulations, dtype=int) * 15
@@ -117,10 +117,15 @@ df.to_csv('Init_data/simulation_parameters.csv', index=False)
 
 for i in range(num_simulations):
     # Defino la región que quiero privilegiar y su peso
+    # regiones_pesos = [
+    #     ((priv_y_sup_right[i], eje_x[i]-priv_y_inf_right[i], eje_y[i]-priv_x_right[i], eje_y[i]),
+    #      50),
+    #     ((priv_y_sup_left[i], eje_x[i]-priv_y_inf_left[i], 0, priv_x_left[i]), 50),
+    # ]
+    print(f"Simulación {i}", eje_x[i], eje_y[i], num_trampas[i])
     regiones_pesos = [
-        ((priv_y_sup_right[i], eje_x[i]-priv_y_inf_right[i], eje_y[i]-priv_x_right[i], eje_y[i]),
-         50),
-        ((priv_y_sup_left[i], eje_x[i]-priv_y_inf_left[i], 0, priv_x_left[i]), 50),
+        ((10, 15, 0, eje_x[i]), 40),  # Región en filas 10-15
+        ((25, 30, 0, eje_x[i]), 40)   # Región en filas 25-30
     ]
 
     # Ruta de las imagenes de cada simulación
@@ -138,9 +143,10 @@ for i in range(num_simulations):
     with open('Init_data/oxygen_state_' + str(i) + '.pkl', 'wb') as f:
         pickle.dump(oxygen_state, f)
 
-    ruta_figuras = carpeta_results + f'/Figures/simulation_{i}'
+    ruta_figuras = ruta_raiz + f'pruebas_inicio/simulation_{i}'
 
     # Representar la región privilegiada
+    # RepresentateState(init_state, ruta_figuras + '_init_state.png')
     # rp.plot_privileged_regions(eje_x[i], eje_y[i], regiones_pesos, ruta_figuras)
 
 # ------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -168,6 +174,11 @@ with open(data_path + "E_a.pkl", 'rb') as f:
 #     gamma_drift = pickle.load(f)
 gamma_drift = np.ones(num_simulations) * cte.gamma_drift
 
+#
+with open(data_path + "factor_generacion.pkl", 'rb') as f:
+    factor_generacion = pickle.load(f)
+# factor_generacion = np.ones(num_simulations) * cte.factor_generacion
+
 # Recombination enhancement factor due to the presence of excessive oxygen ions
 beta_0 = np.ones(num_simulations) * cte.beta_0
 
@@ -182,7 +193,6 @@ with open(data_path + "gamma.pkl", 'rb') as f:
 # Resistance ohmic of the device
 with open(data_path + "ohm_resistence.pkl", 'rb') as f:
     ohm_resistence = pickle.load(f)
-
 # ohm_resistence = np.ones(num_simulations) * cte.ohm_resistence
 
 # Potential barrier at the metal and insulator interface
@@ -197,17 +207,21 @@ with open(data_path + "I_0.pkl", 'rb') as f:
 # I_0 = np.ones(num_simulations) * cte.I_0
 
 # Constante de resistencia térmica en K/W cuando el sistema no percola
-r_termica_no_percola = np.ones(num_simulations) * cte.r_termica_no_percola
+with open(data_path + "r_termica_no_percola.pkl", 'rb') as f:
+    r_termica_no_percola = pickle.load(f)
+# r_termica_no_percola = np.ones(num_simulations) * cte.r_termica_no_percola
 
-# Constante de resistencia térmica en K/W cuando el sistema no percola
-r_termica_percola = np.ones(num_simulations) * cte.r_termica_percola
+# Constante de resistencia térmica en K/W cuando el sistema percola
+with open(data_path + "r_termica_percola.pkl", 'rb') as f:
+    r_termica_percola = pickle.load(f)
+# r_termica_percola = np.ones(num_simulations) * cte.r_termica_percola
 
 # Creo un dataframe nuevo con las constantes de la simulación
 df_ctes = pd.DataFrame(columns=['vibration_frequency', 'migration_energy', 'drift_coefficient',
                                 'cte_red', 'recom_enchancement_factor', 'decaimiento_concentracion',
                                 'activation_energy', 'gamma', 'ohm_resistence',
                                 'pb_metal_insul', 'permitividad_relativa', 'I_0',
-                                'r_termica_percola', 'r_termica_no_percola'])
+                                'r_termica_percola', 'r_termica_no_percola', 'factor_generacion'])
 
 df_ctes['vibration_frequency'] = t_0
 df_ctes['migration_energy'] = E_m
@@ -223,6 +237,7 @@ df_ctes['permitividad_relativa'] = permitividad_relativa
 df_ctes['I_0'] = I_0
 df_ctes['r_termica_percola'] = r_termica_percola
 df_ctes['r_termica_no_percola'] = r_termica_no_percola
+df_ctes['factor_generacion'] = factor_generacion
 
 # Guardo el dataframe de las ctes en un archivo csv
 df_ctes.to_csv('Init_data/simulation_constants.csv', index=False)

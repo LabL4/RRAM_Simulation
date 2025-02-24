@@ -29,7 +29,7 @@ def Init_OxygenState(espesor_dispositivo: float, atom_size: float):
 def Generate_Oxigen(oxygen_state: np.array, num_oxygen: int):
     """
     Generates random oxygen positions in the given oxygen state matrix.
-
+  
     Args:
         oxigen_state (np.array): The current oxygen state matrix.
         num_oxigen (int): The number of oxygen to generate.
@@ -101,8 +101,13 @@ def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float
         print(f"E_m: {E_m}")
         sys.exit(1)  # Termina la ejecución del programa con un código de salida 1
 
-    # En la expresión original se multiplica por 2 lo he quitado para ver si sale algo mejor
-    oxigen_velocity = 3e-07  # 2 * t_0 * cte_red * (senoh * exp_velocity)
+    # Esto es un arreglo temporal para dar cuenta que hay un tiempo hasta que los iones de oxígeno se muevan
+    if abs(E_field*(10e-9)) > 0.45:
+        # En la expresión original se multiplica por 2 lo he quitado para ver si sale algo mejor
+        # print(f"EL valor del potencial es: {E_field*(10e-9)}")
+        oxigen_velocity = 3e-07  # 2 * t_0 * cte_red * (senoh * exp_velocity)
+    else:
+        oxigen_velocity = 0  # para que no se mueva hasta q se alcance un potencial concreto
 
     # Calculo la cantidad de "casillas" que se moverá el ion de oxígeno
     displacement = int(round((oxigen_velocity * paso_temp) / grid_size))

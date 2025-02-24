@@ -1,8 +1,7 @@
-import math
 import numpy as np
+import math
 
 from RRAM import Constants as cte
-from .Representate import RepresentateStateOpt
 
 
 def initial_state(Eje_x: float, Eje_y: float, num_trampas: int):

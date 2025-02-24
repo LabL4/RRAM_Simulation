@@ -291,7 +291,7 @@ def plot_privileged_regions(Eje_x: int, Eje_y: int, regiones_pesos: list, filena
         ax.text(cx, cy, f'w={weight}', color='red', ha='center', va='center', fontsize=8)
 
     plt.gca().set_aspect('equal', adjustable='box')
-    plt.savefig(filename + '.png')
+    plt.savefig(filename)
     plt.close(fig)
 
 

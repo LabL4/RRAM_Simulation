@@ -49,6 +49,8 @@ permitividad_relativa = 20
 # Término inicial de la ecuación de Poole-Frenkel
 I_0 = 2e-3  # 5e-7
 
+# Factor por el que divido la gamma cuando el sistema percola o no
+factor_generacion = 1.5
 
 # def DifussiveBehaviour(pos_x: int, oxigen_velocity: float, paso_temp: float, grid_size: float) -> float:
 #     """

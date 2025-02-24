@@ -1,0 +1,29 @@
+El número de simulacion es: 4
+Se guardan las configuraciones: False
+
+Simulacion 4
+luatex: security risk: running with elevated privileges
+
+El valor de la resistencia de cada casilla es:  1.0
+El valor de gamma es:  8
+El valor de resistencia termica no percola es:  5
+El valor de resistencia termica percola es:  1000.0
+El valor de I_0 es:  0.002
+El valor de E_a es:  1.0
+El valor del factor de generacion es;  1.2
+
+Comienza la primera parte del set
+
+El sistema ha percolado en la iteración:  3456
+
+Se ha superado el voltaje de ruptura en la iteracion:  7858
+Voltaje final set 1.10012 en el tiempo  7.857 
+
+Voltaje inicial sp set 1.10012
+
+ Comienza la segunda parte del set
+
+ Comienza la primera parte del reset
+
+ Comienza la segunda parte del reset
+Todos los archivos CSV se han combinado y guardado exitosamente.

@@ -1,0 +1,17 @@
+El número de simulacion es: 187
+Se guardan las configuraciones: False
+
+Simulacion 187
+luatex: security risk: running with elevated privileges
+
+El valor de la resistencia de cada casilla es:  1.0
+El valor de gamma es:  9
+El valor de resistencia termica no percola es:  5
+El valor de resistencia termica percola es:  900.0
+El valor de I_0 es:  0.002
+El valor de E_a es:  1.0
+El valor del factor de generacion es;  1.8
+
+Comienza la primera parte del set
+
+El sistema ha percolado en la iteración:  3235
