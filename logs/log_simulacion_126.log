@@ -2,7 +2,6 @@ El número de simulacion es: 126
 Se guardan las configuraciones: False
 
 Simulacion 126
-luatex: security risk: running with elevated privileges
 
 El valor de la resistencia de cada casilla es:  1.5
 El valor de gamma es:  8
@@ -14,7 +13,7 @@ El valor del factor de generacion es;  1.2
 
 Comienza la primera parte del set
 
-El sistema ha percolado en la iteración:  4442
+El sistema ha percolado en la iteración:  4416
 
 Se ha superado el voltaje de ruptura en la iteracion:  7858
 Voltaje final set 1.10012 en el tiempo  7.857 

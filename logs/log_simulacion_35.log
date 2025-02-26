@@ -2,7 +2,6 @@ El número de simulacion es: 35
 Se guardan las configuraciones: False
 
 Simulacion 35
-luatex: security risk: running with elevated privileges
 
 El valor de la resistencia de cada casilla es:  1.0
 El valor de gamma es:  8
@@ -14,8 +13,8 @@ El valor del factor de generacion es;  2.0
 
 Comienza la primera parte del set
 
-El sistema ha percolado en la iteración:  3774
-Null resistance matrix in  Results\simulation_35/Null_Resistance/Configuration_Set_0.5283599999999999_null_resistance.pkl
+El sistema ha percolado en la iteración:  3112
+Null resistance matrix in  Results\simulation_35/Null_Resistance/Configuration_Set_0.43567999999999996_null_resistance.pkl
 Traceback (most recent call last):
   File "C:\Users\Usuario\Documents\GitHub\RRAM_Simulation\RRAM_Simulation_exceptions.py", line 219, in <module>
     current, resistencia[k] = CurentSolver.OmhCurrent(

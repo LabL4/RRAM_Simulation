@@ -2,7 +2,6 @@ El número de simulacion es: 70
 Se guardan las configuraciones: False
 
 Simulacion 70
-luatex: security risk: running with elevated privileges
 
 El valor de la resistencia de cada casilla es:  1.0
 El valor de gamma es:  8
@@ -14,42 +13,16 @@ El valor del factor de generacion es;  1.8
 
 Comienza la primera parte del set
 
-El sistema ha percolado en la iteración:  4968
-Null resistance matrix in  Results\simulation_70/Null_Resistance/Configuration_Set_0.6955199999999999_null_resistance.pkl
-Traceback (most recent call last):
-  File "C:\Users\Usuario\Documents\GitHub\RRAM_Simulation\RRAM_Simulation_exceptions.py", line 219, in <module>
-    current, resistencia[k] = CurentSolver.OmhCurrent(
-                              ^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\Usuario\Documents\GitHub\RRAM_Simulation\RRAM\CurentSolver.py", line 56, in OmhCurrent
-    parallel_resistance = 1/(num_resistence/ohm_resistence)
-                          ~^^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-RuntimeWarning: divide by zero encountered in scalar divide
+El sistema ha percolado en la iteración:  4532
 
-During handling of the above exception, another exception occurred:
+Se ha superado el voltaje de ruptura en la iteracion:  7858
+Voltaje final set 1.10012 en el tiempo  7.857 
 
-Traceback (most recent call last):
-  File "C:\Users\Usuario\Documents\GitHub\RRAM_Simulation\RRAM_Simulation_exceptions.py", line 224, in <module>
-    RepresentateState(resistance_matrix, simulation_path +
-  File "C:\Users\Usuario\Documents\GitHub\RRAM_Simulation\RRAM\Representate.py", line 70, in RepresentateState
-    plt.savefig(filename)
-  File "C:\Users\Usuario\AppData\Local\Programs\Python\Python311\Lib\site-packages\matplotlib\pyplot.py", line 1223, in savefig
-    res = fig.savefig(*args, **kwargs)  # type: ignore[func-returns-value]
-          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\Usuario\AppData\Local\Programs\Python\Python311\Lib\site-packages\matplotlib\figure.py", line 3388, in savefig
-    self.canvas.print_figure(fname, **kwargs)
-  File "C:\Users\Usuario\AppData\Local\Programs\Python\Python311\Lib\site-packages\matplotlib\backend_bases.py", line 2218, in print_figure
-    result = print_method(
-             ^^^^^^^^^^^^^
-  File "C:\Users\Usuario\AppData\Local\Programs\Python\Python311\Lib\site-packages\matplotlib\backend_bases.py", line 2068, in <lambda>
-    print_method = functools.wraps(meth)(lambda *args, **kwargs: meth(
-                                                                 ^^^^^
-  File "C:\Users\Usuario\AppData\Local\Programs\Python\Python311\Lib\site-packages\matplotlib\backends\backend_agg.py", line 496, in print_png
-    self._print_pil(filename_or_obj, "png", pil_kwargs, metadata)
-  File "C:\Users\Usuario\AppData\Local\Programs\Python\Python311\Lib\site-packages\matplotlib\backends\backend_agg.py", line 445, in _print_pil
-    mpl.image.imsave(
-  File "C:\Users\Usuario\AppData\Local\Programs\Python\Python311\Lib\site-packages\matplotlib\image.py", line 1676, in imsave
-    image.save(fname, **pil_kwargs)
-  File "C:\Users\Usuario\AppData\Local\Programs\Python\Python311\Lib\site-packages\PIL\Image.py", line 2456, in save
-    fp = builtins.open(filename, "w+b")
-         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-FileNotFoundError: [Errno 2] No such file or directory: 'C:\\Users\\Usuario\\Documents\\GitHub\\RRAM_Simulation\\Results\\simulation_70\\Figures\\Null_Resistance\\NULL_resistance_matrix_pp_set_70.png'
+Voltaje inicial sp set 1.10012
+
+ Comienza la segunda parte del set
+
+ Comienza la primera parte del reset
+
+ Comienza la segunda parte del reset
+Todos los archivos CSV se han combinado y guardado exitosamente.

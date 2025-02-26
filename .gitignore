@@ -14,3 +14,5 @@ Results/
 Init_data/
 Initial_data/
 *.txt
+logs/
+*.log
