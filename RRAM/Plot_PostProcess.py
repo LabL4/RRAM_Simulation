@@ -1,8 +1,8 @@
-import numpy as np
-# from cv2 import log
-import pandas as pd
 # from turtle import setup
 import matplotlib.pyplot as plt
+# from cv2 import log
+import pandas as pd
+import numpy as np
 
 from matplotlib.colors import LinearSegmentedColormap
 
@@ -363,8 +363,6 @@ def plot_simple(data_path: str,
 
 
 # region Configuracion del plot
-
-
 def config_ax(ax):
     ax.grid(which='major', color='#DDDDDD', linewidth=0.8, zorder=-1)
     # Show the minor grid as well. Style it in very light gray as a thin,
@@ -377,7 +375,6 @@ def config_ax(ax):
 
 
 def setup_plt(plt, latex=True, scaling=1):
-
     plt.rcParams.update(
         {
             "pgf.texsystem": "pdflatex",

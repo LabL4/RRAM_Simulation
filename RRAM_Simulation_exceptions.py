@@ -83,6 +83,9 @@ current = float(sim_parmtrs[num_simulation]['initial_current'])
 temperatura = float(sim_parmtrs[num_simulation]['init_temp'])
 E_field = float(sim_parmtrs[num_simulation]['initial_elec_field'])
 
+Resistencia_serie = 25
+current = 0
+
 # Leo los estados iniciales de la simulación
 with open('Init_data/init_state_' + str(num_simulation) + '.pkl', 'rb') as f:
     actual_state = pickle.load(f)
@@ -203,7 +206,7 @@ for k in (range(0, num_pasos)):
     # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
     if Percolation.is_path(actual_state):
         if sistema_percola is False:
-            print("\nEl sistema ha percolado en la iteración: ", k)
+            print("\nEl sistema ha percolado en la iteración: ", k, " que corresponde con el voltaje: ", voltage)
 
         sistema_percola = True
 
@@ -214,6 +217,7 @@ for k in (range(0, num_pasos)):
         ac = actual_state.copy()
         resistance_matrix = findpath.find_path(ac)
 
+        # voltage_RRAM = voltage - (current * Resistencia_serie)
         # Si ha percolado uso la corriente de Ohm
         try:
             current, resistencia[k] = CurentSolver.OmhCurrent(
@@ -233,10 +237,12 @@ for k in (range(0, num_pasos)):
 
         # Si no ha percolado uso la corriente de Poole-Frenkel
         resistencia[k] = 0
+
         mean_field = np.mean(E_field_vector)
         current = CurentSolver.Poole_Frenkel(temperatura, mean_field, **sim_ctes[num_simulation])*(device_size)
 
     # Obtengo los valores del campo eléctrico y la temperatura
+    # voltage_RRAM = voltage - (current * Resistencia_serie)
     E_field = SimpleElectricField(voltage, device_size)
     temperatura = Temperature_Joule(voltage, current, sistema_percola, T_0, ** sim_ctes[num_simulation])
 
@@ -255,6 +261,7 @@ for k in (range(0, num_pasos)):
                     actual_state[i, j] = 1  # Generación de una vacante
     data_pp_set[k-1] = np.array([simulation_time, voltage, current, temperatura,
                                 E_field, np.mean(E_field_vector), 0])
+
     # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
     if k % paso_guardar == 0:
         config_matrix_pp_set[int(k / paso_guardar) - 1] = actual_state
@@ -370,6 +377,7 @@ for k in (range(0, num_pasos)):
         resistance_matrix = findpath.find_path(ac)
         # Si ha percolado uso la corriente de Ohm
         try:
+
             current, resistencia[k] = CurentSolver.OmhCurrent(
                 voltage, resistance_matrix, **sim_ctes[num_simulation])
         except Warning:

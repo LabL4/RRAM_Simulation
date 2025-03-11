@@ -29,7 +29,7 @@ def Init_OxygenState(espesor_dispositivo: float, atom_size: float):
 def Generate_Oxigen(oxygen_state: np.array, num_oxygen: int):
     """
     Generates random oxygen positions in the given oxygen state matrix.
-  
+
     Args:
         oxigen_state (np.array): The current oxygen state matrix.
         num_oxigen (int): The number of oxygen to generate.
@@ -47,7 +47,8 @@ def Generate_Oxigen(oxygen_state: np.array, num_oxygen: int):
 
     # Itero sobre cada par coordenada para asignar el valor de 1 que representa que se generó un oxígeno en esa posición
     for i in range(num_oxygen):
-        if oxygen_state[y[i], 0] == 0:
+        random_number = np.random.rand()
+        if (oxygen_state[y[i], 0] == 0 and random_number < 0.5):
             oxygen_state[y[i], 0] = 1
 
     # Devuelvo la matriz con los oxígenos generados
