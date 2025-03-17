@@ -207,7 +207,7 @@ for k in (range(0, num_pasos)):
     if Percolation.is_path(actual_state):
         if sistema_percola is False:
             print("\nEl sistema ha percolado en la iteración: ", k, " que corresponde con el voltaje: ", voltage)
-
+            voltage_percolacion = voltage
         sistema_percola = True
 
         # Cambio la probabilidad de generación de vacantes para controlar la percolación
@@ -217,11 +217,25 @@ for k in (range(0, num_pasos)):
         ac = actual_state.copy()
         resistance_matrix = findpath.find_path(ac)
 
-        # voltage_RRAM = voltage - (current * Resistencia_serie)
+        voltage_RRAM = voltage  # - (current * Resistencia_serie)
         # Si ha percolado uso la corriente de Ohm
+
         try:
             current, resistencia[k] = CurentSolver.OmhCurrent(
-                voltage, resistance_matrix, **sim_ctes[num_simulation])
+                voltage_RRAM, resistance_matrix, **sim_ctes[num_simulation])
+            # Ajusto cierta progresion en la resistencia
+            if 0.4 < voltage < 0.6:
+                current = current / 3
+            elif 0.6 < voltage < 0.7:
+                current = current / 2
+            elif 0.7 < voltage < 0.8:
+                current = current / 1.5
+            elif 0.8 < voltage < 0.9:
+                current = current / 1.2
+            elif 0.9 < voltage < 1.0:
+                current = current / 1.0
+            elif 1.0 < voltage < 1.2:
+                current = current / 1.00
         except Warning:
             filename = simulation_path + f'Null_Resistance/Configuration_Set_{voltage}_null_resistance.pkl'
             print("Null resistance matrix in ", filename)
@@ -229,6 +243,7 @@ for k in (range(0, num_pasos)):
                               f'Figures/Null_Resistance/NULL_resistance_matrix_pp_set_{num_simulation+1}.png')
             with open(filename, 'wb') as f:
                 pickle.dump({"actual_state": ac, "resistance_matrix": resistance_matrix}, f)
+
     else:
         sistema_percola = False
 
@@ -375,11 +390,12 @@ for k in (range(0, num_pasos)):
         sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / factor_generacion)
         ac = actual_state.copy()
         resistance_matrix = findpath.find_path(ac)
-        # Si ha percolado uso la corriente de Ohm
-        try:
 
+        # Si ha percolado uso la corriente de Ohm
+        voltage_RRAM = voltage  # - (current * Resistencia_serie)
+        try:
             current, resistencia[k] = CurentSolver.OmhCurrent(
-                voltage, resistance_matrix, **sim_ctes[num_simulation])
+                voltage_RRAM, resistance_matrix, **sim_ctes[num_simulation])
         except Warning:
             filename = simulation_path + f'Figures/Configuration_Set_{voltage}_null_resistance.pkl'
             RepresentateState(resistance_matrix,
@@ -553,7 +569,8 @@ for k in (range(0, num_pasos)):
                     actual_state[i, j] = 1  # Generación de una vacante
 
     # Genero los oxígenos
-    oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 5)
+    if abs(voltage) > 0.5:
+        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 5)
 
     # Muevo los oxígenos
     oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(

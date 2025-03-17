@@ -1,8 +1,8 @@
-import math
 import numpy as np
+import math
 
-from RRAM import Constants as cte
 from scipy.constants import elementary_charge, Boltzmann, epsilon_0
+from RRAM import Constants as cte
 
 
 def Generate_Resitence_Matrix(configuration_matrix: np.ndarray, paths: list) -> np.ndarray:
@@ -43,7 +43,7 @@ def OmhCurrent(potential: float, config_state: np.array, **kwargs) -> float:
         # Obtengo el valor de las constantes que necesita la función
         ohm_resistence = float(kwargs.get('ohm_resistence'))
     else:
-        ohm_resistence = 1e7
+        ohm_resistence = 1.5
 
     # Initialize total resistance
     total_resistance = 0
@@ -61,7 +61,21 @@ def OmhCurrent(potential: float, config_state: np.array, **kwargs) -> float:
         # Se suma la resistencia paralela a la resistencia total
         total_resistance += parallel_resistance
 
-    # Se calcula la corriente Ohmica
+        # # Ajusto cierta progresion en la resistencia
+        # if 0.4 < potential < 0.6:
+        #     total_resistance = total_resistance * 1.15
+        # elif 0.6 < potential < 0.7:
+        #     total_resistance = total_resistance * 1.14
+        # elif 0.7 < potential < 0.8:
+        #     total_resistance = total_resistance * 1.13
+        # elif 0.8 < potential < 0.9:
+        #     total_resistance = total_resistance * 1.12
+        # elif 0.9 < potential < 1.0:
+        #     total_resistance = total_resistance * 1.11
+        # elif 1.0 < potential < 1.2:
+        #     total_resistance = total_resistance * 1.00
+
+        # Se calcula la corriente Ohmica
     return potential/total_resistance, total_resistance
 
 
