@@ -51,7 +51,7 @@ os.makedirs(carpeta)
 
 device_size = np.ones(num_simulations) * 10e-9  # m
 atom_size = np.ones(num_simulations) * 0.25e-9  # m TODO: Esto se deberia llamarse tamaño del grid mejor
-num_trampas = np.ones(num_simulations, dtype=int) * 130
+num_trampas = np.ones(num_simulations, dtype=int) * 150
 
 priv_y_sup_right = np.ones(num_simulations, dtype=int) * 15
 priv_y_inf_right = np.ones(num_simulations, dtype=int) * 15
@@ -69,7 +69,7 @@ voltaje_final_set = np.ones(num_simulations) * 1.1   # Esto puede ser mas alto p
 
 paso_guardar = np.ones(num_simulations, dtype=int) * 1
 
-init_temp = np.ones(num_simulations) * 300
+init_temp = np.ones(num_simulations) * 310
 initial_elec_field = np.ones(num_simulations) * 0
 initial_voltaje = np.ones(num_simulations) * 0
 initial_current = np.ones(num_simulations) * 0
@@ -130,7 +130,7 @@ for i in range(num_simulations):
 
     # Ruta de las imagenes de cada simulación
     ruta_simulation = os.path.join(carpeta_results, f'Init_data/simulation_{i}')
-    os.makedirs(ruta_simulation, exist_ok=True)
+    # os.makedirs(ruta_simulation, exist_ok=True)
 
     # Estado inicial de la simulación para los oxígenos y el sistema
     init_state = gn.initial_state_priv(eje_x[i], eje_y[i], num_trampas[i], regiones_pesos)

@@ -103,7 +103,7 @@ def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float
         sys.exit(1)  # Termina la ejecución del programa con un código de salida 1
 
     # Esto es un arreglo temporal para dar cuenta que hay un tiempo hasta que los iones de oxígeno se muevan
-    if abs(E_field*(10e-9)) > 0.45:
+    if abs(E_field*(10e-9)) > 0.5:
         # En la expresión original se multiplica por 2 lo he quitado para ver si sale algo mejor
         # print(f"EL valor del potencial es: {E_field*(10e-9)}")
         oxigen_velocity = 3e-07  # 2 * t_0 * cte_red * (senoh * exp_velocity)

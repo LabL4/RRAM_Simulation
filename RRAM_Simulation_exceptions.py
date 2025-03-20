@@ -1,4 +1,4 @@
-from numpy import save
+from numpy import save, size
 import time as time
 import pandas as pd
 import logging
@@ -223,20 +223,37 @@ for k in (range(0, num_pasos)):
         try:
             current, resistencia[k] = CurentSolver.OmhCurrent(
                 voltage_RRAM, resistance_matrix, **sim_ctes[num_simulation])
+
+            # Hago la guarrada de ajustar la corriente
+            voltaje_division = (voltaje_final_set - voltage_percolacion) / 5
+
             # Ajusto cierta progresion en la resistencia
-            if 0.4 < voltage < 0.6:
-                current = current / 3
-            elif 0.6 < voltage < 0.7:
+            if voltage_percolacion < voltage < voltage_percolacion + voltaje_division:
+                current = current / 4
+                print('Region 0 con voltaje entre ' + str(voltage_percolacion) +
+                      ' y ' + str(voltage_percolacion + voltaje_division))
+            elif voltage_percolacion + voltaje_division < voltage < voltage_percolacion + 1.5*voltaje_division:
+                current = current / 3.5
+                print('Region 1 con voltaje entre ' + str(voltage_percolacion + voltaje_division) +
+                      ' y ' + str(voltage_percolacion + 1.5*voltaje_division))
+            elif voltage_percolacion + 1.5*voltaje_division < voltage < voltage_percolacion + 2*voltaje_division:
                 current = current / 2
-            elif 0.7 < voltage < 0.8:
-                current = current / 1.5
-            elif 0.8 < voltage < 0.9:
-                current = current / 1.2
-            elif 0.9 < voltage < 1.0:
+                print('Region 2 con voltaje entre ' + str(voltage_percolacion + 1.5*voltaje_division) +
+                      ' y ' + str(voltage_percolacion + 2*voltaje_division))
+            elif voltage_percolacion + 2*voltaje_division < voltage < voltage_percolacion + 3*voltaje_division:
+                current = current / 1.3
+                print('Region 3 con voltaje entre ' + str(voltage_percolacion + 2*voltaje_division) +
+                      ' y ' + str(voltage_percolacion + 3*voltaje_division))
+            elif voltage_percolacion + 3*voltaje_division < voltage < voltage_percolacion + 4*voltaje_division:
+                current = current / 1.1
+                print('Region 4 con voltaje entre ' + str(voltage_percolacion + 3*voltaje_division) +
+                      ' y ' + str(voltage_percolacion + 4*voltaje_division))
+            elif voltage_percolacion + 4*voltaje_division < voltage < voltaje_final_set:
                 current = current / 1.0
-            elif 1.0 < voltage < 1.2:
-                current = current / 1.00
+                print('Region 5 con voltaje entre ' + str(voltage_percolacion +
+                      4*voltaje_division) + ' y ' + str(voltaje_final_set))
         except Warning:
+
             filename = simulation_path + f'Null_Resistance/Configuration_Set_{voltage}_null_resistance.pkl'
             print("Null resistance matrix in ", filename)
             RepresentateState(resistance_matrix, simulation_path +
@@ -570,6 +587,9 @@ for k in (range(0, num_pasos)):
 
     # Genero los oxígenos
     if abs(voltage) > 0.5:
+        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 1)
+
+    if abs(voltage) > 0.9:
         oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 5)
 
     # Muevo los oxígenos
@@ -694,8 +714,10 @@ for k in (range(0, num_pasos)):  # son num_pasos + 1 iteraciones
                 random_number = np.random.rand()
                 if random_number < prob_generacion:
                     actual_state[i, j] = 1  # Generación de una vacante
-    # Genero los oxígenos
-    oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 5)
+
+    if abs(voltage) > 0.5:
+        # Genero los oxígenos
+        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 1)
 
     # Muevo los oxígenos
     oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
@@ -781,10 +803,10 @@ axes.set_yscale('log')
 
 axes.set_title(global_tittle, fontsize=18, pad=15)
 
-axes.plot(v_ps, i_ps, color='blue', label='Primera parte Set')
-axes.plot(v_ss, i_ss, color='red', label='Segunda parte Set')
-axes.plot(v_pr, i_pr, color='green', label='Primera parte Reset')
-axes.plot(v_sr, i_sr, color='pink', label='Segunda parte Reset')
+axes.scatter(v_ps, i_ps, color='blue', s=0.2, label='Primera parte Set')
+axes.scatter(v_ss, i_ss, color='red', s=0.2, label='Segunda parte Set')
+axes.scatter(v_pr, i_pr, color='green', s=0.2, label='Primera parte Reset')
+axes.scatter(v_sr, i_sr, color='pink', s=0.2, label='Segunda parte Reset')
 
 plt.legend()
 
