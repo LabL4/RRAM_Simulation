@@ -16,6 +16,8 @@ from RRAM import *
 import warnings
 warnings.filterwarnings("error")
 
+# region Definición de valores iniciales y constantes de la simulación
+
 # Asegúrate de que se ha pasado un parámetro
 if len(sys.argv) > 1:
     num_simulation = int(sys.argv[1])
@@ -36,8 +38,30 @@ ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'
 sys.path.append(ruta_raiz)
 # endregion
 
-# region Definición de valores iniciales y constantes de la simulación
 
+def leer_intensidades_en_intervalo(v_min, v_max):
+    nombre_archivo = "Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt"
+
+    # Cargar solo las dos primeras columnas con NumPy
+    datos = np.loadtxt(nombre_archivo, usecols=(0, 1))  # Columna 0 = voltaje, Columna 1 = intensidad
+
+    voltajes = datos[:, 0]  # Extraer columna de voltaje
+    intensidades = datos[:, 1]  # Extraer columna de intensidad
+
+    # Filtrar intensidades donde el voltaje esté en el intervalo [v_min, v_max]
+    intensidades_filtradas = intensidades[(voltajes >= v_min) & (voltajes <= v_max)]
+
+    # Calcular la media de las intensidades filtradas
+    # Evita error si no hay datos
+    i_media = np.mean(intensidades_filtradas) if intensidades_filtradas.size > 0 else np.nan
+
+    if np.isnan(i_media):
+        print("No hay datos en el intervalo [", v_min, ",", v_max, "]")
+
+    return i_media
+
+
+# region Definición de valores iniciales y constantes de la simulación
 # comienzo leyendo los datos de la simulación almacenados en un archivo csv dentro de la carpeta Init y los guardo en sus respectivas variables
 sim_parmtrs = Montecarlo.read_csv_to_dic("Init_data/simulation_parameters.csv")
 sim_ctes = Montecarlo.read_csv_to_dic("Init_data/simulation_constants.csv")
@@ -100,6 +124,9 @@ config_matrix_pp_set = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size
 paso_temporal = total_simulation_time / num_pasos
 paso_potencial = voltaje_max_simulation / num_pasos
 factor_generacion = float(sim_ctes[num_simulation]['factor_generacion'])
+print("El paso temporal es: ", paso_temporal)
+print("El paso del potencial es: ", paso_potencial)
+print("El factor de generación es: ", factor_generacion)
 print("\nEl valor de la resistencia de cada casilla es: ", sim_ctes[num_simulation]['ohm_resistence'])
 print("El valor de gamma es: ", sim_ctes[num_simulation]['gamma'])
 print("El valor de resistencia termica no percola es: ", sim_ctes[num_simulation]['r_termica_no_percola'])
@@ -127,6 +154,7 @@ num_max_vacantes = (device_size/atom_size)**2
 
 print(f"\nComienza la primera parte del set")
 # region primera parte del set
+
 # for k in tqdm(range(0, num_pasos)):
 for k in (range(0, num_pasos)):
     # Guardo el estado anterior
@@ -206,8 +234,15 @@ for k in (range(0, num_pasos)):
     # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
     if Percolation.is_path(actual_state):
         if sistema_percola is False:
+            num_div = 10
+
             print("\nEl sistema ha percolado en la iteración: ", k, " que corresponde con el voltaje: ", voltage)
             voltage_percolacion = voltage
+            V_div = (voltaje_final_set - voltage_percolacion) / num_div
+            print("La división del voltaje es es: ", V_div)
+
+            i_medias_medida = np.array([leer_intensidades_en_intervalo(
+                voltage_percolacion + i * V_div, voltage_percolacion + (i + 1) * V_div) for i in range(num_div)])
         sistema_percola = True
 
         # Cambio la probabilidad de generación de vacantes para controlar la percolación
@@ -217,43 +252,30 @@ for k in (range(0, num_pasos)):
         ac = actual_state.copy()
         resistance_matrix = findpath.find_path(ac)
 
+        if 0.4 < voltage < 0.6:
+            sim_ctes[num_simulation]['ohm_resistence'] = 2
+
         voltage_RRAM = voltage  # - (current * Resistencia_serie)
         # Si ha percolado uso la corriente de Ohm
-
         try:
             current, resistencia[k] = CurentSolver.OmhCurrent(
                 voltage_RRAM, resistance_matrix, **sim_ctes[num_simulation])
 
-            # Hago la guarrada de ajustar la corriente
-            voltaje_division = (voltaje_final_set - voltage_percolacion) / 5
+            # current_copia = current
+            # for i, factor in enumerate(i_medias_medida):
+            #     v_min = voltage_percolacion + i * V_div
+            #     v_max = voltage_percolacion + (i + 1) * V_div
 
-            # Ajusto cierta progresion en la resistencia
-            if voltage_percolacion < voltage < voltage_percolacion + voltaje_division:
-                current = current / 4
-                print('Region 0 con voltaje entre ' + str(voltage_percolacion) +
-                      ' y ' + str(voltage_percolacion + voltaje_division))
-            elif voltage_percolacion + voltaje_division < voltage < voltage_percolacion + 1.5*voltaje_division:
-                current = current / 3.5
-                print('Region 1 con voltaje entre ' + str(voltage_percolacion + voltaje_division) +
-                      ' y ' + str(voltage_percolacion + 1.5*voltaje_division))
-            elif voltage_percolacion + 1.5*voltaje_division < voltage < voltage_percolacion + 2*voltaje_division:
-                current = current / 2
-                print('Region 2 con voltaje entre ' + str(voltage_percolacion + 1.5*voltaje_division) +
-                      ' y ' + str(voltage_percolacion + 2*voltaje_division))
-            elif voltage_percolacion + 2*voltaje_division < voltage < voltage_percolacion + 3*voltaje_division:
-                current = current / 1.3
-                print('Region 3 con voltaje entre ' + str(voltage_percolacion + 2*voltaje_division) +
-                      ' y ' + str(voltage_percolacion + 3*voltaje_division))
-            elif voltage_percolacion + 3*voltaje_division < voltage < voltage_percolacion + 4*voltaje_division:
-                current = current / 1.1
-                print('Region 4 con voltaje entre ' + str(voltage_percolacion + 3*voltaje_division) +
-                      ' y ' + str(voltage_percolacion + 4*voltaje_division))
-            elif voltage_percolacion + 4*voltaje_division < voltage < voltaje_final_set:
-                current = current / 1.0
-                print('Region 5 con voltaje entre ' + str(voltage_percolacion +
-                      4*voltaje_division) + ' y ' + str(voltaje_final_set))
+            #     if v_min < voltage < v_max:
+            #         factor = current/i_medias_medida[i]
+            #         current /= factor
+            #         # print(f'Region {i} con voltaje entre {v_min} y {v_max}')
+            #         print(f'Factor de corrección: {factor}')
+            #         print(f'Intensidad medida: {i_medias_medida[i]}')
+            #         print(f'Intensidad corregida: {current} y la intensidad sin corregir: {current_copia}')
+            #         break
+
         except Warning:
-
             filename = simulation_path + f'Null_Resistance/Configuration_Set_{voltage}_null_resistance.pkl'
             print("Null resistance matrix in ", filename)
             RepresentateState(resistance_matrix, simulation_path +
@@ -292,7 +314,7 @@ for k in (range(0, num_pasos)):
                 if random_number < prob_generacion:
                     actual_state[i, j] = 1  # Generación de una vacante
     data_pp_set[k-1] = np.array([simulation_time, voltage, current, temperatura,
-                                E_field, np.mean(E_field_vector), 0])
+                                 E_field, np.mean(E_field_vector), 0])
 
     # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
     if k % paso_guardar == 0:
@@ -491,7 +513,6 @@ initial_oxygen_reset = oxygen_state
 # Vuelvo a definir el vector de resistencia total
 resistencia = np.zeros(num_pasos+1)
 
-
 RepresentateState(initial_configuration_reset, simulation_path +
                   f'Figures/Initial_pp_reset_configuration_{num_simulation+1}.png')
 
@@ -603,7 +624,7 @@ for k in (range(0, num_pasos)):
     # Tiempo total de la simulacion
     tiempo_total = simulation_time + 2 * tiempo_pp_set
     data_pp_reset[k] = np.array([tiempo_total, voltage, current, temperatura,
-                                E_field, np.mean(E_field_vector), desplazamiento])
+                                 E_field, np.mean(E_field_vector), desplazamiento])
     # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
     if k % paso_guardar == 0:
         config_matrix_pp_reset[int(k / paso_guardar) - 1] = actual_state

@@ -31,7 +31,6 @@ else:
     print(f"Ruta de los archivos de datos: {data_path}")
     print(f"El número de simulaciones es: {num_simulations}")
 
-
 # ----------------------------------------------------------------------------------------------------------------------------------
 
 # Defino la carpeta donde se guardan los datos iniciales de la simulación
@@ -51,7 +50,7 @@ os.makedirs(carpeta)
 
 device_size = np.ones(num_simulations) * 10e-9  # m
 atom_size = np.ones(num_simulations) * 0.25e-9  # m TODO: Esto se deberia llamarse tamaño del grid mejor
-num_trampas = np.ones(num_simulations, dtype=int) * 150
+num_trampas = np.ones(num_simulations, dtype=int) * 130
 
 priv_y_sup_right = np.ones(num_simulations, dtype=int) * 15
 priv_y_inf_right = np.ones(num_simulations, dtype=int) * 15
@@ -69,7 +68,7 @@ voltaje_final_set = np.ones(num_simulations) * 1.1   # Esto puede ser mas alto p
 
 paso_guardar = np.ones(num_simulations, dtype=int) * 1
 
-init_temp = np.ones(num_simulations) * 310
+init_temp = np.ones(num_simulations) * 315  # K
 initial_elec_field = np.ones(num_simulations) * 0
 initial_voltaje = np.ones(num_simulations) * 0
 initial_current = np.ones(num_simulations) * 0
