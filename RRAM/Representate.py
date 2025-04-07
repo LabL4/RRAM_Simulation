@@ -7,69 +7,129 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from RRAM import Montecarlo
 
+# region Configuración del plot
 
-def RepresentateState(matriz: np.ndarray, filename: str = None, color=(0.478, 0.627, 0.870)) -> None:
+
+def config_ax(ax):
+    # ax.grid(which='major', color='#DDDDDD', linewidth=0.8, zorder=-1)
+    # ax.grid(which='minor', color='#DEDEDE', linestyle=':', linewidth=0.5, zorder=-1)
+    ax.minorticks_on()
+    ax.tick_params(axis='both', which='both', direction='in', top=True, right=True)
+
+
+def setup_plt(plt, latex=True, scaling=1):
+    plt.rcParams.update(
+        {
+            "pgf.texsystem": "pdflatex",
+            "text.usetex": latex,
+            "font.family": "fourier",
+            "text.latex.preamble": "\n".join([
+                r"\usepackage[utf8]{inputenc}",
+                r"\usepackage[T1]{fontenc}",
+                r"\usepackage{siunitx}",
+            ])
+        }
+    )
+
+    SMALL_SIZE = 8 * scaling
+    MEDIUM_SIZE = 10 * scaling
+    BIGGER_SIZE = 11 * scaling
+
+    plt.rc('font', size=SMALL_SIZE)
+    plt.rc('axes', titlesize=SMALL_SIZE)
+    plt.rc('axes', labelsize=MEDIUM_SIZE)
+    plt.rc('xtick', labelsize=SMALL_SIZE)
+    plt.rc('ytick', labelsize=SMALL_SIZE)
+    plt.rc('legend', fontsize=SMALL_SIZE)
+    plt.rc('figure', titlesize=BIGGER_SIZE)
+    plt.rc('axes', titlesize=BIGGER_SIZE*1.05)
+
+
+setup_plt(plt, latex=True, scaling=2)
+
+
+def RepresentateState(matriz: np.ndarray, k: int, paso_voltaje: float, filename: str = None, color=(0.9647, 0.1725, 0.3059)) -> None:
     """
-    Represent the state of a matrix as a colored plot.
+    Representa el estado de una matriz con un estilo gráfico personalizado.
 
-    Parameters:
-    - matriz (np.ndarray): The input matrix to be represented.
-    - filename (str, optional): The name of the file to save the plot. If not provided, the plot will not be saved.
+    Parámetros:
+    - matriz (np.ndarray): Matriz a representar.
+    - k (int): Índice de iteración para el voltaje.
+    - paso_voltaje (float): Incremento de voltaje por iteración.
+    - filename (str, opcional): Nombre del archivo para guardar la gráfica.
+    - color (tuple, opcional): Color de las vacantes.
 
-    Returns:
+    Retorna:
     - None
-
     """
+
+    voltaje = k * paso_voltaje
     nrows, ncols = matriz.shape
-    x = np.arange(ncols)
-    y = np.arange(nrows)
+    x = np.linspace(0, 10, ncols)  # Escala real de 10 nm en eje X
+    y = np.linspace(0, 10, nrows)  # Escala real de 10 nm en eje Y
 
     fig, ax = plt.subplots()
 
-    # Crear un mapa de colores personalizado
-    colors = [
-        (1, 1, 1),                  # Color para el valor 0 que representa que No hay trampa
-        color,                      # Color para el valor 1 que representa que hay trampa (azul por defeto)
-    ]
+    # Crear mapa de colores
+    colors = [(1, 1, 1), color]  # Blanco (0) y Color dado (1)
     if np.all(matriz == 1):
-        colors = list(reversed(colors))
+        colors.reverse()
 
-    cmap_name = "my_list"
-    cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=2)
+    cmap = LinearSegmentedColormap.from_list("custom_cmap", colors, N=2)
 
     # Graficar la matriz
-    ax.pcolormesh(
-        x,
-        y,
-        matriz,
-        shading="nearest",
-        vmin=matriz.min(),
-        vmax=matriz.max(),
-        cmap=cmap,
+    c = ax.pcolormesh(
+        x, y, matriz, shading="nearest",
+        vmin=matriz.min(), vmax=matriz.max(), cmap=cmap
     )
 
-    # Configurar las marcas de los ejes
-    major_ticks = np.arange(0, nrows, 5)
-    minor_ticks = np.arange(0, nrows, 1)
-    ax.set_xticks(major_ticks)
-    ax.set_xticks(minor_ticks, minor=True)
-    ax.set_yticks(major_ticks)
-    ax.set_yticks(minor_ticks, minor=True)
+    # Configuración de electrodos con mayor altura
+    electrode_width = 0.2  # Se mantiene el ancho en X
+    electrode_height = 12  # 🔥 Se extienden en Y (de -1 a 11)
+    electrode_color = "gray"  # Color de los electrodos
 
-    # Establecer relación de aspecto cuadrada
+    left_electrode = patches.Rectangle(
+        (-0.3, -0.5),  # Posición en X, Y (más abajo)
+        electrode_width, electrode_height,  # Ancho y Alto aumentados
+        color=electrode_color
+    )
+
+    right_electrode = patches.Rectangle(
+        (10.13, -1),  # Posición en X, Y (más abajo)
+        electrode_width, electrode_height,  # Ancho y Alto aumentados
+        color=electrode_color
+    )
+
+    ax.add_patch(left_electrode)
+    ax.add_patch(right_electrode)
+
+    # Aplicar configuración de ejes
+    config_ax(ax)
+
+    # Configurar etiquetas y título
+    ax.set_xticks(np.arange(0, 11, 2))  # 🔹 Ticks cada 2 nm en X
+    ax.set_yticks(np.arange(0, 11, 2))  # 🔹 Ticks cada 2 nm en Y
+    ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
+    ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
+    ax.set_title(fr"V = {voltaje} (V)", pad=20)
+
+    # Ajustar formato visual
     ax.set_aspect("equal")
-
-    # Invertir el eje y para que el punto (0, 0) esté en la esquina superior izquierda
     ax.invert_yaxis()
 
-    # Coloco las etiquetas del eje x en la parte superior
-    ax.xaxis.tick_top()
+    # Ajustar límites del eje X y Y para que los electrodos sean visibles
+    ax.set_xlim(-0.3, 10.33)
+    ax.set_ylim(-0, 10)  # 🔥 Extiende el gráfico en Y para acomodar los electrodos
 
-    # Guardar la imagen solo si se proporciona un nombre de archivo
-    if filename is not None:
-        plt.savefig(filename)
+    # Aumentar margen superior para más espacio en el título
+    plt.subplots_adjust(top=0.85)
 
-    # Cierro la figura generada para no acumular
+    # Guardar si se especifica un archivo
+    if filename:
+        plt.savefig(filename, bbox_inches="tight")
+
+    # Mostrar gráfico
+    plt.show()
     plt.close(fig)
 
     return None
@@ -293,6 +353,101 @@ def plot_privileged_regions(Eje_x: int, Eje_y: int, regiones_pesos: list, filena
     plt.gca().set_aspect('equal', adjustable='box')
     plt.savefig(filename)
     plt.close(fig)
+
+
+def RepresentateTwoStates(
+    matriz1: np.ndarray,
+    matriz2: np.ndarray,
+    k: int,
+    paso_voltaje: float,
+    filename: str = None
+) -> None:
+    """
+    Representa el estado de dos matrices con un estilo gráfico personalizado en el mismo plot.
+
+    Parámetros:
+    - matriz1 (np.ndarray): Primera matriz a representar (color rojo).
+    - matriz2 (np.ndarray): Segunda matriz a representar (color azul).
+    - k (int): Factor para calcular el voltaje.
+    - paso_voltaje (float): Paso de voltaje.
+    - filename (str, opcional): Nombre del archivo para guardar la gráfica.
+
+    Retorna:
+    - None
+    """
+
+    voltaje = k * paso_voltaje
+    nrows, ncols = matriz1.shape
+    x = np.linspace(0, 10, ncols)  # Escala real de 10 nm en eje X
+    y = np.linspace(0, 10, nrows)  # Escala real de 10 nm en eje Y
+
+    fig, ax = plt.subplots()
+
+    # Crear mapas de colores para cada matriz
+    cmap1 = LinearSegmentedColormap.from_list("cmap1", [(1, 1, 1), (0.9647, 0.1725, 0.3059)], N=2)  # Rojo
+    cmap2 = LinearSegmentedColormap.from_list("cmap2", [(1, 1, 1), (0.2314, 0.2275, 0.9647)], N=2)  # Azul
+
+    # Graficar la primera matriz
+    ax.pcolormesh(
+        x, y, matriz1, shading="nearest",
+        vmin=matriz1.min(), vmax=matriz1.max(), cmap=cmap1
+    )
+
+    # Graficar la segunda matriz
+    ax.pcolormesh(
+        x, y, matriz2, shading="nearest",
+        vmin=matriz2.min(), vmax=matriz2.max(), cmap=cmap2, alpha=0.5  # Transparencia para superposición
+    )
+
+    # Configuración de electrodos con mayor altura
+    electrode_width = 0.2  # Se mantiene el ancho en X
+    electrode_height = 12  # 🔥 Se extienden en Y (de -1 a 11)
+    electrode_color = "gray"  # Color de los electrodos
+
+    left_electrode = patches.Rectangle(
+        (-0.3, -0.5),  # Posición en X, Y (más abajo)
+        electrode_width, electrode_height,  # Ancho y Alto aumentados
+        color=electrode_color
+    )
+
+    right_electrode = patches.Rectangle(
+        (10.13, -1),  # Posición en X, Y (más abajo)
+        electrode_width, electrode_height,  # Ancho y Alto aumentados
+        color=electrode_color
+    )
+
+    ax.add_patch(left_electrode)
+    ax.add_patch(right_electrode)
+    # Aplicar configuración de ejes
+    config_ax(ax)
+
+    # Configurar etiquetas y título
+    ax.set_xticks(np.arange(0, 11, 2))  # Ticks cada 2 nm en X
+    ax.set_yticks(np.arange(0, 11, 2))  # Ticks cada 2 nm en Y
+    ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
+    ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
+    ax.set_title(fr"V = {voltaje} (V)", pad=20)
+
+    # Ajustar formato visual
+    ax.set_aspect("equal")
+    ax.invert_yaxis()
+
+    # Ajustar límites del eje X y Y para que los electrodos sean visibles
+    ax.set_xlim(-0.3, 10.33)
+    ax.set_ylim(-0, 10)  # 🔥 Extiende el gráfico en Y para acomodar los electrodos
+
+    # Aumentar margen superior para más espacio en el título
+    plt.subplots_adjust(top=0.85)
+
+    # Guardar si se especifica un archivo
+    if filename:
+        plt.savefig(filename, bbox_inches="tight")
+
+    # Mostrar gráfico
+    plt.show()
+    plt.close(fig)
+
+    return None
 
 
 if __name__ == "__main__":
