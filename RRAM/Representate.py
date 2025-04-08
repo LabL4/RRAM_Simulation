@@ -63,7 +63,7 @@ def RepresentateState(matriz: np.ndarray, k: int, paso_voltaje: float, filename:
     - None
     """
 
-    voltaje = k * paso_voltaje
+    voltaje = round(k * paso_voltaje, 3)
     nrows, ncols = matriz.shape
     x = np.linspace(0, 10, ncols)  # Escala real de 10 nm en eje X
     y = np.linspace(0, 10, nrows)  # Escala real de 10 nm en eje Y
@@ -376,7 +376,7 @@ def RepresentateTwoStates(
     - None
     """
 
-    voltaje = k * paso_voltaje
+    voltaje = round(k * paso_voltaje, 3)
     nrows, ncols = matriz1.shape
     x = np.linspace(0, 10, ncols)  # Escala real de 10 nm en eje X
     y = np.linspace(0, 10, nrows)  # Escala real de 10 nm en eje Y

@@ -442,12 +442,16 @@ for k in (range(0, num_pasos)):
     # Genero el vector campo eléctrico
     for i in range(0, actual_state.shape[0]):
         E_field_vector[i] = GapElectricField(voltage, i, actual_state, **sim_parmtrs[num_simulation])
+
     # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
     for i in range(x_size):
         prob_generacion = Generation.Generate(
             paso_temporal, E_field_vector[i], temperatura, **sim_ctes[num_simulation])
         for j in range(y_size):
             if actual_state[i, j] == 0:
+                # Compruebo si tiene una vacante cerca
+                if np.sum(actual_state[i-1:i+1, j-1:j+1]) > 0:
+                    prob_generacion = prob_generacion * 1.5
                 random_number = np.random.rand()
                 if random_number < prob_generacion:
                     actual_state[i, j] = 1  # Generación de una vacante
