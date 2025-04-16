@@ -1,17 +1,17 @@
+from RRAM import Plot_PostProcess as pplt
+import matplotlib.pyplot as plt
+from RRAM import Recombination
 from numpy import save, size
+from RRAM import exceptions
+from tqdm import tqdm
 import time as time
 import pandas as pd
+from RRAM import *
 import logging
 import pickle
 import shutil
 import sys
 import os
-
-from RRAM import Plot_PostProcess as pplt
-from RRAM import Recombination
-from RRAM import exceptions
-from tqdm import tqdm
-from RRAM import *
 
 import warnings
 warnings.filterwarnings("error")
@@ -36,6 +36,45 @@ else:
 ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'
 # ruta_raiz = '/Users/antonio_lopez_torres/Documents/GitHub/RRAM_Simulation/'  # Ruta en el mac
 sys.path.append(ruta_raiz)
+
+
+def config_ax(ax):
+    # ax.grid(which='major', color='#DDDDDD', linewidth=0.8, zorder=-1)
+    # ax.grid(which='minor', color='#DEDEDE', linestyle=':', linewidth=0.5, zorder=-1)
+    ax.minorticks_on()
+    ax.tick_params(axis='both', which='both', direction='in', top=True, right=True)
+
+
+def setup_plt(plt, latex=True, scaling=1):
+    plt.rcParams.update(
+        {
+            "pgf.texsystem": "pdflatex",
+            "text.usetex": latex,
+            "font.family": "fourier",
+            "text.latex.preamble": "\n".join([
+                r"\usepackage[utf8]{inputenc}",
+                r"\usepackage[T1]{fontenc}",
+                r"\usepackage{siunitx}",
+            ])
+        }
+    )
+
+    SMALL_SIZE = 8 * scaling
+    MEDIUM_SIZE = 10 * scaling
+    BIGGER_SIZE = 11 * scaling
+
+    plt.rc('font', size=SMALL_SIZE)
+    plt.rc('axes', titlesize=SMALL_SIZE)
+    plt.rc('axes', labelsize=MEDIUM_SIZE)
+    plt.rc('xtick', labelsize=SMALL_SIZE)
+    plt.rc('ytick', labelsize=SMALL_SIZE)
+    plt.rc('legend', fontsize=SMALL_SIZE)
+    plt.rc('figure', titlesize=BIGGER_SIZE)
+    plt.rc('axes', titlesize=BIGGER_SIZE*1.05)
+
+
+setup_plt(plt, latex=True, scaling=2)
+
 # endregion
 
 
@@ -60,7 +99,7 @@ reset_simulation_path = os.path.join(carpeta_results, f'simulation_{num_simulati
 os.makedirs(reset_simulation_path, exist_ok=True)
 
 # Defino las cabeceras de los archivos csv
-header_files = 'Tiempo simulacion [s],Voltaje [V],Intensidad [A],Temperatura [K],Campo Simple [V/m],Campo Gap medio [V/m],Velocidad [m/s]'
+header_files = 'Tiempo simulacion [s],Voltaje [V],Intensidad [A],Temperatura [K],Campo Simple [V/m],Campo Gap medio [V/m],Velocidad [m/s],Densidad Filamento'
 
 # Pongo el nombre de la simulación y un salto de línea
 print(f"\nSimulacion {num_simulation + 1}")
@@ -117,13 +156,16 @@ print("El valor del factor de generacion es; ", sim_ctes[num_simulation]['factor
 vector_ddp = np.arange(0.000, voltaje_max_simulation + paso_potencial, paso_potencial)
 
 # Creo el vector de datos como una matriz de num_pasos filas y las columnas necesarias
-colunm_number = 7
+colunm_number = 8
 data_pp_set = np.zeros((num_pasos, colunm_number))
 
 # Inicializo el campo eléctrico
 E_field_vector = np.zeros((actual_state.shape[0]))
 num_vacantes = np.zeros(num_pasos+1)
 resistencia = np.zeros(num_pasos+1)
+array_filament_density = np.zeros(num_pasos+1)
+
+
 T_0 = float(sim_parmtrs[num_simulation]['init_temp'])
 # endregion
 
@@ -216,19 +258,19 @@ for k in (range(0, num_pasos)):
 
             print("\nEl sistema ha percolado en la iteración: ", k,
                   " que corresponde con el voltaje: ", voltaje_percolacion)
-            # num_divisiones = round(((voltaje_final_set - 0.2) - voltaje_percolacion) / paso_potencial)
+            num_divisiones = round(((voltaje_final_set - 0.2) - voltaje_percolacion) / paso_potencial)
 
-            # # Generar valores exponenciales
-            # valor_resistencia_celda = np.exp(np.linspace(np.log(13), np.log(1.5), num=num_divisiones))
-            # print("El vector de resistencias es: ", valor_resistencia_celda)
-            # # Generar ruido aleatorio distinto para cada elemento
-            # # loc es la media, scale es la desviación estándar
-            # ruido = np.exp(np.random.normal(loc=-0.1, scale=0.25, size=num_divisiones))
+            # Generar valores exponenciales
+            valor_resistencia_celda = np.exp(np.linspace(np.log(13), np.log(0.5), num=num_divisiones))
+            print("El vector de resistencias es: ", valor_resistencia_celda)
+            # Generar ruido aleatorio distinto para cada elemento
+            # loc es la media, scale es la desviación estándar
+            ruido = np.exp(np.random.normal(loc=-0.1, scale=0.25, size=num_divisiones))
 
-            # # Añadir el ruido a cada término del array
-            # valor_resistencia_celda += ruido
-            # print("El vector de resistencias es: ", valor_resistencia_celda)
-            # indice_resistencia = 0  # Indice de la resistencia
+            # Añadir el ruido a cada término del array
+            valor_resistencia_celda += ruido
+            print("El vector de resistencias es: ", valor_resistencia_celda)
+            indice_resistencia = 0  # Indice de la resistencia
         sistema_percola = True
 
         # Cambio la probabilidad de generación de vacantes para controlar la percolación
@@ -237,14 +279,16 @@ for k in (range(0, num_pasos)):
         # Copio el estado actual
         ac = actual_state.copy()
         resistance_matrix = findpath.find_path(ac)
-        # if voltaje_percolacion < voltage < (voltaje_final_set - 0.2):
-        #     # sim_ctes[num_simulation]['ohm_resistence'] = valor_resistencia_celda[indice_resistencia]
-        #     # indice_resistencia = indice_resistencia + 1
-        #     intensidad_lineal = current
-        # else:
-        #     sim_ctes[num_simulation]['ohm_resistence'] = 1.5
+        densidad_filamento = np.sum(resistance_matrix) / (x_size * y_size)
 
-        # - (current * Resistencia_serie) # esto hay q quitarlo no se  pero como tengo cosas referifas a esa variable es mas delicado
+        if voltaje_percolacion < voltage < (voltaje_final_set - 0.25):
+            sim_ctes[num_simulation]['ohm_resistence'] = valor_resistencia_celda[indice_resistencia]
+            indice_resistencia = indice_resistencia + 1
+            intensidad_lineal = current
+        else:
+            sim_ctes[num_simulation]['ohm_resistence'] = 1.5
+
+        # - (current * Resistencia_serie) # esto hay q quitarlo no se  pero como tengo cosas referidas a esa variable es mas delicado
         voltage_RRAM = voltage
         # Si ha percolado uso la corriente de Ohm
         try:
@@ -270,6 +314,7 @@ for k in (range(0, num_pasos)):
 
         mean_field = np.mean(E_field_vector)
         current = CurentSolver.Poole_Frenkel(temperatura, mean_field, **sim_ctes[num_simulation])*(device_size)
+        densidad_filamento = 0
 
     # Obtengo los valores del campo eléctrico y la temperatura
     # voltage_RRAM = voltage - (current * Resistencia_serie)
@@ -290,17 +335,18 @@ for k in (range(0, num_pasos)):
                 if random_number < prob_generacion:
                     actual_state[i, j] = 1  # Generación de una vacante
 
-    # if 0.45 < voltage < (voltaje_final_set - 0.2):
-    #     # print("El resultado de la division es: ", k % paso_guardar_2)
-    #     if k % paso_guardar_2 == 0:
-    #         data_pp_set[k-1] = np.array([simulation_time, voltage, current, temperatura,
-    #                                     E_field, np.mean(E_field_vector), 0])
-    # else:
-    #     data_pp_set[k-1] = np.array([simulation_time, voltage, current, temperatura,
-    #                                  E_field, np.mean(E_field_vector), 0])
+    if 0.45 < voltage < (voltaje_final_set - 0.2):
+        # print("El resultado de la division es: ", k % paso_guardar_2)
+        if k % paso_guardar_2 == 0:
+            data_pp_set[k-1] = np.array([simulation_time, voltage, current, temperatura,
+                                        E_field, np.mean(E_field_vector), 0, densidad_filamento])
 
-    data_pp_set[k-1] = np.array([simulation_time, voltage, current, temperatura,
-                                 E_field, np.mean(E_field_vector), 0])
+    else:
+        data_pp_set[k-1] = np.array([simulation_time, voltage, current, temperatura,
+                                     E_field, np.mean(E_field_vector), 0, densidad_filamento])
+
+    # data_pp_set[k-1] = np.array([simulation_time, voltage, current, temperatura,
+    #                              E_field, np.mean(E_field_vector), 0])
 
     # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
     if k % paso_guardar == 0:
@@ -308,6 +354,8 @@ for k in (range(0, num_pasos)):
 # endregion
 
 # region Guardar datos del Primera parte del set
+
+data_pp_set = data_pp_set[~np.all(data_pp_set == 0, axis=1)]  # Elimino los valores nulos
 
 # Si está activada la opción de guardar los datos:
 if guardar_datos:
@@ -324,14 +372,14 @@ np.savetxt(set_simulation_path + f'resultados_pp_set_{num_simulation+1}.csv',
 
 # Guardo las vacantes generadas en el forming
 with open(set_simulation_path + f"Vacantes_resistencia_{num_simulation+1}.txt", "w") as f:
-    for v1, v2, v3, v4 in zip(data_pp_set[:, 0], data_pp_set[:, 1], num_vacantes, resistencia):
+    for v1, v2, v3, v4 in zip(data_pp_set[:, 0], data_pp_set[:, 1],  resistencia, num_vacantes):
         f.write(f"{v1} {v2} {v3} {v4}\n")
 
 # Leer el contenido del archivo TXT
 with open(set_simulation_path + f"Vacantes_resistencia_{num_simulation+1}.txt", 'r') as file:
     lines = file.readlines()
 
-header_files_extra = 'Tiempo simulacion [s],Voltaje [V],Resistencia [Ohm],Numero de vacantes \n'
+header_files_extra = 'Tiempo simulacion [s],Voltaje [V], Resistencia [Ohm],Numero de vacantes\n'
 
 # Añadir el texto en la primera fila
 lines.insert(0, header_files_extra)
@@ -399,7 +447,6 @@ for k in (range(0, num_pasos)):
         fig, axes = plt.subplots()
 
         pplt.config_ax(axes)
-        pplt.config_ax(axes)
 
         axes.set_xlabel('Voltaje [V]')
         axes.set_ylabel('Temperatura [K]')
@@ -416,6 +463,8 @@ for k in (range(0, num_pasos)):
         sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / factor_generacion)
         ac = actual_state.copy()
         resistance_matrix = findpath.find_path(ac)
+
+        filament_density = np.sum(resistance_matrix) / (x_size * y_size*(0.25)*(0.25))
 
         # Si ha percolado uso la corriente de Ohm
         voltage_RRAM = voltage  # - (current * Resistencia_serie)
@@ -435,6 +484,7 @@ for k in (range(0, num_pasos)):
         mean_field = np.mean(E_field_vector)
         # Si no ha percolado uso la corriente de Poole-Frenkel
         current = CurentSolver.Poole_Frenkel(temperatura, mean_field, **sim_ctes[num_simulation])*(device_size)
+        filament_density = 0
 
     # Obtengo los valores del campo eléctrico y la temperatura
     E_field = SimpleElectricField(voltage, device_size)
@@ -457,7 +507,8 @@ for k in (range(0, num_pasos)):
                     actual_state[i, j] = 1  # Generación de una vacante
     # Tiempo total de la simulacion
     tiempo_total = simulation_time + tiempo_pp_set
-    data_sp_set[k] = np.array([tiempo_total, voltage, current, temperatura, E_field, np.mean(E_field_vector), 0])
+    data_sp_set[k] = np.array([tiempo_total, voltage, current, temperatura, E_field,
+                              np.mean(E_field_vector), 0, filament_density])
     # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
     if k % paso_guardar == 0:
         config_matrix_sp_set[int(k / paso_guardar) - 1] = actual_state
@@ -495,7 +546,7 @@ config_matrix_pp_reset = np.zeros((int((num_pasos / paso_guardar)), x_size, y_si
 oxygen_matrix_pp_reset = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
 
 # Creo el vector de diferencias de potencial
-vector_ddp = np.arange(0.000, -(voltaje_max_simulation + paso_potencial), -paso_potencial)
+vector_ddp = np.arange(0.000, - (voltaje_max_simulation + paso_potencial), -paso_potencial)
 
 # Estado iniciales de la simulación para el reset
 initial_configuration_reset = actual_state
@@ -511,7 +562,7 @@ RepresentateState(initial_configuration_reset, k, paso_potencial, simulation_pat
 print(f"\n Comienza la primera parte del reset")
 
 # Durante el reset la generación debe ser más baja por lo que cambio el valor de la constante gamma para desfavaorecer la generación
-sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 5)
+sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 3)  # 5)
 
 # Ciclo para la primera parte del reset
 # for k in tqdm(range(0, num_pasos)):
@@ -561,6 +612,8 @@ for k in (range(0, num_pasos)):
         # Obtengo los caminos de percolación
         ac = actual_state.copy()
         resistance_matrix = findpath.find_path(ac)
+        filament_density = np.sum(resistance_matrix) / (x_size * y_size*(0.25)*(0.25))
+
         # Si ha percolado uso la corriente de Ohm
         try:
             current, resistencia[k] = CurentSolver.OmhCurrent(
@@ -577,6 +630,7 @@ for k in (range(0, num_pasos)):
         # Si no ha percolado uso la corriente de Poole-Frenkel
         current = abs(CurentSolver.Poole_Frenkel(temperatura, np.mean(
             E_field_vector), **sim_ctes[num_simulation])*(device_size))
+        filament_density = 0
 
     # Obtengo los valores del campo eléctrico y la temperatura
     E_field = abs(SimpleElectricField(voltage, device_size))
@@ -613,7 +667,7 @@ for k in (range(0, num_pasos)):
     # Tiempo total de la simulacion
     tiempo_total = simulation_time + 2 * tiempo_pp_set
     data_pp_reset[k] = np.array([tiempo_total, voltage, current, temperatura,
-                                 E_field, np.mean(E_field_vector), desplazamiento])
+                                 E_field, np.mean(E_field_vector), desplazamiento, filament_density])
 
     # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
     if k % 1 == 0:  # Arreglo rapido para q lo guarde siempre
@@ -693,6 +747,7 @@ for k in (range(0, num_pasos)):  # son num_pasos + 1 iteraciones
         # Obtengo los caminos de percolación
         ac = actual_state.copy()
         resistance_matrix = findpath.find_path(ac)
+        filament_density = np.sum(resistance_matrix) / (x_size * y_size*(0.25)*(0.25))
         # Si ha percolado uso la corriente de Ohm
         try:
             current, resistencia[k] = CurentSolver.OmhCurrent(
@@ -709,6 +764,9 @@ for k in (range(0, num_pasos)):  # son num_pasos + 1 iteraciones
         # Si no ha percolado uso la corriente de Poole-Frenkel
         current = abs(CurentSolver.Poole_Frenkel(temperatura, np.mean(
             E_field_vector), **sim_ctes[num_simulation])*(device_size))
+
+        filament_density = 0
+
     # Obtengo los valores del campo eléctrico y la temperatura
     E_field = abs(SimpleElectricField(voltage, device_size))
     temperatura = Temperature_Joule(voltage, current, T_0, **sim_ctes[num_simulation])
@@ -739,8 +797,9 @@ for k in (range(0, num_pasos)):  # son num_pasos + 1 iteraciones
 
     # Tiempo total de la simulacion
     tiempo_total = simulation_time + 2 * tiempo_pp_set + tiempo_pp_reset
+
     data_sp_reset[k] = np.array([tiempo_total, voltage, current, temperatura,
-                                 E_field, np.mean(E_field_vector), desplazamiento])
+                                 E_field, np.mean(E_field_vector), desplazamiento, filament_density])
     # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
 
     if k % 1 == 0:  # Arreglo rapido para q lo guarde siempre
@@ -791,7 +850,7 @@ df_sset = pd.read_csv(data_path_sp_set, dtype=float)
 df_preset = pd.read_csv(data_path_pp_reset, dtype=float)
 df_sreset = pd.read_csv(data_path_sp_reset, dtype=float)
 
-global_tittle = 'Intensidad vs Voltaje'
+global_tittle = 'Intensidad [A] vs Voltaje [V]'
 
 save_path = simulation_path + f'Figures/Intensidad_Voltaje_simulation_{num_simulation+1}'
 
@@ -799,80 +858,47 @@ i_ps = np.array(df_pset['Intensidad [A]'])
 i_ss = np.array(df_sset['Intensidad [A]'])
 i_pr = np.array(df_preset['Intensidad [A]'])
 i_sr = np.array(df_sreset['Intensidad [A]'])
+
 v_ps = np.array(df_pset['Voltaje [V]'])
 v_ss = np.array(df_sset['Voltaje [V]'])
 v_pr = np.array(df_preset['Voltaje [V]'])
 v_sr = np.array(df_sreset['Voltaje [V]'])
 
+# Uno en un solo array las intensidades y los voltajes de las curvas de SET
+i_set = np.concatenate((i_ps, i_ss))
+v_set = np.concatenate((v_ps, v_ss))
+
+# Uno en un solo array las intensidades y los voltajes de las curvas de RESET
+i_reset = np.concatenate((i_pr, i_sr))
+v_reset = np.concatenate((v_pr, v_sr))
+
+
+plot_IV(v_set, i_set, v_reset, i_reset, num_simulation)
+
+save_path = simulation_path + f'Figures/Densidad_Filamento_{num_simulation+1}'
+
+densidad_filamento = np.concatenate((np.array(df_pset['Densidad Filamento']), np.array(
+    df_sset['Densidad Filamento']), df_preset['Densidad Filamento'], np.array(df_sreset['Densidad Filamento'])
+))
+
+# Tiempo de simulacion:
+t_ps = np.array(df_pset['# Tiempo simulacion [s]'])
+t_ss = np.array(df_sset['# Tiempo simulacion [s]'])
+t_pr = np.array(df_preset['# Tiempo simulacion [s]'])
+t_sr = np.array(df_sreset['# Tiempo simulacion [s]'])
+
+tiempo = np.concatenate((t_ps, t_ss, t_pr, t_sr))
+
 fig, axes = plt.subplots()
+config_ax(axes)
 
-pplt.config_ax(axes)
+# Configurar etiquetas y título
+axes.set_xlabel(r"Voltage (\si{\V})")  # (\si{\nano\meter^{-1}})
+axes.set_ylabel(r"Conductive filament density (number vancancies in filament/\si{\nano\meter^{2}})", fontsize=12)
+axes.set_title(fr"Filament Density", pad=20)
 
-axes.set_xlabel('Voltaje [V]')
-axes.set_ylabel('Intensidad [A]')
-axes.set_yscale('log')
+axes.scatter(tiempo, densidad_filamento, s=2.5)
 
-axes.set_title(global_tittle, fontsize=18, pad=15)
-
-axes.scatter(v_ps, i_ps, color='blue', s=0.2, label='Primera parte Set')
-axes.scatter(v_ss, i_ss, color='red', s=0.2, label='Segunda parte Set')
-axes.scatter(v_pr, i_pr, color='green', s=0.2, label='Primera parte Reset')
-axes.scatter(v_sr, i_sr, color='pink', s=0.2, label='Segunda parte Reset')
-
-plt.legend()
-
-# Ruta proporcionada
-ruta_exp_data = ruta_raiz + 'Datos_Experimentales/Ciclos_Experimentales'
-ruta_archivo_set = ruta_exp_data + '/Cycle_p_1000.txt'
-ruta_archivo_reset = ruta_exp_data + '/Cycle_n_1000.txt'
-
-# Leer datos del archivo
-data_set = np.loadtxt(ruta_archivo_set)
-data_reset = np.loadtxt(ruta_archivo_reset)
-# Asumimos que los datos están en dos columnas: x e y
-
-x_set = data_set[:, 0]
-y_set = data_set[:, 1]
-
-# Data reset
-x_reset = data_reset[:, 0]
-y_reset = abs(data_reset[:, 1])
-
-# Añado los valores de las variables que estoy cambiando, para eso tengo q ver dentro de la carpeta de init_data el nombre de cada documento, si el nombre conindice con una variable del diccionario, añado el valor que está tomando en la simulación en la representación
-
-# Leer los valores de las variables desde los archivos en Initial_data
-init_data_path = 'Initial_data'
-variables = {}
-
-for filename in os.listdir(init_data_path):
-    if filename.endswith('.pkl'):
-        variable_name = filename.split('.')[0]
-        with open(os.path.join(init_data_path, filename), 'rb') as f:
-            variables[variable_name] = pickle.load(f)
-
-# Crear el subtítulo con los valores de las variables
-espacios = ' ' * 3  # Define el número de espacios que deseas añadir
-
-# Construye la lista de subtítulos con espacios y saltos de línea cada tres valores
-subtitles = []
-for i, (variable_name, value) in enumerate(variables.items()):
-    subtitles.append(f'{variable_name} = {value[num_simulation]}')
-    if (i + 1) % 3 == 0:
-        subtitles.append('\n')
-    else:
-        subtitles.append(espacios)
-
-# Une los subtítulos en una sola cadena
-subtitle = ''.join(subtitles).strip()
-fig.suptitle(subtitle, fontsize=11, y=1.05)  # Ajusta el valor de y según sea necesario
-
-# Crear la gráfica scatter
-axes.plot(x_set, y_set, 'black', label='Set experimental')
-axes.plot(x_reset, y_reset, 'black', label='Reset experimental')
-
-# fig.savefig(save_path + '.pdf', bbox_inches='tight')
-# fig.savefig(figures_path + f'/Intensidad_Voltaje_simulation_{num_simulation + 1}.pdf', bbox_inches='tight')
-fig.savefig(figures_path + f'/Intensidad_Voltaje_simulation_{num_simulation + 1}.png', bbox_inches='tight')
-
-# plt.show()
+plt.show()
+fig.savefig(save_path + '.png', bbox_inches='tight')
 # endregion

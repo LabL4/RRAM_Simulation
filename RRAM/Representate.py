@@ -84,9 +84,9 @@ def RepresentateState(matriz: np.ndarray, k: int, paso_voltaje: float, filename:
     )
 
     # Configuración de electrodos con mayor altura
-    electrode_width = 0.2  # Se mantiene el ancho en X
-    electrode_height = 12  # 🔥 Se extienden en Y (de -1 a 11)
-    electrode_color = "gray"  # Color de los electrodos
+    electrode_width = 0.2       # Se mantiene el ancho en X
+    electrode_height = 12       # Se extienden en Y (de -1 a 11)
+    electrode_color = "gray"    # Color de los electrodos
 
     left_electrode = patches.Rectangle(
         (-0.3, -0.5),  # Posición en X, Y (más abajo)
@@ -448,6 +448,67 @@ def RepresentateTwoStates(
     plt.close(fig)
 
     return None
+
+
+def plot_IV(v_set,
+            i_set,
+            v_reset,
+            i_reset,
+            num_simulation,
+            figures_path='C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Results/Figures'):
+    """
+    Plots the I-V characteristics of a device.
+    Parameters:
+        v_set (list): List of SET voltages.
+        i_set (list): List of SET currents.
+        v_reset (list): List of RESET voltages.
+        i_reset (list): List of RESET currents.
+        num_simulation (int): Simulation number for saving the figure.
+        figures_path (str): Path to save the figure.
+    """
+    # Configuración de la figura
+    setup_plt(plt, latex=True, scaling=2)
+
+    fig, axes = plt.subplots(figsize=(6, 6))
+    config_ax(axes)
+
+    axes.set_xlabel('Voltage [V]')
+    axes.set_ylabel('Current [A]')
+    axes.set_yscale('log')
+
+    # Scatter de SET y RESET
+    axes.scatter(v_set, i_set, color='red', s=20, marker='o', facecolors='white', label='SET')
+    axes.scatter(v_reset, i_reset, color='red', s=20, marker='s', facecolors='white', label='RESET')
+
+    # Ruta de los datos experimentales
+    ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt'
+    ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt'
+
+    # Cargar datos experimentales
+    data_set = np.loadtxt(ruta_archivo_set)
+    data_reset = np.loadtxt(ruta_archivo_reset)
+
+    x_set = data_set[:, 0]
+    y_set = data_set[:, 1]
+    x_reset = data_reset[:, 0]
+    y_reset = abs(data_reset[:, 1])
+
+    # Curvas experimentales
+    axes.plot(x_set, y_set, 'black', label='Set experimental')
+    axes.plot(x_reset, y_reset, 'black', label='Reset experimental')
+
+    # Leyenda ajustada
+    axes.legend(
+        labelspacing=0.3,
+        handletextpad=0.2,
+        handlelength=1.0,
+        borderaxespad=0.2,
+        loc='best',
+    )
+
+    # Guardar figura
+    fig.savefig(figures_path + f'/I-V_{num_simulation}.png', bbox_inches='tight')
+    plt.close(fig)  # Cierra para liberar memoria
 
 
 if __name__ == "__main__":
