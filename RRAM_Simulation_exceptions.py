@@ -189,42 +189,41 @@ for k in (range(0, num_pasos)):
     num_vacantes[k] = np.sum(actual_state)
 
     # Si se llena el 90 del espacio de la matriz salto a otra simulación
-    if np.sum(actual_state) > int(0.9*num_max_vacantes):
-        print("\nSe ha llenado el 90% del espacio de la matriz en la iteración: ", k)
-        # Represento la temperatura
-        save_path = simulation_path + f'Figures/LLENADO_temperature_pp_set_{num_simulation+1}'
-        RepresentateState(actual_state, k, paso_potencial, simulation_path +
-                          f'Figures/LLENADO_configuration_pp_set_{num_simulation + 1}.png')
+    if np.sum(actual_state) > int(0.3*num_max_vacantes):
+        print("\nSe ha llenado el 30% del espacio de la matriz en la iteración: ",
+              k, " que corresponde al voltaje: ", voltage)
+        # # Represento la temperatura
+        # save_path = simulation_path + f'Figures/LLENADO_temperature_pp_set_{num_simulation+1}'
+        # RepresentateState(actual_state, k, paso_potencial, simulation_path +
+        #                   f'Figures/LLENADO_configuration_pp_set_{num_simulation + 1}.png')
 
-        # region representar temperatura
-        # Crear un array de ejemplo
-        data_pp_set[k-1:] = np.nan      # Añadir valores nulos a partir de la fila k
+        # # region representar temperatura
+        # # Crear un array de ejemplo
+        # data_pp_set[k-1:] = np.nan      # Añadir valores nulos a partir de la fila k
 
-        # Eliminar filas con valores nulos
-        data_pp_set = data_pp_set[~np.isnan(data_pp_set).any(axis=1)]
+        # # Eliminar filas con valores nulos
+        # data_pp_set = data_pp_set[~np.isnan(data_pp_set).any(axis=1)]
 
-        # Obtengo los valores de tempertura voltaje
-        datos_temperatura = data_pp_set[:, 3]
-        datos_voltage = data_pp_set[:, 1]
+        # # Obtengo los valores de tempertura voltaje
+        # datos_temperatura = data_pp_set[:, 3]
+        # datos_voltage = data_pp_set[:, 1]
 
-        # Represento la temperatura
-        fig, axes = plt.subplots()
+        # # Represento la temperatura
+        # fig, axes = plt.subplots()
 
-        pplt.config_ax(axes)
-        pplt.config_ax(axes)
+        # pplt.config_ax(axes)
+        # pplt.config_ax(axes)
 
-        axes.set_xlabel('Voltaje [V]')
-        axes.set_ylabel('Temperatura [K]')
-        global_tittle = 'Temperatura vs Voltaje'
-        axes.set_title(global_tittle, fontsize=18, pad=15)
+        # axes.set_xlabel('Voltaje [V]')
+        # axes.set_ylabel('Temperatura [K]')
+        # global_tittle = 'Temperatura vs Voltaje'
+        # axes.set_title(global_tittle, fontsize=18, pad=15)
 
-        axes.plot(datos_voltage, datos_temperatura, color='blue', label='Temperatura [K]')
-        fig.savefig(save_path + '.pdf', bbox_inches='tight')
-        # endregion
+        # axes.plot(datos_voltage, datos_temperatura, color='blue', label='Temperatura [K]')
+        # fig.savefig(save_path + '.pdf', bbox_inches='tight')
+        # # endregion
 
-        raise exceptions.MaxVacantesException()
-    if voltage > voltaje_final_set:
-        print("\nSe ha superado el voltaje de ruptura en la iteracion: ", k)
+        # raise exceptions.MaxVacantesException()
 
         # Verifica si el sistema ha percolado    
         if not sistema_percola:
@@ -251,6 +250,34 @@ for k in (range(0, num_pasos)):
 
         # RepresentateState(resistance_matrix,k,paso_potencial, simulation_path + f'Figures/final_pp_set_resistance_{num_simulation+1}.png')
         break
+    # if voltage > voltaje_final_set:
+        # print("\nSe ha superado el voltaje de ruptura en la iteracion: ", k)
+
+        # # Verifica si el sistema ha percolado    
+        # if not sistema_percola:
+        #     raise exceptions.NoPercolationException()
+
+        # k_ruptura = k
+
+        # voltaje_max_set = vector_ddp[k]
+        # config_matrix_recortada = config_matrix_pp_set[k, :, :]
+        # tiempo_pp_set = paso_temporal * (k - 1)  # Le quitamos un paso porque se ha superado el voltaje de ruptura
+        # resistencia_copy = resistencia.copy()
+
+        # print("Voltaje final set", voltaje_max_set, 'en el tiempo ', tiempo_pp_set, "\n")
+
+        # # Crear un array de ejemplo
+        # data_pp_set[k-1:] = np.nan      # Añadir valores nulos a partir de la fila k
+        # num_vacantes[k:] = np.nan       # Añadir valores nulos a partir de la fila k
+        # resistencia[k:] = np.nan        # Añadir valores nulos a partir de la fila k
+
+        # # Eliminar filas con valores nulos
+        # data_pp_set = data_pp_set[~np.isnan(data_pp_set).any(axis=1)]
+        # num_vacantes = num_vacantes[~np.isnan(num_vacantes)]
+        # resistencia = resistencia[~np.isnan(resistencia)]
+
+        # # RepresentateState(resistance_matrix,k,paso_potencial, simulation_path + f'Figures/final_pp_set_resistance_{num_simulation+1}.png')
+        # break
     # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
     if Percolation.is_path(actual_state):
         if sistema_percola is False:
@@ -331,6 +358,8 @@ for k in (range(0, num_pasos)):
             paso_temporal, E_field_vector[i], temperatura, **sim_ctes[num_simulation])
         for j in range(y_size):
             if actual_state[i, j] == 0:
+                # if np.sum(actual_state[i-1:i+1, j-1:j+1]) > 0:
+                # prob_generacion = prob_generacion * 1.2
                 random_number = np.random.rand()
                 if random_number < prob_generacion:
                     actual_state[i, j] = 1  # Generación de una vacante
@@ -423,10 +452,12 @@ for k in (range(0, num_pasos)):
     simulation_time = paso_temporal * k
     # Actualizo el voltaje
     voltage = vector_ddp[k]
+
+    num_vacantes[k] = np.sum(actual_state)
     # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
 
     # Si se llena el 90 del espacio de la matriz salto a otra simulación
-    if num_vacantes[k] > int(0.85*num_max_vacantes):
+    if num_vacantes[k] > int(0.9*num_max_vacantes):
         # Represento la temperatura
         save_path = simulation_path + f'Figures/LLENADO_temperature_pp_set_{num_simulation+1}'
         RepresentateState(actual_state, k, paso_potencial, simulation_path +
@@ -499,12 +530,21 @@ for k in (range(0, num_pasos)):
             paso_temporal, E_field_vector[i], temperatura, **sim_ctes[num_simulation])
         for j in range(y_size):
             if actual_state[i, j] == 0:
-                # Compruebo si tiene una vacante cerca
-                if np.sum(actual_state[i-1:i+1, j-1:j+1]) > 0:
-                    prob_generacion = prob_generacion * 1.5
+                if np.sum(actual_state) < int(0.5*num_max_vacantes):
+                    # Compruebo si tiene una vacante cerca
+                    if np.sum(actual_state[i-1:i+1, j-1:j+1]) > 0:
+                        prob_generacion = prob_generacion * 1.2
+                else:
+                    prob_generacion = 0
+
                 random_number = np.random.rand()
+
                 if random_number < prob_generacion:
                     actual_state[i, j] = 1  # Generación de una vacante
+                else:
+                    # Si el sistema está lleno de vacantes, no se generan más
+                    prob_generacion = 0
+
     # Tiempo total de la simulacion
     tiempo_total = simulation_time + tiempo_pp_set
     data_sp_set[k] = np.array([tiempo_total, voltage, current, temperatura, E_field,
@@ -562,7 +602,7 @@ RepresentateState(initial_configuration_reset, k, paso_potencial, simulation_pat
 print(f"\n Comienza la primera parte del reset")
 
 # Durante el reset la generación debe ser más baja por lo que cambio el valor de la constante gamma para desfavaorecer la generación
-sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 3)  # 5)
+sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 5)  # 5) #antes habia un 3
 
 # Ciclo para la primera parte del reset
 # for k in tqdm(range(0, num_pasos)):
@@ -605,7 +645,7 @@ for k in (range(0, num_pasos)):
         fig.savefig(save_path + '.pdf', bbox_inches='tight')
         # endregion
 
-        raise exceptions.MaxVacantesExcception()
+        raise exceptions.MaxVacantesException()
 
     # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
     if Percolation.is_path(actual_state):
