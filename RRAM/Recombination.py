@@ -106,7 +106,7 @@ def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float
     if abs(E_field*(10e-9)) > 0.5:
         # En la expresión original se multiplica por 2 lo he quitado para ver si sale algo mejor
         # print(f"EL valor del potencial es: {E_field*(10e-9)}")
-        oxigen_velocity = 2 * t_0 * cte_red * (senoh * exp_velocity)
+        oxigen_velocity = 3e-07 # 2 * t_0 * cte_red * (senoh * exp_velocity)
     else:
         oxigen_velocity = 0  # para que no se mueva hasta q se alcance un potencial concreto
 
@@ -187,18 +187,21 @@ def Prob_Recombination(paso_temporal: float, velocidad: float, temp: float, **kw
         # Obtengo el valor de las constantes que necesita la función
         t_0 = float(kwargs.get('vibration_frequency'))# type: ignore
         beta_0 = float(kwargs.get('recom_enchancement_factor'))# type: ignore
-        E_a = float(kwargs.get('activation_energy'))# type: ignore
+        # E_a = float(kwargs.get('activation_energy'))# type: ignore esto lo dejo por si acasi el valor inicial es 1.05 como el de E_a que el bn es 1.05
+        E_r = float(kwargs.get('recombination_energy')) # type: ignore Energia de activación de la recombinación
         L_p = float(kwargs.get('decaimiento_concentracion'))# type: ignore
         # cte_red = float(kwargs.get('cte_red'))
     else:
         t_0 = cte.t_0
         beta_0 = cte.beta_0
-        E_a = cte.E_a
+        E_r = cte.E_r
         L_p = cte.L_p
         # cte_red = cte.cte_red
 
     # Calculo la  probabilidad de recombinación en equilibrio
-    prob_in_equilibrio = (paso_temporal * t_0) * (math.exp(-E_a / (k_b_ev * temp)))
+    # print("E_r:", E_r)
+    
+    prob_in_equilibrio = (paso_temporal * t_0) * (math.exp(-E_r / (k_b_ev * temp)))
     exp_beta = math.exp(-(paso_temporal * velocidad) / L_p) * beta_0
 
     prob_recom = prob_in_equilibrio * exp_beta

@@ -48,7 +48,7 @@ def setup_plt(plt, latex=True, scaling=1):
 setup_plt(plt, latex=True, scaling=2)
 
 
-def RepresentateState(matriz: np.ndarray, k: int, paso_voltaje: float, filename: str = None, color=(0.9647, 0.1725, 0.3059)) -> None:
+def RepresentateState(matriz: np.ndarray, k: int, paso_voltaje: float, filename: str = None, color=(0.9647, 0.1725, 0.3059)) -> None: # type: ignore
     """
     Representa el estado de una matriz con un estilo gráfico personalizado.
 
@@ -360,7 +360,7 @@ def RepresentateTwoStates(
     matriz2: np.ndarray,
     k: int,
     paso_voltaje: float,
-    filename: str = None
+    filename: str = None # type: ignore
 ) -> None:
     """
     Representa el estado de dos matrices con un estilo gráfico personalizado en el mismo plot.
@@ -455,7 +455,7 @@ def plot_IV(v_set,
             v_reset,
             i_reset,
             num_simulation,
-            figures_path='C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Results/Figures'):
+            figures_path='C:/Users/jimdo/Documents/GitHub/RRAM_Simulation/Results/Figures'):
     """
     Plots the I-V characteristics of a device.
     Parameters:
@@ -477,12 +477,14 @@ def plot_IV(v_set,
     axes.set_yscale('log')
 
     # Scatter de SET y RESET
-    axes.scatter(v_set, i_set, color='red', s=20, marker='o', facecolors='white', label='SET')
-    axes.scatter(v_reset, i_reset, color='red', s=20, marker='s', facecolors='white', label='RESET')
+    axes.scatter(v_set, i_set, color='red', s=20, marker='o', facecolors='white', label='SET') # type: ignore
+    axes.scatter(v_reset, i_reset, color='red', s=20, marker='s', facecolors='white', label='RESET') # type: ignore
 
     # Ruta de los datos experimentales
-    ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt'
-    ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt'
+    # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt'
+    # ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt'
+    ruta_archivo_set = 'C:/Users/jimdo/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt'
+    ruta_archivo_reset = 'C:/Users/jimdo/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt'
 
     # Cargar datos experimentales
     data_set = np.loadtxt(ruta_archivo_set)
@@ -494,8 +496,8 @@ def plot_IV(v_set,
     y_reset = abs(data_reset[:, 1])
 
     # Curvas experimentales
-    axes.plot(x_set, y_set, 'black', label='Set experimental')
-    axes.plot(x_reset, y_reset, 'black', label='Reset experimental')
+    # axes.plot(x_set, y_set, 'black', label='Set experimental')
+    # axes.plot(x_reset, y_reset, 'black', label='Reset experimental')
 
     # Leyenda ajustada
     axes.legend(

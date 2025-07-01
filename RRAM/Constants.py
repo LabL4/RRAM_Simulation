@@ -12,6 +12,9 @@ t_0 = 1e13
 # eV Energía de activación
 E_a = 1  # puedo cambiar el valor
 
+# eV Energía de activación recombinación
+E_r = 1  # puedo cambiar el valor
+
 # Tiene distintos valores dependiendo si el estado es FORMING/SET y RESET
 # La estoy modificando a mano para que el campo eléctrico tmb tenga algún papel en la dinámica
 gamma = 3

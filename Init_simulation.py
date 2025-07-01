@@ -50,7 +50,7 @@ os.makedirs(carpeta)
 
 device_size = np.ones(num_simulations) * 10e-9  # m
 atom_size = np.ones(num_simulations) * 0.25e-9  # m TODO: Esto se deberia llamarse tamaño del grid mejor
-num_trampas = np.ones(num_simulations, dtype=int) * 100  # 130
+num_trampas = np.ones(num_simulations, dtype=int) * 130  # 130
 
 priv_y_sup_right = np.ones(num_simulations, dtype=int) * 15
 priv_y_inf_right = np.ones(num_simulations, dtype=int) * 15
@@ -63,8 +63,8 @@ priv_x_left = np.ones(num_simulations, dtype=int) * 20
 total_simulation_time = np.ones(num_simulations) * 10
 # time step de mili segundo y milivoltios de step voltaje incluso de 0.01
 num_pasos = np.ones(num_simulations, dtype=int) * 10000
-voltaje_final = np.ones(num_simulations) * 4  # 1.4   # Esto puede ser mas alto puede ser de hasta 7 V
-voltaje_final_set = np.ones(num_simulations) * 4  # 1.1   # Esto puede ser mas alto puede ser de hasta 7 V
+voltaje_final = np.ones(num_simulations) *  1.4   # Esto puede ser mas alto puede ser de hasta 7 V
+voltaje_final_set = np.ones(num_simulations) * 1.1   # Esto puede ser mas alto puede ser de hasta 7 V
 
 paso_guardar = np.ones(num_simulations, dtype=int) * 1
 
@@ -215,12 +215,17 @@ with open(data_path + "r_termica_percola.pkl", 'rb') as f:
     r_termica_percola = pickle.load(f)
 # r_termica_percola = np.ones(num_simulations) * cte.r_termica_percola
 
+# Constante de resistencia térmica en K/W cuando el sistema percola
+with open(data_path + "recombination_energy.pkl", 'rb') as f:
+    recombination_energy = pickle.load(f)
+# r_termica_percola = np.ones(num_simulations) * cte.r_termica_percola
+
 # Creo un dataframe nuevo con las constantes de la simulación
 df_ctes = pd.DataFrame(columns=['vibration_frequency', 'migration_energy', 'drift_coefficient',
                                 'cte_red', 'recom_enchancement_factor', 'decaimiento_concentracion',
                                 'activation_energy', 'gamma', 'ohm_resistence',
                                 'pb_metal_insul', 'permitividad_relativa', 'I_0',
-                                'r_termica_percola', 'r_termica_no_percola', 'factor_generacion'])
+                                'r_termica_percola', 'r_termica_no_percola', 'factor_generacion', 'recombination_energy'])
 
 df_ctes['vibration_frequency'] = t_0
 df_ctes['migration_energy'] = E_m
@@ -237,6 +242,7 @@ df_ctes['I_0'] = I_0
 df_ctes['r_termica_percola'] = r_termica_percola
 df_ctes['r_termica_no_percola'] = r_termica_no_percola
 df_ctes['factor_generacion'] = factor_generacion
+df_ctes['recombination_energy'] = recombination_energy
 
 # Guardo el dataframe de las ctes en un archivo csv
 df_ctes.to_csv('Init_data/simulation_constants.csv', index=False)

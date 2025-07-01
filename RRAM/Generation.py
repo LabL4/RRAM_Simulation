@@ -19,7 +19,7 @@ def initial_state(Eje_x: float, Eje_y: float, num_trampas: int):
     """
     # Create a matrix of zeros with size Eje_x x Eje_y
 
-    InitialState = np.zeros((Eje_x, Eje_y), dtype=int)
+    InitialState = np.zeros((Eje_x, Eje_y), dtype=int)# type: ignore
     # Generate random positions for the traps
 
     posiciones_unos = np.random.choice(Eje_x * Eje_y, num_trampas, replace=False)
@@ -89,10 +89,10 @@ def Generate(time_stp: float, electric_field: float, temp: float, **kwargs) -> f
     # Obtengo las constantes necesarias para el cálculo
     if kwargs:
         # Obtengo el valor de las constantes que necesita la función
-        t_0 = float(kwargs.get('vibration_frequency'))
-        E_a = float(kwargs.get('activation_energy'))
-        cte_red = float(kwargs.get('cte_red'))
-        gamma = float(kwargs.get('gamma'))
+        t_0 = float(kwargs.get('vibration_frequency'))      # type: ignore
+        E_a = float(kwargs.get('activation_energy'))        # type: ignore
+        cte_red = float(kwargs.get('cte_red'))              # type: ignore
+        gamma = float(kwargs.get('gamma'))                  # type: ignore
     else:
         t_0 = cte.t_0
         E_a = cte.E_a

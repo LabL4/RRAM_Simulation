@@ -33,7 +33,8 @@ else:
     print(f"El número de simulaciones es: {num_simulation+1}")
     print(f"Se guardan las configuraciones: {guardar_datos}")
 
-ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'
+ruta_raiz = 'C:/Users/jimdo/Documents/GitHub/RRAM_Simulation/' # Pc personal
+# ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'
 # ruta_raiz = '/Users/antonio_lopez_torres/Documents/GitHub/RRAM_Simulation/'  # Ruta en el mac
 sys.path.append(ruta_raiz)
 
@@ -189,8 +190,8 @@ for k in (range(0, num_pasos)):
     num_vacantes[k] = np.sum(actual_state)
 
     # Si se llena el 90 del espacio de la matriz salto a otra simulación
-    if np.sum(actual_state) > int(0.3*num_max_vacantes):
-        print("\nSe ha llenado el 30% del espacio de la matriz en la iteración: ",
+    if np.sum(actual_state) > int(0.9*num_max_vacantes):
+        print("\nSe ha llenado el 90% del espacio de la matriz en la iteración: ",
               k, " que corresponde al voltaje: ", voltage)
         # # Represento la temperatura
         # save_path = simulation_path + f'Figures/LLENADO_temperature_pp_set_{num_simulation+1}'
@@ -250,34 +251,35 @@ for k in (range(0, num_pasos)):
 
         # RepresentateState(resistance_matrix,k,paso_potencial, simulation_path + f'Figures/final_pp_set_resistance_{num_simulation+1}.png')
         break
-    # if voltage > voltaje_final_set:
-        # print("\nSe ha superado el voltaje de ruptura en la iteracion: ", k)
+    if voltage > voltaje_final_set:
+        print("\nSe ha superado el voltaje de ruptura en la iteracion: ", k)
 
-        # # Verifica si el sistema ha percolado    
-        # if not sistema_percola:
-        #     raise exceptions.NoPercolationException()
+        # Verifica si el sistema ha percolado    
+        if not sistema_percola:
+            raise exceptions.NoPercolationException()
 
-        # k_ruptura = k
+        k_ruptura = k
 
-        # voltaje_max_set = vector_ddp[k]
-        # config_matrix_recortada = config_matrix_pp_set[k, :, :]
-        # tiempo_pp_set = paso_temporal * (k - 1)  # Le quitamos un paso porque se ha superado el voltaje de ruptura
-        # resistencia_copy = resistencia.copy()
+        voltaje_max_set = vector_ddp[k]
+        config_matrix_recortada = config_matrix_pp_set[k, :, :]
+        tiempo_pp_set = paso_temporal * (k - 1)  # Le quitamos un paso porque se ha superado el voltaje de ruptura
+        resistencia_copy = resistencia.copy()
 
-        # print("Voltaje final set", voltaje_max_set, 'en el tiempo ', tiempo_pp_set, "\n")
+        print("Voltaje final set", voltaje_max_set, 'en el tiempo ', tiempo_pp_set, "\n")
 
-        # # Crear un array de ejemplo
-        # data_pp_set[k-1:] = np.nan      # Añadir valores nulos a partir de la fila k
-        # num_vacantes[k:] = np.nan       # Añadir valores nulos a partir de la fila k
-        # resistencia[k:] = np.nan        # Añadir valores nulos a partir de la fila k
+        # Crear un array de ejemplo
+        data_pp_set[k-1:] = np.nan      # Añadir valores nulos a partir de la fila k
+        num_vacantes[k:] = np.nan       # Añadir valores nulos a partir de la fila k
+        resistencia[k:] = np.nan        # Añadir valores nulos a partir de la fila k
 
-        # # Eliminar filas con valores nulos
-        # data_pp_set = data_pp_set[~np.isnan(data_pp_set).any(axis=1)]
-        # num_vacantes = num_vacantes[~np.isnan(num_vacantes)]
-        # resistencia = resistencia[~np.isnan(resistencia)]
+        # Eliminar filas con valores nulos
+        data_pp_set = data_pp_set[~np.isnan(data_pp_set).any(axis=1)]
+        num_vacantes = num_vacantes[~np.isnan(num_vacantes)]
+        resistencia = resistencia[~np.isnan(resistencia)]
 
-        # # RepresentateState(resistance_matrix,k,paso_potencial, simulation_path + f'Figures/final_pp_set_resistance_{num_simulation+1}.png')
-        # break
+        # RepresentateState(resistance_matrix,k,paso_potencial, simulation_path + f'Figures/final_pp_set_resistance_{num_simulation+1}.png')
+        break
+    
     # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
     if Percolation.is_path(actual_state):
         if sistema_percola is False:
@@ -357,8 +359,8 @@ for k in (range(0, num_pasos)):
             paso_temporal, E_field_vector[i], temperatura, **sim_ctes[num_simulation])
         for j in range(y_size):
             if actual_state[i, j] == 0:
-                # if np.sum(actual_state[i-1:i+1, j-1:j+1]) > 0:
-                # prob_generacion = prob_generacion * 1.2
+                if np.sum(actual_state[i-1:i+1, j-1:j+1]) > 0:
+                    prob_generacion = prob_generacion * 1.25
                 random_number = np.random.rand()
                 if random_number < prob_generacion:
                     actual_state[i, j] = 1  # Generación de una vacante
@@ -529,7 +531,7 @@ for k in (range(0, num_pasos)):
             paso_temporal, E_field_vector[i], temperatura, **sim_ctes[num_simulation])
         for j in range(y_size):
             if actual_state[i, j] == 0:
-                if np.sum(actual_state) < int(0.5*num_max_vacantes):
+                if np.sum(actual_state) < int(0.6*num_max_vacantes):
                     # Compruebo si tiene una vacante cerca
                     if np.sum(actual_state[i-1:i+1, j-1:j+1]) > 0:
                         prob_generacion = prob_generacion * 1.2
@@ -612,7 +614,7 @@ for k in (range(0, num_pasos)):
     voltage = vector_ddp[k]
 
     # Si se llena el 90 del espacio de la matriz salto a otra simulación
-    if np.sum(actual_state) > int(0.85*num_max_vacantes):
+    if np.sum(actual_state) > int(0.9*num_max_vacantes):
         # Represento la temperatura
         save_path = simulation_path + f'Figures/LLENADO_temperature_pp_set_{num_simulation+1}'
         RepresentateState(actual_state, k, paso_potencial, simulation_path +
