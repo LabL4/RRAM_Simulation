@@ -26,7 +26,7 @@ def Init_OxygenState(espesor_dispositivo: float, atom_size: float):
     return InitialOxygenState
 
 
-def Generate_Oxigen(oxygen_state: np.array, num_oxygen: int):
+def Generate_Oxigen(oxygen_state: np.array, num_oxygen: int): # type: ignore
     """
     Generates random oxygen positions in the given oxygen state matrix.
 
@@ -55,7 +55,7 @@ def Generate_Oxigen(oxygen_state: np.array, num_oxygen: int):
     return oxygen_state
 
 
-def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float, E_field: float, grid_size: float, **kwargs):
+def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float, E_field: float, grid_size: float, **kwargs):# type: ignore
     """
     Move the oxygen ions in the simulation based on the given parameters.
 
@@ -73,10 +73,10 @@ def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float
     # Obtengo los valores de las constantes si las estoy pasando como argumentos
     if kwargs:
         # Obtengo el valor de las constantes que necesita la función
-        t_0 = float(kwargs.get('vibration_frequency'))
-        gamma_drift = float(kwargs.get('drift_coefficient'))
-        E_m = float(kwargs.get('migration_energy'))
-        cte_red = float(kwargs.get('cte_red'))
+        t_0 = float(kwargs.get('vibration_frequency')) # type: ignore
+        gamma_drift = float(kwargs.get('drift_coefficient'))# type: ignore
+        E_m = float(kwargs.get('migration_energy'))# type: ignore
+        cte_red = float(kwargs.get('cte_red'))# type: ignore
     else:
         t_0 = cte.t_0
         gamma_drift = cte.gamma_drift
@@ -106,7 +106,7 @@ def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float
     if abs(E_field*(10e-9)) > 0.5:
         # En la expresión original se multiplica por 2 lo he quitado para ver si sale algo mejor
         # print(f"EL valor del potencial es: {E_field*(10e-9)}")
-        oxigen_velocity = 3e-07  # 2 * t_0 * cte_red * (senoh * exp_velocity)
+        oxigen_velocity = 2 * t_0 * cte_red * (senoh * exp_velocity)
     else:
         oxigen_velocity = 0  # para que no se mueva hasta q se alcance un potencial concreto
 
@@ -133,7 +133,7 @@ def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float
     return oxygen_state, oxigen_velocity, displacement
 
 
-def Recombine(actual_state: np.array, oxygen_state: np.array, paso_temp: float, velocidad: float, temp: float, **kwargs) -> np.array:
+def Recombine(actual_state: np.array, oxygen_state: np.array, paso_temp: float, velocidad: float, temp: float, **kwargs) -> np.array:# type: ignore
     """
     Recombines oxygen and actual states based on certain conditions.
 
@@ -185,10 +185,10 @@ def Prob_Recombination(paso_temporal: float, velocidad: float, temp: float, **kw
     # Obtengo las constantes necesarias para el cálculo
     if kwargs:
         # Obtengo el valor de las constantes que necesita la función
-        t_0 = float(kwargs.get('vibration_frequency'))
-        beta_0 = float(kwargs.get('recom_enchancement_factor'))
-        E_a = float(kwargs.get('activation_energy'))
-        L_p = float(kwargs.get('decaimiento_concentracion'))
+        t_0 = float(kwargs.get('vibration_frequency'))# type: ignore
+        beta_0 = float(kwargs.get('recom_enchancement_factor'))# type: ignore
+        E_a = float(kwargs.get('activation_energy'))# type: ignore
+        L_p = float(kwargs.get('decaimiento_concentracion'))# type: ignore
         # cte_red = float(kwargs.get('cte_red'))
     else:
         t_0 = cte.t_0

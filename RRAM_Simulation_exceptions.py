@@ -319,8 +319,7 @@ for k in (range(0, num_pasos)):
         voltage_RRAM = voltage
         # Si ha percolado uso la corriente de Ohm
         try:
-            current, resistencia[k] = CurentSolver.OmhCurrent(
-                voltage, resistance_matrix, **sim_ctes[num_simulation])
+            current, resistencia[k] = CurentSolver.OmhCurrent(voltage, resistance_matrix, **sim_ctes[num_simulation])# type: ignore
 
         except Warning:
             filename = simulation_path + f'Null_Resistance/Configuration_Set_{voltage}_null_resistance.pkl'
@@ -340,7 +339,7 @@ for k in (range(0, num_pasos)):
         resistencia[k] = 0
 
         mean_field = np.mean(E_field_vector)
-        current = CurentSolver.Poole_Frenkel(temperatura, mean_field, **sim_ctes[num_simulation])*(device_size)
+        current = CurentSolver.Poole_Frenkel(temperatura, mean_field, **sim_ctes[num_simulation])*(device_size)# type: ignore
         densidad_filamento = 0
 
     # Obtengo los valores del campo eléctrico y la temperatura
@@ -501,7 +500,7 @@ for k in (range(0, num_pasos)):
         voltage_RRAM = voltage  # - (current * Resistencia_serie)
         try:
             current, resistencia[k] = CurentSolver.OmhCurrent(
-                voltage_RRAM, resistance_matrix, **sim_ctes[num_simulation])
+                voltage_RRAM, resistance_matrix, **sim_ctes[num_simulation])# type: ignore
         except Warning:
             filename = simulation_path + f'Figures/Configuration_Set_{voltage}_null_resistance.pkl'
             RepresentateState(resistance_matrix, k, paso_potencial,
@@ -514,12 +513,12 @@ for k in (range(0, num_pasos)):
         sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 1)
         mean_field = np.mean(E_field_vector)
         # Si no ha percolado uso la corriente de Poole-Frenkel
-        current = CurentSolver.Poole_Frenkel(temperatura, mean_field, **sim_ctes[num_simulation])*(device_size)
+        current = CurentSolver.Poole_Frenkel(temperatura, mean_field, **sim_ctes[num_simulation])*(device_size)# type: ignore
         filament_density = 0
 
     # Obtengo los valores del campo eléctrico y la temperatura
     E_field = SimpleElectricField(voltage, device_size)
-    temperatura = Temperature_Joule(voltage, current, T_0, **sim_ctes[num_simulation])
+    temperatura = Temperature_Joule(voltage, current, T_0, **sim_ctes[num_simulation])# type: ignore
     # Genero el vector campo eléctrico
     for i in range(0, actual_state.shape[0]):
         E_field_vector[i] = GapElectricField(voltage, i, actual_state, **sim_parmtrs[num_simulation])
@@ -657,7 +656,7 @@ for k in (range(0, num_pasos)):
         # Si ha percolado uso la corriente de Ohm
         try:
             current, resistencia[k] = CurentSolver.OmhCurrent(
-                voltage, resistance_matrix, **sim_ctes[num_simulation])
+                voltage, resistance_matrix, **sim_ctes[num_simulation])# type: ignore
             current = abs(current)
         except Warning:
             filename = reset_simulation_path + f'Configuration_pp_reset_{voltage}_null_resistance.pkl'
@@ -669,12 +668,12 @@ for k in (range(0, num_pasos)):
     else:
         # Si no ha percolado uso la corriente de Poole-Frenkel
         current = abs(CurentSolver.Poole_Frenkel(temperatura, np.mean(
-            E_field_vector), **sim_ctes[num_simulation])*(device_size))
+            E_field_vector), **sim_ctes[num_simulation])*(device_size))# type: ignore
         filament_density = 0
 
     # Obtengo los valores del campo eléctrico y la temperatura
     E_field = abs(SimpleElectricField(voltage, device_size))
-    temperatura = Temperature_Joule(voltage, current, T_0, **sim_ctes[num_simulation])
+    temperatura = Temperature_Joule(voltage, current, T_0, **sim_ctes[num_simulation])# type: ignore
 
     # Genero el vector campo eléctrico
     for i in range(0, actual_state.shape[0]):
@@ -791,7 +790,7 @@ for k in (range(0, num_pasos)):  # son num_pasos + 1 iteraciones
         # Si ha percolado uso la corriente de Ohm
         try:
             current, resistencia[k] = CurentSolver.OmhCurrent(
-                voltage, resistance_matrix, **sim_ctes[num_simulation])
+                voltage, resistance_matrix, **sim_ctes[num_simulation])# type: ignore
             current = abs(current)
         except Warning:
             filename = reset_simulation_path + f'Configuration_sp_reset_{voltage}_null_resistance.pkl'
@@ -803,13 +802,13 @@ for k in (range(0, num_pasos)):  # son num_pasos + 1 iteraciones
     else:
         # Si no ha percolado uso la corriente de Poole-Frenkel
         current = abs(CurentSolver.Poole_Frenkel(temperatura, np.mean(
-            E_field_vector), **sim_ctes[num_simulation])*(device_size))
+            E_field_vector), **sim_ctes[num_simulation])*(device_size))# type: ignore
 
         filament_density = 0
 
     # Obtengo los valores del campo eléctrico y la temperatura
     E_field = abs(SimpleElectricField(voltage, device_size))
-    temperatura = Temperature_Joule(voltage, current, T_0, **sim_ctes[num_simulation])
+    temperatura = Temperature_Joule(voltage, current, T_0, **sim_ctes[num_simulation])# type: ignore
 
     # Genero el vector campo eléctrico
     for i in range(0, actual_state.shape[0]):
