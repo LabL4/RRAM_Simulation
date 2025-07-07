@@ -496,16 +496,16 @@ def plot_IV(v_set,
     y_reset = abs(data_reset[:, 1])
 
     # Curvas experimentales
-    # axes.plot(x_set, y_set, 'black', label='Set experimental')
-    # axes.plot(x_reset, y_reset, 'black', label='Reset experimental')
+    axes.plot(x_set, y_set, 'black', label='Set experimental', linewidth=2.5)
+    axes.plot(x_reset, y_reset, 'black', label='Reset experimental', linewidth=2.5)
 
-    # Leyenda ajustada
+    # Leyenda ajustada en la parte inferior izquierda
     axes.legend(
         labelspacing=0.3,
         handletextpad=0.2,
         handlelength=1.0,
         borderaxespad=0.2,
-        loc='best',
+        loc='lower left',
     )
 
     # Guardar figura

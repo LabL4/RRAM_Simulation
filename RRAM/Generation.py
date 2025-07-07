@@ -91,6 +91,7 @@ def Generate(time_stp: float, electric_field: float, temp: float, **kwargs) -> f
         # Obtengo el valor de las constantes que necesita la función
         t_0 = float(kwargs.get('vibration_frequency'))      # type: ignore
         E_a = float(kwargs.get('activation_energy'))        # type: ignore
+        # print("E_a:", E_a)
         cte_red = float(kwargs.get('cte_red'))              # type: ignore
         gamma = float(kwargs.get('gamma'))                  # type: ignore
     else:
@@ -99,6 +100,7 @@ def Generate(time_stp: float, electric_field: float, temp: float, **kwargs) -> f
         cte_red = cte.cte_red
         gamma = cte.gamma
 
+    # print("E_a:", E_a)
     exponente = (E_a - (gamma * cte_red * electric_field)) / (cte.k_b_ev * temp)
     prob_generacion = time_stp * t_0 * (np.exp(-exponente))
 

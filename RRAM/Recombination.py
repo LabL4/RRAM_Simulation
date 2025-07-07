@@ -189,6 +189,7 @@ def Prob_Recombination(paso_temporal: float, velocidad: float, temp: float, **kw
         beta_0 = float(kwargs.get('recom_enchancement_factor'))# type: ignore
         # E_a = float(kwargs.get('activation_energy'))# type: ignore esto lo dejo por si acasi el valor inicial es 1.05 como el de E_a que el bn es 1.05
         E_r = float(kwargs.get('recombination_energy')) # type: ignore Energia de activación de la recombinación
+        # print("E_r:", E_r)
         L_p = float(kwargs.get('decaimiento_concentracion'))# type: ignore
         # cte_red = float(kwargs.get('cte_red'))
     else:

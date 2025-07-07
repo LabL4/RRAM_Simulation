@@ -151,7 +151,9 @@ print("El valor de resistencia termica no percola es: ", sim_ctes[num_simulation
 print("El valor de resistencia termica percola es: ", sim_ctes[num_simulation]['r_termica_percola'])
 print("El valor de I_0 es: ", sim_ctes[num_simulation]['I_0'])
 print("El valor de E_a es: ", sim_ctes[num_simulation]['activation_energy'])
-print("El valor del factor de generacion es; ", sim_ctes[num_simulation]['factor_generacion'])
+print("El valor de E_r es: ", sim_ctes[num_simulation]['recombination_energy'])
+print("El valor del factor de generacion es: ", sim_ctes[num_simulation]['factor_generacion'])
+
 
 # Creo el vector de diferencias de potencial
 vector_ddp = np.arange(0.000, voltaje_max_simulation + paso_potencial, paso_potencial)
@@ -360,7 +362,7 @@ for k in (range(0, num_pasos)):
         for j in range(y_size):
             if actual_state[i, j] == 0:
                 if np.sum(actual_state[i-1:i+1, j-1:j+1]) > 0:
-                    prob_generacion = prob_generacion * 1.25
+                    prob_generacion = prob_generacion * 1.05
                 random_number = np.random.rand()
                 if random_number < prob_generacion:
                     actual_state[i, j] = 1  # Generación de una vacante
@@ -534,7 +536,7 @@ for k in (range(0, num_pasos)):
                 if np.sum(actual_state) < int(0.6*num_max_vacantes):
                     # Compruebo si tiene una vacante cerca
                     if np.sum(actual_state[i-1:i+1, j-1:j+1]) > 0:
-                        prob_generacion = prob_generacion * 1.2
+                        prob_generacion = prob_generacion * 1.05
                 else:
                     prob_generacion = 0
 
