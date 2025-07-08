@@ -1,3 +1,4 @@
+from flask import g
 from RRAM import Plot_PostProcess as pplt
 import matplotlib.pyplot as plt
 from RRAM import Recombination
@@ -167,6 +168,7 @@ E_field_vector = np.zeros((actual_state.shape[0]))
 num_vacantes = np.zeros(num_pasos+1)
 resistencia = np.zeros(num_pasos+1)
 array_filament_density = np.zeros(num_pasos+1)
+g_valor = np.zeros((num_pasos, x_size))
 
 
 T_0 = float(sim_parmtrs[num_simulation]['init_temp'])
@@ -238,6 +240,7 @@ for k in (range(0, num_pasos)):
         config_matrix_recortada = config_matrix_pp_set[k, :, :]
         tiempo_pp_set = paso_temporal * (k - 1)  # Le quitamos un paso porque se ha superado el voltaje de ruptura
         resistencia_copy = resistencia.copy()
+        g_valor = g_valor[:k, :]
 
         print("Voltaje final set", voltaje_max_set, 'en el tiempo ', tiempo_pp_set, "\n")
 
@@ -267,6 +270,9 @@ for k in (range(0, num_pasos)):
         tiempo_pp_set = paso_temporal * (k - 1)  # Le quitamos un paso porque se ha superado el voltaje de ruptura
         resistencia_copy = resistencia.copy()
 
+        g_valor = g_valor[:k, :]
+        print("El valor de g es: ", g_valor)
+        
         print("Voltaje final set", voltaje_max_set, 'en el tiempo ', tiempo_pp_set, "\n")
 
         # Crear un array de ejemplo
@@ -366,6 +372,9 @@ for k in (range(0, num_pasos)):
                 random_number = np.random.rand()
                 if random_number < prob_generacion:
                     actual_state[i, j] = 1  # Generación de una vacante
+    
+    print(f"El valor de g es : {Generation.evalutate_g(actual_state, size_grid=40)} para el paso {k} y voltaje {voltage}")
+    g_valor[k] = Generation.evalutate_g(actual_state, size_grid=40)
 
     if 0.45 < voltage < (voltaje_final_set - 0.2):
         # print("El resultado de la division es: ", k % paso_guardar_2)
@@ -389,6 +398,7 @@ for k in (range(0, num_pasos)):
 
 data_pp_set = data_pp_set[~np.all(data_pp_set == 0, axis=1)]  # Elimino los valores nulos
 
+
 # Si está activada la opción de guardar los datos:
 if guardar_datos:
     # Cuando acaba la simulacion guardo las matrices de configuración
@@ -401,6 +411,8 @@ with open(set_simulation_path + f'Last_Configuration_pp_set_{num_simulation+1}.p
 
 np.savetxt(set_simulation_path + f'resultados_pp_set_{num_simulation+1}.csv',
            data_pp_set, header=header_files, delimiter=',')
+
+np.savetxt(set_simulation_path + f'g_pp_set_{num_simulation+1}.csv', g_valor, delimiter=',')
 
 # Guardo las vacantes generadas en el forming
 with open(set_simulation_path + f"Vacantes_resistencia_{num_simulation+1}.txt", "w") as f:
@@ -439,6 +451,7 @@ config_matrix_sp_set = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size
 
 # Creo el vector de diferencias de potencial
 vector_ddp = np.arange(voltaje_max_set, 0.000, -paso_potencial)
+g_valor = np.zeros((num_pasos, x_size))
 
 print("Voltaje inicial sp set", voltaje_max_set)
 
@@ -548,6 +561,7 @@ for k in (range(0, num_pasos)):
                     # Si el sistema está lleno de vacantes, no se generan más
                     prob_generacion = 0
 
+    g_valor[k] = Generation.evalutate_g(actual_state, size_grid=40)
     # Tiempo total de la simulacion
     tiempo_total = simulation_time + tiempo_pp_set
     data_sp_set[k] = np.array([tiempo_total, voltage, current, temperatura, E_field,
@@ -570,6 +584,8 @@ with open(set_simulation_path + f'Last_Configuration_sp_set_{num_simulation+1}.p
 
 np.savetxt(set_simulation_path + f'Resultados_sp_set_{num_simulation +1}.csv',
            data_sp_set, header=header_files, delimiter=',')
+
+np.savetxt(set_simulation_path + f'g_sp_set_{num_simulation+1}.csv', g_valor, delimiter=',')
 # endregion
 
 # region Región de la primera parte del reset
@@ -597,6 +613,7 @@ initial_oxygen_reset = oxygen_state
 
 # Vuelvo a definir el vector de resistencia total
 resistencia = np.zeros(num_pasos+1)
+g_valor = np.zeros((num_pasos, x_size))
 
 RepresentateState(initial_configuration_reset, k, paso_potencial, simulation_path +
                   f'Figures/Initial_pp_reset_configuration_{num_simulation+1}.png')
@@ -712,6 +729,8 @@ for k in (range(0, num_pasos)):
     data_pp_reset[k] = np.array([tiempo_total, voltage, current, temperatura,
                                  E_field, np.mean(E_field_vector), desplazamiento, filament_density])
 
+    g_valor[k] = Generation.evalutate_g(actual_state, size_grid=40)
+    
     # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
     if k % 1 == 0:  # Arreglo rapido para q lo guarde siempre
         config_matrix_pp_reset[int(k / paso_guardar) - 1] = actual_state
@@ -740,6 +759,9 @@ RepresentateTwoStates(actual_state, oxygen_state, k, paso_potencial, simulation_
 
 np.savetxt(reset_simulation_path +
            f'resultados_pp_reset_{num_simulation +1}.csv', data_pp_reset, header=header_files, delimiter=',')
+
+np.savetxt(reset_simulation_path + f'g_pp_reset_{num_simulation+1}.csv', g_valor, delimiter=',')
+
 tiempo_pp_reset = simulation_time
 # endregion
 
@@ -775,6 +797,8 @@ RepresentateTwoStates(actual_state, oxygen_state, k, paso_potencial, simulation_
                       f'Figures/Initial_State_sp_reset_{num_simulation+1}.png')
 
 sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 5)
+
+g_valor = np.zeros((num_pasos, x_size))
 
 # Ciclo para la segunda parte del reset
 # for k in tqdm(range(0, num_pasos)):  # son num_pasos + 1 iteraciones
@@ -843,6 +867,9 @@ for k in (range(0, num_pasos)):  # son num_pasos + 1 iteraciones
 
     data_sp_reset[k] = np.array([tiempo_total, voltage, current, temperatura,
                                  E_field, np.mean(E_field_vector), desplazamiento, filament_density])
+    
+    g_valor[k] = Generation.evalutate_g(actual_state, size_grid=40)
+    
     # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
 
     if k % 1 == 0:  # Arreglo rapido para q lo guarde siempre
@@ -862,8 +889,11 @@ if guardar_datos:
 np.savetxt(reset_simulation_path +
            f'resultados_sp_reset_{num_simulation +1}.csv', data_sp_reset, header=header_files, delimiter=',')
 
+np.savetxt(reset_simulation_path + f'g_sp_reset_{num_simulation+1}.csv', g_valor, delimiter=',')
+
 RepresentateTwoStates(actual_state, oxygen_state, k, paso_potencial, simulation_path +
                       f'Figures/Final_State_sp_reset_{num_simulation+1}.png')
+
 
 # endregion
 

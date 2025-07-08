@@ -4,6 +4,19 @@ import math
 from RRAM import Constants as cte
 
 
+def evalutate_g(matrix: np.ndarray, size_grid: int = 40) -> np.ndarray:
+    result = []
+    for row in matrix:
+        count = 0
+        for val in row:
+            if val == 1:
+                count += 1
+            else:
+                break  # parar en el primer 0
+        final_value = size_grid - count
+        result.append(final_value)
+    return np.array(result).transpose()
+
 def initial_state(Eje_x: float, Eje_y: float, num_trampas: int):
     """
     Generate an initial state for a grid with given dimensions and number of traps.
