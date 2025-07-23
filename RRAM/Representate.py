@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 from RRAM import Montecarlo
 
+import os
 # region Configuración del plot
 
 
@@ -68,7 +69,7 @@ def RepresentateState(matriz: np.ndarray, k: int, paso_voltaje: float, filename:
     x = np.linspace(0, 10, ncols)  # Escala real de 10 nm en eje X
     y = np.linspace(0, 10, nrows)  # Escala real de 10 nm en eje Y
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(12, 9))
 
     # Crear mapa de colores
     colors = [(1, 1, 1), color]  # Blanco (0) y Color dado (1)
@@ -129,7 +130,6 @@ def RepresentateState(matriz: np.ndarray, k: int, paso_voltaje: float, filename:
         plt.savefig(filename, bbox_inches="tight")
 
     # Mostrar gráfico
-    plt.show()
     plt.close(fig)
 
     return None
@@ -381,7 +381,7 @@ def RepresentateTwoStates(
     x = np.linspace(0, 10, ncols)  # Escala real de 10 nm en eje X
     y = np.linspace(0, 10, nrows)  # Escala real de 10 nm en eje Y
 
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(12, 9))  # Tamaño de la figura ajustado
 
     # Crear mapas de colores para cada matriz
     cmap1 = LinearSegmentedColormap.from_list("cmap1", [(1, 1, 1), (0.9647, 0.1725, 0.3059)], N=2)  # Rojo
@@ -444,7 +444,6 @@ def RepresentateTwoStates(
         plt.savefig(filename, bbox_inches="tight")
 
     # Mostrar gráfico
-    plt.show()
     plt.close(fig)
 
     return None
@@ -466,10 +465,14 @@ def plot_IV(v_set,
         num_simulation (int): Simulation number for saving the figure.
         figures_path (str): Path to save the figure.
     """
+    
+    figures_path = os.getcwd() + '/Results/Figures'
+    
+    
     # Configuración de la figura
     setup_plt(plt, latex=True, scaling=2)
 
-    fig, axes = plt.subplots(figsize=(6, 6))
+    fig, axes = plt.subplots(figsize=(12, 9))
     config_ax(axes)
 
     axes.set_xlabel('Voltage [V]')
@@ -483,8 +486,8 @@ def plot_IV(v_set,
     # Ruta de los datos experimentales
     # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt'
     # ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt'
-    ruta_archivo_set = 'C:/Users/jimdo/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt'
-    ruta_archivo_reset = 'C:/Users/jimdo/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt'
+    ruta_archivo_set = os.getcwd() + '/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt'
+    ruta_archivo_reset = os.getcwd() + '/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt'
 
     # Cargar datos experimentales
     data_set = np.loadtxt(ruta_archivo_set)
@@ -509,7 +512,7 @@ def plot_IV(v_set,
     )
 
     # Guardar figura
-    fig.savefig(figures_path + f'/I-V_{num_simulation}.png', bbox_inches='tight')
+    fig.savefig(figures_path + f'/I-V_{num_simulation+1}.png', bbox_inches='tight', dpi=300) # type: ignore
     plt.close(fig)  # Cierra para liberar memoria
 
 

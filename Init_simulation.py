@@ -4,14 +4,15 @@ from RRAM import Generation as gn
 from RRAM import Constants as cte
 from RRAM import Recombination
 import pandas as pd
-import numpy as np
+import numpy as np # pyright: ignore[reportMissingImports]
 from RRAM import *
 import shutil
 import pickle
 import sys
 import os
 
-ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'
+# ruta_raiz = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/'
+ruta_raiz = 'C:/Users/jimdo/Documents/GitHub/RRAM_Simulation/'
 # ruta_raiz = '/Users/antonio_lopez_torres/Documents/GitHub/RRAM_Simulation/'  # Ruta en el mac
 sys.path.append(ruta_raiz)
 
@@ -25,12 +26,11 @@ if len(sys.argv) > 1:
 
 else:
     print("No se ha pasado ningún parámetro.")
-    data_path = ruta_raiz + 'Init_data/'
-    num_simulations = 10
+    data_path = ruta_raiz + 'Initial_data/'
+    num_simulations = 4
 
     print(f"Ruta de los archivos de datos: {data_path}")
     print(f"El número de simulaciones es: {num_simulations}")
-
 # ----------------------------------------------------------------------------------------------------------------------------------
 
 # Defino la carpeta donde se guardan los datos iniciales de la simulación
@@ -50,7 +50,7 @@ os.makedirs(carpeta)
 
 device_size = np.ones(num_simulations) * 10e-9  # m
 atom_size = np.ones(num_simulations) * 0.25e-9  # m TODO: Esto se deberia llamarse tamaño del grid mejor
-num_trampas = np.ones(num_simulations, dtype=int) * 130  # 130
+num_trampas = np.ones(num_simulations, dtype=int) * 50  # 130
 
 priv_y_sup_right = np.ones(num_simulations, dtype=int) * 15
 priv_y_inf_right = np.ones(num_simulations, dtype=int) * 15
@@ -245,4 +245,6 @@ df_ctes['factor_generacion'] = factor_generacion
 df_ctes['recombination_energy'] = recombination_energy
 
 # Guardo el dataframe de las ctes en un archivo csv
-df_ctes.to_csv('Init_data/simulation_constants.csv', index=False)
+print(df_ctes)
+
+df_ctes.to_csv('C:/Users/jimdo/Documents/GitHub/RRAM_Simulation/Init_data/simulation_constants.csv', index=False)

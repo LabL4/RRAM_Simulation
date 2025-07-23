@@ -11,4 +11,5 @@ from .Temperature import *
 from .CurentSolver import *
 from .Representate import *
 from .ElectricField import *
+from .io_manager import *
 

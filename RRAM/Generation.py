@@ -1,4 +1,4 @@
-import numpy as np
+import numpy as np # type: ignore
 import math
 
 from RRAM import Constants as cte
@@ -118,3 +118,29 @@ def Generate(time_stp: float, electric_field: float, temp: float, **kwargs) -> f
     prob_generacion = time_stp * t_0 * (np.exp(-exponente))
 
     return prob_generacion
+
+
+def vecinos_verticales(matriz, i, j):
+    x_size = matriz.shape[0]
+    return (
+        (i > 0 and matriz[i-1, j] > 0) or
+        (i < x_size - 1 and matriz[i+1, j] > 0)
+    )
+    
+def vecinos_horizontales(matriz, i, j):
+    y_size = matriz.shape[1]
+    return (
+        (j > 0 and matriz[i, j-1] > 0) or
+        (j < y_size - 1 and matriz[i, j+1] > 0)
+    )
+
+def tiene_vecinos(matriz, i, j):
+    x_size, y_size = matriz.shape
+    return (
+        (i > 0 and matriz[i-1, j] > 0) or           # arriba
+        (i < x_size - 1 and matriz[i+1, j] > 0) or  # abajo
+        (j > 0 and matriz[i, j-1] > 0) or           # izquierda
+        (j < y_size - 1 and matriz[i, j+1] > 0)     # derecha
+    )
+
+

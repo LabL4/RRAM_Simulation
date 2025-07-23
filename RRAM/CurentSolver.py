@@ -25,7 +25,7 @@ def Generate_Resitence_Matrix(configuration_matrix: np.ndarray, paths: list) -> 
     return percolation_matrix
 
 
-def OmhCurrent(potential: float, config_state: np.array, **kwargs) -> float:
+def OmhCurrent(potential: float, config_state: np.array, **kwargs) -> float: # pyright: ignore[reportGeneralTypeIssues]
     """
     Calculates the Ohmic current based on the given parameters.
 
@@ -41,7 +41,7 @@ def OmhCurrent(potential: float, config_state: np.array, **kwargs) -> float:
     # Obtengo los valores de las constantes si las estoy pasando como argumentos
     if kwargs:
         # Obtengo el valor de las constantes que necesita la función
-        ohm_resistence = float(kwargs.get('ohm_resistence'))
+        ohm_resistence = float(kwargs.get('ohm_resistence')) # pyright: ignore[reportArgumentType]
     else:
         ohm_resistence = 1.5
 
