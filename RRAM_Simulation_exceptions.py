@@ -229,7 +229,7 @@ for k in (range(0, num_pasos)):
         # RepresentateState(resistance_matrix,k,paso_potencial, simulation_path + f'Figures/final_pp_set_resistance_{num_simulation+1}.png')
         break
     if voltage > voltaje_final_set:
-        print("\nSe ha superado el voltaje de ruptura en la iteracion: ", k)
+        print("\nSe ha superado el voltaje de ruptura en la iteracion: ", k, " que corresponde al voltaje: ", voltage)
 
         # Verifica si el sistema ha percolado    
         if not sistema_percola:
@@ -260,10 +260,14 @@ for k in (range(0, num_pasos)):
     # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
     if Percolation.is_path(actual_state):
         if sistema_percola is False:
-        
             voltaje_percolacion = voltage   # Guardo el voltaje de percolación
-
+            
             print("\nEl sistema ha percolado en la iteración: ", k, " que corresponde con el voltaje: ", voltaje_percolacion)
+        
+            if voltaje_percolacion >= 0.7:
+                # Si el voltaje de percolación es demasiado alto no va a coincidir con los datos experimentales
+                raise exceptions.HighPercolationVoltageException()
+            
             
             # Cambio la probabilidad de generación de vacantes para controlar la percolación
             sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / factor_generacion)
@@ -337,13 +341,16 @@ for k in (range(0, num_pasos)):
         prob_generacion = Generation.Generate(paso_temporal, E_field_vector[i], temperatura, **sim_ctes[num_simulation])
         for j in range(y_size):
             if actual_state[i, j] == 0:
-                if np.sum(actual_state) < int(0.5*num_max_vacantes): # antes era un 0.6
+                if np.sum(actual_state) < int(0.4*num_max_vacantes): # antes era un 0.6
                     # Compruebo si tiene una vacante cerca
                     if Generation.vecinos_horizontales(actual_state, i, j): #np.sum(actual_state[i-1:i+1, j-1:j+1]) > 0:
                         prob_generacion = prob_generacion * 1.05
                     else:
                         prob_generacion = prob_generacion * 0.9
                 else:
+                    if 'printed_40_percent' not in locals():
+                        print("\nSe ha llenado el espacio de simulación al 40%, se deja de generar vacantes")
+                        printed_40_percent = True
                     prob_generacion = 0 # LO hago para que no se generen más vacantes y no se llene el sistema
                     
                 random_number = np.random.rand()
@@ -381,12 +388,12 @@ with open(set_simulation_path + f'Last_Configuration_pp_set_{num_simulation+1}.p
     pickle.dump(actual_state, f)
 
 np.savetxt(set_simulation_path + f'resultados_pp_set_{num_simulation+1}.csv', data_pp_set, header=header_files, delimiter=',')
-print("El fichero de resultados_pp_set contiene ", data_pp_set.shape[0], ' filas y ', data_pp_set.shape[1], ' columnas')
+# print("El fichero de resultados_pp_set contiene ", data_pp_set.shape[0], ' filas y ', data_pp_set.shape[1], ' columnas')
 
 g_pp_set = np.array(g_valor_list[1:])
 
 np.savetxt(set_simulation_path + f'g_pp_set_{num_simulation+1}.txt', g_pp_set, delimiter=',', fmt='%.0f')
-print("El g en el pp set contiene ", g_pp_set.shape[0], ' filas y ', g_pp_set.shape[1], ' columnas')
+# print("El g en el pp set contiene ", g_pp_set.shape[0], ' filas y ', g_pp_set.shape[1], ' columnas')
 
 # Guardo las vacantes generadas en el forming
 with open(set_simulation_path + f"Vacantes_resistencia_{num_simulation+1}.txt", "w") as f:
@@ -559,21 +566,21 @@ with open(set_simulation_path + f'Last_Configuration_sp_set_{num_simulation+1}.p
     pickle.dump(actual_state, f)
 
 np.savetxt(set_simulation_path + f'Resultados_sp_set_{num_simulation +1}.csv', data_sp_set, header=header_files, delimiter=',')
-print("El fichero de resultados_sp_set contiene ", data_sp_set.shape[0], ' filas y ', data_sp_set.shape[1], ' columnas')
+# print("El fichero de resultados_sp_set contiene ", data_sp_set.shape[0], ' filas y ', data_sp_set.shape[1], ' columnas')
 
 # Guardo los resultados del set completos combinando los resultados de las dos partes
 data_sp_set_final = np.concatenate((data_pp_set, data_sp_set), axis=0)
 np.savetxt(set_simulation_path + f'Resultados_set_{num_simulation +1}.csv', data_sp_set_final, header=header_files, delimiter=',')
-print("El fichero de resultados set contiene ", data_sp_set.shape[0], ' filas y ', data_sp_set.shape[1], ' columnas')
+# print("El fichero de resultados set contiene ", data_sp_set.shape[0], ' filas y ', data_sp_set.shape[1], ' columnas')
 
 np.savetxt(set_simulation_path + f'g_sp_set_{num_simulation+1}.txt', g_sp_set, delimiter=',', fmt='%.0f')
 
 # Guardo los valores de g del proceso de set, combinando los vectores de g de las dos partes
 g_set = np.concatenate((g_pp_set, g_sp_set), axis=0)
 
-print("El g en el set contiene ", g_set.shape[0], ' filas y ', g_set.shape[1], ' columnas')
+# print("El g en el set contiene ", g_set.shape[0], ' filas y ', g_set.shape[1], ' columnas')
 np.savetxt(set_simulation_path + f'g_set_{num_simulation+1}.txt', g_set, delimiter=',', fmt='%.0f')
-print("El fichero de g del set contiene ", g_set.shape[0], ' filas y ', g_set.shape[1], ' columnas')
+# print("El fichero de g del set contiene ", g_set.shape[0], ' filas y ', g_set.shape[1], ' columnas')
 # endregion
 
 # region Región de la primera parte del reset
@@ -609,7 +616,8 @@ RepresentateState(initial_configuration_reset, k, paso_potencial, simulation_pat
 print(f"\n Comienza la primera parte del reset")
 
 # Durante el reset la generación debe ser más baja por lo que cambio el valor de la constante gamma para desfavaorecer la generación
-sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 10)  # 5) #antes habia un 3
+sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 1000)  # 5) #antes habia un 3
+print("El valor de gamma para la primera parte del reset es: ", sim_ctes[num_simulation]['gamma'])
 
 # Ciclo para la primera parte del reset
 # for k in tqdm(range(0, num_pasos)):

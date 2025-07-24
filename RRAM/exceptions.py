@@ -15,3 +15,12 @@ class MaxVacantesException(Exception):
     def __init__(self, message="El espacio de simulación se ha llenado de vacantes"):
         self.message = message
         super().__init__(self.message)
+        
+# Excepción para cuando el voltaje de percolación es demasiado alto
+class HighPercolationVoltageException(Exception):
+    def __init__(self, message="El voltaje de percolación es demasiado alto"):
+        self.message = message
+        super().__init__(self.message)
+# Excepción para cuando el voltaje de percolación es demasiado bajo
+
+
