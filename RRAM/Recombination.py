@@ -48,7 +48,7 @@ def Generate_Oxigen(oxygen_state: np.array, num_oxygen: int): # type: ignore
     # Itero sobre cada par coordenada para asignar el valor de 1 que representa que se generó un oxígeno en esa posición
     for i in range(num_oxygen):
         random_number = np.random.rand()
-        if (oxygen_state[y[i], 0] == 0 and random_number < 0.5):
+        if (oxygen_state[y[i], 0] == 0 and random_number < 0.35):
             oxygen_state[y[i], 0] = 1
 
     # Devuelvo la matriz con los oxígenos generados
@@ -107,6 +107,8 @@ def Move_OxygenIons(paso_temp: float, oxygen_state: np.array, temperature: float
         # En la expresión original se multiplica por 2 lo he quitado para ver si sale algo mejor
         # print(f"EL valor del potencial es: {E_field*(10e-9)}")
         oxigen_velocity = 3e-07 # 2 * t_0 * cte_red * (senoh * exp_velocity)
+    elif abs(E_field*(10e-9)) > 0.7:
+        oxigen_velocity = 5.2e-07 # 2 * t_0 * cte_red * (senoh * exp_velocity)
     else:
         oxigen_velocity = 0  # para que no se mueva hasta q se alcance un potencial concreto
 
@@ -150,8 +152,8 @@ def Recombine(actual_state: np.array, oxygen_state: np.array, paso_temp: float, 
     actual_state_before = np.copy(actual_state)
 
     # Calculo la probabilidad de recombinación.
-    prob_recom = Prob_Recombination(paso_temp, velocidad, temp, **kwargs)
-
+    prob_recom = min(Prob_Recombination(paso_temp, velocidad, temp, **kwargs), 1.0) # Para que no se pase de 1.0
+    # print(f"Probabilidad de recombinación: {prob_recom:.4f}")
     # Recorro la matriz de oxígeno para saber en qué posiciones hay oxígeno
     for i in range(oxygen_state_before.shape[0]):
         for j in range(oxygen_state_before.shape[1]):
@@ -181,31 +183,36 @@ def Recombine(actual_state: np.array, oxygen_state: np.array, paso_temp: float, 
 
 
 def Prob_Recombination(paso_temporal: float, velocidad: float, temp: float, **kwargs) -> float:
-
     # Obtengo las constantes necesarias para el cálculo
     if kwargs:
         # Obtengo el valor de las constantes que necesita la función
-        t_0 = float(kwargs.get('vibration_frequency'))# type: ignore
-        beta_0 = float(kwargs.get('recom_enchancement_factor'))# type: ignore
-        # E_a = float(kwargs.get('activation_energy'))# type: ignore esto lo dejo por si acasi el valor inicial es 1.05 como el de E_a que el bn es 1.05
-        E_r = float(kwargs.get('recombination_energy')) # type: ignore Energia de activación de la recombinación
-        # print("E_r:", E_r)
-        L_p = float(kwargs.get('decaimiento_concentracion'))# type: ignore
-        # cte_red = float(kwargs.get('cte_red'))
+        t_0 = float(kwargs.get('vibration_frequency'))  # type: ignore
+        beta_0 = float(kwargs.get('recom_enchancement_factor'))  # type: ignore
+        E_r = float(kwargs.get('recombination_energy'))  # type: ignore
+        L_p = float(kwargs.get('decaimiento_concentracion'))  # type: ignore
     else:
         t_0 = cte.t_0
         beta_0 = cte.beta_0
         E_r = cte.E_r
         L_p = cte.L_p
-        # cte_red = cte.cte_red
 
-    # Calculo la  probabilidad de recombinación en equilibrio
-    # print("E_r:", E_r)
-    
+    # Calculo la probabilidad de recombinación en equilibrio
     prob_in_equilibrio = (paso_temporal * t_0) * (math.exp(-E_r / (k_b_ev * temp)))
     exp_beta = math.exp(-(paso_temporal * velocidad) / L_p) * beta_0
-
     prob_recom = prob_in_equilibrio * exp_beta
+    # Imprimir los valores usados solo la primera vez que se ejecuta la función
+    if not hasattr(Prob_Recombination, "_has_run"):
+        print("Valores utilizados en Prob_Recombination:")
+        print(f"paso_temporal: {paso_temporal}")
+        print(f"velocidad: {velocidad}")
+        print(f"t_0: {t_0}")
+        print(f"beta_0: {beta_0}")
+        print(f"E_r: {E_r}")
+        print(f"L_p: {L_p}")
+        print(f"Probabilidad de recombinación en equilibrio: {prob_in_equilibrio:.10f}")
+        print(f"Exponencial de beta: {exp_beta:.6f}")
+        Prob_Recombination._has_run = True
+
 
     return prob_recom
 

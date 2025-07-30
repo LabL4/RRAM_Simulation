@@ -1,10 +1,10 @@
 # from turtle import setup
-import matplotlib.pyplot as plt
+import matplotlib.pyplot as plt # type: ignore
 # from cv2 import log
-import pandas as pd
+import pandas as pd # type: ignore
 import numpy as np
 
-from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.colors import LinearSegmentedColormap # type: ignore
 
 # Varias funciones para representar los datos obtenidos de la simulación
 
@@ -60,8 +60,8 @@ def RepresentateALLState(state_matrix: np.ndarray, oxygen_matrix: np.ndarray, fi
     return None
 
 
-def Plot_paneles(data_path: str, col_indices_x: list, col_indices_y: list, save_path: str, global_tittle: str = None,
-                 titles: list = None, eje_x: list = None, eje_y: list = None, log_scale: list = None, ) -> None:
+def Plot_paneles(data_path: str, col_indices_x: list, col_indices_y: list, save_path: str, global_tittle: str = None, # type: ignore
+                 titles: list = None, eje_x: list = None, eje_y: list = None, log_scale: list = None, ) -> None: # type: ignore
     """Plot_paneles Representa los datos de un archivo CSV en un máximo de 4 paneles.
 
     Args:
@@ -97,7 +97,7 @@ def Plot_paneles(data_path: str, col_indices_x: list, col_indices_y: list, save_
 
     # Si hay más de un gráfico, ravel para convertir el array en una lista
     if num_plots > 1:
-        axes = axes.ravel()
+        axes = axes.ravel() # type: ignore
 
     # Asignar los datos y realizar las gráficas
     for i in range(num_plots):
@@ -206,7 +206,7 @@ def plot_both(data_path: str,
               save_path: str,
               global_tittle: str = ' ',
               leyend: list = [' ', ' '],
-              log_scale: list = None
+              log_scale: list = None # type: ignore
               ) -> None:
 
     # leo los datos desde el csv
@@ -257,13 +257,13 @@ def plot_both(data_path: str,
     plt.close(fig)
 
 
-def plot_simple(data_path: str,
+def plot_simple(data_path: str, # type: ignore
                 col_indices_x: int,
                 col_indices_y: int,
                 y_label: str,
                 save_path: str,
                 global_tittle: str = ' ',
-                log_scale: list = None
+                log_scale: list = None # type: ignore
                 ) -> None:
 
     # leo los datos desde el csv
@@ -314,7 +314,7 @@ def plot_simple(data_path: str,
                 global_tittle: str = ' ',
                 x_label: str = ' ',
                 y_label: str = ' ',
-                log_scale: list = None
+                log_scale: list = None # type: ignore
                 ) -> None:
 
     # leo los datos desde el csv
@@ -401,6 +401,6 @@ def setup_plt(plt, latex=True, scaling=1):
     plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
 
-setup_plt(plt, latex=True, scaling=1.5)
+setup_plt(plt, latex=True, scaling=1.5) # type: ignore
 
 # endregion

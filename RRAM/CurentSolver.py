@@ -62,7 +62,7 @@ def OmhCurrent(potential: float, config_state: np.array, **kwargs) -> float: # p
         total_resistance += parallel_resistance
 
         # Se calcula la corriente Ohmica
-    return potential/total_resistance, total_resistance
+    return potential/total_resistance, total_resistance # type: ignore
 
 
 def Poole_Frenkel(temperature: float, E_field: float, **kwargs) -> float:
@@ -82,14 +82,14 @@ def Poole_Frenkel(temperature: float, E_field: float, **kwargs) -> float:
 
     # Obtengo los valores de las constantes si las estoy pasando como argumentos
     if kwargs:
-        # Obtengo el valor de las constantes que necesita la función
-        potential_barrier = float(kwargs.get('pb_metal_insul'))
-        epsilon_r = float(kwargs.get('permitividad_relativa'))
-        I_0 = float(kwargs.get('I_0'))
+        # Obtengo el valor de las constantes que necesita la función hay q mejorarlo por si algun elemento fuera None
+        potential_barrier = float(kwargs.get('pb_metal_insul')) # type: ignore
+        epsilon_r = float(kwargs.get('permitividad_relativa'))# type: ignore
+        I_0 = float(kwargs.get('I_0'))# type: ignore
     else:
         potential_barrier = cte.pb_metal_insul
         epsilon_r = cte.permitividad_relativa
-        # I_0 = cte.I_0
+        I_0 = cte.I_0
 
     k_b_ev = Boltzmann / elementary_charge
 

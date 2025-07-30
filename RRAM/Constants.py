@@ -1,7 +1,7 @@
 # Módulo que contiene todas las constantes que usa el paquete
 import numpy as np
 
-from scipy.constants import Boltzmann, elementary_charge
+from scipy.constants import Boltzmann, elementary_charge # type: ignore
 
 # Valor de la constante de Boltzmann en eV/K
 k_b_ev = Boltzmann / elementary_charge

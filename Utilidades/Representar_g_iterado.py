@@ -22,8 +22,7 @@ if str(base_path) not in sys.path:
 
 # Ahora importa el módulo
 from RRAM.Representate import config_ax, setup_plt
-from RRAM import io_manager as io  # tu loader personalizado
-
+from RRAM import io_manager as io 
 # Inicializa el estilo global
 setup_plt(plt, latex=True, scaling=2)
 

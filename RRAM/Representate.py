@@ -454,7 +454,8 @@ def plot_IV(v_set,
             v_reset,
             i_reset,
             num_simulation,
-            figures_path='C:/Users/jimdo/Documents/GitHub/RRAM_Simulation/Results/Figures'):
+            figures_path='C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Results/Figures'):
+            # figures_path='C:/Users/jimdo/Documents/GitHub/RRAM_Simulation/Results/Figures'):
     """
     Plots the I-V characteristics of a device.
     Parameters:

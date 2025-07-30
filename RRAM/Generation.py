@@ -117,6 +117,18 @@ def Generate(time_stp: float, electric_field: float, temp: float, **kwargs) -> f
     exponente = (E_a - (gamma * cte_red * electric_field)) / (cte.k_b_ev * temp)
     prob_generacion = time_stp * t_0 * (np.exp(-exponente))
 
+    # print("Temperatura:", temp, " K")
+    
+    # Imprimir los valores usados solo la primera vez que se ejecuta la función
+    if not hasattr(Generate, "_has_run"):
+        print("Valores utilizados en Generation:")
+        print(f"paso_temporal: {time_stp}")
+        print(f"t_0: {t_0}")
+        print(f"cte red: {cte_red}")
+        print(f"E_a: {E_a}")
+        print(f"gamma: {gamma}")
+        Generate._has_run = True
+        
     return prob_generacion
 
 
@@ -133,6 +145,12 @@ def vecinos_horizontales(matriz, i, j):
         (j > 0 and matriz[i, j-1] > 0) or
         (j < y_size - 1 and matriz[i, j+1] > 0)
     )
+    
+def vecinos_izquierda(matriz, i, j):
+    """
+    Comprueba si el elemento en la posición (i, j) tiene un elemento a su izquierda (j-1) mayor que 0.
+    """
+    return j > 0 and matriz[i, j-1] > 0
 
 def tiene_vecinos(matriz, i, j):
     x_size, y_size = matriz.shape
