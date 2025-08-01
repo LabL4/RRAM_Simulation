@@ -16,7 +16,7 @@ warnings.filterwarnings(
 )
 
 # --- Ajuste de sys.path para tu módulo RRAM ---
-base_path = Path("c:/Users/jimdo/Documents/GitHub/RRAM_Simulation")
+base_path = Path("c:/Users/Usuario/Documents/GitHub/RRAM_Simulation")
 if str(base_path) not in sys.path:
     sys.path.append(str(base_path))
 
@@ -78,7 +78,7 @@ def compute_weighted_mean(
 
 
 # --- Carpeta destino de todas las figuras ---
-figures_dir = base_path / "Results" / "Figures_g_evolution"
+figures_dir = base_path / "Results" / "Figures" / "Figures_g_evolution"
 figures_dir.mkdir(parents=True, exist_ok=True)
 
 # --- Listar carpetas de simulación bajo Results/ ---
@@ -141,7 +141,7 @@ for sim_dir in sim_dirs:
         fig1, ax1 = plt.subplots(figsize=(12,9))
         config_ax(ax1)
         yticks = np.arange(40, -1, -5) * scale
-        ax1.yaxis.set_major_locator(FixedLocator(yticks))
+        ax1.yaxis.set_major_locator(FixedLocator(yticks)) # type: ignore
         for col in g_filt_set.columns:
             ax1.plot(time_set, g_filt_set[col]*scale, label=f"Fila {col}")
         ax1.set(
@@ -170,7 +170,7 @@ for sim_dir in sim_dirs:
         fig3, ax3 = plt.subplots(figsize=(12,9))
         config_ax(ax3)
         yticks = np.arange(40, -1, -5) * scale
-        ax3.yaxis.set_major_locator(FixedLocator(yticks))
+        ax3.yaxis.set_major_locator(FixedLocator(yticks)) # type: ignore
         for col in g_filt_res.columns:
             ax3.plot(time_res, g_filt_res[col]*scale, label=f"Fila {col}")
         ax3.set(
@@ -205,7 +205,7 @@ for sim_dir in sim_dirs:
         # g completa – set
         config_ax(ax_cset)
         yticks = np.arange(40, -1, -5) * scale
-        ax_cset.yaxis.set_major_locator(FixedLocator(yticks))
+        ax_cset.yaxis.set_major_locator(FixedLocator(yticks)) # type: ignore
         for col in g_filt_set.columns:
             ax_cset.plot(time_set, g_filt_set[col]*scale, label=f"Fila {col}")
         ax_cset.set(

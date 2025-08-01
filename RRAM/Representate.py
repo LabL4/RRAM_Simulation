@@ -49,7 +49,7 @@ def setup_plt(plt, latex=True, scaling=1):
 setup_plt(plt, latex=True, scaling=2)
 
 
-def RepresentateState(matriz: np.ndarray, k: int, paso_voltaje: float, filename: str = None, color=(0.9647, 0.1725, 0.3059)) -> None: # type: ignore
+def RepresentateState(matriz: np.ndarray, voltaje: float, filename: str = None, color=(0.9647, 0.1725, 0.3059)) -> None: # type: ignore
     """
     Representa el estado de una matriz con un estilo gráfico personalizado.
 
@@ -63,8 +63,7 @@ def RepresentateState(matriz: np.ndarray, k: int, paso_voltaje: float, filename:
     Retorna:
     - None
     """
-
-    voltaje = round(k * paso_voltaje, 3)
+    
     nrows, ncols = matriz.shape
     x = np.linspace(0, 10, ncols)  # Escala real de 10 nm en eje X
     y = np.linspace(0, 10, nrows)  # Escala real de 10 nm en eje Y
@@ -358,8 +357,7 @@ def plot_privileged_regions(Eje_x: int, Eje_y: int, regiones_pesos: list, filena
 def RepresentateTwoStates(
     matriz1: np.ndarray,
     matriz2: np.ndarray,
-    k: int,
-    paso_voltaje: float,
+    voltage: float,
     filename: str = None # type: ignore
 ) -> None:
     """
@@ -376,7 +374,6 @@ def RepresentateTwoStates(
     - None
     """
 
-    voltaje = round(k * paso_voltaje, 3)
     nrows, ncols = matriz1.shape
     x = np.linspace(0, 10, ncols)  # Escala real de 10 nm en eje X
     y = np.linspace(0, 10, nrows)  # Escala real de 10 nm en eje Y
@@ -426,7 +423,7 @@ def RepresentateTwoStates(
     ax.set_yticks(np.arange(0, 11, 2))  # Ticks cada 2 nm en Y
     ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
     ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
-    ax.set_title(fr"V = {voltaje} (V)", pad=20)
+    ax.set_title(fr"V = {voltage} (V)", pad=20)
 
     # Ajustar formato visual
     ax.set_aspect("equal")
