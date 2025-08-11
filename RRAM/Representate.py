@@ -451,6 +451,7 @@ def plot_IV(v_set,
             v_reset,
             i_reset,
             num_simulation,
+            titulo_figura = 'I-V Characteristics',
             figures_path='C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Results/Figures'):
             # figures_path='C:/Users/jimdo/Documents/GitHub/RRAM_Simulation/Results/Figures'):
     """
@@ -461,6 +462,7 @@ def plot_IV(v_set,
         v_reset (list): List of RESET voltages.
         i_reset (list): List of RESET currents.
         num_simulation (int): Simulation number for saving the figure.
+        titulo_figura (str): Title of the figure.
         figures_path (str): Path to save the figure.
     """
     
@@ -476,10 +478,11 @@ def plot_IV(v_set,
     axes.set_xlabel('Voltage [V]')
     axes.set_ylabel('Current [A]')
     axes.set_yscale('log')
+    axes.set_title(titulo_figura, pad=20)
 
     # Scatter de SET y RESET
-    axes.scatter(v_set, i_set, color='red', s=20, marker='o', facecolors='white', label='SET') # type: ignore
-    axes.scatter(v_reset, i_reset, color='red', s=20, marker='s', facecolors='white', label='RESET') # type: ignore
+    axes.scatter(v_set, i_set, color='red', s=10, marker='o', facecolors='white', label='SET')
+    axes.scatter(v_reset, i_reset, color='red', s=10, marker='s', facecolors='white', label='RESET')
 
     # Ruta de los datos experimentales
     # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt'

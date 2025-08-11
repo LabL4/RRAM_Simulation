@@ -353,10 +353,10 @@ for k in (range(0, num_pasos)):
         base_prob = prob_generacion_fila[i]
         for j in range(y_size):
             if actual_state[i, j] == 0:
-                if np.sum(actual_state) < int(0.3*num_max_vacantes): # antes era un 0.6
+                if np.sum(actual_state) < int(0.45*num_max_vacantes): # antes era un 0.6
                     # Compruebo si tiene una vacante cerca
-                    if Generation.vecinos_horizontales(actual_state, i, j): #np.sum(actual_state[i-1:i+1, j-1:j+1]) > 0:
-                        prob_generacion = base_prob * 1.1
+                    if Generation.tiene_vecinos(actual_state, i, j): #np.sum(actual_state[i-1:i+1, j-1:j+1]) > 0:
+                        prob_generacion = base_prob * 1.2
                     else:
                         prob_generacion = base_prob * 0.9
                 else:
@@ -555,12 +555,12 @@ for k in (range(0, num_pasos)):
         base_prob = prob_generacion_fila[i]
         for j in range(y_size):
             if actual_state[i, j] == 0:
-                if np.sum(actual_state) < int(0.5*num_max_vacantes): # antes era un 0.6
+                if np.sum(actual_state) < int(0.55*num_max_vacantes): # antes era un 0.6
                     # Compruebo si tiene una vacante cerca
                     if Generation.vecinos_horizontales(actual_state, i, j): #np.sum(actual_state[i-1:i+1, j-1:j+1]) > 0:
                         prob_generacion = base_prob * 1.1
                     else:
-                        prob_generacion = base_prob * 1
+                        prob_generacion = base_prob * 0.9
                 else:
                     if 'set_sp_vacantes_limit' not in locals():
                         print("\nSe ha llenado el espacio de simulación al 55%, se deja de generar vacantes")
@@ -975,7 +975,7 @@ df_sreset = pd.read_csv(data_path_sp_reset, dtype=float)
 
 global_tittle = 'Intensidad [A] vs Voltaje [V]'
 
-save_path = simulation_path + f'Figures/Intensidad_Voltaje_simulation_{num_simulation+1}'
+save_path = simulation_path + f'Figures'
 
 i_ps = np.array(df_pset['Intensidad [A]'])
 i_ss = np.array(df_sset['Intensidad [A]'])
@@ -995,8 +995,11 @@ v_set = np.concatenate((v_ps, v_ss))
 i_reset = np.concatenate((i_pr, i_sr))
 v_reset = np.concatenate((v_pr, v_sr))
 
+E_r = sim_ctes[num_simulation]['recombination_energy']
+resistencia = sim_ctes[num_simulation]['ohm_resistence']
+titulo_figura = rf'I-V_{num_simulation+1}_$E_r = {E_r}$_$R = {resistencia}$'
 
-plot_IV(v_set, i_set, v_reset, i_reset, num_simulation)
+plot_IV(v_set, i_set, v_reset, i_reset, num_simulation,titulo_figura, save_path, )
 
 save_path = simulation_path + f'Figures/Densidad_Filamento_{num_simulation+1}'
 
@@ -1017,7 +1020,7 @@ fig, axes = plt.subplots(figsize=(12,9))
 config_ax(axes)
 
 # Configurar etiquetas y título
-axes.set_xlabel(r"Tiempo (\si{\seconds})")  # (\si{\nano\meter^{-1}})
+axes.set_xlabel(r"Tiempo (\si{\s})")  # (\si{\nano\meter^{-1}})
 axes.set_ylabel(r"Conductive filament density (number vancancies in filament/\si{\nano\meter^{2}})", fontsize=12)
 axes.set_title(fr"Filament Density", pad=20)
 

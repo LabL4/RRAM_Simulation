@@ -51,7 +51,7 @@ os.makedirs(carpeta)
 
 device_size = np.ones(num_simulations) * 10e-9  # m
 atom_size = np.ones(num_simulations) * 0.25e-9  # m TODO: Esto se deberia llamarse tamaño del grid mejor
-num_trampas = np.ones(num_simulations, dtype=int) * 130  # 130
+num_trampas = np.ones(num_simulations, dtype=int) * 110  # 130
 
 priv_y_sup_right = np.ones(num_simulations, dtype=int) * 15
 priv_y_inf_right = np.ones(num_simulations, dtype=int) * 15
@@ -126,10 +126,10 @@ for i in range(num_simulations):
     regiones_pesos = [
         # ((10, 15, 0, eje_x[i]), 40),  # Región en filas 10-15
         # ((15, 23, 0, eje_x[i]), 50)   # Región en filas 15-23 para una gran banda central
-        ((3, 6, 0, eje_x[i]), 50),    # Primera banda (filas 3-6)
-        ((12, 15, 0, eje_x[i]), 50),    # Primera banda (filas 3-6)
-        ((21, 24, 0, eje_x[i]), 60),  # Segunda banda (filas 15-18)
-        ((32, 35, 0, eje_x[i]), 50)   # Tercera banda (filas 30-34)
+        # ((3, 6, 0, eje_x[i]), 50),    # Primera banda (filas 3-6)
+        ((9, 14, 0, eje_x[i]), 50),    # Primera banda (filas 3-6)
+        ((23, 28, 0, eje_x[i]), 50),  # Segunda banda (filas 15-18)
+        # ((32, 35, 0, eje_x[i]), 50)   # Tercera banda (filas 30-34)
     ]
 
     # Ruta de las imagenes de cada simulación
