@@ -1,7 +1,7 @@
 # Módulo que contiene todas las constantes que usa el paquete
-import numpy as np
+# import numpy as np
 
-from scipy.constants import Boltzmann, elementary_charge # type: ignore
+from scipy.constants import Boltzmann, elementary_charge  # type: ignore
 
 # Valor de la constante de Boltzmann en eV/K
 k_b_ev = Boltzmann / elementary_charge
@@ -32,7 +32,7 @@ gamma_drift = 10
 E_m = 0.6
 
 # Constante de resistencia térmica en K/W cuando el sistema no percola
-r_termica_no_percola = 5        # bajar dos órdenes de magnitud
+r_termica_no_percola = 5  # bajar dos órdenes de magnitud
 
 # Constante de resistencia térmica en K/W cuando el sistema percola
 r_termica_percola = 5e2

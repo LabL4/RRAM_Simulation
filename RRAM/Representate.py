@@ -1,11 +1,11 @@
-import pandas as pd
+# import pandas as pd
 import numpy as np
 
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
 
 from matplotlib.colors import LinearSegmentedColormap
-from RRAM import Montecarlo
+# from RRAM import Montecarlo
 
 import os
 # region Configuración del plot
@@ -15,7 +15,7 @@ def config_ax(ax):
     # ax.grid(which='major', color='#DDDDDD', linewidth=0.8, zorder=-1)
     # ax.grid(which='minor', color='#DEDEDE', linestyle=':', linewidth=0.5, zorder=-1)
     ax.minorticks_on()
-    ax.tick_params(axis='both', which='both', direction='in', top=True, right=True)
+    ax.tick_params(axis="both", which="both", direction="in", top=True, right=True)
 
 
 def setup_plt(plt, latex=True, scaling=1):
@@ -24,11 +24,13 @@ def setup_plt(plt, latex=True, scaling=1):
             "pgf.texsystem": "pdflatex",
             "text.usetex": latex,
             "font.family": "fourier",
-            "text.latex.preamble": "\n".join([
-                r"\usepackage[utf8]{inputenc}",
-                r"\usepackage[T1]{fontenc}",
-                r"\usepackage{siunitx}",
-            ])
+            "text.latex.preamble": "\n".join(
+                [
+                    r"\usepackage[utf8]{inputenc}",
+                    r"\usepackage[T1]{fontenc}",
+                    r"\usepackage{siunitx}",
+                ]
+            ),
         }
     )
 
@@ -36,20 +38,25 @@ def setup_plt(plt, latex=True, scaling=1):
     MEDIUM_SIZE = 10 * scaling
     BIGGER_SIZE = 11 * scaling
 
-    plt.rc('font', size=SMALL_SIZE)
-    plt.rc('axes', titlesize=SMALL_SIZE)
-    plt.rc('axes', labelsize=MEDIUM_SIZE)
-    plt.rc('xtick', labelsize=SMALL_SIZE)
-    plt.rc('ytick', labelsize=SMALL_SIZE)
-    plt.rc('legend', fontsize=SMALL_SIZE)
-    plt.rc('figure', titlesize=BIGGER_SIZE)
-    plt.rc('axes', titlesize=BIGGER_SIZE*1.05)
+    plt.rc("font", size=SMALL_SIZE)
+    plt.rc("axes", titlesize=SMALL_SIZE)
+    plt.rc("axes", labelsize=MEDIUM_SIZE)
+    plt.rc("xtick", labelsize=SMALL_SIZE)
+    plt.rc("ytick", labelsize=SMALL_SIZE)
+    plt.rc("legend", fontsize=SMALL_SIZE)
+    plt.rc("figure", titlesize=BIGGER_SIZE)
+    plt.rc("axes", titlesize=BIGGER_SIZE * 1.05)
 
 
 setup_plt(plt, latex=True, scaling=2)
 
 
-def RepresentateState(matriz: np.ndarray, voltaje: float, filename: str = None, color=(0.9647, 0.1725, 0.3059)) -> None: # type: ignore
+def RepresentateState(
+    matriz: np.ndarray,
+    voltaje: float,
+    filename: str = None,
+    color=(0.9647, 0.1725, 0.3059),
+) -> None:  # type: ignore
     """
     Representa el estado de una matriz con un estilo gráfico personalizado.
 
@@ -63,7 +70,7 @@ def RepresentateState(matriz: np.ndarray, voltaje: float, filename: str = None, 
     Retorna:
     - None
     """
-    
+
     nrows, ncols = matriz.shape
     x = np.linspace(0, 10, ncols)  # Escala real de 10 nm en eje X
     y = np.linspace(0, 10, nrows)  # Escala real de 10 nm en eje Y
@@ -79,25 +86,26 @@ def RepresentateState(matriz: np.ndarray, voltaje: float, filename: str = None, 
 
     # Graficar la matriz
     c = ax.pcolormesh(
-        x, y, matriz, shading="nearest",
-        vmin=matriz.min(), vmax=matriz.max(), cmap=cmap
+        x, y, matriz, shading="nearest", vmin=matriz.min(), vmax=matriz.max(), cmap=cmap
     )
 
     # Configuración de electrodos con mayor altura
-    electrode_width = 0.2       # Se mantiene el ancho en X
-    electrode_height = 12       # Se extienden en Y (de -1 a 11)
-    electrode_color = "gray"    # Color de los electrodos
+    electrode_width = 0.2  # Se mantiene el ancho en X
+    electrode_height = 12  # Se extienden en Y (de -1 a 11)
+    electrode_color = "gray"  # Color de los electrodos
 
     left_electrode = patches.Rectangle(
         (-0.3, -0.5),  # Posición en X, Y (más abajo)
-        electrode_width, electrode_height,  # Ancho y Alto aumentados
-        color=electrode_color
+        electrode_width,
+        electrode_height,  # Ancho y Alto aumentados
+        color=electrode_color,
     )
 
     right_electrode = patches.Rectangle(
         (10.13, -1),  # Posición en X, Y (más abajo)
-        electrode_width, electrode_height,  # Ancho y Alto aumentados
-        color=electrode_color
+        electrode_width,
+        electrode_height,  # Ancho y Alto aumentados
+        color=electrode_color,
     )
 
     ax.add_patch(left_electrode)
@@ -111,7 +119,7 @@ def RepresentateState(matriz: np.ndarray, voltaje: float, filename: str = None, 
     ax.set_yticks(np.arange(0, 11, 2))  # 🔹 Ticks cada 2 nm en Y
     ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
     ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
-    ax.set_title(fr"V = {voltaje} (V)", pad=20)
+    ax.set_title(rf"V = {voltaje} (V)", pad=20)
 
     # Ajustar formato visual
     ax.set_aspect("equal")
@@ -150,8 +158,12 @@ def RepresentateStateOpt(matriz: np.ndarray, filename: str = "grafica.png") -> N
 
     # Crear un mapa de colores personalizado
     colors = [
-        (1, 1, 1),                  # Color para el valor 0 que representa que No hay trampa
-        (0.478, 0.627, 0.870),      # Color para el valor 1 que representa que hay trampa (azul)
+        (1, 1, 1),  # Color para el valor 0 que representa que No hay trampa
+        (
+            0.478,
+            0.627,
+            0.870,
+        ),  # Color para el valor 1 que representa que hay trampa (azul)
     ]
     if np.all(matriz == 1):
         colors = list(reversed(colors))
@@ -160,10 +172,10 @@ def RepresentateStateOpt(matriz: np.ndarray, filename: str = "grafica.png") -> N
     cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=2)
 
     # Usar imshow en lugar de pcolormesh para una representación más eficiente
-    ax.imshow(matriz, cmap=cmap, origin='upper')
+    ax.imshow(matriz, cmap=cmap, origin="upper")
 
     # Establecer la relación de aspecto para que las celdas sean cuadradas
-    ax.set_aspect('equal')
+    ax.set_aspect("equal")
 
     # Colocar las etiquetas del eje x en la parte superior
     ax.xaxis.tick_top()
@@ -177,7 +189,14 @@ def RepresentateStateOpt(matriz: np.ndarray, filename: str = "grafica.png") -> N
     plt.savefig(filename)
 
 
-def RepresentateState_parall(matriz: np.ndarray, fig, ax, im=None, color=(0.478, 0.627, 0.870), filename: str = "grafica.png") -> None:
+def RepresentateState_parall(
+    matriz: np.ndarray,
+    fig,
+    ax,
+    im=None,
+    color=(0.478, 0.627, 0.870),
+    filename: str = "grafica.png",
+) -> None:
     """
     Represent the state of a matrix as a colored plot.
 
@@ -192,8 +211,8 @@ def RepresentateState_parall(matriz: np.ndarray, fig, ax, im=None, color=(0.478,
 
     # Crear un mapa de colores personalizado
     colors = [
-        (1, 1, 1),                  # Color para el valor 0 que representa que No hay trampa
-        color,                      # Color para el valor 1 que representa que hay trampa (azul por defeto)
+        (1, 1, 1),  # Color para el valor 0 que representa que No hay trampa
+        color,  # Color para el valor 1 que representa que hay trampa (azul por defeto)
     ]
     if np.all(matriz == 1):
         colors = list(reversed(colors))
@@ -205,10 +224,10 @@ def RepresentateState_parall(matriz: np.ndarray, fig, ax, im=None, color=(0.478,
         cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=2)
 
         # Usar imshow en lugar de pcolormesh para una representación más eficiente
-        im = ax.imshow(matriz, cmap=cmap, origin='upper')
+        im = ax.imshow(matriz, cmap=cmap, origin="upper")
 
         # Establecer la relación de aspecto para que las celdas sean cuadradas
-        ax.set_aspect('equal')
+        ax.set_aspect("equal")
 
     # Colocar las etiquetas del eje x en la parte superior
     # ax.xaxis.tick_top()
@@ -232,7 +251,9 @@ def RepresentateState_parall(matriz: np.ndarray, fig, ax, im=None, color=(0.478,
     return im
 
 
-def RepresentateStateOxygen(matriz: np.ndarray, fig, ax, im=None, filename: str = "grafica.png") -> None:
+def RepresentateStateOxygen(
+    matriz: np.ndarray, fig, ax, im=None, filename: str = "grafica.png"
+) -> None:
     """
     Represent the state of a matrix as a colored plot. Es la misma funcion que arriba solo que pinta
     en rojo los oxigenos (solo los soxigenos pinta) para diferenciarlos de las trampas
@@ -248,8 +269,12 @@ def RepresentateStateOxygen(matriz: np.ndarray, fig, ax, im=None, filename: str 
 
     # Crear un mapa de colores personalizado
     colors = [
-        (1, 1, 1),                      # Color para el valor 0 que representa que No hay trampa
-        (0.9922, 0.2157, 0.2157),       # Color para el valor 1 que representa que hay oxigeno (rojo)
+        (1, 1, 1),  # Color para el valor 0 que representa que No hay trampa
+        (
+            0.9922,
+            0.2157,
+            0.2157,
+        ),  # Color para el valor 1 que representa que hay oxigeno (rojo)
     ]
     if np.all(matriz == 1):
         colors = list(reversed(colors))
@@ -261,10 +286,10 @@ def RepresentateStateOxygen(matriz: np.ndarray, fig, ax, im=None, filename: str 
         cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=2)
 
         # Usar imshow en lugar de pcolormesh para una representación más eficiente
-        im = ax.imshow(matriz, cmap=cmap, origin='upper')
+        im = ax.imshow(matriz, cmap=cmap, origin="upper")
 
         # Establecer la relación de aspecto para que las celdas sean cuadradas
-        ax.set_aspect('equal')
+        ax.set_aspect("equal")
 
     # Colocar las etiquetas del eje x en la parte superior
     # ax.xaxis.tick_top()
@@ -292,25 +317,37 @@ def plot_regions(Eje_x: int, Eje_y: int, regiones_pesos: list, filename: str) ->
     # Draw grid
     for i in range(Eje_x):
         for j in range(Eje_y):
-            rect = patches.Rectangle((j, i), 1, 1, edgecolor='grey', facecolor='white', fill=True)
+            rect = patches.Rectangle(
+                (j, i), 1, 1, edgecolor="grey", facecolor="white", fill=True
+            )
             ax.add_patch(rect)
 
     # Highlight privileged regions
     for (x_start, x_end, y_start, y_end), weight in regiones_pesos:
-        rect = patches.Rectangle((y_start, x_start), y_end - y_start, x_end - x_start,
-                                 linewidth=4, edgecolor='r', facecolor='none')
+        rect = patches.Rectangle(
+            (y_start, x_start),
+            y_end - y_start,
+            x_end - x_start,
+            linewidth=4,
+            edgecolor="r",
+            facecolor="none",
+        )
         ax.add_patch(rect)
         # Add text for weight
         cx = (y_start + y_end) / 2
         cy = (x_start + x_end) / 2
-        ax.text(cx, cy, f'w={weight}', color='red', ha='center', va='center', fontsize=8)
+        ax.text(
+            cx, cy, f"w={weight}", color="red", ha="center", va="center", fontsize=8
+        )
 
-    plt.gca().set_aspect('equal', adjustable='box')
+    plt.gca().set_aspect("equal", adjustable="box")
 
     plt.savefig(filename)
 
 
-def plot_privileged_regions(Eje_x: int, Eje_y: int, regiones_pesos: list, filename: str) -> None:
+def plot_privileged_regions(
+    Eje_x: int, Eje_y: int, regiones_pesos: list, filename: str
+) -> None:
     """
     Plot the privileged regions on a grid.
 
@@ -336,20 +373,30 @@ def plot_privileged_regions(Eje_x: int, Eje_y: int, regiones_pesos: list, filena
     # Draw grid
     for i in range(Eje_x):
         for j in range(Eje_y):
-            rect = patches.Rectangle((j, i), 1, 1, edgecolor='grey', facecolor='white', fill=True)
+            rect = patches.Rectangle(
+                (j, i), 1, 1, edgecolor="grey", facecolor="white", fill=True
+            )
             ax.add_patch(rect)
 
     # Highlight privileged regions
     for (x_start, x_end, y_start, y_end), weight in regiones_pesos:
-        rect = patches.Rectangle((y_start, x_start), y_end - y_start, x_end - x_start,
-                                 linewidth=4, edgecolor='r', facecolor='none')
+        rect = patches.Rectangle(
+            (y_start, x_start),
+            y_end - y_start,
+            x_end - x_start,
+            linewidth=4,
+            edgecolor="r",
+            facecolor="none",
+        )
         ax.add_patch(rect)
         # Add text for weight
         cx = (y_start + y_end) / 2
         cy = (x_start + x_end) / 2
-        ax.text(cx, cy, f'w={weight}', color='red', ha='center', va='center', fontsize=8)
+        ax.text(
+            cx, cy, f"w={weight}", color="red", ha="center", va="center", fontsize=8
+        )
 
-    plt.gca().set_aspect('equal', adjustable='box')
+    plt.gca().set_aspect("equal", adjustable="box")
     plt.savefig(filename)
     plt.close(fig)
 
@@ -358,7 +405,7 @@ def RepresentateTwoStates(
     matriz1: np.ndarray,
     matriz2: np.ndarray,
     voltage: float,
-    filename: str = None # type: ignore
+    filename: str = None,  # type: ignore
 ) -> None:
     """
     Representa el estado de dos matrices con un estilo gráfico personalizado en el mismo plot.
@@ -381,19 +428,34 @@ def RepresentateTwoStates(
     fig, ax = plt.subplots(figsize=(12, 9))  # Tamaño de la figura ajustado
 
     # Crear mapas de colores para cada matriz
-    cmap1 = LinearSegmentedColormap.from_list("cmap1", [(1, 1, 1), (0.9647, 0.1725, 0.3059)], N=2)  # Rojo
-    cmap2 = LinearSegmentedColormap.from_list("cmap2", [(1, 1, 1), (0.2314, 0.2275, 0.9647)], N=2)  # Azul
+    cmap1 = LinearSegmentedColormap.from_list(
+        "cmap1", [(1, 1, 1), (0.9647, 0.1725, 0.3059)], N=2
+    )  # Rojo
+    cmap2 = LinearSegmentedColormap.from_list(
+        "cmap2", [(1, 1, 1), (0.2314, 0.2275, 0.9647)], N=2
+    )  # Azul
 
     # Graficar la primera matriz
     ax.pcolormesh(
-        x, y, matriz1, shading="nearest",
-        vmin=matriz1.min(), vmax=matriz1.max(), cmap=cmap1
+        x,
+        y,
+        matriz1,
+        shading="nearest",
+        vmin=matriz1.min(),
+        vmax=matriz1.max(),
+        cmap=cmap1,
     )
 
     # Graficar la segunda matriz
     ax.pcolormesh(
-        x, y, matriz2, shading="nearest",
-        vmin=matriz2.min(), vmax=matriz2.max(), cmap=cmap2, alpha=0.5  # Transparencia para superposición
+        x,
+        y,
+        matriz2,
+        shading="nearest",
+        vmin=matriz2.min(),
+        vmax=matriz2.max(),
+        cmap=cmap2,
+        alpha=0.5,  # Transparencia para superposición
     )
 
     # Configuración de electrodos con mayor altura
@@ -403,14 +465,16 @@ def RepresentateTwoStates(
 
     left_electrode = patches.Rectangle(
         (-0.3, -0.5),  # Posición en X, Y (más abajo)
-        electrode_width, electrode_height,  # Ancho y Alto aumentados
-        color=electrode_color
+        electrode_width,
+        electrode_height,  # Ancho y Alto aumentados
+        color=electrode_color,
     )
 
     right_electrode = patches.Rectangle(
         (10.13, -1),  # Posición en X, Y (más abajo)
-        electrode_width, electrode_height,  # Ancho y Alto aumentados
-        color=electrode_color
+        electrode_width,
+        electrode_height,  # Ancho y Alto aumentados
+        color=electrode_color,
     )
 
     ax.add_patch(left_electrode)
@@ -423,7 +487,7 @@ def RepresentateTwoStates(
     ax.set_yticks(np.arange(0, 11, 2))  # Ticks cada 2 nm en Y
     ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
     ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
-    ax.set_title(fr"V = {voltage} (V)", pad=20)
+    ax.set_title(rf"V = {voltage} (V)", pad=20)
 
     # Ajustar formato visual
     ax.set_aspect("equal")
@@ -446,14 +510,16 @@ def RepresentateTwoStates(
     return None
 
 
-def plot_IV(v_set,
-            i_set,
-            v_reset,
-            i_reset,
-            num_simulation,
-            titulo_figura = 'I-V Characteristics',
-            figures_path='C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Results/Figures'):
-            # figures_path='C:/Users/jimdo/Documents/GitHub/RRAM_Simulation/Results/Figures'):
+def plot_IV(
+    v_set,
+    i_set,
+    v_reset,
+    i_reset,
+    num_simulation,
+    titulo_figura="I-V Characteristics",
+    figures_path="C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Results/Figures",
+):
+    # figures_path='C:/Users/jimdo/Documents/GitHub/RRAM_Simulation/Results/Figures'):
     """
     Plots the I-V characteristics of a device.
     Parameters:
@@ -465,30 +531,43 @@ def plot_IV(v_set,
         titulo_figura (str): Title of the figure.
         figures_path (str): Path to save the figure.
     """
-    
-    figures_path = os.getcwd() + '/Results/Figures'
-    
-    
+
+    figures_path = os.getcwd() + "/Results/Figures"
+
     # Configuración de la figura
     setup_plt(plt, latex=True, scaling=2)
 
     fig, axes = plt.subplots(figsize=(12, 9))
     config_ax(axes)
 
-    axes.set_xlabel('Voltage [V]')
-    axes.set_ylabel('Current [A]')
-    axes.set_yscale('log')
+    axes.set_xlabel("Voltage [V]")
+    axes.set_ylabel("Current [A]")
+    axes.set_yscale("log")
     axes.set_title(titulo_figura, pad=20)
 
     # Scatter de SET y RESET
-    axes.scatter(v_set, i_set, color='red', s=10, marker='o', facecolors='white', label='SET')
-    axes.scatter(v_reset, i_reset, color='red', s=10, marker='s', facecolors='white', label='RESET')
+    axes.scatter(
+        v_set, i_set, color="red", s=10, marker="o", facecolors="white", label="SET"
+    )
+    axes.scatter(
+        v_reset,
+        i_reset,
+        color="red",
+        s=10,
+        marker="s",
+        facecolors="white",
+        label="RESET",
+    )
 
     # Ruta de los datos experimentales
     # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt'
     # ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt'
-    ruta_archivo_set = os.getcwd() + '/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt'
-    ruta_archivo_reset = os.getcwd() + '/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt'
+    ruta_archivo_set = (
+        os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt"
+    )
+    ruta_archivo_reset = (
+        os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt"
+    )
 
     # Cargar datos experimentales
     data_set = np.loadtxt(ruta_archivo_set)
@@ -500,8 +579,8 @@ def plot_IV(v_set,
     y_reset = abs(data_reset[:, 1])
 
     # Curvas experimentales
-    axes.plot(x_set, y_set, 'black', label='Set experimental', linewidth=2.5)
-    axes.plot(x_reset, y_reset, 'black', label='Reset experimental', linewidth=2.5)
+    axes.plot(x_set, y_set, "black", label="Set experimental", linewidth=2.5)
+    axes.plot(x_reset, y_reset, "black", label="Reset experimental", linewidth=2.5)
 
     # Leyenda ajustada en la parte inferior izquierda
     axes.legend(
@@ -509,11 +588,13 @@ def plot_IV(v_set,
         handletextpad=0.2,
         handlelength=1.0,
         borderaxespad=0.2,
-        loc='lower left',
+        loc="lower left",
     )
 
     # Guardar figura
-    fig.savefig(figures_path + f'/I-V_{num_simulation+1}.png', bbox_inches='tight', dpi=300) # type: ignore
+    fig.savefig(
+        figures_path + f"/I-V_{num_simulation + 1}.png", bbox_inches="tight", dpi=300
+    )
     plt.close(fig)  # Cierra para liberar memoria
 
 
@@ -521,8 +602,9 @@ if __name__ == "__main__":
     Longitud_Dispositivo = 10
     atom_size = 0.5
 
-    Eje_x, Eje_y = round(Longitud_Dispositivo / atom_size), round(
-        Longitud_Dispositivo / atom_size
+    Eje_x, Eje_y = (
+        round(Longitud_Dispositivo / atom_size),
+        round(Longitud_Dispositivo / atom_size),
     )
     num_trampas = 10
 
