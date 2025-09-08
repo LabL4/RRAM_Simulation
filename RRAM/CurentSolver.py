@@ -1,3 +1,4 @@
+from numpy.typing import NDArray
 import numpy as np
 import math
 
@@ -5,7 +6,7 @@ from scipy.constants import elementary_charge, Boltzmann, epsilon_0
 from RRAM import Constants as cte
 
 
-def Generate_Resitence_Matrix(configuration_matrix: np.ndarray, paths: list) -> np.ndarray:
+def Generate_Resitence_Matrix(configuration_matrix: NDArray, paths: list) -> NDArray:
     """
     Generates a resistance matrix based on the given configuration matrix and percolation paths.
     Args:
@@ -19,13 +20,15 @@ def Generate_Resitence_Matrix(configuration_matrix: np.ndarray, paths: list) -> 
 
     # Iterar sobre cada camino de percolación y marcar las posiciones en la matriz
     for path in paths:
-        for (x, y) in path:
+        for x, y in path:
             percolation_matrix[y, x] = 1
 
     return percolation_matrix
 
 
-def OmhCurrent(potential: float, config_state: np.array, **kwargs) -> float: # pyright: ignore[reportGeneralTypeIssues]
+def OmhCurrent(
+    potential: float, config_state: NDArray, **kwargs
+) -> tuple[float, float]:
     """
     Calculates the Ohmic current based on the given parameters.
 
@@ -41,7 +44,7 @@ def OmhCurrent(potential: float, config_state: np.array, **kwargs) -> float: # p
     # Obtengo los valores de las constantes si las estoy pasando como argumentos
     if kwargs:
         # Obtengo el valor de las constantes que necesita la función
-        ohm_resistence = float(kwargs.get('ohm_resistence')) # pyright: ignore[reportArgumentType]
+        ohm_resistence = float(kwargs.get("ohm_resistence"))  # pyright: ignore[reportArgumentType]
     else:
         ohm_resistence = 1.5
 
@@ -53,7 +56,7 @@ def OmhCurrent(potential: float, config_state: np.array, **kwargs) -> float: # p
     for row in config_state.T:
         # Se calcula la resistencia paralela de los elementos de la columna
         num_resistence = sum(row)
-        parallel_resistance = 1/(num_resistence/ohm_resistence)
+        parallel_resistance = 1 / (num_resistence / ohm_resistence)
 
         # for i in range(num_resistence):
         #     parallel_resistance += 1 / ohm_resistence
@@ -62,7 +65,7 @@ def OmhCurrent(potential: float, config_state: np.array, **kwargs) -> float: # p
         total_resistance += parallel_resistance
 
         # Se calcula la corriente Ohmica
-    return potential/total_resistance, total_resistance # type: ignore
+    return potential / total_resistance, total_resistance  # type: ignore
 
 
 def Poole_Frenkel(temperature: float, E_field: float, **kwargs) -> float:
@@ -83,9 +86,9 @@ def Poole_Frenkel(temperature: float, E_field: float, **kwargs) -> float:
     # Obtengo los valores de las constantes si las estoy pasando como argumentos
     if kwargs:
         # Obtengo el valor de las constantes que necesita la función hay q mejorarlo por si algun elemento fuera None
-        potential_barrier = float(kwargs.get('pb_metal_insul')) # type: ignore
-        epsilon_r = float(kwargs.get('permitividad_relativa'))# type: ignore
-        I_0 = float(kwargs.get('I_0'))# type: ignore
+        potential_barrier = float(kwargs.get("pb_metal_insul"))  # type: ignore
+        epsilon_r = float(kwargs.get("permitividad_relativa"))  # type: ignore
+        I_0 = float(kwargs.get("I_0"))  # type: ignore
     else:
         potential_barrier = cte.pb_metal_insul
         epsilon_r = cte.permitividad_relativa
@@ -95,8 +98,11 @@ def Poole_Frenkel(temperature: float, E_field: float, **kwargs) -> float:
 
     beta = math.sqrt(elementary_charge / (epsilon_0 * epsilon_r * math.pi))
 
-    exponencial = math.exp(elementary_charge * (beta * math.sqrt(E_field) -
-                                                potential_barrier) / (k_b_ev * temperature))
+    exponencial = math.exp(
+        elementary_charge
+        * (beta * math.sqrt(E_field) - potential_barrier)
+        / (k_b_ev * temperature)
+    )
 
     I_poole_frenkel = I_0 * E_field * exponencial
 

@@ -1,16 +1,18 @@
-import matplotlib.pyplot as plt  # type: ignore
-from RRAM import Recombination
-from RRAM import exceptions
-from RRAM import Montecarlo  # Importación explícita de Montecarlo
-from RRAM import Generation  # Importación explícita de Generation
+from RRAM import Recombination  # Importación explícita de Recombination
+from RRAM import ElectricField  # Importación explícita de ElectricField
 from RRAM import Representate  # Importación explícita de Representate
 from RRAM import CurentSolver  # Importación explícita de CurentSolver
-from RRAM import ElectricField  # Importación explícita de ElectricField
 from RRAM import Percolation  # Importación explícita de Percolation
-from RRAM import findpath  # Importación explícita de Percolation
 from RRAM import Temperature  # Importación explícita de Temperature
-import time as time
+from RRAM import Montecarlo  # Importación explícita de Montecarlo
+from RRAM import Generation  # Importación explícita de Generation
+from RRAM import findpath  # Importación explícita de Percolation
+from RRAM import utils  # Importación explícita de utils
+
+import matplotlib.pyplot as plt  # type: ignore
 import pandas as pd  # type: ignore
+from RRAM import exceptions
+import time as time
 
 import pickle
 import sys
@@ -387,7 +389,7 @@ for k in range(0, num_pasos):
         try:
             current, resistencia[k] = CurentSolver.OmhCurrent(
                 voltage, resistance_matrix, **sim_ctes[num_simulation]
-            )  # type: ignore
+            )
 
         except Warning:
             filename = (
@@ -1428,7 +1430,12 @@ df_sreset = pd.read_csv(data_path_sp_reset, dtype=float)
 
 global_tittle = "Intensidad [A] vs Voltaje [V]"
 
-save_path = simulation_path + "Figures"
+save_path = simulation_path + "Figures/I-V_Curvas"
+
+# # Get voltage and current arrays for all simulation phases TODO: revisar si esto funciona bien
+# dfs = [df_pset, df_sset, df_preset, df_sreset]
+# i_ps, i_ss, i_pr, i_sr = [df["Intensidad [A]"].to_numpy() for df in dfs]
+# v_ps, v_ss, v_pr, v_sr = [df["Voltaje [V]"].to_numpy() for df in dfs]
 
 i_ps = np.array(df_pset["Intensidad [A]"])
 i_ss = np.array(df_sset["Intensidad [A]"])
@@ -1450,7 +1457,34 @@ v_reset = np.concatenate((v_pr, v_sr))
 
 E_r = sim_ctes[num_simulation]["recombination_energy"]
 resistencia = sim_ctes[num_simulation]["ohm_resistence"]
-titulo_figura = rf"I-V_{num_simulation + 1}_$E_r = {E_r}$_$R = {resistencia}$"
+titulo_figura = "I-V Characteristics"  # rf"I-V_{num_simulation + 1}_$E_r = {E_r}$_$R = {resistencia}$"
+
+
+# Diccionario de puntos que quieres ubicar
+puntos_x_set = {"a)": 1e-6, "b)": 0.5, "c)": 1.1}
+puntos_x_pp_reset = {"d)": -0.9, "e)": -1.4}
+puntos_x_sp_reset = {"f)": -0.01}
+
+# Obtener puntos en cada curva
+puntos_set = utils.obtener_puntos_en_curva(v_ps, i_ps, puntos_x_set)
+puntos_x_pp_reset = utils.obtener_puntos_en_curva(v_pr, i_pr, puntos_x_pp_reset)
+puntos_x_sp_reset = utils.obtener_puntos_en_curva(v_sr, i_sr, puntos_x_sp_reset)
+
+# Crear un único diccionario combinando ambos
+puntos_totales = {}
+puntos_totales.update(puntos_set)
+puntos_totales.update(puntos_x_pp_reset)
+puntos_totales.update(puntos_x_sp_reset)
+
+# Diccionario de desplazamiento (dx, dy) para cada punto
+desplazamiento = {
+    "a)": (0.02, 1.0),  # derecha, misma altura
+    "b)": (-0.0, 0.4),  # izquierda, un poco arriba
+    "c)": (0.02, 1.0),  # derecha, un poco abajo
+    "d)": (0.02, 1.0),  # izquierda, misma altura
+    "e)": (0.0, 0.4),  # izquierda, un poco abajo
+    "f)": (-0.1, 1.0),  # derecha, un poco arriba
+}
 
 Representate.plot_IV(
     v_set,
@@ -1458,8 +1492,20 @@ Representate.plot_IV(
     v_reset,
     i_reset,
     num_simulation,
-    titulo_figura,
-    save_path,
+    titulo_figura="",
+    figures_path=save_path,
+)
+
+Representate.plot_IV_marcado(
+    v_set,
+    i_set,
+    v_reset,
+    i_reset,
+    num_simulation,
+    puntos_totales,
+    desplazamiento,
+    titulo_figura="",
+    figures_path=save_path,
 )
 
 save_path = simulation_path + f"Figures/Densidad_Filamento_{num_simulation + 1}"

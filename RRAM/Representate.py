@@ -1,8 +1,9 @@
-# import pandas as pd
-import numpy as np
-
 import matplotlib.patches as patches
 import matplotlib.pyplot as plt
+from matplotlib import markers
+
+# import pandas as pd
+import numpy as np
 
 from matplotlib.colors import LinearSegmentedColormap
 # from RRAM import Montecarlo
@@ -12,8 +13,8 @@ import os
 
 
 def config_ax(ax):
-    # ax.grid(which='major', color='#DDDDDD', linewidth=0.8, zorder=-1)
-    # ax.grid(which='minor', color='#DEDEDE', linestyle=':', linewidth=0.5, zorder=-1)
+    ax.grid(which="major", color="#DDDDDD", linewidth=0.8, zorder=-1)
+    ax.grid(which="minor", color="#DEDEDE", linestyle=":", linewidth=0.5, zorder=-1)
     ax.minorticks_on()
     ax.tick_params(axis="both", which="both", direction="in", top=True, right=True)
 
@@ -54,7 +55,7 @@ setup_plt(plt, latex=True, scaling=2)
 def RepresentateState(
     matriz: np.ndarray,
     voltaje: float,
-    filename: str = None,
+    filename: str = None,  # type: ignore
     color=(0.9647, 0.1725, 0.3059),
 ) -> None:  # type: ignore
     """
@@ -517,9 +518,9 @@ def plot_IV(
     i_reset,
     num_simulation,
     titulo_figura="I-V Characteristics",
-    figures_path="C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Results/Figures",
+    figures_path="C:/Users/jimdo/Documents/GitHub/RRAM_Simulation/Results/Figures",
 ):
-    # figures_path='C:/Users/jimdo/Documents/GitHub/RRAM_Simulation/Results/Figures'):
+    # figures_path="C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Results/Figures",
     """
     Plots the I-V characteristics of a device.
     Parameters:
@@ -547,14 +548,20 @@ def plot_IV(
 
     # Scatter de SET y RESET
     axes.scatter(
-        v_set, i_set, color="red", s=10, marker="o", facecolors="white", label="SET"
+        v_set,
+        i_set,
+        color="red",
+        s=15,
+        marker=markers.MarkerStyle("o"),
+        facecolors="white",
+        label="SET",
     )
     axes.scatter(
         v_reset,
         i_reset,
         color="red",
-        s=10,
-        marker="s",
+        s=15,
+        marker=markers.MarkerStyle("s"),
         facecolors="white",
         label="RESET",
     )
@@ -594,6 +601,140 @@ def plot_IV(
     # Guardar figura
     fig.savefig(
         figures_path + f"/I-V_{num_simulation + 1}.png", bbox_inches="tight", dpi=300
+    )
+    plt.close(fig)  # Cierra para liberar memoria
+
+
+def plot_IV_marcado(
+    v_set,
+    i_set,
+    v_reset,
+    i_reset,
+    num_simulation,
+    lista_puntos,
+    desplazamiento,
+    titulo_figura="I-V Characteristics",
+    figures_path="C:/Users/jimdo/Documents/GitHub/RRAM_Simulation/Results/Figures",
+):
+    # figures_path="C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Results/Figures",
+    """
+    Plots the I-V characteristics of a device.
+    Parameters:
+        v_set (list): List of SET voltages.
+        i_set (list): List of SET currents.
+        v_reset (list): List of RESET voltages.
+        i_reset (list): List of RESET currents.
+        num_simulation (int): Simulation number for saving the figure.
+        titulo_figura (str): Title of the figure.
+        figures_path (str): Path to save the figure.
+    """
+
+    figures_path = os.getcwd() + "/Results/Figures"
+
+    # Configuración de la figura
+    setup_plt(plt, latex=True, scaling=2)
+
+    fig, axes = plt.subplots(figsize=(12, 9))
+    config_ax(axes)
+
+    axes.set_xlabel("Voltage [V]")
+    axes.set_ylabel("Current [A]")
+    axes.set_yscale("log")
+    axes.set_title(titulo_figura, pad=20)
+
+    # Scatter de SET y RESET
+    axes.scatter(
+        v_set,
+        i_set,
+        color="red",
+        s=15,
+        marker=markers.MarkerStyle("o"),
+        facecolors="white",
+        label="SET",
+    )
+    axes.scatter(
+        v_reset,
+        i_reset,
+        color="red",
+        s=15,
+        marker=markers.MarkerStyle("s"),
+        facecolors="white",
+        label="RESET",
+    )
+
+    # Ruta de los datos experimentales
+    # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt'
+    # ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt'
+    ruta_archivo_set = (
+        os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt"
+    )
+    ruta_archivo_reset = (
+        os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt"
+    )
+
+    # Cargar datos experimentales
+    data_set = np.loadtxt(ruta_archivo_set)
+    data_reset = np.loadtxt(ruta_archivo_reset)
+
+    x_set = data_set[:, 0]
+    y_set = data_set[:, 1]
+    x_reset = data_reset[:, 0]
+    y_reset = abs(data_reset[:, 1])
+
+    (x_0, y_0) = next(iter(lista_puntos.values()))
+    print("Punto de referencia (0,0): ", (x_0, y_0))
+    axes.scatter(
+        1e-6,
+        1e-6,
+        color="blue",
+        s=80,
+        marker=markers.MarkerStyle("D"),
+        zorder=10,
+    )
+
+    # Curvas experimentales
+    axes.plot(x_set, y_set, "black", label="Set experimental", linewidth=2.5)
+    axes.plot(x_reset, y_reset, "black", label="Reset experimental", linewidth=2.5)
+
+    for label, (xp, yp) in lista_puntos.items():
+        dx, factor_y = desplazamiento.get(
+            label, (0.02, 1.0)
+        )  # 1.0 = sin desplazamiento en y
+        print(
+            label,
+            "puntos: ",
+            (xp, yp),
+            (dx, factor_y),
+            "puntos finales: ",
+            (xp + dx, yp * factor_y),
+        )
+        axes.scatter(
+            xp, yp, color="blue", s=80, marker=markers.MarkerStyle("D"), zorder=10
+        )
+        axes.text(
+            xp + dx,  # Usar la posición calculada en x
+            max(yp * factor_y, 1e-6),  # Usar la posición calculada en y con un mínimo
+            label,
+            fontsize=22,  # Reducir el tamaño de fuente
+            verticalalignment="bottom",
+            horizontalalignment="left",
+            zorder=10,
+        )
+
+    # Leyenda ajustada en la parte inferior izquierda
+    axes.legend(
+        labelspacing=0.3,
+        handletextpad=0.2,
+        handlelength=1.0,
+        borderaxespad=0.2,
+        loc="lower left",
+    )
+
+    # Guardar figura
+    fig.savefig(
+        figures_path + f"/I-V_marcado_{num_simulation + 1}.png",
+        bbox_inches="tight",
+        dpi=300,
     )
     plt.close(fig)  # Cierra para liberar memoria
 
