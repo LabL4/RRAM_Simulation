@@ -7,7 +7,7 @@ from RRAM import Temperature  # Importación explícita de Temperature
 from RRAM import Montecarlo  # Importación explícita de Montecarlo
 from RRAM import Generation  # Importación explícita de Generation
 from RRAM import findpath  # Importación explícita de Percolation
-from RRAM import utils  # Importación explícita de utils
+from RRAM import utils  # Importación explícita de utilsutils
 
 import matplotlib.pyplot as plt  # type: ignore
 import pandas as pd  # type: ignore
@@ -212,8 +212,12 @@ voltage_vector = np.zeros(num_pasos + 1)
 
 sistema_percola = False
 num_max_vacantes = (device_size / atom_size) ** 2
-max_vancantes_pp_set = int(0.35 * num_max_vacantes)
-max_vancantes_sp_set = int(0.4 * num_max_vacantes)
+
+ocupacion_max_pp_set = 0.3
+ocupacion_max_sp_set = 0.4
+
+max_vancantes_pp_set = int(ocupacion_max_pp_set * num_max_vacantes)
+max_vancantes_sp_set = int(ocupacion_max_sp_set * num_max_vacantes)
 paso_guardar_2 = 10
 # endregion
 
@@ -460,13 +464,13 @@ for k in range(0, num_pasos):
                     # Compruebo si tiene una vacate cerca
                     # np.sum(actual_state[i-1:i+1, j-1:j+1]) > 0:
                     if Generation.vecinos_horizontales(actual_state, i, j):
-                        prob_generacion = base_prob * 1
+                        prob_generacion = base_prob * 1.1
                     else:
-                        prob_generacion = base_prob * 1
+                        prob_generacion = base_prob * 0.9
                 else:
                     if "set_pp_vacantes_limit" not in locals():
                         print(
-                            "\nSe ha llenado el espacio de simulación al 30%, se deja de generar vacantes"
+                            f"\nSe ha llenado el espacio de simulación al {ocupacion_max_pp_set * 100}%, se deja de generar vacantes"
                         )
                         set_pp_vacantes_limit = True
                     prob_generacion = 0  # LO hago para que no se generen más vacantes y no se llene el sistema
@@ -760,13 +764,13 @@ for k in range(0, num_pasos):
                     # Compruebo si tiene una vacante cerca
                     # np.sum(actual_state[i-1:i+1, j-1:j+1]) > 0:
                     if Generation.vecinos_horizontales(actual_state, i, j):
-                        prob_generacion = base_prob * 1
+                        prob_generacion = base_prob * 1.1
                     else:
                         prob_generacion = base_prob * 1
                 else:
                     if "set_sp_vacantes_limit" not in locals():
                         print(
-                            "\nSe ha llenado el espacio de simulación al 45%, se deja de generar vacantes"
+                            f"\nSe ha llenado el espacio de simulación al {ocupacion_max_sp_set * 100}%, se deja de generar vacantes"
                         )
                         set_sp_vacantes_limit = True
                     prob_generacion = 0  # Lo hago para que no se generen más vacantes y no se llene el sistema

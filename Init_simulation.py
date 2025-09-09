@@ -153,12 +153,14 @@ for i in range(num_simulations):
     # ]
     print(f"Simulación {i}", eje_x[i], eje_y[i], num_trampas[i])
     regiones_pesos = [
-        # ((10, 15, 0, eje_x[i]), 40),  # Región en filas 10-15
-        # ((15, 23, 0, eje_x[i]), 50)   # Región en filas 15-23 para una gran banda central
-        # ((3, 6, 0, eje_x[i]), 50),    # Primera banda (filas 3-6)
-        ((9, 14, 0, eje_x[i]), 50),  # Primera banda (filas 3-6)
-        ((23, 28, 0, eje_x[i]), 50),  # Segunda banda (filas 15-18)
-        # ((32, 35, 0, eje_x[i]), 50)   # Tercera banda (filas 30-34)
+        # Cuatro filamentos
+        ((3, 6, 0, eje_x[i]), 50),  # Primera banda (filas 3-6)
+        ((12, 15, 0, eje_x[i]), 50),  # Primera banda (filas 3-6)
+        ((21, 24, 0, eje_x[i]), 60),  # Segunda banda (filas 15-18)
+        ((32, 35, 0, eje_x[i]), 50),  # Tercera banda (filas 30-34)
+        # Dos filamentos
+        # ((9, 14, 0, eje_x[i]), 50),  # Primera banda (filas 3-6)
+        # ((23, 28, 0, eje_x[i]), 50),  # Segunda banda (filas 15-18)
     ]
 
     # Ruta de las imagenes de cada simulación
