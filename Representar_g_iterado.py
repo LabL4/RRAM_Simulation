@@ -21,7 +21,7 @@ ruta_raiz = os.getcwd() + "/"
 print("Ruta raiz del proyecto:", ruta_raiz)
 
 sys.path.append(ruta_raiz)
-base_path = Path("c:/Users/jimdo/Documents/GitHub/RRAM_Simulation")
+base_path = Path("c:/Users/Usuario/Documents/GitHub/RRAM_Simulation")
 if str(base_path) not in sys.path:
     sys.path.append(str(base_path))
 

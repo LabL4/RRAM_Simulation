@@ -165,7 +165,7 @@ config_matrix_pp_set = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size
 paso_temporal = total_simulation_time / num_pasos
 paso_potencial = voltaje_max_simulation / num_pasos
 factor_generacion = float(sim_ctes[num_simulation]["factor_generacion"])
-print("El tamañi en x es: ", x_size, " y en y es: ", y_size)
+print("El tamaño en x es: ", x_size, " y en y es: ", y_size)
 
 print("El paso temporal es: ", paso_temporal)
 print("El paso del potencial es: ", paso_potencial)
@@ -191,7 +191,6 @@ print(
     sim_ctes[num_simulation]["factor_generacion"],
 )
 
-
 # Creo el vector de diferencias de potencial
 vector_ddp = np.arange(0.000, voltaje_max_simulation + paso_potencial, paso_potencial)
 
@@ -206,19 +205,19 @@ resistencia = np.zeros(num_pasos + 1)
 array_filament_density = np.zeros(num_pasos + 1)
 
 g_valor_list = []
-
 voltage_vector = np.zeros(num_pasos + 1)
-
-
 sistema_percola = False
 num_max_vacantes = (device_size / atom_size) ** 2
 
-ocupacion_max_pp_set = 0.3
+ocupacion_max_pp_set = 0.35
 ocupacion_max_sp_set = 0.4
 
 max_vancantes_pp_set = int(ocupacion_max_pp_set * num_max_vacantes)
 max_vancantes_sp_set = int(ocupacion_max_sp_set * num_max_vacantes)
-paso_guardar_2 = 10
+paso_guardar_2 = 1
+
+print("La maxima ocupación en pp set es: ", ocupacion_max_pp_set)
+print("La maxima ocupación en sp set es: ", ocupacion_max_sp_set)
 # endregion
 
 # region primera parte del set

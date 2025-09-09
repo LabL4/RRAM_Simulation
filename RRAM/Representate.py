@@ -19,6 +19,13 @@ def config_ax(ax):
     ax.tick_params(axis="both", which="both", direction="in", top=True, right=True)
 
 
+def config_ax_state(ax):
+    # ax.grid(which="major", color="#DDDDDD", linewidth=0.8, zorder=-1)
+    # ax.grid(which="minor", color="#DEDEDE", linestyle=":", linewidth=0.5, zorder=-1)
+    ax.minorticks_off()
+    ax.tick_params(axis="both", which="both", direction="in", top=True, right=True)
+
+
 def setup_plt(plt, latex=True, scaling=1):
     plt.rcParams.update(
         {
@@ -78,6 +85,9 @@ def RepresentateState(
 
     fig, ax = plt.subplots(figsize=(12, 9))
 
+    # Desactivar minorticks para evitar sobrecarga visual
+    config_ax_state(ax)
+
     # Crear mapa de colores
     colors = [(1, 1, 1), color]  # Blanco (0) y Color dado (1)
     if np.all(matriz == 1):
@@ -86,7 +96,7 @@ def RepresentateState(
     cmap = LinearSegmentedColormap.from_list("custom_cmap", colors, N=2)
 
     # Graficar la matriz
-    c = ax.pcolormesh(
+    ax.pcolormesh(
         x, y, matriz, shading="nearest", vmin=matriz.min(), vmax=matriz.max(), cmap=cmap
     )
 
@@ -113,7 +123,7 @@ def RepresentateState(
     ax.add_patch(right_electrode)
 
     # Aplicar configuración de ejes
-    config_ax(ax)
+    config_ax_state(ax)
 
     # Configurar etiquetas y título
     ax.set_xticks(np.arange(0, 11, 2))  # 🔹 Ticks cada 2 nm en X
@@ -461,7 +471,7 @@ def RepresentateTwoStates(
 
     # Configuración de electrodos con mayor altura
     electrode_width = 0.2  # Se mantiene el ancho en X
-    electrode_height = 12  # 🔥 Se extienden en Y (de -1 a 11)
+    electrode_height = 12  # Se extienden en Y (de -1 a 11)
     electrode_color = "gray"  # Color de los electrodos
 
     left_electrode = patches.Rectangle(
@@ -481,7 +491,7 @@ def RepresentateTwoStates(
     ax.add_patch(left_electrode)
     ax.add_patch(right_electrode)
     # Aplicar configuración de ejes
-    config_ax(ax)
+    config_ax_state(ax)
 
     # Configurar etiquetas y título
     ax.set_xticks(np.arange(0, 11, 2))  # Ticks cada 2 nm en X
