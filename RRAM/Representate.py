@@ -37,6 +37,7 @@ def setup_plt(plt, latex=True, scaling=1):
                     r"\usepackage[utf8]{inputenc}",
                     r"\usepackage[T1]{fontenc}",
                     r"\usepackage{siunitx}",
+                    r"\usepackage{physics}",
                 ]
             ),
         }
