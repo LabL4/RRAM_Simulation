@@ -343,7 +343,7 @@ for k in range(0, num_pasos):
                 " %",
             )
 
-            if voltaje_percolacion >= 0.55:
+            if voltaje_percolacion >= 0.75:
                 # Si el voltaje de percolación es demasiado alto no va a coincidir con los datos experimentales
                 raise exceptions.HighPercolationVoltageException()
 
@@ -1530,8 +1530,8 @@ t_sr = np.array(df_sreset["# Tiempo simulacion [s]"])
 
 tiempo = np.concatenate((t_ps, t_ss, t_pr, t_sr))
 
-setup_plt(plt, latex=True, scaling=1)
 fig, axes = plt.subplots(figsize=(12, 9))
+setup_plt(plt, latex=True, scaling=2)
 config_ax(axes)
 
 # Configurar etiquetas y título
