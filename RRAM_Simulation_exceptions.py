@@ -1,16 +1,17 @@
 from RRAM import Recombination  # Importación explícita de Recombination
 from RRAM import ElectricField  # Importación explícita de ElectricField
 from RRAM import Representate  # Importación explícita de Representate
-from RRAM import CurentSolver  # Importación explícita de CurentSolver
+from RRAM import CurrentSolver  # Importación explícita de CurentSolver
 from RRAM import Percolation  # Importación explícita de Percolation
 from RRAM import Temperature  # Importación explícita de Temperature
 from RRAM import Montecarlo  # Importación explícita de Montecarlo
 from RRAM import Generation  # Importación explícita de Generation
-from RRAM import findpath  # Importación explícita de Percolation
+
+# from RRAM import findpath  # Importación explícita de Percolation
 from RRAM import utils  # Importación explícita de utilsutils
 
-import matplotlib.pyplot as plt  # type: ignore
-import pandas as pd  # type: ignore
+import matplotlib.pyplot as plt
+import pandas as pd
 from RRAM import exceptions
 import time as time
 
@@ -324,7 +325,6 @@ for k in range(0, num_pasos):
     if Percolation.is_path(actual_state):
         if sistema_percola is False:
             voltaje_percolacion = voltage  # Guardo el voltaje de percolación
-
             print(
                 "\nEl sistema ha percolado en la iteración: ",
                 k,
@@ -356,41 +356,18 @@ for k in range(0, num_pasos):
                 sim_ctes[num_simulation]["gamma"],
             )
 
-            # num_divisiones = round(((voltaje_final_set - 0.2) - voltaje_percolacion) / paso_potencial)
-
-            # Generar valores exponenciales
-            # valor_resistencia_celda = np.exp(np.linspace(np.log(10), np.log(resistencia_original-0.5), num=num_divisiones))
-            # print("El vector de resistencias es: ", valor_resistencia_celda)
-
-            # Generar ruido aleatorio distinto para cada elemento
-            # loc es la media, scale es la desviación estándar
-            # ruido = np.exp(np.random.normal(loc=-0.1, scale=0.25, size=num_divisiones))
-
-            # Añadir el ruido a cada término del array
-            # valor_resistencia_celda += ruido
-            # print("El vector de resistencias es: ", valor_resistencia_celda)
-            # indice_resistencia = 0  # Indice de la resistencia
-
             r_termica = float(sim_ctes[num_simulation]["r_termica_percola"])
         sistema_percola = True
 
         # Copio el estado actual
         ac = actual_state.copy()
-        resistance_matrix = findpath.find_path(ac)
+        resistance_matrix = CurrentSolver.Generate_resitence_matrix(actual_state)
         densidad_filamento = np.sum(resistance_matrix) / (x_size * y_size)
 
-        # if voltaje_percolacion < voltage < (voltaje_final_set - 0.25):
-        #     sim_ctes[num_simulation]['ohm_resistence'] = valor_resistencia_celda[indice_resistencia]
-        #     indice_resistencia = indice_resistencia + 1
-        #     intensidad_lineal = current
-        # else:
-        #     sim_ctes[num_simulation]['ohm_resistence'] = resistencia_original
-
-        # - (current * Resistencia_serie) # esto hay q quitarlo no se  pero como tengo cosas referidas a esa variable es mas delicado
         voltage_RRAM = voltage
         # Si ha percolado uso la corriente de Ohm
         try:
-            current, resistencia[k] = CurentSolver.OmhCurrent(
+            current, resistencia[k] = CurrentSolver.OmhCurrent(
                 voltage, resistance_matrix, **sim_ctes[num_simulation]
             )
 
@@ -419,16 +396,13 @@ for k in range(0, num_pasos):
         resistencia[k] = 0
 
         mean_field = np.mean(E_field_vector).item()
-        current = CurentSolver.Poole_Frenkel(
+        current = CurrentSolver.Poole_Frenkel(
             temperatura, mean_field, **sim_ctes[num_simulation]
         ) * (device_size)  # type: ignore
         densidad_filamento = 0
 
     # Obtengo los valores del campo eléctrico y la temperatura
-    # voltage_RRAM = voltage - (current * Resistencia_serie)
     E_field = ElectricField.SimpleElectricField(voltage, device_size)
-    # print("La temperatura es: ", temperatura)
-    # print("La temperatura será: " f"{T_0} + ({abs(voltage)} * {abs(current)} * {r_termica})")
     temperatura = Temperature.Temperature_Joule(
         voltage, current, sistema_percola, T_0, **sim_ctes[num_simulation]
     )
@@ -452,7 +426,6 @@ for k in range(0, num_pasos):
         ],
         1,
     )
-    # print("Las probabilidades de generación por fila son: ", prob_generacion_fila)
 
     # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
     for i in range(x_size):
@@ -679,7 +652,7 @@ for k in range(0, num_pasos):
         # print("\nEl sistema ha percolado en la iteración: ", k, ' el valor de gamma es: ', sim_ctes[num_simulation]['gamma'])
         sistema_percola = True
         ac = actual_state.copy()
-        resistance_matrix = findpath.find_path(ac)
+        resistance_matrix = CurrentSolver.Generate_resitence_matrix(ac)
 
         r_termica = float(sim_ctes[num_simulation]["r_termica_percola"])
 
@@ -690,7 +663,7 @@ for k in range(0, num_pasos):
         # Si ha percolado uso la corriente de Ohm
         voltage_RRAM = voltage  # - (current * Resistencia_serie)
         try:
-            current, resistencia[k] = CurentSolver.OmhCurrent(
+            current, resistencia[k] = CurrentSolver.OmhCurrent(
                 voltage_RRAM, resistance_matrix, **sim_ctes[num_simulation]
             )  # type: ignore
         except Warning:
@@ -722,7 +695,7 @@ for k in range(0, num_pasos):
         # el . item es pra convertir el valor de un array con un solo elemento a un float
         mean_field = np.mean(E_field_vector).item()
         # Si no ha percolado uso la corriente de Poole-Frenkel
-        current = CurentSolver.Poole_Frenkel(
+        current = CurrentSolver.Poole_Frenkel(
             temperatura, mean_field, **sim_ctes[num_simulation]
         ) * (device_size)  # type: ignore
         filament_density = 0
@@ -820,7 +793,6 @@ np.savetxt(
     header=header_files,
     delimiter=",",
 )
-# print("El fichero de resultados_sp_set contiene ", data_sp_set.shape[0], ' filas y ', data_sp_set.shape[1], ' columnas')
 
 # Guardo los resultados del set completos combinando los resultados de las dos partes
 data_sp_set_final = np.concatenate((data_pp_set, data_sp_set), axis=0)
@@ -849,7 +821,6 @@ np.savetxt(
     delimiter=",",
     fmt="%.0f",
 )
-# print("El fichero de g del set contiene ", g_set.shape[0], ' filas y ', g_set.shape[1], ' columnas')
 # endregion
 
 # region Región de la primera parte del reset
@@ -956,7 +927,7 @@ for k in range(0, num_pasos):
     if Percolation.is_path(actual_state):
         # Obtengo los caminos de percolación
         ac = actual_state.copy()
-        resistance_matrix = findpath.find_path(ac)
+        resistance_matrix = CurrentSolver.Generate_resitence_matrix(ac)
         filament_density = np.sum(resistance_matrix) / (
             x_size * y_size * (0.25) * (0.25)
         )
@@ -964,7 +935,7 @@ for k in range(0, num_pasos):
 
         # Si ha percolado uso la corriente de Ohm
         try:
-            current, resistencia[k] = CurentSolver.OmhCurrent(
+            current, resistencia[k] = CurrentSolver.OmhCurrent(
                 voltage, resistance_matrix, **sim_ctes[num_simulation]
             )  # type: ignore
             current = abs(current)
@@ -987,7 +958,7 @@ for k in range(0, num_pasos):
     else:
         # Si no ha percolado uso la corriente de Poole-Frenkel
         current = abs(
-            CurentSolver.Poole_Frenkel(
+            CurrentSolver.Poole_Frenkel(
                 temperatura, float(np.mean(E_field_vector)), **sim_ctes[num_simulation]
             )
             * (device_size)
@@ -1198,13 +1169,13 @@ for k in range(0, num_pasos):  # son num_pasos + 1 iteraciones
         percola = True
         # Obtengo los caminos de percolación
         ac = actual_state.copy()
-        resistance_matrix = findpath.find_path(ac)
+        resistance_matrix = CurrentSolver.Generate_resitence_matrix(ac)
         filament_density = np.sum(resistance_matrix) / (
             x_size * y_size * (0.25) * (0.25)
         )
         # Si ha percolado uso la corriente de Ohm
         try:
-            current, resistencia[k] = CurentSolver.OmhCurrent(
+            current, resistencia[k] = CurrentSolver.OmhCurrent(
                 voltage, resistance_matrix, **sim_ctes[num_simulation]
             )  # type: ignore
             current = abs(current)
@@ -1229,7 +1200,7 @@ for k in range(0, num_pasos):  # son num_pasos + 1 iteraciones
         campo_medio = float(np.mean(E_field_vector))
 
         current = abs(
-            CurentSolver.Poole_Frenkel(
+            CurrentSolver.Poole_Frenkel(
                 temperatura, campo_medio, **sim_ctes[num_simulation]
             )
             * (device_size)
