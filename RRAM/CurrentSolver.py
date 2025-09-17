@@ -80,9 +80,17 @@ def Generate_resitence_matrix(
 
     # print("Número de componentes conectados:", len(validos))
 
-    # Elimino los Nodos con grado 1 (hojas), excluyendo primera y última columna
-    leaf_nodes = [n for n, d in G.degree() if d == 1 and n[1] not in (0, W - 1)]
-    G.remove_nodes_from(leaf_nodes)
+    # Nodos con grado 1 (hojas), excluyendo primera y última columna hasta que no quede ningún nodo sin conexión
+    while True:
+        # Encontrar nodos hoja excluyendo primera y última columna
+        leaf_nodes = [n for n, d in G.degree() if d == 1 and n[1] not in (0, W - 1)]
+
+        # Si no hay más nodos hoja, salir del bucle
+        if not leaf_nodes:
+            break
+
+        # Eliminar los nodos hoja encontrados
+        G.remove_nodes_from(leaf_nodes)
 
     # Crear matriz vacía de ceros para la matriz resistencia
     resistance_matriz = np.zeros((H, W), dtype=int)
