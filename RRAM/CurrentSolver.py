@@ -5,54 +5,13 @@ import math
 import os
 
 from scipy.constants import elementary_charge, Boltzmann, epsilon_0
-from RRAM import Constants as cte
 from RRAM import Representate as rp
+from RRAM import Constants as cte
 
 
-# def Generate_Resitence_Matrix(configuration_matrix: NDArray, paths: list) -> NDArray:
-#     """
-#     Generates a resistance matrix based on the given configuration matrix and percolation paths.
-#     Args:
-#         configuration_matrix (np.ndarray): The initial configuration matrix.
-#         paths (list): A list of percolation paths, where each path is a list of (x, y) tuples representing coordinates.
-#     Returns:
-#         np.ndarray: A matrix of the same size as the configuration matrix, with positions marked as 1 where percolation paths exist.
-#     """
-#     # Crear una matriz de ceros del mismo tamaño que la configuración inicial
-#     percolation_matrix = np.zeros_like(configuration_matrix)
-
-#     # Iterar sobre cada camino de percolación y marcar las posiciones en la matriz
-#     for path in paths:
-#         for x, y in path:
-#             percolation_matrix[y, x] = 1
-
-#     return percolation_matrix
-
-
-def Generate_resitence_matrix(
+def Generate_CF_matrix(
     config_matrix: np.ndarray, min_size: int = 20, plot_resmatrix: bool = False
-) -> np.ndarray:
-    """
-    Generates a resistance matrix based on a configuration matrix, filtering out small
-    connected components and leaf nodes, and optionally plotting the resulting matrix.
-    Args:
-        config_matrix (np.ndarray): A 2D numpy array representing the configuration matrix,
-            where 1 indicates walkable cells and 0 indicates non-walkable cells.
-        min_size (int, optional): The minimum size of connected components to retain.
-            Components smaller than this size will be removed. Default is 10.
-        plot_resmatrix (bool, optional): If True, generates a PDF plot of the resulting
-            resistance matrix. Default is False.
-    Returns:
-        np.ndarray: A 2D numpy array representing the resistance matrix, where 1 indicates
-        retained nodes and 0 indicates removed nodes.
-    Notes:
-        - The function constructs an undirected graph from the configuration matrix, where
-          nodes represent walkable cells and edges represent orthogonal connections between them.
-        - Small connected components (smaller than `min_size`) are removed.
-        - Leaf nodes (nodes with degree 1) are removed, except those in the first and last columns.
-        - The resulting resistance matrix is a binary matrix indicating the retained nodes.
-    """
-
+) -> tuple[np.ndarray, nx.Graph]:
     # Preparar el grafo no dirigido (A-B es igual que B-A)
     G = nx.Graph()
     grid = np.array(config_matrix)
@@ -78,8 +37,6 @@ def Generate_resitence_matrix(
     nodos_finales = set().union(*validos)
     G = G.subgraph(nodos_finales).copy()
 
-    # print("Número de componentes conectados:", len(validos))
-
     # Nodos con grado 1 (hojas), excluyendo primera y última columna hasta que no quede ningún nodo sin conexión
     while True:
         # Encontrar nodos hoja excluyendo primera y última columna
@@ -93,18 +50,77 @@ def Generate_resitence_matrix(
         G.remove_nodes_from(leaf_nodes)
 
     # Crear matriz vacía de ceros para la matriz resistencia
-    resistance_matriz = np.zeros((H, W), dtype=int)
+    CF_matrix = np.zeros((H, W), dtype=int)
 
     # Poner 1 en las posiciones de los nodos que siguen en G
     for i, j in G.nodes():
-        resistance_matriz[i, j] = 1
+        CF_matrix[i, j] = 1
 
     if plot_resmatrix:
-        rp.RepresentateState(
-            resistance_matriz, 0.00, os.getcwd() + "/Matriz_resistencia.pdf"
-        )
+        rp.RepresentateState(CF_matrix, 0.00, os.getcwd() + "/Matriz_resistencia.pdf")
 
-    return resistance_matriz
+    return CF_matrix, G
+
+
+def Clasificar_CF(
+    G: nx.Graph,
+    x_max: int,
+    y_max: int,
+    filamentos_ranges: list[tuple[int, int]],
+    toleracia: int = 3,
+) -> dict:
+    # Nodos de origen y destino
+    nodos_inicio = [n for n in G.nodes() if n[1] == 0]
+    nodos_fin = [n for n in G.nodes() if n[1] == x_max - 1]
+
+    # Clasificación de nodos de inicio en filamentos
+    nodos_inicio_clasificados = {}
+    for nodo in nodos_inicio:
+        fila = nodo[0]
+        filamento_asignado = None
+        for idx, (fila_min, fila_max) in enumerate(filamentos_ranges, start=1):
+            # TODO: debatible, poner directamente todo el rango? que son 4 bn pero con dos ya daría problemas
+            if (
+                fila_min - toleracia <= fila <= fila_max + toleracia
+            ):  # tolerancia ±3 por defecto
+                filamento_asignado = idx
+                break
+        if filamento_asignado is None:
+            raise ValueError(f"Nodo {nodo} no pudo asignarse a ningún filamento")
+        nodos_inicio_clasificados[nodo] = filamento_asignado
+
+    resultados = {}
+    for nodo, filamento in nodos_inicio_clasificados.items():
+        percola = any(nx.has_path(G, nodo, t) for t in nodos_fin)
+        resultados[nodo] = {"filamento": filamento, "percola": percola}
+
+    return resultados
+
+
+def Existe_filamentos(resultados, num_filamentos) -> list[bool]:
+    """
+    Comprueba si cada filamento tiene al menos un nodo de inicio que percola.
+
+    Args:
+        resultados : dict
+            Diccionario { nodo: {"filamento": i, "percola": True/False} }
+        num_filamentos : int
+            Número total de filamentos
+
+    Returns:
+        lista_bool : list
+            Lista de booleanos [F1, F2, ...] indicando si cada filamento tiene
+            al menos un nodo que percola
+    """
+    lista_bool = []
+
+    for i in range(1, num_filamentos + 1):
+        existe = any(
+            info["filamento"] == i and info["percola"] for info in resultados.values()
+        )
+        lista_bool.append(existe)
+
+    return lista_bool
 
 
 def OmhCurrent(

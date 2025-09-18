@@ -1,7 +1,7 @@
 from RRAM import Recombination  # Importación explícita de Recombination
 from RRAM import ElectricField  # Importación explícita de ElectricField
-from RRAM import Representate  # Importación explícita de Representate
 from RRAM import CurrentSolver  # Importación explícita de CurentSolver
+from RRAM import Representate  # Importación explícita de Representate
 from RRAM import Percolation  # Importación explícita de Percolation
 from RRAM import Temperature  # Importación explícita de Temperature
 from RRAM import Montecarlo  # Importación explícita de Montecarlo
@@ -11,8 +11,8 @@ from RRAM import Generation  # Importación explícita de Generation
 from RRAM import utils  # Importación explícita de utilsutils
 
 import matplotlib.pyplot as plt
-import pandas as pd
 from RRAM import exceptions
+import pandas as pd
 import time as time
 
 import pickle
@@ -162,6 +162,14 @@ Representate.RepresentateState(
 # Defino las matrices donde guardo las configuración del sistema y la de los oxígenos
 config_matrix_pp_set = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
 
+# Rango donde se estima que están los filamentos
+filamentos_ranges = [
+    (3, 6),
+    (13, 15),
+    (23, 25),
+    (33, 35),
+]  # Se incluye el 3 y se incluye el 6
+
 # Defino el paso temporal
 paso_temporal = total_simulation_time / num_pasos
 paso_potencial = voltaje_max_simulation / num_pasos
@@ -191,6 +199,7 @@ print(
     "El valor del factor de generacion es: ",
     sim_ctes[num_simulation]["factor_generacion"],
 )
+print("EL rango donde se buscan los filamentos es: ", filamentos_ranges)
 
 # Creo el vector de diferencias de potencial
 vector_ddp = np.arange(0.000, voltaje_max_simulation + paso_potencial, paso_potencial)
@@ -361,7 +370,9 @@ for k in range(0, num_pasos):
 
         # Copio el estado actual
         ac = actual_state.copy()
-        resistance_matrix = CurrentSolver.Generate_resitence_matrix(actual_state)
+        resistance_matrix, _ = CurrentSolver.Generate_CF_matrix(
+            actual_state
+        )  # No me interesa el grafo ahora mismo en el set
         densidad_filamento = np.sum(resistance_matrix) / (x_size * y_size)
 
         voltage_RRAM = voltage
@@ -413,7 +424,7 @@ for k in range(0, num_pasos):
             voltage, i, actual_state, **sim_parmtrs[num_simulation]
         )
 
-    # Precalcular las probabilidades por fila
+    # calcular las probabilidades por fila
     prob_generacion_fila = np.minimum(
         [
             Generation.Generate(
@@ -516,14 +527,14 @@ np.savetxt(
 )
 # print("El fichero de resultados_pp_set contiene ", data_pp_set.shape[0], ' filas y ', data_pp_set.shape[1], ' columnas')
 
-g_pp_set = np.array(g_valor_list[1:])
+# g_pp_set = np.array(g_valor_list[1:])
 
-np.savetxt(
-    set_simulation_path + f"g_pp_set_{num_simulation + 1}.txt",
-    g_pp_set,
-    delimiter=",",
-    fmt="%.0f",
-)
+# np.savetxt(
+#     set_simulation_path + f"g_pp_set_{num_simulation + 1}.txt",
+#     g_pp_set,
+#     delimiter=",",
+#     fmt="%.0f",
+# )
 # print("El g en el pp set contiene ", g_pp_set.shape[0], ' filas y ', g_pp_set.shape[1], ' columnas')
 
 # Guardo las vacantes generadas en el forming
@@ -575,7 +586,7 @@ config_matrix_sp_set = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size
 
 # Creo el vector de diferencias de potencial
 vector_ddp = np.arange(voltaje_max_set, 0.000, -paso_potencial)
-g_sp_set = np.zeros((num_pasos, x_size))
+# g_sp_set = np.zeros((num_pasos, x_size))
 
 print("Voltaje inicial sp set", voltaje_max_set)
 
@@ -652,7 +663,7 @@ for k in range(0, num_pasos):
         # print("\nEl sistema ha percolado en la iteración: ", k, ' el valor de gamma es: ', sim_ctes[num_simulation]['gamma'])
         sistema_percola = True
         ac = actual_state.copy()
-        resistance_matrix = CurrentSolver.Generate_resitence_matrix(ac)
+        resistance_matrix, _ = CurrentSolver.Generate_CF_matrix(ac)
 
         r_termica = float(sim_ctes[num_simulation]["r_termica_percola"])
 
@@ -766,7 +777,7 @@ for k in range(0, num_pasos):
             filament_density,
         ]
     )
-    g_sp_set[k] = Generation.evalutate_g(actual_state, size_grid=40)
+    # g_sp_set[k] = Generation.evalutate_g(actual_state, size_grid=40)
     # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
     if k % paso_guardar == 0:
         config_matrix_sp_set[int(k / paso_guardar) - 1] = actual_state
@@ -804,23 +815,23 @@ np.savetxt(
 )
 # print("El fichero de resultados set contiene ", data_sp_set.shape[0], ' filas y ', data_sp_set.shape[1], ' columnas')
 
-np.savetxt(
-    set_simulation_path + f"g_sp_set_{num_simulation + 1}.txt",
-    g_sp_set,
-    delimiter=",",
-    fmt="%.0f",
-)
+# np.savetxt(
+#     set_simulation_path + f"g_sp_set_{num_simulation + 1}.txt",
+#     g_sp_set,
+#     delimiter=",",
+#     fmt="%.0f",
+# )
 
 # Guardo los valores de g del proceso de set, combinando los vectores de g de las dos partes
-g_set = np.concatenate((g_pp_set, g_sp_set), axis=0)
+# g_set = np.concatenate((g_pp_set, g_sp_set), axis=0)
 
 # print("El g en el set contiene ", g_set.shape[0], ' filas y ', g_set.shape[1], ' columnas')
-np.savetxt(
-    set_simulation_path + f"g_set_{num_simulation + 1}.txt",
-    g_set,
-    delimiter=",",
-    fmt="%.0f",
-)
+# np.savetxt(
+#     set_simulation_path + f"g_set_{num_simulation + 1}.txt",
+#     g_set,
+#     delimiter=",",
+#     fmt="%.0f",
+# )
 # endregion
 
 # region Región de la primera parte del reset
@@ -852,7 +863,7 @@ initial_oxygen_reset = oxygen_state
 
 # Vuelvo a definir el vector de resistencia total
 resistencia = np.zeros(num_pasos + 1)
-g_pp_reset = np.zeros((num_pasos, x_size))
+# g_pp_reset = np.zeros((num_pasos, x_size))
 
 Representate.RepresentateState(
     initial_configuration_reset,
@@ -872,6 +883,8 @@ print(
     sim_ctes[num_simulation]["gamma"],
 )
 
+CF_destruido = np.full(len(filamentos_ranges), False, dtype=bool)
+
 # Ciclo para la primera parte del reset
 # for k in tqdm(range(0, num_pasos)):
 for k in range(0, num_pasos):
@@ -879,6 +892,26 @@ for k in range(0, num_pasos):
     simulation_time = paso_temporal * k
     # Actualizo el voltaje
     voltage = vector_ddp[k]
+
+    CF_matrix, CF_graph = CurrentSolver.Generate_CF_matrix(actual_state)
+
+    max_x, max_y = ac.shape
+    filamentos = CurrentSolver.Clasificar_CF(CF_graph, max_x, max_y, filamentos_ranges)
+
+    # print(f"{filamentos} \n")
+    if any(~CF_destruido):  # mientras haya alguno sin romper
+        for i, v in enumerate(
+            CurrentSolver.Existe_filamentos(filamentos, len(filamentos_ranges))
+        ):
+            if not v and not CF_destruido[i]:
+                CF_destruido[i] = True
+                Representate.RepresentateState(
+                    actual_state,
+                    voltage,
+                    simulation_path
+                    + f"Figures/Filamento_{i + 1}_roto_reset_{num_simulation + 1}.png",
+                )
+                print(f"El filamento {i + 1} se ha roto en el voltaje {voltage}")
 
     # Si se llena el 90 del espacio de la matriz salto a otra simulación
     if np.sum(actual_state) > int(0.9 * num_max_vacantes):
@@ -927,7 +960,7 @@ for k in range(0, num_pasos):
     if Percolation.is_path(actual_state):
         # Obtengo los caminos de percolación
         ac = actual_state.copy()
-        resistance_matrix = CurrentSolver.Generate_resitence_matrix(ac)
+        resistance_matrix = CF_matrix
         filament_density = np.sum(resistance_matrix) / (
             x_size * y_size * (0.25) * (0.25)
         )
@@ -980,15 +1013,6 @@ for k in range(0, num_pasos):
             )
         )
 
-    # # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
-    # for i in range(x_size):
-    #     prob_generacion = Generation.Generate(paso_temporal, E_field_vector[i], temperatura, **sim_ctes[num_simulation])
-    #     for j in range(y_size):
-    #         if actual_state[i, j] == 0:
-    #             random_number = np.random.rand()
-    #             if random_number < prob_generacion:
-    #                 actual_state[i, j] = 1  # Generación de una vacante
-
     # Genero los oxígenos
     if abs(voltage) > 0.7:
         oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 1)
@@ -1031,7 +1055,7 @@ for k in range(0, num_pasos):
         ]
     )
 
-    g_pp_reset[k] = Generation.evalutate_g(actual_state, size_grid=40)
+    # g_pp_reset[k] = Generation.evalutate_g(actual_state, size_grid=40)
 
     # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
     if k % 1 == 0:  # Arreglo rapido para q lo guarde siempre
@@ -1039,15 +1063,15 @@ for k in range(0, num_pasos):
         oxygen_matrix_pp_reset[int(k / paso_guardar) - 1] = oxygen_state
 
     # Represento el estado cada 1500 pasos
-    if k % 1500 == 0:
+    if k % 3000 == 0:
         fig_voltage = round(vector_ddp[k], 3)
         figure_name = f"_pp_reset_V={fig_voltage}_{num_simulation + 1}.png"
-        Representate.RepresentateTwoStates(
-            actual_state,
-            oxygen_state,
-            fig_voltage,
-            simulation_path + "Figures/state_" + figure_name,
-        )
+        # Representate.RepresentateTwoStates(
+        #     actual_state,
+        #     oxygen_state,
+        #     fig_voltage,
+        #     simulation_path + "Figures/state_" + figure_name,
+        # )
         Representate.RepresentateState(
             actual_state,
             fig_voltage,
@@ -1084,12 +1108,12 @@ with open(
 ) as file:
     pickle.dump(oxygen_state, file)
 
-Representate.RepresentateTwoStates(
-    actual_state,
-    oxygen_state,
-    round(voltage, 3),
-    simulation_path + f"Figures/Final_state_pp_reset_{num_simulation + 1}.png",
-)
+# Representate.RepresentateTwoStates(
+#     actual_state,
+#     oxygen_state,
+#     round(voltage, 3),
+#     simulation_path + f"Figures/Final_state_pp_reset_{num_simulation + 1}.png",
+# )
 Representate.RepresentateState(
     actual_state,
     round(voltage, 3),
@@ -1104,14 +1128,12 @@ np.savetxt(
 )
 # print("El fichero de resultados_pp_reset contiene ", data_pp_reset.shape[0], ' filas y ', data_pp_reset.shape[1], ' columnas')
 
-np.savetxt(
-    reset_simulation_path + f"g_pp_reset_{num_simulation + 1}.txt",
-    g_pp_reset,
-    delimiter=",",
-    fmt="%.0f",
-)
-# print("El g en el pp reset contiene ", g_pp_reset.shape[0], ' filas y ', g_pp_reset.shape[1], ' columnas')
-
+# np.savetxt(
+#     reset_simulation_path + f"g_pp_reset_{num_simulation + 1}.txt",
+#     g_pp_reset,
+#     delimiter=",",
+#     fmt="%.0f",
+# )
 
 tiempo_pp_reset = simulation_time
 # endregion
@@ -1145,34 +1167,48 @@ oxygen_matrix_sp_reset = np.zeros((int((num_pasos + 1 / paso_guardar)), x_size, 
 # Creo el vector de diferencias de potencial
 vector_ddp = np.arange(-voltaje_max_simulation, 0.000 + paso_potencial, paso_potencial)
 
-# Estado iniciales de la simulación para la segunda parte del reset
-# initial_configuration_reset = actual_state
-# initial_oxygen_reset = oxygen_state
-
-
-# sim_ctes[num_simulation]['gamma'] = str(float(sim_ctes[num_simulation]['gamma']) / 5)
-
-g_sp_reset = np.zeros((num_pasos, x_size))
+# g_sp_reset = np.zeros((num_pasos, x_size))
 
 # Ciclo para la segunda parte del reset
 # for k in tqdm(range(0, num_pasos)):  # son num_pasos + 1 iteraciones
 for k in range(0, num_pasos):  # son num_pasos + 1 iteraciones
     # Actualizo el tiempo de simulación
     simulation_time = paso_temporal * k
-    # print(f"\nComienza la iteración {k} de la segunda parte del reset")
 
     # Actualizo el voltaje
     voltage = vector_ddp[k]
 
+    CF_matrix, CF_graph = CurrentSolver.Generate_CF_matrix(actual_state)
+
+    max_x, max_y = ac.shape
+    filamentos = CurrentSolver.Clasificar_CF(CF_graph, max_x, max_y, filamentos_ranges)
+
+    # print(f"{filamentos} \n")
+    if any(~CF_destruido):  # mientras haya alguno sin romper
+        for i, v in enumerate(
+            CurrentSolver.Existe_filamentos(filamentos, len(filamentos_ranges))
+        ):
+            if not v and not CF_destruido[i]:
+                CF_destruido[i] = True
+                Representate.RepresentateState(
+                    actual_state,
+                    voltage,
+                    simulation_path
+                    + f"Figures/Filamento_{i + 1}_roto_reset_{num_simulation + 1}.png",
+                )
+                print(f"El filamento {i + 1} se ha roto en el voltaje {voltage}")
+
     # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
     if Percolation.is_path(actual_state):
         percola = True
+
         # Obtengo los caminos de percolación
         ac = actual_state.copy()
-        resistance_matrix = CurrentSolver.Generate_resitence_matrix(ac)
+        resistance_matrix = CF_matrix
         filament_density = np.sum(resistance_matrix) / (
             x_size * y_size * (0.25) * (0.25)
         )
+
         # Si ha percolado uso la corriente de Ohm
         try:
             current, resistencia[k] = CurrentSolver.OmhCurrent(
@@ -1223,16 +1259,6 @@ for k in range(0, num_pasos):  # son num_pasos + 1 iteraciones
             )
         )
 
-    # # Calculo la probabilidad de generación o recombinación para ello recorro toda la matriz
-    # for i in range(x_size):
-    #     prob_generacion = Generation.Generate(
-    #         paso_temporal, E_field_vector[i], temperatura, **sim_ctes[num_simulation])
-    #     for j in range(y_size):
-    #         if actual_state[i, j] == 0:
-    #             random_number = np.random.rand()
-    #             if random_number < prob_generacion:
-    #                 actual_state[i, j] = 1  # Generación de una vacante
-
     oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 10)
 
     # Muevo los oxígenos
@@ -1271,7 +1297,7 @@ for k in range(0, num_pasos):  # son num_pasos + 1 iteraciones
         ]
     )
 
-    g_sp_reset[k] = Generation.evalutate_g(actual_state, size_grid=40)
+    # g_sp_reset[k] = Generation.evalutate_g(actual_state, size_grid=40)
 
     # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
 
@@ -1280,15 +1306,15 @@ for k in range(0, num_pasos):  # son num_pasos + 1 iteraciones
         oxygen_matrix_sp_reset[int(k / paso_guardar) - 1] = oxygen_state
 
     # Represento el estado cada 1500 pasos
-    if k % 1500 == 0:
+    if k % 3000 == 0:
         fig_voltage = round(vector_ddp[k], 3)
         figure_name = f"_sp_reset_V={fig_voltage}_{num_simulation + 1}.png"
-        Representate.RepresentateTwoStates(
-            actual_state,
-            oxygen_state,
-            fig_voltage,
-            simulation_path + "Figures/state" + figure_name,
-        )
+        # Representate.RepresentateTwoStates(
+        #     actual_state,
+        #     oxygen_state,
+        #     fig_voltage,
+        #     simulation_path + "Figures/state" + figure_name,
+        # )
         Representate.RepresentateState(
             actual_state,
             fig_voltage,
@@ -1331,30 +1357,30 @@ np.savetxt(
 
 
 # Obtengo los valores de g del proceso de reset, combinando los vectores de g de las dos partes
-np.savetxt(
-    reset_simulation_path + f"g_sp_reset_{num_simulation + 1}.txt",
-    g_sp_reset,
-    delimiter=",",
-    fmt="%.0f",
-)
+# np.savetxt(
+#     reset_simulation_path + f"g_sp_reset_{num_simulation + 1}.txt",
+#     g_sp_reset,
+#     delimiter=",",
+#     fmt="%.0f",
+# )
 # print("El g en el sp reset contiene ", g_sp_reset.shape[0], ' filas y ', g_sp_reset.shape[1], ' columnas')
 
-g_reset = np.concatenate((g_pp_reset, g_sp_reset), axis=0)
-np.savetxt(
-    reset_simulation_path + f"g_reset_{num_simulation + 1}.txt",
-    g_reset,
-    delimiter=",",
-    fmt="%.0f",
-)
+# g_reset = np.concatenate((g_pp_reset, g_sp_reset), axis=0)
+# np.savetxt(
+#     reset_simulation_path + f"g_reset_{num_simulation + 1}.txt",
+#     g_reset,
+#     delimiter=",",
+#     fmt="%.0f",
+# )
 # print("El g en el reset contiene ", g_reset.shape[0], ' filas y ', g_reset.shape[1], ' columnas')
 
 # Guardo el estado final de la simulación
-Representate.RepresentateTwoStates(
-    actual_state,
-    oxygen_state,
-    round(voltage, 3),
-    simulation_path + f"Figures/Final_state_sp_reset_{num_simulation + 1}.png",
-)
+# Representate.RepresentateTwoStates(
+#     actual_state,
+#     oxygen_state,
+#     round(voltage, 3),
+#     simulation_path + f"Figures/Final_state_sp_reset_{num_simulation + 1}.png",
+# )
 Representate.RepresentateState(
     actual_state,
     0,
@@ -1433,32 +1459,31 @@ E_r = sim_ctes[num_simulation]["recombination_energy"]
 resistencia = sim_ctes[num_simulation]["ohm_resistence"]
 titulo_figura = "I-V Characteristics"  # rf"I-V_{num_simulation + 1}_$E_r = {E_r}$_$R = {resistencia}$"
 
+# # Diccionario de puntos que quieres ubicar
+# puntos_x_set = {"a)": 1e-6, "b)": 0.5, "c)": 1.1}
+# puntos_x_pp_reset = {"d)": -0.9, "e)": -1.4}
+# puntos_x_sp_reset = {"f)": -0.01}
 
-# Diccionario de puntos que quieres ubicar
-puntos_x_set = {"a)": 1e-6, "b)": 0.5, "c)": 1.1}
-puntos_x_pp_reset = {"d)": -0.9, "e)": -1.4}
-puntos_x_sp_reset = {"f)": -0.01}
+# # Obtener puntos en cada curva
+# puntos_set = utils.obtener_puntos_en_curva(v_ps, i_ps, puntos_x_set)
+# puntos_x_pp_reset = utils.obtener_puntos_en_curva(v_pr, i_pr, puntos_x_pp_reset)
+# puntos_x_sp_reset = utils.obtener_puntos_en_curva(v_sr, i_sr, puntos_x_sp_reset)
 
-# Obtener puntos en cada curva
-puntos_set = utils.obtener_puntos_en_curva(v_ps, i_ps, puntos_x_set)
-puntos_x_pp_reset = utils.obtener_puntos_en_curva(v_pr, i_pr, puntos_x_pp_reset)
-puntos_x_sp_reset = utils.obtener_puntos_en_curva(v_sr, i_sr, puntos_x_sp_reset)
+# # Crear un único diccionario combinando ambos
+# puntos_totales = {}
+# puntos_totales.update(puntos_set)
+# puntos_totales.update(puntos_x_pp_reset)
+# puntos_totales.update(puntos_x_sp_reset)
 
-# Crear un único diccionario combinando ambos
-puntos_totales = {}
-puntos_totales.update(puntos_set)
-puntos_totales.update(puntos_x_pp_reset)
-puntos_totales.update(puntos_x_sp_reset)
-
-# Diccionario de desplazamiento (dx, dy) para cada punto
-desplazamiento = {
-    "a)": (0.02, 1.0),  # derecha, misma altura
-    "b)": (-0.0, 0.4),  # izquierda, un poco arriba
-    "c)": (0.02, 1.0),  # derecha, un poco abajo
-    "d)": (0.02, 1.0),  # izquierda, misma altura
-    "e)": (0.0, 0.4),  # izquierda, un poco abajo
-    "f)": (-0.1, 1.0),  # derecha, un poco arriba
-}
+# # Diccionario de desplazamiento (dx, dy) para cada punto
+# desplazamiento = {
+#     "a)": (0.02, 1.0),  # derecha, misma altura
+#     "b)": (-0.0, 0.4),  # izquierda, un poco arriba
+#     "c)": (0.02, 1.0),  # derecha, un poco abajo
+#     "d)": (0.02, 1.0),  # izquierda, misma altura
+#     "e)": (0.0, 0.4),  # izquierda, un poco abajo
+#     "f)": (-0.1, 1.0),  # derecha, un poco arriba
+# }
 
 Representate.plot_IV(
     v_set,
@@ -1470,51 +1495,51 @@ Representate.plot_IV(
     figures_path=save_path,
 )
 
-Representate.plot_IV_marcado(
-    v_set,
-    i_set,
-    v_reset,
-    i_reset,
-    num_simulation,
-    puntos_totales,
-    desplazamiento,
-    titulo_figura="",
-    figures_path=save_path,
-)
+# Representate.plot_IV_marcado(
+#     v_set,
+#     i_set,
+#     v_reset,
+#     i_reset,
+#     num_simulation,
+#     puntos_totales,
+#     desplazamiento,
+#     titulo_figura="",
+#     figures_path=save_path,
+# )
 
-save_path = simulation_path + f"Figures/Densidad_Filamento_{num_simulation + 1}"
+# save_path = simulation_path + f"Figures/Densidad_Filamento_{num_simulation + 1}"
 
-densidad_filamento = np.concatenate(
-    (
-        np.array(df_pset["Densidad Filamento"]),
-        np.array(df_sset["Densidad Filamento"]),
-        df_preset["Densidad Filamento"],
-        np.array(df_sreset["Densidad Filamento"]),
-    )
-)
+# densidad_filamento = np.concatenate(
+#     (
+#         np.array(df_pset["Densidad Filamento"]),
+#         np.array(df_sset["Densidad Filamento"]),
+#         df_preset["Densidad Filamento"],
+#         np.array(df_sreset["Densidad Filamento"]),
+#     )
+# )
 
-# Tiempo de simulacion:
-t_ps = np.array(df_pset["# Tiempo simulacion [s]"])
-t_ss = np.array(df_sset["# Tiempo simulacion [s]"])
-t_pr = np.array(df_preset["# Tiempo simulacion [s]"])
-t_sr = np.array(df_sreset["# Tiempo simulacion [s]"])
+# # Tiempo de simulacion:
+# t_ps = np.array(df_pset["# Tiempo simulacion [s]"])
+# t_ss = np.array(df_sset["# Tiempo simulacion [s]"])
+# t_pr = np.array(df_preset["# Tiempo simulacion [s]"])
+# t_sr = np.array(df_sreset["# Tiempo simulacion [s]"])
 
-tiempo = np.concatenate((t_ps, t_ss, t_pr, t_sr))
+# tiempo = np.concatenate((t_ps, t_ss, t_pr, t_sr))
 
-fig, axes = plt.subplots(figsize=(12, 9))
-setup_plt(plt, latex=True, scaling=2)
-config_ax(axes)
+# fig, axes = plt.subplots(figsize=(12, 9))
+# setup_plt(plt, latex=True, scaling=2)
+# config_ax(axes)
 
-# Configurar etiquetas y título
-axes.set_xlabel(r"Tiempo (\si{\s})")  # (\si{\nano\meter^{-1}})
-axes.set_ylabel(
-    r"Conductive filament density (number vancancies in filament/\si{\nano\meter^{2}})",
-    fontsize=12,
-)
-axes.set_title("Filament Density", pad=20)
+# # Configurar etiquetas y título
+# axes.set_xlabel(r"Tiempo (\si{\s})")  # (\si{\nano\meter^{-1}})
+# axes.set_ylabel(
+#     r"Conductive filament density (number vancancies in filament/\si{\nano\meter^{2}})",
+#     fontsize=12,
+# )
+# axes.set_title("Filament Density", pad=20)
 
-axes.scatter(tiempo, densidad_filamento, s=2.5)
+# axes.scatter(tiempo, densidad_filamento, s=2.5)
 
-fig.savefig(save_path + ".png", bbox_inches="tight", dpi=300)
+# fig.savefig(save_path + ".png", bbox_inches="tight", dpi=300)
 
 # endregion

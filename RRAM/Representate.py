@@ -98,7 +98,15 @@ def RepresentateState(
 
     # Graficar la matriz
     ax.pcolormesh(
-        x, y, matriz, shading="nearest", vmin=matriz.min(), vmax=matriz.max(), cmap=cmap
+        x,
+        y,
+        matriz,
+        shading="nearest",
+        vmin=matriz.min(),
+        vmax=matriz.max(),
+        cmap=cmap,
+        edgecolors="gray",  # bordes negros
+        linewidth=0.52,  # grosor del borde
     )
 
     # Configuración de electrodos con mayor altura
