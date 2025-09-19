@@ -11,7 +11,6 @@ from matplotlib.colors import LinearSegmentedColormap
 import os
 # region Configuración del plot
 
-
 def config_ax(ax):
     ax.grid(which="major", color="#DDDDDD", linewidth=0.8, zorder=-1)
     ax.grid(which="minor", color="#DEDEDE", linestyle=":", linewidth=0.5, zorder=-1)
@@ -24,6 +23,38 @@ def config_ax_state(ax):
     # ax.grid(which="minor", color="#DEDEDE", linestyle=":", linewidth=0.5, zorder=-1)
     ax.minorticks_off()
     ax.tick_params(axis="both", which="both", direction="in", top=True, right=True)
+
+
+def setup_paper_plt(plt, latex=True, scaling=1):
+    plt.rcParams.update(
+        {
+            "pgf.texsystem": "pdflatex",
+            "text.usetex": latex,
+            "font.family": "mathpazo",
+            "text.latex.preamble": "\n".join(
+                [
+                    r"\usepackage[utf8]{inputenc}",
+                    r"\usepackage[T1]{fontenc}",
+                    r"\usepackage{siunitx}",
+                    r"\usepackage{physics}",
+                ]
+            ),
+        }
+    )
+
+    SMALL_SIZE = 8 * scaling
+    MEDIUM_SIZE = 10 * scaling
+    BIGGER_SIZE = 11 * scaling
+    BIGGEST_SIZE = 14 * scaling
+
+    plt.rc("font", size=SMALL_SIZE)
+    plt.rc("axes", titlesize=MEDIUM_SIZE)
+    plt.rc("axes", labelsize=BIGGEST_SIZE * 1.2)
+    plt.rc("xtick", labelsize=BIGGEST_SIZE)
+    plt.rc("ytick", labelsize=BIGGEST_SIZE)
+    plt.rc("legend", fontsize=SMALL_SIZE)
+    plt.rc("figure", titlesize=BIGGER_SIZE)
+    plt.rc("axes", titlesize=BIGGER_SIZE)
 
 
 def setup_plt(plt, latex=True, scaling=1):
