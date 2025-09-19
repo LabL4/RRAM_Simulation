@@ -11,6 +11,7 @@ from matplotlib.colors import LinearSegmentedColormap
 import os
 # region Configuración del plot
 
+
 def config_ax(ax):
     ax.grid(which="major", color="#DDDDDD", linewidth=0.8, zorder=-1)
     ax.grid(which="minor", color="#DEDEDE", linestyle=":", linewidth=0.5, zorder=-1)
@@ -47,12 +48,12 @@ def setup_paper_plt(plt, latex=True, scaling=1):
     BIGGER_SIZE = 11 * scaling
     BIGGEST_SIZE = 14 * scaling
 
-    plt.rc("font", size=SMALL_SIZE)
+    plt.rc("font", size=BIGGER_SIZE)
     plt.rc("axes", titlesize=MEDIUM_SIZE)
     plt.rc("axes", labelsize=BIGGEST_SIZE * 1.2)
     plt.rc("xtick", labelsize=BIGGEST_SIZE)
     plt.rc("ytick", labelsize=BIGGEST_SIZE)
-    plt.rc("legend", fontsize=SMALL_SIZE)
+    plt.rc("legend", fontsize=BIGGER_SIZE)
     plt.rc("figure", titlesize=BIGGER_SIZE)
     plt.rc("axes", titlesize=BIGGER_SIZE)
 
