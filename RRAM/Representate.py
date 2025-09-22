@@ -43,19 +43,17 @@ def setup_paper_plt(plt, latex=True, scaling=1):
         }
     )
 
-    SMALL_SIZE = 8 * scaling
     MEDIUM_SIZE = 10 * scaling
     BIGGER_SIZE = 11 * scaling
     BIGGEST_SIZE = 14 * scaling
 
     plt.rc("font", size=BIGGER_SIZE)
     plt.rc("axes", titlesize=MEDIUM_SIZE)
-    plt.rc("axes", labelsize=BIGGEST_SIZE * 1.2)
+    plt.rc("axes", labelsize=BIGGEST_SIZE)
     plt.rc("xtick", labelsize=BIGGEST_SIZE)
     plt.rc("ytick", labelsize=BIGGEST_SIZE)
     plt.rc("legend", fontsize=BIGGER_SIZE)
-    plt.rc("figure", titlesize=BIGGER_SIZE)
-    plt.rc("axes", titlesize=BIGGER_SIZE)
+    plt.rc("figure", titlesize=BIGGEST_SIZE)
 
 
 def setup_plt(plt, latex=True, scaling=1):
@@ -89,7 +87,7 @@ def setup_plt(plt, latex=True, scaling=1):
     plt.rc("axes", titlesize=BIGGER_SIZE * 1.05)
 
 
-setup_plt(plt, latex=True, scaling=2)
+setup_paper_plt(plt, latex=True, scaling=2)
 
 
 def RepresentateState(
@@ -118,6 +116,8 @@ def RepresentateState(
 
     fig, ax = plt.subplots(figsize=(12, 9))
 
+    setup_paper_plt(plt, latex=True, scaling=2)
+    plt.rc("axes", labelsize=14 * 2 * 1.3)
     # Desactivar minorticks para evitar sobrecarga visual
     config_ax_state(ax)
 
@@ -137,8 +137,8 @@ def RepresentateState(
         vmin=matriz.min(),
         vmax=matriz.max(),
         cmap=cmap,
-        edgecolors="gray",  # bordes negros
-        linewidth=0.52,  # grosor del borde
+        # edgecolors="gray",  # bordes negros
+        # linewidth=0.52,  # grosor del borde
     )
 
     # Configuración de electrodos con mayor altura
@@ -171,7 +171,7 @@ def RepresentateState(
     ax.set_yticks(np.arange(0, 11, 2))  # 🔹 Ticks cada 2 nm en Y
     ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
     ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
-    ax.set_title(rf"V = {voltaje} (V)", pad=20)
+    ax.set_title(rf"V = {voltaje} (V)", pad=20, fontsize=32)
 
     # Ajustar formato visual
     ax.set_aspect("equal")
@@ -188,57 +188,14 @@ def RepresentateState(
     if filename:
         plt.savefig(filename, bbox_inches="tight")
 
+    cadena = filename
+    ruta_pdf = os.path.splitext(cadena)[0] + ".pdf"
+    plt.savefig(ruta_pdf, bbox_inches="tight")
+
     # Mostrar gráfico
     plt.close(fig)
 
     return None
-
-
-def RepresentateStateOpt(matriz: np.ndarray, filename: str = "grafica.png") -> None:
-    """
-    Represent the state of a matrix as a colored plot.
-
-    Parameters:
-    - matriz (np.ndarray): The input matrix to be represented.
-    - filename (str, optional): The name of the file to save the plot. Default is "grafica.png".
-
-    Returns:
-    None
-    """
-    # Crear una figura y un eje con plt.subplots()
-    fig, ax = plt.subplots()
-
-    # Crear un mapa de colores personalizado
-    colors = [
-        (1, 1, 1),  # Color para el valor 0 que representa que No hay trampa
-        (
-            0.478,
-            0.627,
-            0.870,
-        ),  # Color para el valor 1 que representa que hay trampa (azul)
-    ]
-    if np.all(matriz == 1):
-        colors = list(reversed(colors))
-
-    cmap_name = "my_list"
-    cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=2)
-
-    # Usar imshow en lugar de pcolormesh para una representación más eficiente
-    ax.imshow(matriz, cmap=cmap, origin="upper")
-
-    # Establecer la relación de aspecto para que las celdas sean cuadradas
-    ax.set_aspect("equal")
-
-    # Colocar las etiquetas del eje x en la parte superior
-    ax.xaxis.tick_top()
-
-    # Colocar las etiquetas del eje y en la parte izquierda
-    ax.yaxis.tick_left()
-
-    # plt.title("Iteracion {}".format(filename.split("_")[1].split(".")[0]))
-
-    # Guardar la imagen
-    plt.savefig(filename)
 
 
 def RepresentateState_parall(
@@ -587,7 +544,7 @@ def plot_IV(
     figures_path = os.getcwd() + "/Results/Figures"
 
     # Configuración de la figura
-    setup_plt(plt, latex=True, scaling=2)
+    setup_paper_plt(plt, latex=True, scaling=2)
 
     fig, axes = plt.subplots(figsize=(12, 9))
     config_ax(axes)
@@ -653,6 +610,11 @@ def plot_IV(
     fig.savefig(
         figures_path + f"/I-V_{num_simulation + 1}.png", bbox_inches="tight", dpi=300
     )
+
+    # Guardar figura
+    fig.savefig(
+        figures_path + f"/I-V_{num_simulation + 1}.pdf", bbox_inches="tight", dpi=300
+    )
     plt.close(fig)  # Cierra para liberar memoria
 
 
@@ -683,7 +645,7 @@ def plot_IV_marcado(
     figures_path = os.getcwd() + "/Results/Figures"
 
     # Configuración de la figura
-    setup_plt(plt, latex=True, scaling=2)
+    setup_paper_plt(plt, latex=True, scaling=2)
 
     fig, axes = plt.subplots(figsize=(12, 9))
     config_ax(axes)
@@ -766,7 +728,7 @@ def plot_IV_marcado(
             xp + dx,  # Usar la posición calculada en x
             max(yp * factor_y, 1e-6),  # Usar la posición calculada en y con un mínimo
             label,
-            fontsize=22,  # Reducir el tamaño de fuente
+            fontsize=30,
             verticalalignment="bottom",
             horizontalalignment="left",
             zorder=10,
@@ -784,6 +746,13 @@ def plot_IV_marcado(
     # Guardar figura
     fig.savefig(
         figures_path + f"/I-V_marcado_{num_simulation + 1}.png",
+        bbox_inches="tight",
+        dpi=300,
+    )
+
+    # Guardar figura
+    fig.savefig(
+        figures_path + f"/I-V_marcado_{num_simulation + 1}.pdf",
         bbox_inches="tight",
         dpi=300,
     )

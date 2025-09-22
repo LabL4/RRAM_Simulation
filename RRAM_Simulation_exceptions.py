@@ -57,37 +57,38 @@ def config_ax(ax):
     ax.tick_params(axis="both", which="both", direction="in", top=True, right=True)
 
 
-def setup_plt(plt, latex=True, scaling=1):
+def setup_paper_plt(plt, latex=True, scaling=1):
     plt.rcParams.update(
         {
             "pgf.texsystem": "pdflatex",
             "text.usetex": latex,
-            "font.family": "fourier",
+            "font.family": "mathpazo",
             "text.latex.preamble": "\n".join(
                 [
                     r"\usepackage[utf8]{inputenc}",
                     r"\usepackage[T1]{fontenc}",
                     r"\usepackage{siunitx}",
+                    r"\usepackage{physics}",
                 ]
             ),
         }
     )
 
-    SMALL_SIZE = 8 * scaling
     MEDIUM_SIZE = 10 * scaling
     BIGGER_SIZE = 11 * scaling
+    BIGGEST_SIZE = 14 * scaling
 
-    plt.rc("font", size=SMALL_SIZE)
-    plt.rc("axes", titlesize=SMALL_SIZE)
-    plt.rc("axes", labelsize=MEDIUM_SIZE)
-    plt.rc("xtick", labelsize=SMALL_SIZE)
-    plt.rc("ytick", labelsize=SMALL_SIZE)
-    plt.rc("legend", fontsize=SMALL_SIZE)
+    plt.rc("font", size=BIGGER_SIZE)
+    plt.rc("axes", titlesize=MEDIUM_SIZE)
+    plt.rc("axes", labelsize=BIGGEST_SIZE * 1.2)
+    plt.rc("xtick", labelsize=BIGGEST_SIZE)
+    plt.rc("ytick", labelsize=BIGGEST_SIZE)
+    plt.rc("legend", fontsize=BIGGER_SIZE)
     plt.rc("figure", titlesize=BIGGER_SIZE)
-    plt.rc("axes", titlesize=BIGGER_SIZE * 1.05)
+    plt.rc("axes", titlesize=BIGGER_SIZE)
 
 
-setup_plt(plt, latex=True, scaling=2)
+setup_paper_plt(plt, latex=True, scaling=2)
 
 # endregion
 
@@ -156,7 +157,9 @@ with open("Init_data/oxygen_state_" + str(num_simulation) + ".pkl", "rb") as f:
     oxygen_state = pickle.load(f)
 
 Representate.RepresentateState(
-    actual_state, 0, simulation_path + "Figures/initial_pp_set_" + str(num_simulation)
+    actual_state,
+    0,
+    simulation_path + "Figures/initial_pp_set_" + str(num_simulation) + ".png",
 )
 
 # Defino las matrices donde guardo las configuración del sistema y la de los oxígenos
@@ -884,6 +887,8 @@ print(
 )
 
 CF_destruido = np.full(len(filamentos_ranges), False, dtype=bool)
+voltage_CF_destruido = np.full(len(filamentos_ranges), 0.0)
+indice_filamento = 0
 
 # Ciclo para la primera parte del reset
 # for k in tqdm(range(0, num_pasos)):
@@ -905,9 +910,11 @@ for k in range(0, num_pasos):
         ):
             if not v and not CF_destruido[i]:
                 CF_destruido[i] = True
+                voltage_CF_destruido[indice_filamento] = voltage
+                indice_filamento += 1
                 Representate.RepresentateState(
                     actual_state,
-                    voltage,
+                    round(voltage, 3),
                     simulation_path
                     + f"Figures/Filamento_{i + 1}_roto_reset_{num_simulation + 1}.png",
                 )
@@ -1190,6 +1197,8 @@ for k in range(0, num_pasos):  # son num_pasos + 1 iteraciones
         ):
             if not v and not CF_destruido[i]:
                 CF_destruido[i] = True
+                voltage_CF_destruido[indice_filamento] = voltage
+                indice_filamento += 1
                 Representate.RepresentateState(
                     actual_state,
                     voltage,
@@ -1459,31 +1468,32 @@ E_r = sim_ctes[num_simulation]["recombination_energy"]
 resistencia = sim_ctes[num_simulation]["ohm_resistence"]
 titulo_figura = "I-V Characteristics"  # rf"I-V_{num_simulation + 1}_$E_r = {E_r}$_$R = {resistencia}$"
 
-# # Diccionario de puntos que quieres ubicar
-# puntos_x_set = {"a)": 1e-6, "b)": 0.5, "c)": 1.1}
-# puntos_x_pp_reset = {"d)": -0.9, "e)": -1.4}
-# puntos_x_sp_reset = {"f)": -0.01}
+# Diccionario de puntos que quieres ubicar
+puntos_x_set = {"a)": 1e-6, "b)": 0.5, "c)": 1.1}
+puntos_x_pp_reset = {"d)": -0.42, "e)": voltage_CF_destruido[0], "f)": -1.4}
+puntos_x_sp_reset = {"g)": -0.01}
 
-# # Obtener puntos en cada curva
-# puntos_set = utils.obtener_puntos_en_curva(v_ps, i_ps, puntos_x_set)
-# puntos_x_pp_reset = utils.obtener_puntos_en_curva(v_pr, i_pr, puntos_x_pp_reset)
-# puntos_x_sp_reset = utils.obtener_puntos_en_curva(v_sr, i_sr, puntos_x_sp_reset)
+# Obtener puntos en cada curva
+puntos_set = utils.obtener_puntos_en_curva(v_ps, i_ps, puntos_x_set)
+puntos_x_pp_reset = utils.obtener_puntos_en_curva(v_pr, i_pr, puntos_x_pp_reset)
+puntos_x_sp_reset = utils.obtener_puntos_en_curva(v_sr, i_sr, puntos_x_sp_reset)
 
-# # Crear un único diccionario combinando ambos
-# puntos_totales = {}
-# puntos_totales.update(puntos_set)
-# puntos_totales.update(puntos_x_pp_reset)
-# puntos_totales.update(puntos_x_sp_reset)
+# Crear un único diccionario combinando ambos
+puntos_totales = {}
+puntos_totales.update(puntos_set)
+puntos_totales.update(puntos_x_pp_reset)
+puntos_totales.update(puntos_x_sp_reset)
 
-# # Diccionario de desplazamiento (dx, dy) para cada punto
-# desplazamiento = {
-#     "a)": (0.02, 1.0),  # derecha, misma altura
-#     "b)": (-0.0, 0.4),  # izquierda, un poco arriba
-#     "c)": (0.02, 1.0),  # derecha, un poco abajo
-#     "d)": (0.02, 1.0),  # izquierda, misma altura
-#     "e)": (0.0, 0.4),  # izquierda, un poco abajo
-#     "f)": (-0.1, 1.0),  # derecha, un poco arriba
-# }
+# Diccionario de desplazamiento (dx, dy) para cada punto
+desplazamiento = {
+    "a)": (0.02, 1.0),  # derecha, misma altura
+    "b)": (-0.0, 0.4),  # izquierda, un poco arriba
+    "c)": (0.02, 1.0),  # derecha, un poco abajo
+    "d)": (0.02, 1.0),  # izquierda, misma altura
+    "e)": (0.02, 1.0),  # izquierda, misma altura
+    "f)": (0.0, 0.4),  # izquierda, un poco abajo
+    "g)": (-0.1, 1.0),  # derecha, un poco arriba
+}
 
 Representate.plot_IV(
     v_set,
@@ -1495,51 +1505,51 @@ Representate.plot_IV(
     figures_path=save_path,
 )
 
-# Representate.plot_IV_marcado(
-#     v_set,
-#     i_set,
-#     v_reset,
-#     i_reset,
-#     num_simulation,
-#     puntos_totales,
-#     desplazamiento,
-#     titulo_figura="",
-#     figures_path=save_path,
-# )
+Representate.plot_IV_marcado(
+    v_set,
+    i_set,
+    v_reset,
+    i_reset,
+    num_simulation,
+    puntos_totales,
+    desplazamiento,
+    titulo_figura="",
+    figures_path=save_path,
+)
 
-# save_path = simulation_path + f"Figures/Densidad_Filamento_{num_simulation + 1}"
+save_path = simulation_path + f"Figures/Densidad_Filamento_{num_simulation + 1}"
 
-# densidad_filamento = np.concatenate(
-#     (
-#         np.array(df_pset["Densidad Filamento"]),
-#         np.array(df_sset["Densidad Filamento"]),
-#         df_preset["Densidad Filamento"],
-#         np.array(df_sreset["Densidad Filamento"]),
-#     )
-# )
+densidad_filamento = np.concatenate(
+    (
+        np.array(df_pset["Densidad Filamento"]),
+        np.array(df_sset["Densidad Filamento"]),
+        df_preset["Densidad Filamento"],
+        np.array(df_sreset["Densidad Filamento"]),
+    )
+)
 
-# # Tiempo de simulacion:
-# t_ps = np.array(df_pset["# Tiempo simulacion [s]"])
-# t_ss = np.array(df_sset["# Tiempo simulacion [s]"])
-# t_pr = np.array(df_preset["# Tiempo simulacion [s]"])
-# t_sr = np.array(df_sreset["# Tiempo simulacion [s]"])
+# Tiempo de simulacion:
+t_ps = np.array(df_pset["# Tiempo simulacion [s]"])
+t_ss = np.array(df_sset["# Tiempo simulacion [s]"])
+t_pr = np.array(df_preset["# Tiempo simulacion [s]"])
+t_sr = np.array(df_sreset["# Tiempo simulacion [s]"])
 
-# tiempo = np.concatenate((t_ps, t_ss, t_pr, t_sr))
+tiempo = np.concatenate((t_ps, t_ss, t_pr, t_sr))
 
-# fig, axes = plt.subplots(figsize=(12, 9))
-# setup_plt(plt, latex=True, scaling=2)
-# config_ax(axes)
+fig, axes = plt.subplots(figsize=(12, 9))
+setup_paper_plt(plt, latex=True, scaling=2)
+config_ax(axes)
 
-# # Configurar etiquetas y título
-# axes.set_xlabel(r"Tiempo (\si{\s})")  # (\si{\nano\meter^{-1}})
-# axes.set_ylabel(
-#     r"Conductive filament density (number vancancies in filament/\si{\nano\meter^{2}})",
-#     fontsize=12,
-# )
-# axes.set_title("Filament Density", pad=20)
+# Configurar etiquetas y título
+axes.set_xlabel(r"Tiempo (\si{\s})")  # (\si{\nano\meter^{-1}})
+axes.set_ylabel(
+    r"Conductive filament density (number vancancies in filament/\si{\nano\meter^{2}})",
+    fontsize=12,
+)
+axes.set_title("Filament Density", pad=20)
 
-# axes.scatter(tiempo, densidad_filamento, s=2.5)
+axes.scatter(tiempo, densidad_filamento, s=2.5)
 
-# fig.savefig(save_path + ".png", bbox_inches="tight", dpi=300)
+fig.savefig(save_path + ".png", bbox_inches="tight", dpi=300)
 
 # endregion
