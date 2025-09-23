@@ -145,27 +145,16 @@ carpeta_results = ruta_raiz + "Results/"
 df.to_csv("Init_data/simulation_parameters.csv", index=False)
 
 for i in range(num_simulations):
-    # Defino la región que quiero privilegiar y su peso
-    # regiones_pesos = [
-    #     ((priv_y_sup_right[i], eje_x[i]-priv_y_inf_right[i], eje_y[i]-priv_x_right[i], eje_y[i]),
-    #      50),
-    #     ((priv_y_sup_left[i], eje_x[i]-priv_y_inf_left[i], 0, priv_x_left[i]), 50),
-    # ]
-    print(f"Simulación {i}", eje_x[i], eje_y[i], num_trampas[i])
+    # print(f"Simulación {i}", eje_x[i], eje_y[i], num_trampas[i])
     regiones_pesos = [
-        # # Cuatro filamentos
+        # Cuatro filamentos equiespaciados para identificar bien los filamentos, el utlimo numero no entra en el rango
         # ((3, 6, 0, eje_x[i]), 50),  # Primera banda (filas 3-6)
-        # ((12, 15, 0, eje_x[i]), 50),  # Primera banda (filas 3-6)
-        # ((21, 24, 0, eje_x[i]), 60),  # Segunda banda (filas 15-18)
-        # ((32, 35, 0, eje_x[i]), 50),  # Tercera banda (filas 30-34)
-        # Cuatro filamentos equiespaciados para identificar bien los filamentos el utlimo numero no entra en el rango
-        ((3, 6, 0, eje_x[i]), 50),  # Primera banda (filas 3-6)
-        ((13, 16, 0, eje_x[i]), 50),  # Primera banda (filas 3-6)
-        ((23, 26, 0, eje_x[i]), 60),  # Segunda banda (filas 15-18)
-        ((33, 36, 0, eje_x[i]), 50),  # Tercera banda (filas 30-34)
+        # ((13, 16, 0, eje_x[i]), 50),  # Primera banda (filas 3-6)
+        # ((23, 26, 0, eje_x[i]), 60),  # Segunda banda (filas 15-18)
+        # ((33, 36, 0, eje_x[i]), 50),  # Tercera banda (filas 30-34)
         # Dos filamentos
-        # ((9, 14, 0, eje_x[i]), 50),  # Primera banda (filas 3-6)
-        # ((23, 28, 0, eje_x[i]), 50),  # Segunda banda (filas 15-18)
+        ((8, 13, 0, eje_x[i]), 50),  # Primera banda (filas 8-12)
+        ((28, 33, 0, eje_x[i]), 50),  # Segunda banda (filas 28-34)
     ]
 
     # Ruta de las imagenes de cada simulación

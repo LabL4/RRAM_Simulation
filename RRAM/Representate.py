@@ -117,7 +117,11 @@ def RepresentateState(
     fig, ax = plt.subplots(figsize=(12, 9))
 
     setup_paper_plt(plt, latex=True, scaling=2)
-    plt.rc("axes", labelsize=14 * 2 * 1.3)
+    CUSTOM_SIZE = 32
+
+    plt.rc("axes", labelsize=CUSTOM_SIZE)
+    plt.rc("xtick", labelsize=CUSTOM_SIZE)
+    plt.rc("ytick", labelsize=CUSTOM_SIZE)
     # Desactivar minorticks para evitar sobrecarga visual
     config_ax_state(ax)
 
@@ -171,7 +175,7 @@ def RepresentateState(
     ax.set_yticks(np.arange(0, 11, 2))  # 🔹 Ticks cada 2 nm en Y
     ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
     ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
-    ax.set_title(rf"V = {voltaje} (V)", pad=20, fontsize=32)
+    ax.set_title(rf"V_RRAM = {voltaje} V", pad=20, fontsize=32)
 
     # Ajustar formato visual
     ax.set_aspect("equal")
@@ -549,8 +553,8 @@ def plot_IV(
     fig, axes = plt.subplots(figsize=(12, 9))
     config_ax(axes)
 
-    axes.set_xlabel("Voltage [V]")
-    axes.set_ylabel("Current [A]")
+    axes.set_xlabel("Voltage (V)")
+    axes.set_ylabel("Current (A)")
     axes.set_yscale("log")
     axes.set_title(titulo_figura, pad=20)
 
@@ -650,8 +654,8 @@ def plot_IV_marcado(
     fig, axes = plt.subplots(figsize=(12, 9))
     config_ax(axes)
 
-    axes.set_xlabel("Voltage [V]")
-    axes.set_ylabel("Current [A]")
+    axes.set_xlabel("Voltage (V)")
+    axes.set_ylabel("Current (A)")
     axes.set_yscale("log")
     axes.set_title(titulo_figura, pad=20)
 
@@ -728,7 +732,7 @@ def plot_IV_marcado(
             xp + dx,  # Usar la posición calculada en x
             max(yp * factor_y, 1e-6),  # Usar la posición calculada en y con un mínimo
             label,
-            fontsize=30,
+            fontsize=36,
             verticalalignment="bottom",
             horizontalalignment="left",
             zorder=10,

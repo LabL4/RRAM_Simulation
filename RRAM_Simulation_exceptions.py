@@ -5,7 +5,9 @@ from RRAM import Representate  # Importación explícita de Representate
 from RRAM import Percolation  # Importación explícita de Percolation
 from RRAM import Temperature  # Importación explícita de Temperature
 from RRAM import Montecarlo  # Importación explícita de Montecarlo
-from RRAM import Generation  # Importación explícita de Generation
+from RRAM import (
+    Generation,
+)  # Importación explícita de Generationneration  # Importación explícita de Generation)  # Importación explícita de Generationneration  # Importación explícita de Generation)  # Importación explícita de Generationneration  # Importación explícita de Generation)  # Importación explícita de Generationneration  # Importación explícita de Generation
 
 # from RRAM import findpath  # Importación explícita de Percolation
 from RRAM import utils  # Importación explícita de utilsutils
@@ -165,13 +167,12 @@ Representate.RepresentateState(
 # Defino las matrices donde guardo las configuración del sistema y la de los oxígenos
 config_matrix_pp_set = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
 
-# Rango donde se estima que están los filamentos
-filamentos_ranges = [
-    (3, 6),
-    (13, 15),
-    (23, 25),
-    (33, 35),
-]  # Se incluye el 3 y se incluye el 6
+# Rango donde se estima que están los filamentos con 4
+# filamentos_ranges = [(0, 9), (10, 19), (20, 29), (30, 39)]  # Se incluye el ultimo valor
+
+# Rango donde se estima que están los filamentos con 2
+filamentos_ranges = [(0, 19), (20, 39)]  # Se incluye el ultimo valor
+
 
 # Defino el paso temporal
 paso_temporal = total_simulation_time / num_pasos
@@ -350,7 +351,7 @@ for k in range(0, num_pasos):
             )
 
             print(
-                "El sistema ha eproclado cuando tiene una ocupación del: ",
+                "El sistema ha percolado cuando tiene una ocupación del: ",
                 (np.sum(actual_state) / (num_max_vacantes)) * 100,
                 " %",
             )
@@ -369,20 +370,33 @@ for k in range(0, num_pasos):
             )
 
             r_termica = float(sim_ctes[num_simulation]["r_termica_percola"])
+
         sistema_percola = True
 
         # Copio el estado actual
         ac = actual_state.copy()
-        resistance_matrix, _ = CurrentSolver.Generate_CF_matrix(
-            actual_state
-        )  # No me interesa el grafo ahora mismo en el set
-        densidad_filamento = np.sum(resistance_matrix) / (x_size * y_size)
+
+        ac_clean_matriz, ac_clean_grid = CurrentSolver.Clean_state_matrix(actual_state)
+
+        cf_clasificados = CurrentSolver.Clasificar_CF(
+            ac_clean_grid, x_size, y_size, filamentos_ranges
+        )
+
+        exist_cf = CurrentSolver.Existe_filamentos(
+            cf_clasificados, len(filamentos_ranges)
+        )
+
+        cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(
+            ac_clean_grid, filamentos_ranges, exist_cf
+        )
+
+        densidad_filamento = np.sum(cf_clean_matrix) / (x_size * y_size)
 
         voltage_RRAM = voltage
         # Si ha percolado uso la corriente de Ohm
         try:
             current, resistencia[k] = CurrentSolver.OmhCurrent(
-                voltage, resistance_matrix, **sim_ctes[num_simulation]
+                voltage, cf_clean_matrix, **sim_ctes[num_simulation]
             )
 
         except Warning:
@@ -392,14 +406,14 @@ for k in range(0, num_pasos):
             )
             print("Null resistance matrix in ", filename)
             Representate.RepresentateState(
-                resistance_matrix,
+                cf_clean_matrix,
                 round(vector_ddp[k], 3),
                 simulation_path
                 + f"Figures/Null_Resistance/NULL_resistance_matrix_pp_set_{num_simulation + 1}.png",
             )
             with open(filename, "wb") as f:
                 pickle.dump(
-                    {"actual_state": ac, "resistance_matrix": resistance_matrix}, f
+                    {"actual_state": ac, "resistance_matrix": cf_clean_matrix}, f
                 )
 
     else:
@@ -465,7 +479,7 @@ for k in range(0, num_pasos):
                 if random_number < prob_generacion:
                     actual_state[i, j] = 1  # Generación de una vacante
 
-    if 0.45 < voltage < (voltaje_final_set - 0.2):
+    if 1.2 < voltage < (1.6 - 0.2):  # 0.2 SOn valores inventados para q no entre
         # print("El resultado de la division es: ", k % paso_guardar_2)
         if k % paso_guardar_2 == 0:
             data_pp_set[k - 1] = np.array(
@@ -666,19 +680,28 @@ for k in range(0, num_pasos):
         # print("\nEl sistema ha percolado en la iteración: ", k, ' el valor de gamma es: ', sim_ctes[num_simulation]['gamma'])
         sistema_percola = True
         ac = actual_state.copy()
-        resistance_matrix, _ = CurrentSolver.Generate_CF_matrix(ac)
+
+        ac_clean_matriz, ac_clean_grid = CurrentSolver.Clean_state_matrix(actual_state)
+
+        cf_clasificados = CurrentSolver.Clasificar_CF(
+            ac_clean_grid, x_size, y_size, filamentos_ranges
+        )
+        exist_cf = CurrentSolver.Existe_filamentos(
+            cf_clasificados, len(filamentos_ranges)
+        )
+        cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(
+            ac_clean_grid, filamentos_ranges, exist_cf
+        )
 
         r_termica = float(sim_ctes[num_simulation]["r_termica_percola"])
 
-        filament_density = np.sum(resistance_matrix) / (
-            x_size * y_size * (0.25) * (0.25)
-        )
+        filament_density = np.sum(cf_clean_matrix) / (x_size * y_size * (0.25) * (0.25))
 
         # Si ha percolado uso la corriente de Ohm
         voltage_RRAM = voltage  # - (current * Resistencia_serie)
         try:
             current, resistencia[k] = CurrentSolver.OmhCurrent(
-                voltage_RRAM, resistance_matrix, **sim_ctes[num_simulation]
+                voltage_RRAM, cf_clean_matrix, **sim_ctes[num_simulation]
             )  # type: ignore
         except Warning:
             filename = (
@@ -686,7 +709,7 @@ for k in range(0, num_pasos):
                 + f"Figures/Configuration_Set_{voltage}_null_resistance.pkl"
             )
             Representate.RepresentateState(
-                resistance_matrix,
+                cf_clean_matrix,
                 voltage,
                 simulation_path
                 + f"Figures/PS_resistance_matrix_{num_simulation + 1}.png",
@@ -694,7 +717,7 @@ for k in range(0, num_pasos):
             print("Null resistance matrix in ", filename)
             with open(filename, "wb") as f:
                 pickle.dump(
-                    {"actual_state": ac, "resistance_matrix": resistance_matrix}, f
+                    {"actual_state": ac, "resistance_matrix": cf_clean_matrix}, f
                 )
     else:
         sistema_percola = False
@@ -898,7 +921,7 @@ for k in range(0, num_pasos):
     # Actualizo el voltaje
     voltage = vector_ddp[k]
 
-    CF_matrix, CF_graph = CurrentSolver.Generate_CF_matrix(actual_state)
+    CF_matrix, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
 
     max_x, max_y = ac.shape
     filamentos = CurrentSolver.Clasificar_CF(CF_graph, max_x, max_y, filamentos_ranges)
@@ -967,16 +990,25 @@ for k in range(0, num_pasos):
     if Percolation.is_path(actual_state):
         # Obtengo los caminos de percolación
         ac = actual_state.copy()
-        resistance_matrix = CF_matrix
-        filament_density = np.sum(resistance_matrix) / (
-            x_size * y_size * (0.25) * (0.25)
+
+        ac_clean_matriz, ac_clean_grid = CurrentSolver.Clean_state_matrix(actual_state)
+
+        cf_clasificados = CurrentSolver.Clasificar_CF(
+            ac_clean_grid, x_size, y_size, filamentos_ranges
         )
+        exist_cf = CurrentSolver.Existe_filamentos(
+            cf_clasificados, len(filamentos_ranges)
+        )
+        cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(
+            ac_clean_grid, filamentos_ranges, exist_cf
+        )
+        filament_density = np.sum(cf_clean_matrix) / (x_size * y_size * (0.25) * (0.25))
         percola = True
 
         # Si ha percolado uso la corriente de Ohm
         try:
             current, resistencia[k] = CurrentSolver.OmhCurrent(
-                voltage, resistance_matrix, **sim_ctes[num_simulation]
+                voltage, cf_clean_matrix, **sim_ctes[num_simulation]
             )  # type: ignore
             current = abs(current)
         except Warning:
@@ -986,14 +1018,14 @@ for k in range(0, num_pasos):
             )
             print("Null resistance matrix in ", filename)
             Representate.RepresentateState(
-                resistance_matrix,
+                cf_clean_matrix,
                 round(voltage, 3),
                 simulation_path
                 + f"Figures/NULL_resistance_pp_reset_{num_simulation + 1}.png",
             )
             with open(filename, "wb") as f:
                 pickle.dump(
-                    {"actual_state": ac, "resistance_matrix": resistance_matrix}, f
+                    {"actual_state": ac, "resistance_matrix": cf_clean_matrix}, f
                 )
     else:
         # Si no ha percolado uso la corriente de Poole-Frenkel
@@ -1185,7 +1217,7 @@ for k in range(0, num_pasos):  # son num_pasos + 1 iteraciones
     # Actualizo el voltaje
     voltage = vector_ddp[k]
 
-    CF_matrix, CF_graph = CurrentSolver.Generate_CF_matrix(actual_state)
+    CF_matrix, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
 
     max_x, max_y = ac.shape
     filamentos = CurrentSolver.Clasificar_CF(CF_graph, max_x, max_y, filamentos_ranges)
@@ -1212,16 +1244,23 @@ for k in range(0, num_pasos):  # son num_pasos + 1 iteraciones
         percola = True
 
         # Obtengo los caminos de percolación
-        ac = actual_state.copy()
-        resistance_matrix = CF_matrix
-        filament_density = np.sum(resistance_matrix) / (
-            x_size * y_size * (0.25) * (0.25)
+        ac_clean_matriz, ac_clean_grid = CurrentSolver.Clean_state_matrix(actual_state)
+
+        cf_clasificados = CurrentSolver.Clasificar_CF(
+            ac_clean_grid, x_size, y_size, filamentos_ranges
         )
+        exist_cf = CurrentSolver.Existe_filamentos(
+            cf_clasificados, len(filamentos_ranges)
+        )
+        cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(
+            ac_clean_grid, filamentos_ranges, exist_cf
+        )
+        filament_density = np.sum(cf_clean_matrix) / (x_size * y_size * (0.25) * (0.25))
 
         # Si ha percolado uso la corriente de Ohm
         try:
             current, resistencia[k] = CurrentSolver.OmhCurrent(
-                voltage, resistance_matrix, **sim_ctes[num_simulation]
+                voltage, cf_clean_matrix, **sim_ctes[num_simulation]
             )  # type: ignore
             current = abs(current)
         except Warning:
@@ -1231,14 +1270,14 @@ for k in range(0, num_pasos):  # son num_pasos + 1 iteraciones
             )
             print("Null resistance matrix in ", filename)
             Representate.RepresentateState(
-                resistance_matrix,
+                cf_clean_matrix,
                 round(voltage, 3),
                 simulation_path
                 + f"Figures/PR_resistance_matrix_{num_simulation + 1}.png",
             )
             with open(filename, "wb") as f:
                 pickle.dump(
-                    {"actual_state": ac, "resistance_matrix": resistance_matrix}, f
+                    {"actual_state": ac, "resistance_matrix": cf_clean_matrix}, f
                 )
     else:
         # Si no ha percolado uso la corriente de Poole-Frenkel
@@ -1469,7 +1508,7 @@ resistencia = sim_ctes[num_simulation]["ohm_resistence"]
 titulo_figura = "I-V Characteristics"  # rf"I-V_{num_simulation + 1}_$E_r = {E_r}$_$R = {resistencia}$"
 
 # Diccionario de puntos que quieres ubicar
-puntos_x_set = {"a)": 1e-6, "b)": 0.5, "c)": 1.1}
+puntos_x_set = {"a)": 1e-6, "b)": voltaje_percolacion, "c)": 1.1}
 puntos_x_pp_reset = {"d)": -0.42, "e)": voltage_CF_destruido[0], "f)": -1.4}
 puntos_x_sp_reset = {"g)": -0.01}
 
@@ -1486,13 +1525,13 @@ puntos_totales.update(puntos_x_sp_reset)
 
 # Diccionario de desplazamiento (dx, dy) para cada punto
 desplazamiento = {
-    "a)": (0.02, 1.0),  # derecha, misma altura
+    "a)": (0.025, 1.0),  # derecha, misma altura
     "b)": (-0.0, 0.4),  # izquierda, un poco arriba
     "c)": (0.02, 1.0),  # derecha, un poco abajo
     "d)": (0.02, 1.0),  # izquierda, misma altura
-    "e)": (0.02, 1.0),  # izquierda, misma altura
-    "f)": (0.0, 0.4),  # izquierda, un poco abajo
-    "g)": (-0.1, 1.0),  # derecha, un poco arriba
+    "e)": (0.05, 0.6),  # izquierda, misma altura
+    "f)": (-0.2, 0.25),  # izquierda, un poco abajo
+    "g)": (-0.15, 0.6),  # derecha, un poco arriba
 }
 
 Representate.plot_IV(
@@ -1523,7 +1562,7 @@ densidad_filamento = np.concatenate(
     (
         np.array(df_pset["Densidad Filamento"]),
         np.array(df_sset["Densidad Filamento"]),
-        df_preset["Densidad Filamento"],
+        np.array(df_preset["Densidad Filamento"]),
         np.array(df_sreset["Densidad Filamento"]),
     )
 )
