@@ -168,10 +168,10 @@ Representate.RepresentateState(
 config_matrix_pp_set = np.zeros((int((num_pasos / paso_guardar)), x_size, y_size))
 
 # Rango donde se estima que están los filamentos con 4
-# filamentos_ranges = [(0, 9), (10, 19), (20, 29), (30, 39)]  # Se incluye el ultimo valor
+filamentos_ranges = [(0, 9), (10, 19), (20, 29), (30, 39)]  # Se incluye el ultimo valor
 
 # Rango donde se estima que están los filamentos con 2
-filamentos_ranges = [(0, 19), (20, 39)]  # Se incluye el ultimo valor
+# filamentos_ranges = [(0, 19), (20, 39)]  # Se incluye el ultimo valor
 
 
 # Defino el paso temporal
