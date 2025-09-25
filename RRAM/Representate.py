@@ -26,7 +26,7 @@ def config_ax_state(ax):
     ax.tick_params(axis="both", which="both", direction="in", top=True, right=True)
 
 
-def setup_paper_plt(plt, latex=True, scaling=1):
+def setup_paper_plt(plt, latex=True, scaling: float = 1):
     plt.rcParams.update(
         {
             "pgf.texsystem": "pdflatex",
@@ -43,12 +43,12 @@ def setup_paper_plt(plt, latex=True, scaling=1):
         }
     )
 
-    MEDIUM_SIZE = 10 * scaling
+    # MEDIUM_SIZE = 10 * scaling
     BIGGER_SIZE = 11 * scaling
     BIGGEST_SIZE = 14 * scaling
 
     plt.rc("font", size=BIGGER_SIZE)
-    plt.rc("axes", titlesize=MEDIUM_SIZE)
+    plt.rc("axes", titlesize=BIGGEST_SIZE)
     plt.rc("axes", labelsize=BIGGEST_SIZE)
     plt.rc("xtick", labelsize=BIGGEST_SIZE)
     plt.rc("ytick", labelsize=BIGGEST_SIZE)
@@ -651,6 +651,8 @@ def plot_IV_marcado(
     # Configuración de la figura
     setup_paper_plt(plt, latex=True, scaling=2)
 
+    plt.rcParams["axes.labelsize"] = 32
+
     fig, axes = plt.subplots(figsize=(12, 9))
     config_ax(axes)
 
@@ -699,7 +701,7 @@ def plot_IV_marcado(
     y_reset = abs(data_reset[:, 1])
 
     (x_0, y_0) = next(iter(lista_puntos.values()))
-    print("Punto de referencia (0,0): ", (x_0, y_0))
+    # print("Punto de referencia (0,0): ", (x_0, y_0))
     axes.scatter(
         1e-6,
         1e-6,

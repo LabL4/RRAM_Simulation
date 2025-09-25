@@ -7,7 +7,7 @@ from RRAM import Temperature  # Importación explícita de Temperature
 from RRAM import Montecarlo  # Importación explícita de Montecarlo
 from RRAM import (
     Generation,
-)  # Importación explícita de Generationneration  # Importación explícita de Generation)  # Importación explícita de Generationneration  # Importación explícita de Generation)  # Importación explícita de Generationneration  # Importación explícita de Generation)  # Importación explícita de Generationneration  # Importación explícita de Generation
+)  # Importación explícita de Generationneration
 
 # from RRAM import findpath  # Importación explícita de Percolation
 from RRAM import utils  # Importación explícita de utilsutils
@@ -234,6 +234,10 @@ print("La maxima ocupación en pp set es: ", ocupacion_max_pp_set)
 print("La maxima ocupación en sp set es: ", ocupacion_max_sp_set)
 # endregion
 
+CF_creado = np.full(len(filamentos_ranges), False, dtype=bool)
+voltage_CF_creado = np.full(len(filamentos_ranges), 0.0)
+indice_filamento = 0
+
 # region primera parte del set
 print("\nComienza la primera parte del set")
 # for k in tqdm(range(0, num_pasos)):
@@ -246,6 +250,28 @@ for k in range(0, num_pasos):
 
     # Actualizo el voltaje
     voltage = vector_ddp[k]
+
+    CF_matrix, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
+
+    max_x, max_y = actual_state.shape
+    filamentos = CurrentSolver.Clasificar_CF(CF_graph, max_x, max_y, filamentos_ranges)
+
+    # print(f"{filamentos} \n")
+    if any(~CF_creado):  # mientras haya alguno sin romper
+        for i, v in enumerate(
+            CurrentSolver.Existe_filamentos(filamentos, len(filamentos_ranges))
+        ):
+            if v and not CF_creado[i]:
+                CF_creado[i] = True
+                voltage_CF_creado[indice_filamento] = voltage
+                indice_filamento += 1
+                Representate.RepresentateState(
+                    actual_state,
+                    round(voltage, 3),
+                    simulation_path
+                    + f"Figures/Filamento_{i + 1}_creado_set_{num_simulation + 1}.png",
+                )
+                print(f"El filamento {i + 1} se ha creado en el voltaje {voltage}")
 
     num_vacantes[k] = np.sum(actual_state)
 
@@ -376,18 +402,16 @@ for k in range(0, num_pasos):
         # Copio el estado actual
         ac = actual_state.copy()
 
-        ac_clean_matriz, ac_clean_grid = CurrentSolver.Clean_state_matrix(actual_state)
+        # ac_clean_matriz, ac_clean_grid = CurrentSolver.Clean_state_matrix(actual_state)
 
-        cf_clasificados = CurrentSolver.Clasificar_CF(
-            ac_clean_grid, x_size, y_size, filamentos_ranges
-        )
+        # cf_clasificados = CurrentSolver.Clasificar_CF(
+        #     CF_graph, x_size, y_size, filamentos_ranges
+        # )
 
-        exist_cf = CurrentSolver.Existe_filamentos(
-            cf_clasificados, len(filamentos_ranges)
-        )
+        exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(filamentos_ranges))
 
         cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(
-            ac_clean_grid, filamentos_ranges, exist_cf
+            CF_graph, filamentos_ranges, exist_cf
         )
 
         densidad_filamento = np.sum(cf_clean_matrix) / (x_size * y_size)
@@ -621,6 +645,7 @@ sim_ctes[num_simulation]["gamma"] = str(
 print("El valor de gamma para la sp set es: ", sim_ctes[num_simulation]["gamma"])
 
 print("\n Comienza la segunda parte del set")
+
 print("La temperatura al ininio de sp set es: ", temperatura)
 # Ciclo para la segunda parte del set
 # for k in tqdm(range(0, num_pasos)):
@@ -629,6 +654,28 @@ for k in range(0, num_pasos):
     simulation_time = paso_temporal * k
     # Actualizo el voltaje
     voltage = vector_ddp[k]
+
+    CF_matrix, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
+
+    max_x, max_y = actual_state.shape
+    filamentos = CurrentSolver.Clasificar_CF(CF_graph, max_x, max_y, filamentos_ranges)
+
+    # # print(f"{filamentos} \n")
+    # if any(~CF_creado):  # mientras haya alguno sin romper
+    #     for i, v in enumerate(
+    #         CurrentSolver.Existe_filamentos(filamentos, len(filamentos_ranges))
+    #     ):
+    #         if v and not CF_creado[i]:
+    #             CF_creado[i] = True
+    #             voltage_CF_creado[indice_filamento] = voltage
+    #             indice_filamento += 1
+    #             Representate.RepresentateState(
+    #                 actual_state,
+    #                 round(voltage, 3),
+    #                 simulation_path
+    #                 + f"Figures/Filamento_{i + 1}_creado_set_{num_simulation + 1}.png",
+    #             )
+    #             print(f"El filamento {i + 1} se ha creado en el voltaje {voltage}")
 
     num_vacantes[k] = np.sum(actual_state)
     # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
@@ -681,16 +728,14 @@ for k in range(0, num_pasos):
         sistema_percola = True
         ac = actual_state.copy()
 
-        ac_clean_matriz, ac_clean_grid = CurrentSolver.Clean_state_matrix(actual_state)
+        # ac_clean_matriz, ac_clean_grid = CurrentSolver.Clean_state_matrix(actual_state)
 
-        cf_clasificados = CurrentSolver.Clasificar_CF(
-            ac_clean_grid, x_size, y_size, filamentos_ranges
-        )
-        exist_cf = CurrentSolver.Existe_filamentos(
-            cf_clasificados, len(filamentos_ranges)
-        )
+        # cf_clasificados = CurrentSolver.Clasificar_CF(
+        #     ac_clean_grid, x_size, y_size, filamentos_ranges
+        # )
+        exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(filamentos_ranges))
         cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(
-            ac_clean_grid, filamentos_ranges, exist_cf
+            CF_graph, filamentos_ranges, exist_cf
         )
 
         r_termica = float(sim_ctes[num_simulation]["r_termica_percola"])
@@ -991,16 +1036,14 @@ for k in range(0, num_pasos):
         # Obtengo los caminos de percolación
         ac = actual_state.copy()
 
-        ac_clean_matriz, ac_clean_grid = CurrentSolver.Clean_state_matrix(actual_state)
+        # ac_clean_matriz, ac_clean_grid = CurrentSolver.Clean_state_matrix(actual_state)
 
-        cf_clasificados = CurrentSolver.Clasificar_CF(
-            ac_clean_grid, x_size, y_size, filamentos_ranges
-        )
-        exist_cf = CurrentSolver.Existe_filamentos(
-            cf_clasificados, len(filamentos_ranges)
-        )
+        # cf_clasificados = CurrentSolver.Clasificar_CF(
+        #     CF_graph, x_size, y_size, filamentos_ranges
+        # )
+        exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(filamentos_ranges))
         cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(
-            ac_clean_grid, filamentos_ranges, exist_cf
+            CF_graph, filamentos_ranges, exist_cf
         )
         filament_density = np.sum(cf_clean_matrix) / (x_size * y_size * (0.25) * (0.25))
         percola = True
@@ -1011,6 +1054,7 @@ for k in range(0, num_pasos):
                 voltage, cf_clean_matrix, **sim_ctes[num_simulation]
             )  # type: ignore
             current = abs(current)
+
         except Warning:
             filename = (
                 reset_simulation_path
@@ -1508,9 +1552,9 @@ resistencia = sim_ctes[num_simulation]["ohm_resistence"]
 titulo_figura = "I-V Characteristics"  # rf"I-V_{num_simulation + 1}_$E_r = {E_r}$_$R = {resistencia}$"
 
 # Diccionario de puntos que quieres ubicar
-puntos_x_set = {"a)": 1e-6, "b)": voltaje_percolacion, "c)": 1.1}
-puntos_x_pp_reset = {"d)": -0.42, "e)": voltage_CF_destruido[0], "f)": -1.4}
-puntos_x_sp_reset = {"g)": -0.01}
+puntos_x_set = {"a": 1e-6, "b": voltaje_percolacion, "c": 1.1}
+puntos_x_pp_reset = {"d": -0.42, "e": voltage_CF_destruido[0], "f": -1.4}
+puntos_x_sp_reset = {"g": -0.01}
 
 # Obtener puntos en cada curva
 puntos_set = utils.obtener_puntos_en_curva(v_ps, i_ps, puntos_x_set)
@@ -1525,15 +1569,14 @@ puntos_totales.update(puntos_x_sp_reset)
 
 # Diccionario de desplazamiento (dx, dy) para cada punto
 desplazamiento = {
-    "a)": (0.025, 1.0),  # derecha, misma altura
-    "b)": (-0.0, 0.4),  # izquierda, un poco arriba
-    "c)": (0.02, 1.0),  # derecha, un poco abajo
-    "d)": (0.02, 1.0),  # izquierda, misma altura
-    "e)": (0.05, 0.6),  # izquierda, misma altura
-    "f)": (-0.2, 0.25),  # izquierda, un poco abajo
-    "g)": (-0.15, 0.6),  # derecha, un poco arriba
+    "a": (0.025, 1.0),  # derecha, misma altura
+    "b": (-0.005, 0.27),  # izquierda, un poco arriba
+    "c": (-0.02, 0.35),  # derecha, un poco abajo
+    "d": (0.02, 1.0),  # izquierda, misma altura
+    "e": (-0.11, 0.66),  # izquierda, misma altura
+    "f": (-0.025, 0.25),  # izquierda, un poco abajo
+    "g": (-0.12, 0.6),  # derecha, un poco arriba
 }
-
 Representate.plot_IV(
     v_set,
     i_set,
