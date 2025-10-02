@@ -94,7 +94,6 @@ setup_paper_plt(plt, latex=True, scaling=2)
 
 # endregion
 
-
 # region Definición de valores iniciales y constantes de la simulación
 
 # comienzo leyendo los datos de la simulación almacenados en un archivo csv dentro de la carpeta Init y los guardo en sus respectivas variables
@@ -1101,7 +1100,7 @@ for k in range(0, num_pasos):
         oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 1)
 
     if abs(voltage) > 1.1:
-        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 5)
+        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 7)
 
     # Muevo los oxígenos
     oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
@@ -1547,9 +1546,9 @@ v_set = np.concatenate((v_ps, v_ss))
 i_reset = np.concatenate((i_pr, i_sr))
 v_reset = np.concatenate((v_pr, v_sr))
 
-E_r = sim_ctes[num_simulation]["recombination_energy"]
-resistencia = sim_ctes[num_simulation]["ohm_resistence"]
-titulo_figura = "I-V Characteristics"  # rf"I-V_{num_simulation + 1}_$E_r = {E_r}$_$R = {resistencia}$"
+# E_r = sim_ctes[num_simulation]["recombination_energy"]
+# resistencia = sim_ctes[num_simulation]["ohm_resistence"]
+# titulo_figura = "I-V Characteristics"  # rf"I-V_{num_simulation + 1}_$E_r = {E_r}$_$R = {resistencia}$"
 
 # Diccionario de puntos que quieres ubicar
 puntos_x_set = {"a": 1e-6, "b": voltaje_percolacion, "c": 1.1}
@@ -1599,39 +1598,39 @@ Representate.plot_IV_marcado(
     figures_path=save_path,
 )
 
-save_path = simulation_path + f"Figures/Densidad_Filamento_{num_simulation + 1}"
+# save_path = simulation_path + f"Figures/Densidad_Filamento_{num_simulation + 1}"
 
-densidad_filamento = np.concatenate(
-    (
-        np.array(df_pset["Densidad Filamento"]),
-        np.array(df_sset["Densidad Filamento"]),
-        np.array(df_preset["Densidad Filamento"]),
-        np.array(df_sreset["Densidad Filamento"]),
-    )
-)
+# densidad_filamento = np.concatenate(
+#     (
+#         np.array(df_pset["Densidad Filamento"]),
+#         np.array(df_sset["Densidad Filamento"]),
+#         np.array(df_preset["Densidad Filamento"]),
+#         np.array(df_sreset["Densidad Filamento"]),
+#     )
+# )
 
-# Tiempo de simulacion:
-t_ps = np.array(df_pset["# Tiempo simulacion [s]"])
-t_ss = np.array(df_sset["# Tiempo simulacion [s]"])
-t_pr = np.array(df_preset["# Tiempo simulacion [s]"])
-t_sr = np.array(df_sreset["# Tiempo simulacion [s]"])
+# # Tiempo de simulacion:
+# t_ps = np.array(df_pset["# Tiempo simulacion [s]"])
+# t_ss = np.array(df_sset["# Tiempo simulacion [s]"])
+# t_pr = np.array(df_preset["# Tiempo simulacion [s]"])
+# t_sr = np.array(df_sreset["# Tiempo simulacion [s]"])
 
-tiempo = np.concatenate((t_ps, t_ss, t_pr, t_sr))
+# tiempo = np.concatenate((t_ps, t_ss, t_pr, t_sr))
 
-fig, axes = plt.subplots(figsize=(12, 9))
-setup_paper_plt(plt, latex=True, scaling=2)
-config_ax(axes)
+# fig, axes = plt.subplots(figsize=(12, 9))
+# setup_paper_plt(plt, latex=True, scaling=2)
+# config_ax(axes)
 
-# Configurar etiquetas y título
-axes.set_xlabel(r"Tiempo (\si{\s})")  # (\si{\nano\meter^{-1}})
-axes.set_ylabel(
-    r"Conductive filament density (number vancancies in filament/\si{\nano\meter^{2}})",
-    fontsize=12,
-)
-axes.set_title("Filament Density", pad=20)
+# # Configurar etiquetas y título
+# axes.set_xlabel(r"Tiempo (\si{\s})")  # (\si{\nano\meter^{-1}})
+# axes.set_ylabel(
+#     r"Conductive filament density (number vancancies in filament/\si{\nano\meter^{2}})",
+#     fontsize=12,
+# )
+# axes.set_title("Filament Density", pad=20)
 
-axes.scatter(tiempo, densidad_filamento, s=2.5)
+# axes.scatter(tiempo, densidad_filamento, s=2.5)
 
-fig.savefig(save_path + ".png", bbox_inches="tight", dpi=300)
+# fig.savefig(save_path + ".png", bbox_inches="tight", dpi=300)
 
 # endregion

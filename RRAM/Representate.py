@@ -530,7 +530,7 @@ def plot_IV(
     i_reset,
     num_simulation,
     titulo_figura="I-V Characteristics",
-    figures_path="C:/Users/jimdo/Documents/GitHub/RRAM_Simulation/Results/Figures",
+    figures_path="C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/",
 ):
     # figures_path="C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Results/Figures",
     """
@@ -631,7 +631,7 @@ def plot_IV_marcado(
     lista_puntos,
     desplazamiento,
     titulo_figura="I-V Characteristics",
-    figures_path="C:/Users/jimdo/Documents/GitHub/RRAM_Simulation/Results/Figures",
+    figures_path="C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/",
 ):
     # figures_path="C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Results/Figures",
     """
@@ -719,14 +719,14 @@ def plot_IV_marcado(
         dx, factor_y = desplazamiento.get(
             label, (0.02, 1.0)
         )  # 1.0 = sin desplazamiento en y
-        print(
-            label,
-            "puntos: ",
-            (xp, yp),
-            (dx, factor_y),
-            "puntos finales: ",
-            (xp + dx, yp * factor_y),
-        )
+        # print(
+        #     label,
+        #     "puntos: ",
+        #     (xp, yp),
+        #     (dx, factor_y),
+        #     "puntos finales: ",
+        #     (xp + dx, yp * factor_y),
+        # )
         axes.scatter(
             xp, yp, color="blue", s=80, marker=markers.MarkerStyle("D"), zorder=10
         )
