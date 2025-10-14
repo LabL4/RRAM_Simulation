@@ -19,6 +19,13 @@ def config_ax(ax):
     ax.tick_params(axis="both", which="both", direction="in", top=True, right=True)
 
 
+def config_ax_IV(ax):
+    # ax.grid(which="major", color="#DDDDDD", linewidth=0.8, zorder=-1)
+    # ax.grid(which="minor", color="#DEDEDE", linestyle=":", linewidth=0.5, zorder=-1)
+    ax.minorticks_on()
+    # ax.tick_params(axis="both", which="both", direction="in", top=True, right=True)
+
+
 def config_ax_state(ax):
     # ax.grid(which="major", color="#DDDDDD", linewidth=0.8, zorder=-1)
     # ax.grid(which="minor", color="#DEDEDE", linestyle=":", linewidth=0.5, zorder=-1)
@@ -75,7 +82,7 @@ def setup_plt(plt, latex=True, scaling=1):
 
     SMALL_SIZE = 8 * scaling
     MEDIUM_SIZE = 10 * scaling
-    BIGGER_SIZE = 11 * scaling
+    BIGGER_SIZE = 12 * scaling
 
     plt.rc("font", size=SMALL_SIZE)
     plt.rc("axes", titlesize=SMALL_SIZE)
@@ -84,7 +91,7 @@ def setup_plt(plt, latex=True, scaling=1):
     plt.rc("ytick", labelsize=SMALL_SIZE)
     plt.rc("legend", fontsize=SMALL_SIZE)
     plt.rc("figure", titlesize=BIGGER_SIZE)
-    plt.rc("axes", titlesize=BIGGER_SIZE * 1.05)
+    plt.rc("axes", titlesize=BIGGER_SIZE * 1.5)
 
 
 setup_paper_plt(plt, latex=True, scaling=2)
@@ -551,7 +558,7 @@ def plot_IV(
     setup_paper_plt(plt, latex=True, scaling=2)
 
     fig, axes = plt.subplots(figsize=(12, 9))
-    config_ax(axes)
+    config_ax_IV(axes)
 
     axes.set_xlabel("Voltage (V)")
     axes.set_ylabel("Current (A)")
@@ -654,7 +661,7 @@ def plot_IV_marcado(
     plt.rcParams["axes.labelsize"] = 32
 
     fig, axes = plt.subplots(figsize=(12, 9))
-    config_ax(axes)
+    config_ax_IV(axes)
 
     axes.set_xlabel("Voltage (V)")
     axes.set_ylabel("Current (A)")

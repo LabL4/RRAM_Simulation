@@ -47,27 +47,25 @@ class NullResistanceException(Exception):
     def __init__(
         self,
         simulation_path,
+        figures_path,
         voltage,
         num_simulation,
         actual_state,
     ):
-        self.filename = (
-            str(simulation_path)
-            + f"Null_Resistance/state_{voltage}_null_resistance.pkl"
-        )
+        self.filename = str(simulation_path) + f"/state_{voltage}_null_resistance.pkl"
         self.voltage = voltage
         self.simulation_path = simulation_path
-        self.num_simulation = num_simulation
+        self.num_simulation = num_simulation + 1
         self.actual_state = actual_state
+        self.figures_path = (
+            str(figures_path) + f"/NULL_resistance_{self.num_simulation}.png"
+        )
 
         print("Null resistance matrix in ", self.filename)
 
         # Generar representación visual
         Representate.RepresentateState(
-            self.actual_state,
-            round(self.voltage, 3),
-            str(self.simulation_path)
-            + f"Figures/NULL_resistance_set_{self.num_simulation + 1}.png",
+            self.actual_state, round(self.voltage, 3), self.figures_path
         )
 
         # Guardar estado
