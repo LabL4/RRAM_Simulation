@@ -12,6 +12,24 @@ from RRAM import Constants as cte
 def Clean_state_matrix(
     config_matrix: np.ndarray, min_size: int = 20, plot_resmatrix: bool = False
 ) -> tuple[np.ndarray, nx.Graph]:
+    """
+    Cleans and processes a state matrix by removing small disconnected components
+    and simplifying the graph representation of the matrix.
+    Args:
+        config_matrix (np.ndarray): A 2D numpy array representing the configuration
+            matrix, where `1` indicates a walkable cell and `0` indicates a non-walkable cell.
+        min_size (int, optional): The minimum size of connected components to retain.
+            Components smaller than this size will be removed. Defaults to 20.
+        plot_resmatrix (bool, optional): If True, generates a PDF visualization of the
+            resulting cleaned matrix. Defaults to False.
+    Returns:
+        tuple[np.ndarray, nx.Graph]:
+            - A 2D numpy array representing the cleaned state matrix, where `1` indicates
+              retained nodes and `0` indicates removed nodes.
+            - A NetworkX graph representing the cleaned grid, with nodes and edges
+              corresponding to the retained walkable cells and their connections.
+    """
+
     # Preparar el grafo no dirigido (A-B es igual que B-A)
     actual_state_clean_grid = nx.Graph()
     grid = np.array(config_matrix)
@@ -78,6 +96,37 @@ def Clasificar_CF(
     y_max: int,
     filamentos_ranges: list[tuple[int, int]],
 ) -> dict:
+    """
+    Classifies starting nodes of a graph into filaments and determines if they percolate.
+    This function takes a graph `G` and classifies its starting nodes (nodes with y-coordinate 0)
+    into filaments based on their x-coordinate ranges. It also checks if there is a path from each
+    starting node to any of the ending nodes (nodes with y-coordinate `x_max - 1`).
+    Args:
+        G (nx.Graph): The graph representing the system.
+        x_max (int): The maximum x-coordinate value in the graph.
+        y_max (int): The maximum y-coordinate value in the graph (not used in this function).
+        filamentos_ranges (list[tuple[int, int]]): A list of tuples representing the x-coordinate
+            ranges for each filament. Each tuple is of the form (fila_min, fila_max).
+    Returns:
+        dict: A dictionary where each key is a starting node, and the value is another dictionary
+        with the following keys:
+            - "filamento" (int): The filament number to which the node belongs.
+            - "percola" (bool): True if there is a path from the node to any ending node, False otherwise.
+    Raises:
+        ValueError: If a starting node cannot be assigned to any filament based on the provided ranges.
+    Example:
+        >>> G = nx.grid_2d_graph(5, 5)
+        >>> x_max = 5
+        >>> y_max = 5
+        >>> filamentos_ranges = [(0, 2), (3, 4)]
+        >>> Clasificar_CF(G, x_max, y_max, filamentos_ranges)
+        {
+            (0, 0): {"filamento": 1, "percola": True},
+            (1, 0): {"filamento": 1, "percola": True},
+            ...
+        }
+    """
+
     # Nodos de origen y destino
     nodos_inicio = [n for n in G.nodes() if n[1] == 0]
     nodos_fin = [n for n in G.nodes() if n[1] == x_max - 1]
@@ -171,6 +220,18 @@ def Eliminar_filamentos_incompletos(
 
 
 def calcular_resistencia(CF_matrix, ohm_resistence=11.5):
+    """
+    Calcula la resistencia total de una matriz de formación de filamentos conductores (CF_matrix).
+    Este método asume que cada columna de la matriz representa un conjunto de resistencias en paralelo.
+    La resistencia total se calcula sumando las resistencias paralelas de cada columna.
+    Args:
+        CF_matrix (numpy.ndarray): Matriz donde cada elemento representa la presencia (1) o ausencia (0)
+                                    de un filamento conductor.
+        ohm_resistence (float, optional): Resistencia en ohmios asociada a cada filamento conductor.
+                                           Por defecto es 11.5 ohmios.
+    Returns:
+        float: Resistencia total calculada a partir de la matriz CF_matrix.
+    """
     total_resistance = 0.0
     # Sobre cada columna de la matriz
     for row in CF_matrix.T:

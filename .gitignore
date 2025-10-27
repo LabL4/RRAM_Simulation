@@ -16,3 +16,4 @@ Initial_data/
 *.txt
 logs/
 *.log
+*.npz

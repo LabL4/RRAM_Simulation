@@ -245,6 +245,18 @@ with open(data_path + "r_termica_percola.pkl", "rb") as f:
 # Constante de resistencia térmica en K/W cuando el sistema percola
 with open(data_path + "recombination_energy.pkl", "rb") as f:
     recombination_energy = pickle.load(f)
+
+# Numero oxigenos generados primera parte reset 1     if abs(voltage) > 0.7:
+with open(data_path + "num_oxigenos_pp_reset_1.pkl", "rb") as f:
+    num_oxigenos_pp_reset_1 = pickle.load(f)
+
+# Numero oxigenos generados primera parte reset 2     if abs(voltage) > 1.1:
+with open(data_path + "num_oxigenos_pp_reset_2.pkl", "rb") as f:
+    num_oxigenos_pp_reset_2 = pickle.load(f)
+
+    # Constante de resistencia térmica en K/W cuando el sistema percola
+with open(data_path + "num_oxigenos_sp_reset.pkl", "rb") as f:
+    num_oxigenos_sp_reset = pickle.load(f)
 # r_termica_percola = np.ones(num_simulations) * cte.r_termica_percola
 
 # Creo un dataframe nuevo con las constantes de la simulación
@@ -266,6 +278,9 @@ df_ctes = pd.DataFrame(
         "r_termica_no_percola",
         "factor_generacion",
         "recombination_energy",
+        "num_oxigenos_pp_reset_1",
+        "num_oxigenos_pp_reset_2",
+        "num_oxigenos_sp_reset",
     ]
 )
 
@@ -285,6 +300,9 @@ df_ctes["r_termica_percola"] = r_termica_percola
 df_ctes["r_termica_no_percola"] = r_termica_no_percola
 df_ctes["factor_generacion"] = factor_generacion
 df_ctes["recombination_energy"] = recombination_energy
+df_ctes["num_oxigenos_pp_reset_1"] = num_oxigenos_pp_reset_1
+df_ctes["num_oxigenos_pp_reset_2"] = num_oxigenos_pp_reset_2
+df_ctes["num_oxigenos_sp_reset"] = num_oxigenos_sp_reset
 
 # Guardo el dataframe de las ctes en un archivo csv
 print(df_ctes)

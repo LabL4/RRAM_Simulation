@@ -1,18 +1,16 @@
-from RRAM import Recombination  # Importación explícita de Recombination
-from RRAM import ElectricField  # Importación explícita de ElectricField
-from RRAM import CurrentSolver  # Importación explícita de CurentSolver
-from RRAM import Representate  # Importación explícita de Representate
-from RRAM import Percolation  # Importación explícita de Percolation
-from RRAM import Temperature  # Importación explícita de Temperature
-from RRAM import (
-    Montecarlo,
-)  # Importación explícita de Montecarloón explícita de Montecarlo
+from RRAM import Recombination  # Importación de Recombination
+from RRAM import ElectricField  # Importación de ElectricField
+from RRAM import CurrentSolver  # Importación de CurentSolver
+from RRAM import Representate  # Importación de Representate
+from RRAM import Percolation  # Importación de Percolation
+from RRAM import Temperature  # Importación de Temperature
+from RRAM import Montecarlo  # Importación de Montecarlo
 from RRAM import (
     Generation,
-)  # Importación explícita de Generationnerationonneration
+)  # Importación de Generationfrom RRAM import Generation  # Importación de Generation
 
-# from RRAM import findpath  # Importación explícita de Percolation
-from RRAM import utils  # Importación explícita de utilsutils
+# from RRAM import findpath  # Importación de Percolation
+from RRAM import utils  # Importación de utilsutils
 
 import matplotlib.pyplot as plt
 from RRAM import exceptions
@@ -27,6 +25,7 @@ from RRAM import Plot_PostProcess as pplt
 import numpy as np
 
 import warnings
+
 
 warnings.filterwarnings("error")
 
@@ -205,6 +204,19 @@ print(
     sim_ctes[num_simulation]["factor_generacion"],
 )
 print("EL rango donde se buscan los filamentos es: ", filamentos_ranges)
+print(
+    "EL numero de oxigenos generados en pp_reset 1 es: ",
+    sim_ctes[num_simulation]["num_oxigenos_pp_reset_1"],
+)
+print(
+    "EL numero de oxigenos generados en pp_reset 2 es: ",
+    sim_ctes[num_simulation]["num_oxigenos_pp_reset_2"],
+)
+print(
+    "EL numero de oxigenos generados en sp_reset es: ",
+    sim_ctes[num_simulation]["num_oxigenos_sp_reset"],
+)
+
 
 # Creo el vector de diferencias de potencial
 vector_ddp = np.arange(0.000, voltaje_max_simulation + paso_potencial, paso_potencial)
@@ -272,6 +284,16 @@ for k in range(0, num_pasos):
                     simulation_path
                     + f"Figures/Filamento_{i + 1}_creado_set_{num_simulation + 1}.png",
                 )
+
+                # Guardar estado actual en archivo pkl
+                nombre_pkl = (
+                    set_simulation_path
+                    + f"/filamento_{i + 1}_creado_set_{num_simulation}.pkl"
+                )
+
+                with open(nombre_pkl, "wb") as f:
+                    pickle.dump(actual_state, f)
+
                 print(f"El filamento {i + 1} se ha creado en el voltaje {voltage}")
 
     num_vacantes[k] = np.sum(actual_state)
@@ -886,25 +908,7 @@ np.savetxt(
     header=header_files,
     delimiter=",",
 )
-# print("El fichero de resultados set contiene ", data_sp_set.shape[0], ' filas y ', data_sp_set.shape[1], ' columnas')
 
-# np.savetxt(
-#     set_simulation_path + f"g_sp_set_{num_simulation + 1}.txt",
-#     g_sp_set,
-#     delimiter=",",
-#     fmt="%.0f",
-# )
-
-# Guardo los valores de g del proceso de set, combinando los vectores de g de las dos partes
-# g_set = np.concatenate((g_pp_set, g_sp_set), axis=0)
-
-# print("El g en el set contiene ", g_set.shape[0], ' filas y ', g_set.shape[1], ' columnas')
-# np.savetxt(
-#     set_simulation_path + f"g_set_{num_simulation + 1}.txt",
-#     g_set,
-#     delimiter=",",
-#     fmt="%.0f",
-# )
 # endregion
 
 # region Región de la primera parte del reset
@@ -988,7 +992,17 @@ for k in range(0, num_pasos):
                     simulation_path
                     + f"Figures/Filamento_{i + 1}_roto_reset_{num_simulation + 1}.png",
                 )
+
                 print(f"El filamento {i + 1} se ha roto en el voltaje {voltage}")
+
+                # Guardar estado actual en archivo pkl
+                nombre_pkl = (
+                    reset_simulation_path
+                    + f"/filamento_{i + 1}_detruido_reset_{num_simulation}.pkl"
+                )
+
+                with open(nombre_pkl, "wb") as f:
+                    pickle.dump(actual_state, f)
 
     # Si se llena el 90 del espacio de la matriz salto a otra simulación
     if np.sum(actual_state) > int(0.9 * num_max_vacantes):
@@ -1097,13 +1111,19 @@ for k in range(0, num_pasos):
                 voltage, i, actual_state, **sim_parmtrs[num_simulation]
             )
         )
-
+    num_oxigenos_pp_reset_1 = int(sim_ctes[num_simulation]["num_oxigenos_pp_reset_1"])
     # Genero los oxígenos
     if abs(voltage) > 0.7:
-        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 1)
-
+        oxygen_state = Recombination.Generate_Oxygen(
+            oxygen_state, num_oxigenos_pp_reset_1
+        )
+        num_oxigenos_pp_reset_2 = int(
+            sim_ctes[num_simulation]["num_oxigenos_pp_reset_2"]
+        )
     if abs(voltage) > 1.1:
-        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 7)
+        oxygen_state = Recombination.Generate_Oxygen(
+            oxygen_state, num_oxigenos_pp_reset_2
+        )
 
     # Muevo los oxígenos
     oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
@@ -1140,28 +1160,31 @@ for k in range(0, num_pasos):
         ]
     )
 
-    # g_pp_reset[k] = Generation.evalutate_g(actual_state, size_grid=40)
-
     # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
     if k % 1 == 0:  # Arreglo rapido para q lo guarde siempre
         config_matrix_pp_reset[int(k / paso_guardar) - 1] = actual_state
         oxygen_matrix_pp_reset[int(k / paso_guardar) - 1] = oxygen_state
 
-    # Represento el estado cada 1500 pasos
+    # Represento el estado cada 3000 pasos
     if k % 3000 == 0:
         fig_voltage = round(vector_ddp[k], 3)
         figure_name = f"_pp_reset_V={fig_voltage}_{num_simulation + 1}.png"
-        # Representate.RepresentateTwoStates(
-        #     actual_state,
-        #     oxygen_state,
-        #     fig_voltage,
-        #     simulation_path + "Figures/state_" + figure_name,
-        # )
+
         Representate.RepresentateState(
             actual_state,
             fig_voltage,
             simulation_path + "Figures/vacancy_state" + figure_name,
         )
+
+        # Guardar estado actual en archivo pkl
+        nombre_pkl = (
+            reset_simulation_path
+            + f"/_pp_reset_V={fig_voltage}_{num_simulation + 1}.pkl"
+        )
+
+        with open(nombre_pkl, "wb") as f:
+            pickle.dump(actual_state, f)
+
         print("Representando el estado de la simulación en el voltaje ", fig_voltage)
 
 # endregion
@@ -1193,12 +1216,6 @@ with open(
 ) as file:
     pickle.dump(oxygen_state, file)
 
-# Representate.RepresentateTwoStates(
-#     actual_state,
-#     oxygen_state,
-#     round(voltage, 3),
-#     simulation_path + f"Figures/Final_state_pp_reset_{num_simulation + 1}.png",
-# )
 Representate.RepresentateState(
     actual_state,
     round(voltage, 3),
@@ -1211,14 +1228,6 @@ np.savetxt(
     header=header_files,
     delimiter=",",
 )
-# print("El fichero de resultados_pp_reset contiene ", data_pp_reset.shape[0], ' filas y ', data_pp_reset.shape[1], ' columnas')
-
-# np.savetxt(
-#     reset_simulation_path + f"g_pp_reset_{num_simulation + 1}.txt",
-#     g_pp_reset,
-#     delimiter=",",
-#     fmt="%.0f",
-# )
 
 tiempo_pp_reset = simulation_time
 # endregion
@@ -1353,7 +1362,8 @@ for k in range(0, num_pasos):  # son num_pasos + 1 iteraciones
             )
         )
 
-    oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 10)
+    num_oxigenos_sp_reset = int(sim_ctes[num_simulation]["num_oxigenos_sp_reset"])
+    oxygen_state = Recombination.Generate_Oxygen(oxygen_state, num_oxigenos_sp_reset)
 
     # Muevo los oxígenos
     oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
@@ -1403,12 +1413,16 @@ for k in range(0, num_pasos):  # son num_pasos + 1 iteraciones
     if k % 3000 == 0:
         fig_voltage = round(vector_ddp[k], 3)
         figure_name = f"_sp_reset_V={fig_voltage}_{num_simulation + 1}.png"
-        # Representate.RepresentateTwoStates(
-        #     actual_state,
-        #     oxygen_state,
-        #     fig_voltage,
-        #     simulation_path + "Figures/state" + figure_name,
-        # )
+
+        # Guardar estado actual en archivo pkl
+        nombre_pkl = (
+            reset_simulation_path
+            + f"/_sp_reset_V={fig_voltage}_{num_simulation + 1}.pkl"
+        )
+
+        with open(nombre_pkl, "wb") as f:
+            pickle.dump(actual_state, f)
+
         Representate.RepresentateState(
             actual_state,
             fig_voltage,

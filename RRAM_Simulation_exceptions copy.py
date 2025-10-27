@@ -1,18 +1,16 @@
-from RRAM import Recombination  # Importación explícita de Recombination
-from RRAM import ElectricField  # Importación explícita de ElectricField
-from RRAM import CurrentSolver  # Importación explícita de CurentSolver
-from RRAM import Representate  # Importación explícita de Representate
-from RRAM import Percolation  # Importación explícita de Percolation
-from RRAM import Temperature  # Importación explícita de Temperature
-from RRAM import (
-    Montecarlo,
-)  # Importación explícita de Montecarloón explícita de Montecarlo
+from RRAM import Recombination  # Importación de Recombination
+from RRAM import ElectricField  # Importación de ElectricField
+from RRAM import CurrentSolver  # Importación de CurentSolver
+from RRAM import Representate  # Importación de Representate
+from RRAM import Percolation  # Importación de Percolation
+from RRAM import Temperature  # Importación de Temperature
+from RRAM import Montecarlo  # Importación de Montecarlo
 from RRAM import (
     Generation,
-)  # Importación explícita de Generationnerationonneration
+)  # Importación de Generationfrom RRAM import Generation  # Importación de Generation
 
-# from RRAM import findpath  # Importación explícita de Percolation
-from RRAM import utils  # Importación explícita de utilsutils
+# from RRAM import findpath  # Importación de Percolation
+from RRAM import utils  # Importación de utilsutils
 
 import matplotlib.pyplot as plt
 from RRAM import exceptions
@@ -1100,10 +1098,10 @@ for k in range(0, num_pasos):
 
     # Genero los oxígenos
     if abs(voltage) > 0.7:
-        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 1)
+        oxygen_state = Recombination.Generate_Oxygen(oxygen_state, 1)
 
     if abs(voltage) > 1.1:
-        oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 7)
+        oxygen_state = Recombination.Generate_Oxygen(oxygen_state, 7)
 
     # Muevo los oxígenos
     oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
@@ -1353,7 +1351,7 @@ for k in range(0, num_pasos):  # son num_pasos + 1 iteraciones
             )
         )
 
-    oxygen_state = Recombination.Generate_Oxigen(oxygen_state, 10)
+    oxygen_state = Recombination.Generate_Oxygen(oxygen_state, 10)
 
     # Muevo los oxígenos
     oxygen_state, velocidad, desplazamiento = Recombination.Move_OxygenIons(
@@ -1394,7 +1392,6 @@ for k in range(0, num_pasos):  # son num_pasos + 1 iteraciones
     # g_sp_reset[k] = Generation.evalutate_g(actual_state, size_grid=40)
 
     # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
-
     if k % 1 == 0:  # Arreglo rapido para q lo guarde siempre
         config_matrix_sp_reset[int(k / paso_guardar) - 1] = actual_state
         oxygen_matrix_sp_reset[int(k / paso_guardar) - 1] = oxygen_state
@@ -1447,34 +1444,7 @@ np.savetxt(
     header=header_files,
     delimiter=",",
 )
-# print("El fichero de resultados reset contiene ", dat_reset.shape[0], ' filas y ', dat_reset.shape[1], ' columnas')
 
-
-# Obtengo los valores de g del proceso de reset, combinando los vectores de g de las dos partes
-# np.savetxt(
-#     reset_simulation_path + f"g_sp_reset_{num_simulation + 1}.txt",
-#     g_sp_reset,
-#     delimiter=",",
-#     fmt="%.0f",
-# )
-# print("El g en el sp reset contiene ", g_sp_reset.shape[0], ' filas y ', g_sp_reset.shape[1], ' columnas')
-
-# g_reset = np.concatenate((g_pp_reset, g_sp_reset), axis=0)
-# np.savetxt(
-#     reset_simulation_path + f"g_reset_{num_simulation + 1}.txt",
-#     g_reset,
-#     delimiter=",",
-#     fmt="%.0f",
-# )
-# print("El g en el reset contiene ", g_reset.shape[0], ' filas y ', g_reset.shape[1], ' columnas')
-
-# Guardo el estado final de la simulación
-# Representate.RepresentateTwoStates(
-#     actual_state,
-#     oxygen_state,
-#     round(voltage, 3),
-#     simulation_path + f"Figures/Final_state_sp_reset_{num_simulation + 1}.png",
-# )
 Representate.RepresentateState(
     actual_state,
     0,
@@ -1525,11 +1495,6 @@ df_sreset = pd.read_csv(data_path_sp_reset, dtype=float)
 global_tittle = "Intensidad [A] vs Voltaje [V]"
 
 save_path = simulation_path + "Figures/I-V_Curvas"
-
-# # Get voltage and current arrays for all simulation phases TODO: revisar si esto funciona bien
-# dfs = [df_pset, df_sset, df_preset, df_sreset]
-# i_ps, i_ss, i_pr, i_sr = [df["Intensidad [A]"].to_numpy() for df in dfs]
-# v_ps, v_ss, v_pr, v_sr = [df["Voltaje [V]"].to_numpy() for df in dfs]
 
 i_ps = np.array(df_pset["Intensidad [A]"])
 i_ss = np.array(df_sset["Intensidad [A]"])

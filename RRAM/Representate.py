@@ -1,4 +1,5 @@
 import matplotlib.patches as patches
+import matplotlib.ticker as ticker
 import matplotlib.pyplot as plt
 from matplotlib import markers
 
@@ -102,6 +103,7 @@ def RepresentateState(
     voltaje: float,
     filename: str = None,  # type: ignore
     color=(0.9647, 0.1725, 0.3059),
+    guardar_png: bool = False,
 ) -> None:  # type: ignore
     """
     Representa el estado de una matriz con un estilo gráfico personalizado.
@@ -123,12 +125,12 @@ def RepresentateState(
 
     fig, ax = plt.subplots(figsize=(12, 9))
 
-    setup_paper_plt(plt, latex=True, scaling=2)
-    CUSTOM_SIZE = 32
+    setup_paper_plt(plt, latex=True, scaling=3)
+    # CUSTOM_SIZE = 32
 
-    plt.rc("axes", labelsize=CUSTOM_SIZE)
-    plt.rc("xtick", labelsize=CUSTOM_SIZE)
-    plt.rc("ytick", labelsize=CUSTOM_SIZE)
+    # plt.rc("axes", labelsize=CUSTOM_SIZE)
+    # plt.rc("xtick", labelsize=CUSTOM_SIZE)
+    # plt.rc("ytick", labelsize=CUSTOM_SIZE)
     # Desactivar minorticks para evitar sobrecarga visual
     config_ax_state(ax)
 
@@ -196,7 +198,7 @@ def RepresentateState(
     plt.subplots_adjust(top=0.85)
 
     # Guardar si se especifica un archivo
-    if filename:
+    if filename and guardar_png:
         plt.savefig(filename, bbox_inches="tight")
 
     cadena = filename
@@ -426,6 +428,7 @@ def RepresentateTwoStates(
     matriz2: np.ndarray,
     voltage: float,
     filename: str = None,  # type: ignore
+    guardar_png: bool = False,
 ) -> None:
     """
     Representa el estado de dos matrices con un estilo gráfico personalizado en el mismo plot.
@@ -446,6 +449,7 @@ def RepresentateTwoStates(
     y = np.linspace(0, 10, nrows)  # Escala real de 10 nm en eje Y
 
     fig, ax = plt.subplots(figsize=(12, 9))  # Tamaño de la figura ajustado
+    setup_paper_plt(plt, latex=True, scaling=3)
 
     # Crear mapas de colores para cada matriz
     cmap1 = LinearSegmentedColormap.from_list(
@@ -521,12 +525,15 @@ def RepresentateTwoStates(
     plt.subplots_adjust(top=0.85)
 
     # Guardar si se especifica un archivo
-    if filename:
+    if filename and guardar_png:
         plt.savefig(filename, bbox_inches="tight")
+
+    cadena = filename
+    ruta_pdf = os.path.splitext(cadena)[0] + ".pdf"
+    plt.savefig(ruta_pdf, bbox_inches="tight")
 
     # Mostrar gráfico
     plt.close(fig)
-
     return None
 
 
@@ -552,10 +559,10 @@ def plot_IV(
         figures_path (str): Path to save the figure.
     """
 
-    figures_path = os.getcwd() + "/Results/Figures"
+    figures_path = os.getcwd() + "/Results copy/Figures"
 
     # Configuración de la figura
-    setup_paper_plt(plt, latex=True, scaling=2)
+    setup_paper_plt(plt, latex=True, scaling=3)
 
     fig, axes = plt.subplots(figsize=(12, 9))
     config_ax_IV(axes)
@@ -564,6 +571,30 @@ def plot_IV(
     axes.set_ylabel("Current (A)")
     axes.set_yscale("log")
     axes.set_title(titulo_figura, pad=20)
+
+    # ---------- EJE X ----------
+    # Marcas exactas: -1.5 -1.0 −0.5 0.0 0.5 1.0
+    axes.set_xticks([-1.5, -1.0, -0.5, 0.0, 0.5, 1.0])
+    axes.set_xticklabels(["-1.5", "-1.0", "-0.5", "0.0", "0.5", "1.0"])
+
+    # ---------- EJE Y ----------
+    # Marcas en potencias de 10 de 10⁻⁷ a 10⁻²
+    y_ticks = [1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2]
+    axes.set_yscale("log")
+    axes.set_yticks(y_ticks)
+    axes.get_yaxis().set_major_formatter(ticker.FormatStrFormatter("$10^{%d}$"))
+
+    # Esto imprime las etiquetas en forma 10⁻⁷, 10⁻⁶, etc.
+    axes.set_yticklabels(
+        [
+            r"$10^{-7}$",
+            r"$10^{-6}$",
+            r"$10^{-5}$",
+            r"$10^{-4}$",
+            r"$10^{-3}$",
+            r"$10^{-2}$",
+        ]
+    )
 
     # Scatter de SET y RESET
     axes.scatter(
@@ -653,12 +684,12 @@ def plot_IV_marcado(
         figures_path (str): Path to save the figure.
     """
 
-    figures_path = os.getcwd() + "/Results/Figures"
+    figures_path = os.getcwd() + "/Results copy/Figures"
 
     # Configuración de la figura
-    setup_paper_plt(plt, latex=True, scaling=2)
+    setup_paper_plt(plt, latex=True, scaling=3)
 
-    plt.rcParams["axes.labelsize"] = 32
+    # plt.rcParams["axes.labelsize"] = 32
 
     fig, axes = plt.subplots(figsize=(12, 9))
     config_ax_IV(axes)
@@ -667,6 +698,30 @@ def plot_IV_marcado(
     axes.set_ylabel("Current (A)")
     axes.set_yscale("log")
     axes.set_title(titulo_figura, pad=20)
+
+    # ---------- EJE X ----------
+    # Marcas exactas: -1.5 -1.0 −0.5 0.0 0.5 1.0
+    axes.set_xticks([-1.5, -1.0, -0.5, 0.0, 0.5, 1.0])
+    axes.set_xticklabels(["-1.5", "-1.0", "-0.5", "0.0", "0.5", "1.0"])
+
+    # ---------- EJE Y ----------
+    # Marcas en potencias de 10 de 10⁻⁷ a 10⁻²
+    y_ticks = [1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2]
+    axes.set_yscale("log")
+    axes.set_yticks(y_ticks)
+    axes.get_yaxis().set_major_formatter(ticker.FormatStrFormatter("$10^{%d}$"))
+
+    # Esto imprime las etiquetas en forma 10⁻⁷, 10⁻⁶, etc.
+    axes.set_yticklabels(
+        [
+            r"$10^{-7}$",
+            r"$10^{-6}$",
+            r"$10^{-5}$",
+            r"$10^{-4}$",
+            r"$10^{-3}$",
+            r"$10^{-2}$",
+        ]
+    )
 
     # Scatter de SET y RESET
     axes.scatter(
@@ -741,7 +796,7 @@ def plot_IV_marcado(
             xp + dx,  # Usar la posición calculada en x
             max(yp * factor_y, 1e-6),  # Usar la posición calculada en y con un mínimo
             label,
-            fontsize=36,
+            fontsize=42,
             verticalalignment="bottom",
             horizontalalignment="left",
             zorder=10,

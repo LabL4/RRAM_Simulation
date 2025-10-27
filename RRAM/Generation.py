@@ -1,21 +1,13 @@
 import numpy as np  # type: ignore
-import math
+# import math
 
 from RRAM import Constants as cte
 
 
-def evalutate_g(matrix: np.ndarray, size_grid: int = 40) -> np.ndarray:
-    result = []
-    for row in matrix:
-        count = 0
-        for val in row:
-            if val == 1:
-                count += 1
-            else:
-                break  # parar en el primer 0
-        final_value = size_grid - count
-        result.append(final_value)
-    return np.array(result).transpose()
+def get_required_param(kwargs, param_name):
+    if param_name not in kwargs:
+        raise ValueError(f"El parámetro '{param_name}' es obligatorio")
+    return kwargs[param_name]
 
 
 def initial_state(Eje_x: float, Eje_y: float, num_trampas: int):
@@ -104,12 +96,12 @@ def Generate(time_stp: float, electric_field: float, temp: float, **kwargs) -> f
 
     # Obtengo las constantes necesarias para el cálculo
     if kwargs:
-        # Obtengo el valor de las constantes que necesita la función
-        t_0 = float(kwargs.get("vibration_frequency"))  # type: ignore
-        E_a = float(kwargs.get("activation_energy"))  # type: ignore
-        cte_red = float(kwargs.get("cte_red"))  # type: ignore
-        gamma = float(kwargs.get("gamma"))  # type: ignore
+        t_0 = float(get_required_param(kwargs, "vibration_frequency"))
+        E_a = float(get_required_param(kwargs, "activation_energy"))
+        cte_red = float(get_required_param(kwargs, "cte_red"))
+        gamma = float(get_required_param(kwargs, "gamma"))
     else:
+        # Aquí reemplaza con tus constantes globales si las tienes
         t_0 = cte.t_0
         E_a = cte.E_a
         cte_red = cte.cte_red
@@ -131,6 +123,43 @@ def Generate(time_stp: float, electric_field: float, temp: float, **kwargs) -> f
     #     Generate._has_run = True
 
     return prob_generacion
+
+
+def Generate_vectorized(
+    time_stp: float, electric_field_matrix: np.ndarray, temp: float, **kwargs
+) -> np.ndarray:
+    """
+    Calcula la matriz de probabilidades de generación para una matriz de campo eléctrico.
+
+    Parámetros:
+        time_stp (float): Paso temporal.
+        electric_field_matrix (np.ndarray): Matriz 2D con valores del campo eléctrico, cada fila tiene el mimso valor de campo eléctrico.
+        temp (float): Temperatura (escala única para toda la matriz).
+        **kwargs: Constantes necesarias (vibration_frequency, activation_energy, cte_red, gamma).
+
+    Retorna:
+        np.ndarray: Matriz con probabilidades de generación (mismo tamaño que electric_field_matrix).
+    """
+
+    if kwargs:
+        t_0 = float(get_required_param(kwargs, "vibration_frequency"))
+        E_a = float(get_required_param(kwargs, "activation_energy"))
+        cte_red = float(get_required_param(kwargs, "cte_red"))
+        gamma = float(get_required_param(kwargs, "gamma"))
+    else:
+        # Aquí reemplaza con tus constantes globales si las tienes
+        t_0 = cte.t_0
+        E_a = cte.E_a
+        cte_red = cte.cte_red
+        gamma = cte.gamma
+
+    exponente = (E_a - (gamma * cte_red * electric_field_matrix)) / (cte.k_b_ev * temp)
+    prob_matrix = time_stp * t_0 * np.exp(-exponente)
+
+    # Limitar probabilidades máximas a 1
+    prob_matrix = np.minimum(prob_matrix, 1.0)
+
+    return prob_matrix
 
 
 def vecinos_verticales(matriz, i, j):
@@ -158,3 +187,21 @@ def tiene_vecinos(matriz, i, j):
         or (j > 0 and matriz[i, j - 1] > 0)  # izquierda
         or (j < y_size - 1 and matriz[i, j + 1] > 0)  # derecha
     )
+
+
+def generate_oxygen(oxygen_state: np.ndarray, num_oxygen: int):
+    eje_y = oxygen_state.shape[1]
+
+    # Generar todas las coordenadas y al mismo tiempo
+    y_indices = np.random.randint(0, eje_y, size=num_oxygen)
+
+    # Generar todas las probabilidades de una sola vez
+    rand_vals = np.random.rand(num_oxygen)
+
+    # Crear una máscara para las posiciones donde se colocarán oxígenos
+    mask = (oxygen_state[y_indices, 0] == 0) & (rand_vals < 0.5)
+
+    # Asignar oxígeno en las posiciones seleccionadas
+    oxygen_state[y_indices[mask], 0] = 1
+
+    return oxygen_state
