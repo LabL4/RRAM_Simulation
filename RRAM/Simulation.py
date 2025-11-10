@@ -10,7 +10,6 @@ from . import (
     utils,
 )
 
-
 from dataclasses import dataclass, replace, asdict, field
 from typing import get_type_hints
 from dataclasses import fields
@@ -22,6 +21,7 @@ import numpy as np
 import pickle
 import time
 import csv
+import re
 
 
 def medir_tiempo(func):
@@ -231,6 +231,8 @@ def procesar_filamentos_destruidos(
     voltage_CF_destruido,
     actual_state,
     num_simulation,
+    roturas_dict,
+    etapa,
 ):
     """
     Detecta filamentos rotos, actualiza su estado y guarda imágenes e
@@ -255,8 +257,17 @@ def procesar_filamentos_destruidos(
 
     for i in filamentos_rotos:
         CF_destruido[i] = True
-        voltage_CF_destruido[i] = voltage
-        print(f"El filamento {i + 1} se ha roto en el voltaje {round(voltage, 4)} (V)")
+        if voltage_CF_destruido[i] == 0:
+            voltage_CF_destruido[i] = voltage
+            j = len(roturas_dict)  # obtiene el siguiente índice disponible
+            roturas_dict[j] = {
+                "filamento": i + 1,
+                "voltaje": voltage,
+                "etapa": etapa,
+            }
+            print(
+                f"\nEl filamento {i + 1} se ha roto en el voltaje {round(voltage, 4)} (V)\n"
+            )
 
         nombre_img = imagen_path / f"Filamento_{i + 1}_roto_reset_{num_simulation}.png"
         Representate.RepresentateState(actual_state, round(voltage, 3), str(nombre_img))
@@ -396,7 +407,6 @@ def update_state_recombinate(
         return actual_state_update, oxygen_state_update
 
 
-@medir_tiempo
 def PP_set(
     num_simulation: int,
     params: SimulationParameters,
@@ -435,6 +445,10 @@ def PP_set(
     # Declaro todas las variables que voy a usar exclusivamente en la primera parte (PP) del set.
     rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="set")
 
+    rutas["simulation_path"].mkdir(parents=True, exist_ok=True)
+    rutas["figures_path"].mkdir(parents=True, exist_ok=True)
+    rutas["data_simulation_path"].mkdir(parents=True, exist_ok=True)
+
     # Cargo y represento el estado inicial de configuración
     actual_state = utils.cargar_y_representar_estado(
         Path.cwd() / f"Init_data/init_state_{num_simulation - 1}",
@@ -445,7 +459,7 @@ def PP_set(
     sistema_percola = False
     total_vacantes_pp_set = False
 
-    ocupacion_max_pp_set = 0.35
+    ocupacion_max_pp_set = 0.38  # Antes habia un 35 y l resultado era aceptable
     factor_vecinos = 1.1  # Factor de aumento de la probabilidad si tiene vecino
     factor_libre = 0.9  # Factor de disminución de la probabilidad si no tiene vecino
     lim_voltage_percolacion = 0.75  # Si el voltaje de percolación es mayor que este valor la simulación no vale la pena seguirla
@@ -469,7 +483,11 @@ def PP_set(
     params_dict = asdict(params)
     sim_ctes_dict = asdict(sim_ctes)
 
-    print(f"\nSimulacion {num_simulation} - Primera parte del set")
+    print("El nuevo valor de gamma es:", sim_ctes_dict["gamma"], "\n")
+
+    indice_gamma = 1
+
+    print(f"Simulacion {num_simulation} - Primera parte del set\n")
 
     for k in range(0, params.num_pasos + 1):
         total_vacantes = np.sum(actual_state)
@@ -543,13 +561,13 @@ def PP_set(
                     str(rutas["figures_path"]) + f"/Percola_state_{num_simulation}.png",
                 )
 
-                nueva_gamma = sim_ctes.gamma / sim_ctes.factor_generacion
-                # Cambio la probabilidad de generación de vacantes para controlar la percolación
-                sim_ctes = sim_ctes.update_gamma(nueva_gamma)
+                # nueva_gamma = sim_ctes.gamma - 1  # / sim_ctes.factor_generacion
+                # sim_ctes = sim_ctes.update_gamma(nueva_gamma)
+                # sim_ctes_dict = asdict(sim_ctes)
 
-                sim_ctes_dict = asdict(sim_ctes)
+                # indice_gamma = indice_gamma + 1
 
-                print("El nuevo valor de gamma es:", sim_ctes_dict["gamma"], "\n")
+                # print("El nuevo valor de gamma es:", sim_ctes_dict["gamma"], "\n")
 
             sistema_percola = True
 
@@ -571,6 +589,17 @@ def PP_set(
                     actual_state=actual_state,
                     num_simulation=num_simulation,
                 )
+
+            if sum(CF_creado) == indice_gamma:
+                if len(CF_ranges) == 2:
+                    nueva_gamma = sim_ctes.gamma - 2
+                else:
+                    nueva_gamma = sim_ctes.gamma - 1
+
+                sim_ctes = sim_ctes.update_gamma(nueva_gamma)
+                sim_ctes_dict = asdict(sim_ctes)
+                indice_gamma = indice_gamma + 1
+                print("El nuevo valor de gamma es:", sim_ctes_dict["gamma"], "\n")
 
             cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(
                 CF_graph, CF_ranges, exist_cf
@@ -623,10 +652,6 @@ def PP_set(
         # Guardo los datos de la simulación
         data_pp_set[k] = np.array([simulation_time, voltage, current])
 
-        # # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
-        # if k % params.paso_guardar == 0:
-        #     config_matrix_pp_set[int(k / params.paso_guardar) - 1] = actual_state
-
     # Guardo los datos de la simulación
     save_path_pkl = rutas["data_simulation_path"] / f"Data_pp_set_{num_simulation}.pkl"
     save_path_data = rutas["simulation_path"] / f"Data_pp_set_{num_simulation}.txt"
@@ -670,7 +695,6 @@ def PP_set(
     return final_state_pp_set
 
 
-@medir_tiempo
 def SP_set(
     final_state_pp_set: dict,
     num_simulation: int,
@@ -739,11 +763,8 @@ def SP_set(
     # Defino la matriz para almacenar los datos
     data_sp_set = np.zeros((k_max, num_columnas), dtype=np.float64)
 
-    nueva_gamma = sim_ctes.gamma / sim_ctes.factor_generacion
-
-    # Cambio la probabilidad de generación de vacantes para controlar la percolación
-    sim_ctes = sim_ctes.update_gamma(nueva_gamma)
-
+    # nueva_gamma = sim_ctes.gamma / sim_ctes.factor_generacion
+    # sim_ctes = sim_ctes.update_gamma(nueva_gamma)
     sim_ctes_dict = asdict(sim_ctes)
 
     print(f"Simulacion {num_simulation} - Segunda parte del set\n")
@@ -770,40 +791,17 @@ def SP_set(
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
-            # Si es la primera vez que percola, siste_percola será falso y entra aquí
-            if sistema_percola is False:
-                voltaje_percolacion = voltage  # Guardo el voltaje de percolación
-                print(
-                    "El sistema ha percolado en la iteración: ",
-                    k,
-                    " que corresponde con el voltaje: ",
-                    voltaje_percolacion,
-                    " con una ocupación del: ",
-                    round((np.sum(actual_state) / (params.num_max_vacantes)), 4) * 100,
-                    "%\n",
+            # Si el sistema llega al maximo de vacante, como no genera mas, no hace falta recalcular los filamentos, ya que no van a cambiar
+            if total_vacantes < max_vancantes_sp_set:
+                _, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
+                filamentos = CurrentSolver.Clasificar_CF(
+                    CF_graph, params.x_size, params.y_size, CF_ranges
                 )
+                exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(CF_ranges))
 
-                Representate.RepresentateState(
-                    actual_state,
-                    round(voltaje_percolacion, 3),
-                    str(rutas["figures_path"]) + f"/Percola_state_{num_simulation}.png",
+                cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(
+                    CF_graph, CF_ranges, exist_cf
                 )
-
-                nueva_gamma = sim_ctes.gamma / sim_ctes.factor_generacion
-                # Cambio la probabilidad de generación de vacantes para controlar la percolación
-                sim_ctes = sim_ctes.update_gamma(nueva_gamma)
-
-            sistema_percola = True
-
-            _, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
-            filamentos = CurrentSolver.Clasificar_CF(
-                CF_graph, params.x_size, params.y_size, CF_ranges
-            )
-            exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(CF_ranges))
-
-            cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(
-                CF_graph, CF_ranges, exist_cf
-            )
 
             # Si ha percolado uso la corriente de Ohm
             try:
@@ -896,7 +894,6 @@ def SP_set(
     return final_state_sp_set
 
 
-@medir_tiempo
 def PP_reset(
     final_state_sp_set: dict,
     num_simulation: int,
@@ -939,6 +936,8 @@ def PP_reset(
 
     rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="reset")
 
+    rutas["data_simulation_path"].mkdir(parents=True, exist_ok=True)
+
     oxygen_state = np.zeros_like(actual_state, dtype=np.int8)
 
     num_columnas = 3  # Tiempo, Voltaje, Intensidad
@@ -969,6 +968,9 @@ def PP_reset(
         -(params.voltaje_final_reset + params.paso_potencial),
         -params.paso_potencial,
     )
+
+    CF_destruido_index = 1
+    roturas_dict = dict()
 
     print(f"Simulacion {num_simulation} - primera parte del reset")
 
@@ -1002,6 +1004,8 @@ def PP_reset(
                 voltage_CF_destruido=voltage_CF_destruido,
                 actual_state=actual_state,
                 num_simulation=num_simulation,
+                roturas_dict=roturas_dict,
+                etapa="pp",
             )
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
@@ -1080,7 +1084,7 @@ def PP_reset(
             )
 
             print(
-                "\nRepresentando el estado de la simulación en el voltaje ",
+                "Representando el estado de la simulación en el voltaje ",
                 fig_voltage,
                 " (V)",
             )
@@ -1115,6 +1119,8 @@ def PP_reset(
         "voltaje_max_reset": voltage,
         "tiempo_pp_reset": simulation_time,
         "voltage_CF_destruido": voltage_CF_destruido,
+        "CF_destruido_index": CF_destruido_index,
+        "roturas_dict": roturas_dict,
     }
     with open(
         rutas["simulation_path"] / f"final_state_pp_reset_{num_simulation}.pkl", "wb"
@@ -1143,12 +1149,16 @@ def SP_reset(
     percola = final_state_pp_reset["sistema_percola"]
     actual_state = final_state_pp_reset["actual_state"]
     oxygen_state = final_state_pp_reset["oxygen_state"]
-    CF_destruido = final_state_pp_reset["voltage_CF_destruido"]
+    CF_destruido_index = final_state_pp_reset["CF_destruido_index"]
+    voltage_CF_destruido = final_state_pp_reset["voltage_CF_destruido"]
+    roturas_dict = final_state_pp_reset["roturas_dict"]
+
+    print("Lol voltaje de rotura de pp reset son: ", voltage_CF_destruido)
 
     rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="reset")
 
     num_columnas = 3  # Tiempo, Voltaje, Intensidad
-    data_pp_reset = np.zeros((params.num_pasos, num_columnas), dtype=np.float64)
+    data_sp_reset = np.zeros((params.num_pasos, num_columnas), dtype=np.float64)
 
     params_dict = asdict(params)
     sim_ctes_dict = asdict(sim_ctes)
@@ -1156,10 +1166,13 @@ def SP_reset(
     sim_ctes_dict["voltaje_generar_oxigeno"] = -0.2
 
     # Configuración de umbrales
-    oxygen_config = {float(sim_ctes_dict["voltaje_generar_oxigeno"]): int(10)}
+    oxygen_config = {
+        float(sim_ctes_dict["voltaje_generar_oxigeno"]): int(
+            sim_ctes_dict["num_oxigenos_sp_reset"]
+        )
+    }
 
     CF_destruido = np.full(len(CF_ranges), False, dtype=bool)
-    voltage_CF_destruido = np.full(len(CF_ranges), 0.0)
 
     E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
     vector_ddp = np.arange(
@@ -1168,7 +1181,7 @@ def SP_reset(
         params.paso_potencial,
     )
 
-    print(f"Simulacion {num_simulation} - segunda parte del reset")
+    print(f"\nSimulacion {num_simulation} - segunda parte del reset\n")
 
     # Ciclo para la primera parte del reset
     for k in range(0, params.num_pasos):
@@ -1190,6 +1203,8 @@ def SP_reset(
         filamentos = CurrentSolver.Clasificar_CF(CF_graph, max_x, max_y, CF_ranges)
         exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(CF_ranges))
 
+        anterior_voltage_CF = voltage_CF_destruido.copy()
+
         if any(~CF_destruido):  # mientras haya alguno sin romper
             procesar_filamentos_destruidos(
                 imagen_path=rutas["figures_path"],
@@ -1200,6 +1215,8 @@ def SP_reset(
                 voltage_CF_destruido=voltage_CF_destruido,
                 actual_state=actual_state,
                 num_simulation=num_simulation,
+                roturas_dict=roturas_dict,
+                etapa="sp",
             )
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
@@ -1253,7 +1270,7 @@ def SP_reset(
 
         # Tiempo total de la simulacion
         tiempo_total = simulation_time + tiempo_pp_reset
-        data_pp_reset[k] = np.array([tiempo_total, voltage, current])
+        data_sp_reset[k] = np.array([tiempo_total, voltage, current])
 
         # Represento el estado cada 3000 pasos
         if k % num_pasos_guardar_estado == 0:
@@ -1278,9 +1295,9 @@ def SP_reset(
             )
 
             print(
-                "\nRepresentando el estado de la simulación en el voltaje ",
+                "Representando el estado de la simulación en el voltaje: ",
                 fig_voltage,
-                " (V)",
+                " (V)\n",
             )
 
     # Guardo los datos de la simulación
@@ -1295,7 +1312,7 @@ def SP_reset(
     utils.guardar_datos(
         voltaje_final=voltage,
         config_state=actual_state,
-        datos_save=data_pp_reset,
+        datos_save=data_sp_reset,
         header_files="Tiempo simulacion [s],Voltaje [V],Intensidad [A]",
         save_path_data=save_path_data,
         save_path_pkl=save_path_pkl,
@@ -1326,6 +1343,152 @@ def SP_reset(
         "tiempo_sp_reset": simulation_time,
         "voltage_CF_destruido": voltage_CF_destruido,
         "CF_destruido": CF_destruido,
+        "roturas_dict": roturas_dict,
     }
 
+    return final_state_sp_reset
+
+
+def simulation_IV(
+    num_simulation: int,
+    figures_path: Path,
+    simulation_path: Path,
+    desplazamiento: dict,
+    voltaje_percolacion: float,
+    roturas_dict: dict,
+):
+    # region Representar datos
+    save_path = figures_path / f"I-V_{num_simulation}"
+    save_path_marcado = figures_path / f"I-V_{num_simulation}_marcado"
+
+    # Definir nombres base y tipos
+    prefixes = ["pp", "sp"]
+    stages = ["set", "reset"]
+    # Diccionario para guardar los datos cargados
+    data = {}
+    # Cargar archivos de forma automatizada
+    for prefix in prefixes:
+        for stage in stages:
+            name = f"data_{prefix}_{stage}_{num_simulation}.npz"
+            key = f"{prefix}_{stage}"
+            data[key] = np.load(simulation_path / name)
+    # Extraer y concatenar columnas de interés
+    i_set = np.concatenate(
+        [abs(data["pp_set"]["datos"][:, 2]), abs(data["sp_set"]["datos"][:, 2])]
+    )
+    v_set = np.concatenate(
+        [data["pp_set"]["datos"][:, 1], data["sp_set"]["datos"][:, 1]]
+    )
+    v_reset = np.concatenate(
+        [data["pp_reset"]["datos"][:, 1], data["sp_reset"]["datos"][:, 1]]
+    )
+    i_reset = np.concatenate(
+        [abs(data["pp_reset"]["datos"][:, 2]), abs(data["sp_reset"]["datos"][:, 2])]
+    )
+
+    # Diccionario de puntos que quieres ubicar
+    puntos_x_set = {"a": 1e-7, "b": voltaje_percolacion, "c": 1.1}
+    print("Puntos x set:", puntos_x_set, "\n")
+    letras_ruptura = [
+        "e",
+        "f",
+        "g",
+        "h",
+        "i",
+        "j",
+        "k",
+        "l",
+        "m",
+        "n",
+        "o",
+        "p",
+        "q",
+        "r",
+        "s",
+    ]
+
+    puntos_x_pp_reset = {"d": -0.42}
+
+    contador_pp = sum(1 for v in roturas_dict.values() if v["etapa"] == "pp")
+
+    print(f"Número de elementos con etapa 'pp': {contador_pp}", "\n")
+
+    puntos_x_sp_reset = {}
+
+    # Contador para seguir la última letra usada
+    ultima_letra_usada = 0
+
+    # Añado puntos de ruptura
+    for clave, datos in roturas_dict.items():
+        voltaje = datos["voltaje"]
+        etapa = datos["etapa"]
+        # print("Etapa:", etapa, " Voltaje:", voltaje, "\n")
+        # print("La letra usada es:", letras_ruptura[ultima_letra_usada])
+        if etapa == "pp" and ultima_letra_usada < len(letras_ruptura):
+            puntos_x_pp_reset[letras_ruptura[ultima_letra_usada]] = voltaje
+            # print("Los puntos de la pp reset son:", puntos_x_pp_reset, "\n")
+
+        elif etapa == "sp" and ultima_letra_usada < len(letras_ruptura):
+            puntos_x_sp_reset[letras_ruptura[ultima_letra_usada + contador_pp]] = (
+                voltaje
+            )
+            # print("Los puntos de la sp reset son:", puntos_x_sp_reset)
+
+        ultima_letra_usada += 1
+        print("\n")
+
+    # Añadir el punto final -1.4 usando la siguiente letra disponible
+    puntos_x_pp_reset[letras_ruptura[contador_pp]] = -1.4
+    puntos_x_sp_reset[letras_ruptura[contador_pp + ultima_letra_usada]] = -0.001
+
+    # Obtener puntos en cada curva
+    puntos_set = utils.obtener_puntos_en_curva(
+        data["pp_set"]["datos"][:, 1], abs(data["pp_set"]["datos"][:, 2]), puntos_x_set
+    )
+
+    puntos_x_pp_reset = utils.obtener_puntos_en_curva(
+        data["pp_reset"]["datos"][:, 1],
+        abs(data["pp_reset"]["datos"][:, 2]),
+        puntos_x_pp_reset,
+    )
+
+    puntos_x_sp_reset = utils.obtener_puntos_en_curva(
+        data["sp_reset"]["datos"][:, 1],
+        abs(data["sp_reset"]["datos"][:, 2]),
+        puntos_x_sp_reset,
+    )
+    print("Puntos en la curva I-V:")
+    for label, (v, i) in {
+        **puntos_set,
+        **puntos_x_pp_reset,
+        **puntos_x_sp_reset,
+    }.items():
+        print(f"  Punto {label}: V = {v:.6f} V, I = {i:.6e} A")
+
+    # Crear un único diccionario combinando ambos
+    puntos_totales = {}
+    puntos_totales.update(puntos_set)
+    puntos_totales.update(puntos_x_pp_reset)
+    puntos_totales.update(puntos_x_sp_reset)
+
+    Representate.plot_IV(
+        v_set,
+        i_set,
+        v_reset,
+        i_reset,
+        num_simulation - 1,
+        titulo_figura="",
+        figures_path=str(save_path),
+    )
+    Representate.plot_IV_marcado(
+        v_set,
+        i_set,
+        v_reset,
+        i_reset,
+        num_simulation - 1,
+        puntos_totales,
+        desplazamiento,
+        titulo_figura="",
+        figures_path=str(save_path_marcado),
+    )
     return None

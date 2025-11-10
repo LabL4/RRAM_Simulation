@@ -518,7 +518,6 @@ for k in range(0, num_pasos):
                     densidad_filamento,
                 ]
             )
-            g_valor_list.append(Generation.evalutate_g(actual_state, size_grid=40))
 
     else:
         data_pp_set[k - 1] = np.array(
@@ -533,7 +532,6 @@ for k in range(0, num_pasos):
                 densidad_filamento,
             ]
         )
-        g_valor_list.append(Generation.evalutate_g(actual_state, size_grid=40))
 
     # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
     if k % paso_guardar == 0:
@@ -566,17 +564,6 @@ np.savetxt(
     header=header_files,
     delimiter=",",
 )
-# print("El fichero de resultados_pp_set contiene ", data_pp_set.shape[0], ' filas y ', data_pp_set.shape[1], ' columnas')
-
-# g_pp_set = np.array(g_valor_list[1:])
-
-# np.savetxt(
-#     set_simulation_path + f"g_pp_set_{num_simulation + 1}.txt",
-#     g_pp_set,
-#     delimiter=",",
-#     fmt="%.0f",
-# )
-# print("El g en el pp set contiene ", g_pp_set.shape[0], ' filas y ', g_pp_set.shape[1], ' columnas')
 
 # Guardo las vacantes generadas en el forming
 with open(

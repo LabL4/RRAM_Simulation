@@ -115,10 +115,8 @@ def Move_OxygenIons(
     # En la expresión original se multiplica por 2 lo he quitado para ver si sale algo mejor
     abs_field = abs(E_field * 10e-9)
     thresholds = [
-        (1.25, 1.01e-06),
-        (1.1, 8.2e-07),
-        (0.9, 5.2e-07),
-        (0.7, 3e-07),
+        (0.7, 5.2e-07),
+        (0.5, 3e-07),
     ]
     oxigen_velocity = 0
     for limit, vel in thresholds:
@@ -128,8 +126,8 @@ def Move_OxygenIons(
 
     # Calculo la cantidad de "casillas" que se moverá el ion de oxígeno
     displacement = int(round((oxigen_velocity * paso_temp) / grid_size))
-    if displacement > 4:
-        displacement = 4
+    if displacement > 3:
+        displacement = 3
 
     if displacement == 0:
         pass  # print("No se mueve")
@@ -305,19 +303,28 @@ def update_oxygen_state(
     #     print(f"Error en cálculo de velocidad de iones: {e}")
     #     sys.exit(1)
 
-    E_field_abs = abs(E_field * 10e-9)
-    velocity_map = [
-        (1.25, 10.1e-07),
-        (1.1, 8.2e-07),
-        (0.9, 5.2e-07),
-        (0.7, 3e-07),
-    ]
+    # E_field_abs = abs(E_field * 10e-9)
+    # velocity_map = [
+    #     (0.7, 5.1e-07),
+    #     (0.5, 2.6e-07),
+    # ]
 
-    oxigen_velocity = 0
-    for threshold, velocity in velocity_map:
-        if E_field_abs > threshold:
-            oxigen_velocity = velocity
-            break
+    # oxigen_velocity = 0
+    # for threshold, velocity in velocity_map:
+    #     if E_field_abs > threshold:
+    #         oxigen_velocity = velocity
+    #         break
+
+    # Esto es un arreglo temporal para dar cuenta que hay un tiempo hasta que los iones de oxígeno se muevan
+    if abs(E_field * (10e-9)) > 0.5:
+        # En la expresión original se multiplica por 2 lo he quitado para ver si sale algo mejor
+        oxigen_velocity = 3e-07  # 2 * t_0 * cte_red * (senoh * exp_velocity)
+    elif abs(E_field * (10e-9)) > 0.7:
+        oxigen_velocity = 5.2e-07  # 2 * t_0 * cte_red * (senoh * exp_velocity)
+    else:
+        oxigen_velocity = (
+            0  # para que no se mueva hasta q se alcance un potencial concreto
+        )
 
     # Calculo la cantidad de "casillas" que se moverá el ion de oxígeno
     displacement = int(round((oxigen_velocity * paso_temp) / grid_size))

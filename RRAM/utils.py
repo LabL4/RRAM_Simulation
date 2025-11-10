@@ -40,13 +40,9 @@ def crear_rutas_simulacion(num_simulation: int, state: str) -> dict:
     Side-effects:
         Crea las carpetas en disco si no existen.
     """
-    simulation_path = Path.cwd() / "Results copy" / f"simulation_{num_simulation}"
+    simulation_path = Path.cwd() / "Results" / f"simulation_{num_simulation}"
     figures_path = simulation_path / "Figures"
     data_simulation_path = simulation_path / state
-
-    simulation_path.mkdir(parents=True, exist_ok=True)
-    figures_path.mkdir(parents=True, exist_ok=True)
-    data_simulation_path.mkdir(parents=True, exist_ok=True)
 
     return {
         "simulation_path": simulation_path,

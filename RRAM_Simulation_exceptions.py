@@ -542,7 +542,6 @@ for k in range(0, num_pasos):
                     densidad_filamento,
                 ]
             )
-            g_valor_list.append(Generation.evalutate_g(actual_state, size_grid=40))
 
     else:
         data_pp_set[k - 1] = np.array(
@@ -557,7 +556,6 @@ for k in range(0, num_pasos):
                 densidad_filamento,
             ]
         )
-        g_valor_list.append(Generation.evalutate_g(actual_state, size_grid=40))
 
     # Guardo el estado actual CADA paso_guardar PASOS MONTECARLO
     if k % paso_guardar == 0:
@@ -1461,34 +1459,6 @@ np.savetxt(
     header=header_files,
     delimiter=",",
 )
-# print("El fichero de resultados reset contiene ", dat_reset.shape[0], ' filas y ', dat_reset.shape[1], ' columnas')
-
-
-# Obtengo los valores de g del proceso de reset, combinando los vectores de g de las dos partes
-# np.savetxt(
-#     reset_simulation_path + f"g_sp_reset_{num_simulation + 1}.txt",
-#     g_sp_reset,
-#     delimiter=",",
-#     fmt="%.0f",
-# )
-# print("El g en el sp reset contiene ", g_sp_reset.shape[0], ' filas y ', g_sp_reset.shape[1], ' columnas')
-
-# g_reset = np.concatenate((g_pp_reset, g_sp_reset), axis=0)
-# np.savetxt(
-#     reset_simulation_path + f"g_reset_{num_simulation + 1}.txt",
-#     g_reset,
-#     delimiter=",",
-#     fmt="%.0f",
-# )
-# print("El g en el reset contiene ", g_reset.shape[0], ' filas y ', g_reset.shape[1], ' columnas')
-
-# Guardo el estado final de la simulación
-# Representate.RepresentateTwoStates(
-#     actual_state,
-#     oxygen_state,
-#     round(voltage, 3),
-#     simulation_path + f"Figures/Final_state_sp_reset_{num_simulation + 1}.png",
-# )
 Representate.RepresentateState(
     actual_state,
     0,
@@ -1593,6 +1563,15 @@ desplazamiento = {
     "f": (-0.025, 0.25),  # izquierda, un poco abajo
     "g": (-0.12, 0.6),  # derecha, un poco arriba
 }
+
+print("Puntos en la curva I-V:")
+for label, (v, i) in {
+    **puntos_set,
+    **puntos_x_pp_reset,
+    **puntos_x_sp_reset,
+}.items():
+    print(f"  Punto {label}: V = {v:.6f} V, I = {i:.6e} A")
+
 Representate.plot_IV(
     v_set,
     i_set,

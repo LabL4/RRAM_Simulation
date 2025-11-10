@@ -559,7 +559,7 @@ def plot_IV(
         figures_path (str): Path to save the figure.
     """
 
-    figures_path = os.getcwd() + "/Results copy/Figures"
+    figures_path = os.getcwd() + "/Results/Figures"
 
     # Configuración de la figura
     setup_paper_plt(plt, latex=True, scaling=3)
@@ -684,7 +684,7 @@ def plot_IV_marcado(
         figures_path (str): Path to save the figure.
     """
 
-    figures_path = os.getcwd() + "/Results copy/Figures"
+    figures_path = os.getcwd() + "/Results/Figures"
 
     # Configuración de la figura
     setup_paper_plt(plt, latex=True, scaling=3)

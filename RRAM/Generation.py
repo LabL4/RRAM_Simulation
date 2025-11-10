@@ -199,7 +199,7 @@ def generate_oxygen(oxygen_state: np.ndarray, num_oxygen: int):
     rand_vals = np.random.rand(num_oxygen)
 
     # Crear una máscara para las posiciones donde se colocarán oxígenos
-    mask = (oxygen_state[y_indices, 0] == 0) & (rand_vals < 0.5)
+    mask = (oxygen_state[y_indices, 0] == 0) & (rand_vals < 0.35)
 
     # Asignar oxígeno en las posiciones seleccionadas
     oxygen_state[y_indices[mask], 0] = 1
