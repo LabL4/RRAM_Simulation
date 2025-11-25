@@ -205,3 +205,39 @@ def generate_oxygen(oxygen_state: np.ndarray, num_oxygen: int):
     oxygen_state[y_indices[mask], 0] = 1
 
     return oxygen_state
+
+
+def generate_oxigen_old(oxygen_state: np.ndarray, num_oxygen: int):
+    """
+    Generates random oxygen positions in the given oxygen state matrix.
+
+    Args:
+        oxigen_state (np.ndarray): The current oxygen state matrix.
+        num_oxigen (int): The number of oxygen to generate.
+
+    Returns:
+        np.ndarray: The updated oxygen state matrix with the generated oxygen positions.
+    """
+
+    eje_y = oxygen_state.shape[1]
+    y = np.zeros(num_oxygen, dtype=int)
+
+    for i in range(num_oxygen):
+        # Genero las coordenadas aleatorias para el eje y donde habrá un oxígeno
+        y[i] = np.random.randint(0, eje_y)
+
+    if num_oxygen == 1:
+        prob = 0.35
+    elif num_oxygen == 7:
+        prob = 0.7
+    elif num_oxygen == 10:
+        prob = 0.8
+
+    # Itero sobre cada par coordenada para asignar el valor de 1 que representa que se generó un oxígeno en esa posición
+    for i in range(num_oxygen):
+        random_number = np.random.rand()
+        if oxygen_state[y[i], 0] == 0 and random_number < prob:
+            oxygen_state[y[i], 0] = 1
+
+    # Devuelvo la matriz con los oxígenos generados
+    return oxygen_state

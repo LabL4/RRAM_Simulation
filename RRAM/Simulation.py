@@ -157,6 +157,9 @@ class SimulationConstants:
     def update_gamma(self, nuevo_valor_gamma: float):
         return replace(self, gamma=nuevo_valor_gamma)
 
+    def update_I_0(self, nuevo_I_0: float):
+        return replace(self, I_0=nuevo_I_0)
+
     def __repr__(self):
         # Crear lista de líneas con "nombre=valor" para cada atributo
         atributos = []
@@ -382,29 +385,31 @@ def update_state_recombinate(
     # Genera oxígenos según voltaje
     for threshold_voltage, num_oxigenos in oxygen_config.items():
         if abs(voltage) > threshold_voltage:
-            oxygen_state = Generation.generate_oxygen(oxygen_state, num_oxigenos)
+            # print("Se van a generar", num_oxigenos, "oxígenos por voltaje de", voltage)
+            oxygen_state = Generation.generate_oxigen_old(oxygen_state, num_oxigenos)
+            break  # Solo generar una vez por paso temporal
 
-        # Muevo los oxígenos
-        oxygen_state, velocidad = Recombination.update_oxygen_state(
-            paso_temp=params.paso_temporal,
-            oxygen_state=oxygen_state,
-            temperature=temperatura,
-            E_field=E_field,
-            grid_size=params.atom_size,
-            **sim_ctes_dict,
-        )
+    # Muevo los oxígenos
+    oxygen_state, velocidad = Recombination.update_oxygen_state_old(
+        paso_temp=params.paso_temporal,
+        oxygen_state=oxygen_state,
+        temperature=temperatura,
+        E_field=E_field,
+        grid_size=params.atom_size,
+        **sim_ctes_dict,
+    )
 
-        # Obtengo la nueva configuración
-        actual_state_update, oxygen_state_update = Recombination.Recombine_opt(
-            vacancy_state=actual_state,
-            oxygen_state=oxygen_state,
-            paso_temp=params.paso_temporal,
-            velocidad=velocidad,
-            temp=temperatura,
-            **sim_ctes_dict,
-        )
+    # Obtengo la nueva configuración
+    actual_state_update, oxygen_state_update = Recombination.Recombine_opt(
+        vacancy_state=actual_state,
+        oxygen_state=oxygen_state,
+        paso_temp=params.paso_temporal,
+        velocidad=velocidad,
+        temp=temperatura,
+        **sim_ctes_dict,
+    )
 
-        return actual_state_update, oxygen_state_update
+    return actual_state_update, oxygen_state_update
 
 
 def PP_set(
@@ -592,7 +597,7 @@ def PP_set(
 
             if sum(CF_creado) == indice_gamma:
                 if len(CF_ranges) == 2:
-                    nueva_gamma = sim_ctes.gamma - 2
+                    nueva_gamma = sim_ctes.gamma - 2.5
                 else:
                     nueva_gamma = sim_ctes.gamma - 1
 
@@ -949,17 +954,24 @@ def PP_reset(
     sim_ctes_dict["voltaje_generar_oxigeno_1"] = 0.7
     sim_ctes_dict["voltaje_generar_oxigeno_2"] = 1.1
 
-    # Configuración de umbrales
+    # CUIDADO Configuración de umbrales, tiene q estar ordenado de mayor a menor!!
     oxygen_config = {
-        float(sim_ctes_dict["voltaje_generar_oxigeno_1"]): int(
-            sim_ctes_dict["num_oxigenos_pp_reset_1"]
-        ),
         float(sim_ctes_dict["voltaje_generar_oxigeno_2"]): int(
             sim_ctes_dict["num_oxigenos_pp_reset_2"]
         ),
+        float(sim_ctes_dict["voltaje_generar_oxigeno_1"]): int(
+            sim_ctes_dict["num_oxigenos_pp_reset_1"]
+        ),
     }
 
+    print("La configuración de generación de oxígeno es:")
+    for key, value in oxygen_config.items():
+        print(f"  - {key} V: {value} oxígenos")
+
+    print("\n")
+
     CF_destruido = np.full(len(CF_ranges), False, dtype=bool)
+    all_df_destruidos = False
     voltage_CF_destruido = np.full(len(CF_ranges), 0.0)
 
     E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
@@ -979,7 +991,7 @@ def PP_reset(
         simulation_time = params.paso_temporal * k
         voltage = vector_ddp[k]
 
-        # Obtengo los valores del campo eléctrico y la temperatura
+        # Obtengo los valores del campo eléctrico
         E_field = abs(ElectricField.SimpleElectricField(voltage, params.device_size))
 
         # Genero el vector campo eléctrico
@@ -1029,7 +1041,23 @@ def PP_reset(
                     num_simulation=num_simulation,
                     actual_state=actual_state,
                 )
+
+            # Calculo la temperatura cuando hay percolación
+            temperatura = Temperature.Temperature_Joule(
+                voltage, current, percola, params.T_0, **sim_ctes_dict
+            )
+
         else:
+            percola = False
+            # print("Los filamentos destruidos son: ", np.all(CF_destruido))
+            # Cambio el valor I_0 cuando el sistema ha roto todos los filamentos
+            if np.all(CF_destruido) and not all_df_destruidos:
+                I_0_nuevo = 0.003
+                sim_ctes = sim_ctes.update_I_0(I_0_nuevo)
+                sim_ctes_dict = asdict(sim_ctes)
+                all_df_destruidos = True
+                print("El nuevo valor de I_0 es:", sim_ctes_dict["I_0"], "\n")
+
             # Si no ha percolado uso la corriente de Poole-Frenkel
             current = abs(
                 CurrentSolver.Poole_Frenkel(
@@ -1040,7 +1068,7 @@ def PP_reset(
                 * (params.device_size)
             )
 
-            percola = False
+            # Calculo la temperatura cuando no hay percolación
             temperatura = Temperature.Temperature_Joule(
                 voltage, current, percola, params.T_0, **sim_ctes_dict
             )
@@ -1240,6 +1268,11 @@ def SP_reset(
                     num_simulation=num_simulation,
                     actual_state=actual_state,
                 )
+
+            temperatura = Temperature.Temperature_Joule(
+                voltage, current, percola, params.T_0, **sim_ctes_dict
+            )
+
         else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
             current = abs(
@@ -1297,7 +1330,7 @@ def SP_reset(
             print(
                 "Representando el estado de la simulación en el voltaje: ",
                 fig_voltage,
-                " (V)\n",
+                " (V)",
             )
 
     # Guardo los datos de la simulación
@@ -1386,60 +1419,55 @@ def simulation_IV(
         [abs(data["pp_reset"]["datos"][:, 2]), abs(data["sp_reset"]["datos"][:, 2])]
     )
 
-    # Diccionario de puntos que quieres ubicar
+    # # Diccionario de puntos que quieres ubicar
+    # letras_ruptura = [
+    #     "e",
+    #     "f",
+    #     "g",
+    #     "h",
+    #     "i",
+    #     "j",
+    #     "k",
+    #     "l",
+    #     "m",
+    #     "n",
+    #     "o",
+    #     "p",
+    #     "q",
+    #     "r",
+    #     "s",
+    # ]
+
     puntos_x_set = {"a": 1e-7, "b": voltaje_percolacion, "c": 1.1}
-    print("Puntos x set:", puntos_x_set, "\n")
-    letras_ruptura = [
-        "e",
-        "f",
-        "g",
-        "h",
-        "i",
-        "j",
-        "k",
-        "l",
-        "m",
-        "n",
-        "o",
-        "p",
-        "q",
-        "r",
-        "s",
-    ]
+    puntos_x_pp_reset = {"d": -0.42, "e": roturas_dict[0]["voltaje"], "f": -1.4}
+    puntos_x_sp_reset = {"g": -0.001}
 
-    puntos_x_pp_reset = {"d": -0.42}
+    # contador_pp = sum(1 for v in roturas_dict.values() if v["etapa"] == "pp")
 
-    contador_pp = sum(1 for v in roturas_dict.values() if v["etapa"] == "pp")
-
-    print(f"Número de elementos con etapa 'pp': {contador_pp}", "\n")
-
-    puntos_x_sp_reset = {}
+    # puntos_x_sp_reset = {}
 
     # Contador para seguir la última letra usada
-    ultima_letra_usada = 0
+    # ultima_letra_usada = 0
 
-    # Añado puntos de ruptura
-    for clave, datos in roturas_dict.items():
-        voltaje = datos["voltaje"]
-        etapa = datos["etapa"]
-        # print("Etapa:", etapa, " Voltaje:", voltaje, "\n")
-        # print("La letra usada es:", letras_ruptura[ultima_letra_usada])
-        if etapa == "pp" and ultima_letra_usada < len(letras_ruptura):
-            puntos_x_pp_reset[letras_ruptura[ultima_letra_usada]] = voltaje
-            # print("Los puntos de la pp reset son:", puntos_x_pp_reset, "\n")
+    # # Añado puntos de ruptura
+    # for clave, datos in roturas_dict.items():
+    #     voltaje = datos["voltaje"]
+    #     etapa = datos["etapa"]
+    #     if etapa == "pp" and ultima_letra_usada < len(letras_ruptura):
+    #         puntos_x_pp_reset[letras_ruptura[ultima_letra_usada]] = voltaje
+    #         # print("Los puntos de la pp reset son:", puntos_x_pp_reset, "\n")
 
-        elif etapa == "sp" and ultima_letra_usada < len(letras_ruptura):
-            puntos_x_sp_reset[letras_ruptura[ultima_letra_usada + contador_pp]] = (
-                voltaje
-            )
-            # print("Los puntos de la sp reset son:", puntos_x_sp_reset)
+    #     elif etapa == "sp" and ultima_letra_usada < len(letras_ruptura):
+    #         puntos_x_sp_reset[letras_ruptura[ultima_letra_usada + contador_pp]] = (
+    #             voltaje
+    #         )
+    #         # print("Los puntos de la sp reset son:", puntos_x_sp_reset)
 
-        ultima_letra_usada += 1
-        print("\n")
+    #     ultima_letra_usada += 1
 
-    # Añadir el punto final -1.4 usando la siguiente letra disponible
-    puntos_x_pp_reset[letras_ruptura[contador_pp]] = -1.4
-    puntos_x_sp_reset[letras_ruptura[contador_pp + ultima_letra_usada]] = -0.001
+    # # Añadir el punto final -1.4 usando la siguiente letra disponible
+    # puntos_x_pp_reset[letras_ruptura[contador_pp]] = -1.4
+    # puntos_x_sp_reset[letras_ruptura[contador_pp + ultima_letra_usada]] = -0.001
 
     # Obtener puntos en cada curva
     puntos_set = utils.obtener_puntos_en_curva(
@@ -1457,7 +1485,8 @@ def simulation_IV(
         abs(data["sp_reset"]["datos"][:, 2]),
         puntos_x_sp_reset,
     )
-    print("Puntos en la curva I-V:")
+
+    print("Puntos en la curva I-V:\n")
     for label, (v, i) in {
         **puntos_set,
         **puntos_x_pp_reset,

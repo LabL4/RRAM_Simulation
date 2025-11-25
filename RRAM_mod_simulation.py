@@ -1,3 +1,4 @@
+from typing import final
 from RRAM import Simulation, utils
 from turtle import back
 from pathlib import Path
@@ -69,12 +70,17 @@ final_state_pp_reset = Simulation.PP_reset(
     CF_ranges=filamentos_ranges,
 )
 
+# nuevo_I_0 = 0.0022
+# final_state_pp_reset["sim_ctes"] = final_state_pp_reset["sim_ctes"].update_I_0(
+#     nuevo_I_0
+# )
+
 final_state_sp_reset = Simulation.SP_reset(
     final_state_pp_reset=final_state_pp_reset,
     num_simulation=num_simulation + 1,
     CF_ranges=filamentos_ranges,
 )
-print("Resultados de la simulación SP_reset:")
+print("Resultados de la destruccion de filamentos:\n")
 for key, valor in final_state_sp_reset["roturas_dict"].items():
     print(f"Filamento destruido {key}:")
     for campo, dato in valor.items():
@@ -82,29 +88,27 @@ for key, valor in final_state_sp_reset["roturas_dict"].items():
 
 
 # Diccionario de desplazamiento (dx, dy) para cada punto
-desplazamiento = {
-    "a": (0.025, 1.0),  # derecha, misma altura
-    "b": (-0.005, 0.27),  # izquierda, un poco arriba
-    "c": (-0.02, 0.35),  # derecha, un poco abajo
-    "d": (0.02, 1.0),  # izquierda, misma altura
-    "e": (0.0, 1.0),  # izquierda, misma altura
-    "f": (0.0, 1.0),  # izquierda, un poco abajo
-    "g": (0.0, 1.0),  # derecha, un poco arriba
-    "h": (0.0, 1.0),  # derecha, un poco arriba
-    "i": (0.0, 1.0),  # derecha, un poco arriba
-}
-
 # desplazamiento = {
 #     "a": (0.025, 1.0),  # derecha, misma altura
 #     "b": (-0.005, 0.27),  # izquierda, un poco arriba
 #     "c": (-0.02, 0.35),  # derecha, un poco abajo
 #     "d": (0.02, 1.0),  # izquierda, misma altura
-#     "e": (-0.11, 0.66),  # izquierda, misma altura
-#     "f": (-0.025, 0.25),  # izquierda, un poco abajo
-#     "g": (-0.12, 0.6),  # derecha, un poco arriba
-#     "h": (-0.12, 0.6),  # derecha, un poco arriba
-#     "i": (-0.12, 0.6),  # derecha, un poco arriba
+#     "e": (0.0, 1.0),  # izquierda, misma altura
+#     "f": (0.0, 1.0),  # izquierda, un poco abajo
+#     "g": (0.0, 1.0),  # derecha, un poco arriba
+#     "h": (0.0, 1.0),  # derecha, un poco arriba
+#     "i": (0.0, 1.0),  # derecha, un poco arriba
 # }
+
+desplazamiento = {
+    "a": (0.025, 1.0),  # derecha, misma altura
+    "b": (-0.005, 0.27),  # izquierda, un poco arriba
+    "c": (-0.02, 0.35),  # derecha, un poco abajo
+    "d": (0.02, 1.0),  # izquierda, misma altura
+    "e": (-0.11, 0.66),  # izquierda, misma altura
+    "f": (-0.025, 0.25),  # izquierda, un poco abajo
+    "g": (-0.12, 0.6),  # derecha, un poco arriba
+}
 
 Simulation.simulation_IV(
     num_simulation=num_simulation + 1,

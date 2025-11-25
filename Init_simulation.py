@@ -53,7 +53,7 @@ os.makedirs(carpeta)
 device_size = np.ones(num_simulations) * 10e-9  # m
 # m TODO: Esto se deberia llamarse tamaño del grid mejor
 atom_size = np.ones(num_simulations) * 0.25e-9
-num_trampas = np.ones(num_simulations, dtype=int) * 120  # 130
+num_trampas = np.ones(num_simulations, dtype=int) * 100  # 130
 
 priv_y_sup_right = np.ones(num_simulations, dtype=int) * 15
 priv_y_inf_right = np.ones(num_simulations, dtype=int) * 15
@@ -71,7 +71,7 @@ voltaje_final_set = np.ones(num_simulations) * 1.1
 
 paso_guardar = np.ones(num_simulations, dtype=int) * 1
 
-init_temp = np.ones(num_simulations) * 315  # K
+init_temp = np.ones(num_simulations) * 310  # K
 initial_elec_field = np.ones(num_simulations) * 0
 initial_voltaje = np.ones(num_simulations) * 0
 initial_current = np.ones(num_simulations) * 0
@@ -143,13 +143,13 @@ for i in range(num_simulations):
     # print(f"Simulación {i}", eje_x[i], eje_y[i], num_trampas[i])
     regiones_pesos = [
         # Cuatro filamentos equiespaciados para identificar bien los filamentos, el utlimo numero no entra en el rango
-        ((3, 6, 0, eje_x[i]), 50),  # Primera banda (filas 3-6)
-        ((13, 16, 0, eje_x[i]), 50),  # Primera banda (filas 3-6)
-        ((23, 26, 0, eje_x[i]), 60),  # Segunda banda (filas 15-18)
-        ((33, 36, 0, eje_x[i]), 50),  # Tercera banda (filas 30-34)
+        # ((3, 6, 0, eje_x[i]), 50),  # Primera banda (filas 3-6)
+        # ((13, 16, 0, eje_x[i]), 50),  # Primera banda (filas 3-6)
+        # ((23, 26, 0, eje_x[i]), 60),  # Segunda banda (filas 15-18)
+        # ((33, 36, 0, eje_x[i]), 50),  # Tercera banda (filas 30-34)
         # Dos filamentos
-        # ((8, 13, 0, eje_x[i]), 50),  # Primera banda (filas 8-12)
-        # ((28, 33, 0, eje_x[i]), 50),  # Segunda banda (filas 28-34)
+        ((8, 13, 0, eje_x[i]), 30),  # Primera banda (filas 8-12)
+        ((28, 33, 0, eje_x[i]), 30),  # Segunda banda (filas 28-34)
     ]
 
     # Ruta de las imagenes de cada simulación

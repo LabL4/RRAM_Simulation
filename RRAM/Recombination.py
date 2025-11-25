@@ -339,3 +339,86 @@ def update_oxygen_state(
         oxygen_state_new = oxygen_state.copy()
 
     return oxygen_state_new, oxigen_velocity
+
+
+def update_oxygen_state_old(
+    paso_temp: float,
+    oxygen_state: np.ndarray,
+    temperature: float,
+    E_field: float,
+    grid_size: float,
+    **kwargs,
+):  # type: ignore
+    """
+    Move the oxygen ions in the simulation based on the given parameters.
+    Parameters:
+        - simu_time (float): The simulation time.
+        - oxygen_state (np.ndarray): The matrix representing the state of oxygen ions.
+        - temperature (float): The temperature of the system.
+        - E_field (float): The electric field strength.
+        - atom_size (float): The size of each atom.
+    Returns:
+    np.ndarray: The updated matrix representing the state of oxygen ions after the movement. returns oxygen_state_new, oxigen_velocity
+
+    """
+
+    # Obtengo los valores de las constantes si las estoy pasando como argumentos
+    if kwargs:
+        # Obtengo el valor de las constantes que necesita la función
+        t_0 = float(kwargs.get("vibration_frequency"))  # type: ignore
+        gamma_drift = float(kwargs.get("drift_coefficient"))  # type: ignore
+        E_m = float(kwargs.get("migration_energy"))  # type: ignore
+        cte_red = float(kwargs.get("cte_red"))  # type: ignore
+    else:
+        t_0 = cte.t_0
+        gamma_drift = cte.gamma_drift
+        E_m = cte.E_m
+        cte_red = cte.cte_red
+
+    # Esto es un arreglo temporal para dar cuenta que hay un tiempo hasta que los iones de oxígeno se muevan. En la expresión original se multiplica por 2 lo he quitado para ver si sale algo mejor
+    # Calcular velocidad de iones con manejo robusto usando numpy
+    # try:
+    #     senoh = np.sinh(
+    #         (cte_red * E_field * gamma_drift) / (2 * 8.617333262145e-5 * temperature)
+    #     )
+    #     exp_velocity = np.exp(-E_m / (8.617333262145e-5 * temperature))
+    # except Exception as e:
+    #     print(f"Error en cálculo de velocidad de iones: {e}")
+    #     sys.exit(1)
+
+    # E_field_abs = abs(E_field * 10e-9)
+    # velocity_map = [
+    #     (0.7, 5.1e-07),
+    #     (0.5, 2.6e-07),
+    # ]
+
+    # oxigen_velocity = 0
+    # for threshold, velocity in velocity_map:
+    #     if E_field_abs > threshold:
+    #         oxigen_velocity = velocity
+    #         break
+
+    # Esto es un arreglo temporal para dar cuenta que hay un tiempo hasta que los iones de oxígeno se muevan
+    if abs(E_field * (10e-9)) > 0.5:
+        # En la expresión original se multiplica por 2 lo he quitado para ver si sale algo mejor
+        oxigen_velocity = 3e-07  # 2 * t_0 * cte_red * (senoh * exp_velocity)
+    elif abs(E_field * (10e-9)) > 0.7:
+        oxigen_velocity = 5.2e-07  # 2 * t_0 * cte_red * (senoh * exp_velocity)
+    else:
+        oxigen_velocity = (
+            0  # para que no se mueva hasta q se alcance un potencial concreto
+        )
+
+    # Calculo la cantidad de "casillas" que se moverá el ion de oxígeno
+    displacement = int(round((oxigen_velocity * paso_temp) / grid_size))
+
+    # Generar nueva matriz vacía para estado actualizado
+    oxygen_state_new = np.zeros_like(oxygen_state)
+
+    if displacement > 0:
+        oxygen_state_new[:, displacement:] = oxygen_state[:, :-displacement]
+    else:
+        # Sin desplazamiento, copiar directamente
+        oxygen_state_new = oxygen_state.copy()
+
+    return oxygen_state_new, oxigen_velocity
