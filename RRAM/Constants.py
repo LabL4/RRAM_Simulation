@@ -1,7 +1,7 @@
 # Módulo que contiene todas las constantes que usa el paquete
-import numpy as np
+# import numpy as np
 
-from scipy.constants import Boltzmann, elementary_charge
+from scipy.constants import Boltzmann, elementary_charge  # type: ignore
 
 # Valor de la constante de Boltzmann en eV/K
 k_b_ev = Boltzmann / elementary_charge
@@ -10,7 +10,10 @@ k_b_ev = Boltzmann / elementary_charge
 t_0 = 1e13
 
 # eV Energía de activación
-E_a = 1
+E_a = 1  # puedo cambiar el valor
+
+# eV Energía de activación recombinación
+E_r = 1  # puedo cambiar el valor
 
 # Tiene distintos valores dependiendo si el estado es FORMING/SET y RESET
 # La estoy modificando a mano para que el campo eléctrico tmb tenga algún papel en la dinámica
@@ -26,13 +29,16 @@ L_p = 1e-9
 gamma_drift = 10
 
 # Potencial de migración de los iones de oxígeno en eV
-E_m = 1
+E_m = 0.6
 
-# Constante de resistencia térmica en K/W
-r_termica = 5e7
+# Constante de resistencia térmica en K/W cuando el sistema no percola
+r_termica_no_percola = 5  # bajar dos órdenes de magnitud
+
+# Constante de resistencia térmica en K/W cuando el sistema percola
+r_termica_percola = 5e2
 
 # Constante de resistencia en ohmios
-ohm_resistence = 1e7
+ohm_resistence = 2.5  # este valor hay q bajarlo a entorno a 2 2.5 ohmios
 
 # Constante de red, el paper original propone 0.25 nm
 cte_red = 0.25e-9
@@ -44,8 +50,10 @@ pb_metal_insul = 0.5
 permitividad_relativa = 20
 
 # Término inicial de la ecuación de Poole-Frenkel
-I_0 = 5e-10
+I_0 = 2e-3  # 5e-7
 
+# Factor por el que divido la gamma cuando el sistema percola o no
+factor_generacion = 1.5
 
 # def DifussiveBehaviour(pos_x: int, oxigen_velocity: float, paso_temp: float, grid_size: float) -> float:
 #     """

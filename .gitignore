@@ -3,7 +3,6 @@
 *.csv
 *.mp4
 *.pkl
-*.png
 *.zip
 *.png
 *.pdf
@@ -11,3 +10,10 @@ env/
 .venv/
 .DS_Store
 Datos_Experimentales/
+Results/
+Init_data/
+Initial_data/
+*.txt
+logs/
+*.log
+*.npz
