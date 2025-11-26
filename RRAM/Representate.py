@@ -95,7 +95,7 @@ def setup_plt(plt, latex=True, scaling=1):
     plt.rc("axes", titlesize=BIGGER_SIZE * 1.5)
 
 
-setup_paper_plt(plt, latex=True, scaling=2)
+setup_paper_plt(plt, latex=True, scaling=3)
 
 
 def RepresentateState(
@@ -126,13 +126,13 @@ def RepresentateState(
     fig, ax = plt.subplots(figsize=(12, 9))
 
     setup_paper_plt(plt, latex=True, scaling=3)
+    config_ax_state(ax)
     # CUSTOM_SIZE = 32
 
     # plt.rc("axes", labelsize=CUSTOM_SIZE)
     # plt.rc("xtick", labelsize=CUSTOM_SIZE)
     # plt.rc("ytick", labelsize=CUSTOM_SIZE)
     # Desactivar minorticks para evitar sobrecarga visual
-    config_ax_state(ax)
 
     # Crear mapa de colores
     colors = [(1, 1, 1), color]  # Blanco (0) y Color dado (1)
@@ -176,15 +176,12 @@ def RepresentateState(
     ax.add_patch(left_electrode)
     ax.add_patch(right_electrode)
 
-    # Aplicar configuración de ejes
-    config_ax_state(ax)
-
     # Configurar etiquetas y título
     ax.set_xticks(np.arange(0, 11, 2))  # 🔹 Ticks cada 2 nm en X
     ax.set_yticks(np.arange(0, 11, 2))  # 🔹 Ticks cada 2 nm en Y
     ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
     ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
-    ax.set_title(rf"V_RRAM = {voltaje} V", pad=20, fontsize=32)
+    ax.set_title(rf"V_RRAM = {voltaje} V", pad=20)
 
     # Ajustar formato visual
     ax.set_aspect("equal")

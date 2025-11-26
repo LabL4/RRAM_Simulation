@@ -148,8 +148,8 @@ for i in range(num_simulations):
         # ((23, 26, 0, eje_x[i]), 60),  # Segunda banda (filas 15-18)
         # ((33, 36, 0, eje_x[i]), 50),  # Tercera banda (filas 30-34)
         # Dos filamentos
-        ((8, 13, 0, eje_x[i]), 30),  # Primera banda (filas 8-12)
-        ((28, 33, 0, eje_x[i]), 30),  # Segunda banda (filas 28-34)
+        ((8, 13, 0, eje_x[i]), 40),  # Primera banda (filas 8-12)
+        ((28, 33, 0, eje_x[i]), 40),  # Segunda banda (filas 28-34)
     ]
 
     # Ruta de las imagenes de cada simulación

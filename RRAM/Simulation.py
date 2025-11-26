@@ -488,7 +488,7 @@ def PP_set(
     params_dict = asdict(params)
     sim_ctes_dict = asdict(sim_ctes)
 
-    print("El nuevo valor de gamma es:", sim_ctes_dict["gamma"], "\n")
+    print("El valor de gamma es:", sim_ctes_dict["gamma"], "\n")
 
     indice_gamma = 1
 
@@ -1146,6 +1146,7 @@ def PP_reset(
         "Temperatura_final": temperatura,
         "voltaje_max_reset": voltage,
         "tiempo_pp_reset": simulation_time,
+        "CF_destruido": CF_destruido,
         "voltage_CF_destruido": voltage_CF_destruido,
         "CF_destruido_index": CF_destruido_index,
         "roturas_dict": roturas_dict,
@@ -1178,6 +1179,7 @@ def SP_reset(
     actual_state = final_state_pp_reset["actual_state"]
     oxygen_state = final_state_pp_reset["oxygen_state"]
     CF_destruido_index = final_state_pp_reset["CF_destruido_index"]
+    CF_destruido = final_state_pp_reset["CF_destruido"]
     voltage_CF_destruido = final_state_pp_reset["voltage_CF_destruido"]
     roturas_dict = final_state_pp_reset["roturas_dict"]
 
@@ -1200,7 +1202,7 @@ def SP_reset(
         )
     }
 
-    CF_destruido = np.full(len(CF_ranges), False, dtype=bool)
+    print("Los filamentos destruidos al inicio del SP reset son: ", CF_destruido)
 
     E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
     vector_ddp = np.arange(
