@@ -1,3 +1,4 @@
+from cycler import V
 import numpy as np  # type: ignore
 # import math
 
@@ -110,18 +111,6 @@ def Generate(time_stp: float, electric_field: float, temp: float, **kwargs) -> f
     exponente = (E_a - (gamma * cte_red * electric_field)) / (cte.k_b_ev * temp)
     prob_generacion = time_stp * t_0 * (np.exp(-exponente))
 
-    # print("Temperatura:", temp, " K")
-
-    # Imprimir los valores usados solo la primera vez que se ejecuta la función
-    # if not hasattr(Generate, "_has_run"):
-    #     print("Valores utilizados en Generation:")
-    #     print(f"paso_temporal: {time_stp}")
-    #     print(f"t_0: {t_0}")
-    #     print(f"cte red: {cte_red}")
-    #     print(f"E_a: {E_a}")
-    #     print(f"gamma: {gamma}")
-    #     Generate._has_run = True
-
     return prob_generacion
 
 
@@ -227,17 +216,26 @@ def generate_oxigen_old(oxygen_state: np.ndarray, num_oxygen: int):
         y[i] = np.random.randint(0, eje_y)
 
     if num_oxygen == 1:
-        prob = 0.35
+        prob = 0.5
     elif num_oxygen == 7:
-        prob = 0.7
-    elif num_oxygen == 10:
         prob = 0.8
+    elif num_oxygen == 10:
+        prob = 1
 
     # Itero sobre cada par coordenada para asignar el valor de 1 que representa que se generó un oxígeno en esa posición
-    for i in range(num_oxygen):
-        random_number = np.random.rand()
-        if oxygen_state[y[i], 0] == 0 and random_number < prob:
-            oxygen_state[y[i], 0] = 1
+    try:
+        for i in range(num_oxygen):
+            random_number = np.random.rand()
+            if oxygen_state[y[i], 0] == 0 and random_number < prob:
+                oxygen_state[y[i], 0] = 1
+    except ValueError:
+        print(
+            "Error en la generación de oxígenos, la probabilidad es",
+            prob,
+            "que corresponde a",
+            num_oxygen,
+            "oxígenos.",
+        )
 
     # Devuelvo la matriz con los oxígenos generados
     return oxygen_state

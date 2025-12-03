@@ -614,22 +614,22 @@ def plot_IV(
     )
 
     # Ruta de los datos experimentales
-    # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt'
-    # ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt'
+    # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Set_1t'
+    # ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Reset_1.txt'
     ruta_archivo_set = (
-        os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt"
+        os.getcwd() + "/Datos_Experimentales/Medidas Arturo/Mean_DC_Set_1.txt"
     )
     ruta_archivo_reset = (
-        os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt"
+        os.getcwd() + "/Datos_Experimentales/Medidas Arturo/DC_Reset_1_Run40.txt"
     )
 
     # Cargar datos experimentales
-    data_set = np.loadtxt(ruta_archivo_set)
-    data_reset = np.loadtxt(ruta_archivo_reset)
+    data_set = np.loadtxt(ruta_archivo_set, skiprows=1)
+    data_reset = np.loadtxt(ruta_archivo_reset, skiprows=1)
 
-    x_set = data_set[:, 0]
+    x_set = data_set[:, 2]
     y_set = data_set[:, 1]
-    x_reset = data_reset[:, 0]
+    x_reset = data_reset[:, 2] * (-1.0)
     y_reset = abs(data_reset[:, 1])
 
     # Curvas experimentales
@@ -741,22 +741,22 @@ def plot_IV_marcado(
     )
 
     # Ruta de los datos experimentales
-    # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt'
-    # ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt'
+    # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Set_1t'
+    # ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Reset_1.txt'
     ruta_archivo_set = (
-        os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt"
+        os.getcwd() + "/Datos_Experimentales/Medidas Arturo/Mean_DC_Set_1.txt"
     )
     ruta_archivo_reset = (
-        os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt"
+        os.getcwd() + "/Datos_Experimentales/Medidas Arturo/Mean_DC_Reset_1.txt"
     )
 
     # Cargar datos experimentales
-    data_set = np.loadtxt(ruta_archivo_set)
-    data_reset = np.loadtxt(ruta_archivo_reset)
+    data_set = np.loadtxt(ruta_archivo_set, skiprows=1)
+    data_reset = np.loadtxt(ruta_archivo_reset, skiprows=1)
 
     x_set = data_set[:, 0]
     y_set = data_set[:, 1]
-    x_reset = data_reset[:, 0]
+    x_reset = -data_reset[:, 0]
     y_reset = abs(data_reset[:, 1])
 
     (x_0, y_0) = next(iter(lista_puntos.values()))

@@ -290,7 +290,42 @@ def update_state_generate(
     temperatura: float,
     factor_vecinos: float,
     factor_sin_vecinos: float,
+    neighbor_mode: str = "horizontal",  # Opciones: 'horizontal', 'vertical', 'both'
 ) -> np.ndarray:
+    """
+    Updates the state matrix by generating new vacancies based on the electric field,
+    temperature, and neighboring conditions.
+    Args:
+        state (np.ndarray): Current state matrix where 0 represents free positions
+            and 1 represents occupied positions.
+        params (SimulationParameters): Object containing simulation parameters such as
+            `paso_temporal`, `x_size`, and `y_size`.
+        sim_ctes_cte (dict): Dictionary containing simulation constants required for
+            the generation process.
+        E_field_vector (np.ndarray): Vector representing the electric field for each
+            row of the state matrix.
+        temperatura (float): Temperature value used in the generation probability calculation.
+        factor_vecinos (float): Multiplicative factor to increase the probability of
+            generation for free positions with neighbors.
+        factor_sin_vecinos (float): Multiplicative factor to decrease the probability of
+            generation for free positions without neighbors.
+        neighbor_mode (str, optional): Mode to determine neighbor consideration.
+            Options are "horizontal", "vertical", or "both". Defaults to "horizontal".
+    Returns:
+        np.ndarray: Updated state matrix with new vacancies generated based on the
+        calculated probabilities.
+    Raises:
+        AssertionError: If the number of rows in `E_field_vector` does not match the
+            number of rows in the `state` matrix.
+    Notes:
+        - The function calculates the probability of vacancy generation for each free
+          position in the state matrix based on the electric field, temperature, and
+          neighboring conditions.
+        - Neighboring conditions are determined based on the `neighbor_mode` parameter.
+        - The generation process is stochastic, using random numbers to determine
+          whether a vacancy is generated at each position.
+    """
+
     assert E_field_vector.shape[0] == state.shape[0], (
         "El vector de campo eléctrico debe tener igual número de filas que la matriz de estado"
     )
@@ -300,21 +335,42 @@ def update_state_generate(
     # Máscara posiciones libres (True donde actual_state == 0)
     free_mask = state == 0
 
-    # Máscara vecinos a la izquierda: desplazamos matriz a la derecha
-    left_neighbor = np.zeros_like(state, dtype=bool)
-    left_neighbor[:, 1:] = state[:, :-1] == 1
+    # Inicializamos la máscara de vecinos en Falso
+    vecino_mask = np.zeros_like(state, dtype=bool)
 
-    # Máscara vecinos a la derecha: desplazamos matriz a la izquierda
-    right_neighbor = np.zeros_like(state, dtype=bool)
-    right_neighbor[:, :-1] = state[:, 1:] == 1
+    # --- Lógica Horizontal (Izquierda / Derecha) ---
+    if neighbor_mode in ["horizontal", "both"]:
+        # Vecinos a la izquierda: desplazamos matriz a la derecha (axis 1)
+        left_neighbor = np.zeros_like(state, dtype=bool)
+        left_neighbor[:, 1:] = state[:, :-1] == 1
 
-    # Máscara posiciones libres con vecino (True donde hay vecino)
-    vecino_mask = left_neighbor | right_neighbor
+        # Vecinos a la derecha: desplazamos matriz a la izquierda (axis 1)
+        right_neighbor = np.zeros_like(state, dtype=bool)
+        right_neighbor[:, :-1] = state[:, 1:] == 1
 
+        # Acumulamos en la máscara total
+        vecino_mask |= left_neighbor | right_neighbor
+
+    # --- Lógica Vertical (Arriba / Abajo) ---
+    if neighbor_mode in ["vertical", "both"]:
+        # Vecino Arriba: desplazamos matriz hacia abajo (axis 0)
+        up_neighbor = np.zeros_like(state, dtype=bool)
+        up_neighbor[1:, :] = state[:-1, :] == 1
+
+        # Vecino Abajo: desplazamos matriz hacia arriba (axis 0)
+        down_neighbor = np.zeros_like(state, dtype=bool)
+        down_neighbor[:-1, :] = state[1:, :] == 1
+
+        # Acumulamos en la máscara total usando OR lógico
+        vecino_mask |= up_neighbor | down_neighbor
+
+    # Definir quiénes están libres CON vecinos y quiénes SIN vecinos
     free_with_vecino = free_mask & vecino_mask
     free_without_vecino = free_mask & (~vecino_mask)
 
-    # calcular las probabilidades por fila
+    # --- Cálculo de probabilidades ---
+
+    # Calcular las probabilidades por fila
     prob_generacion_fila = np.minimum(
         [
             Generation.Generate(
@@ -328,25 +384,25 @@ def update_state_generate(
         1,
     )
 
-    # Probabilidad base (40x1) expandida a (40x40)
+    # Probabilidad base expandida al tamaño de la matriz
     prob_base_matrix = np.tile(prob_generacion_fila.reshape(-1, 1), (1, params.y_size))
 
-    # Crear una copia para la matriz de salida
+    # Crear matriz de probabilidad final
     prob_final = np.zeros_like(prob_base_matrix)
 
-    # Aplicar factor de vecinos y sin vecinos
+    # Aplicar factores condicionales
+    # 1. Si tiene vecinos (según el modo seleccionado), aumentamos prob
     prob_final[free_with_vecino] = prob_base_matrix[free_with_vecino] * factor_vecinos
+
+    # 2. Si está aislado (según el modo seleccionado), reducimos prob
     prob_final[free_without_vecino] = (
         prob_base_matrix[free_without_vecino] * factor_sin_vecinos
     )
 
-    # Generar números aleatorios
+    # Generación estocástica
     aleatorios = np.random.rand(params.x_size, params.y_size)
-
-    # Determinar nuevas vacantes
     nueva_vacante = aleatorios < prob_final
 
-    # Actualizar el estado
     act_state[nueva_vacante] = 1
 
     return act_state
@@ -464,10 +520,10 @@ def PP_set(
     sistema_percola = False
     total_vacantes_pp_set = False
 
-    ocupacion_max_pp_set = 0.38  # Antes habia un 35 y l resultado era aceptable
-    factor_vecinos = 1.1  # Factor de aumento de la probabilidad si tiene vecino
-    factor_libre = 0.9  # Factor de disminución de la probabilidad si no tiene vecino
-    lim_voltage_percolacion = 0.75  # Si el voltaje de percolación es mayor que este valor la simulación no vale la pena seguirla
+    ocupacion_max_pp_set = 0.25  # Antes habia un 35 y l resultado era aceptable
+    factor_vecinos = 1.2  # Factor de aumento de la probabilidad si tiene vecino
+    factor_libre = 0.5  # Factor de disminución de la probabilidad si no tiene vecino
+    lim_voltage_percolacion = 0.70  # Si el voltaje de percolación es mayor que este valor la simulación no vale la pena seguirla
     temperatura = params.T_0
     current = 0.0
 
@@ -577,9 +633,11 @@ def PP_set(
             sistema_percola = True
 
             _, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
+
             filamentos = CurrentSolver.Clasificar_CF(
                 CF_graph, params.x_size, params.y_size, CF_ranges
             )
+
             exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(CF_ranges))
 
             # Compruebo si hay filamentos nuevos
@@ -596,6 +654,9 @@ def PP_set(
                 )
 
             if sum(CF_creado) == indice_gamma:
+                if len(CF_ranges) == 1:
+                    print("Todos los filamentos creados.")
+                    nueva_gamma = sim_ctes.gamma - 4
                 if len(CF_ranges) == 2:
                     nueva_gamma = sim_ctes.gamma - 2.5
                 else:
@@ -753,10 +814,10 @@ def SP_set(
 
     temperatura = final_state_pp_set["Temperatura_final"]
 
-    ocupacion_max_sp_set = 0.4
+    ocupacion_max_sp_set = 0.27
     max_vancantes_sp_set = int(ocupacion_max_sp_set * params.num_max_vacantes)
     factor_vecinos = 1.2  # Factor de aumento de la probabilidad si tiene vecino
-    factor_libre = 0.8  # Factor de disminución de la probabilidad si no tiene vecino
+    factor_libre = 0.5  # Factor de disminución de la probabilidad si no tiene vecino
     total_vacantes_sp_set = False
     num_columnas = 3  # Tiempo, Voltaje, Intensidad
 
@@ -951,8 +1012,8 @@ def PP_reset(
     params_dict = asdict(params)
     sim_ctes_dict = asdict(sim_ctes)
 
-    sim_ctes_dict["voltaje_generar_oxigeno_1"] = 0.7
-    sim_ctes_dict["voltaje_generar_oxigeno_2"] = 1.1
+    sim_ctes_dict["voltaje_generar_oxigeno_1"] = 0.5
+    sim_ctes_dict["voltaje_generar_oxigeno_2"] = 0.75
 
     # CUIDADO Configuración de umbrales, tiene q estar ordenado de mayor a menor!!
     oxygen_config = {
@@ -1052,10 +1113,10 @@ def PP_reset(
             # print("Los filamentos destruidos son: ", np.all(CF_destruido))
             # Cambio el valor I_0 cuando el sistema ha roto todos los filamentos
             if np.all(CF_destruido) and not all_df_destruidos:
-                I_0_nuevo = 0.003
-                sim_ctes = sim_ctes.update_I_0(I_0_nuevo)
-                sim_ctes_dict = asdict(sim_ctes)
-                all_df_destruidos = True
+                # I_0_nuevo = 0.003
+                # sim_ctes = sim_ctes.update_I_0(I_0_nuevo)
+                # sim_ctes_dict = asdict(sim_ctes)
+                # all_df_destruidos = True
                 print("El nuevo valor de I_0 es:", sim_ctes_dict["I_0"], "\n")
 
             # Si no ha percolado uso la corriente de Poole-Frenkel
@@ -1089,33 +1150,33 @@ def PP_reset(
         tiempo_total = simulation_time + tiempo_sp_set
         data_pp_reset[k] = np.array([tiempo_total, voltage, current])
 
-        # Represento el estado cada 3000 pasos
-        if k % num_pasos_guardar_estado == 0:
-            fig_voltage = round(vector_ddp[k], 3)
-            utils.guardar_representar_estado(
-                voltaje=fig_voltage,
-                config_state=actual_state,
-                save_path_pkl=rutas["data_simulation_path"]
-                / f"pp_reset_state_V={fig_voltage}_{num_simulation}.pkl",
-                save_path_figures=rutas["figures_path"]
-                / f"pp_reset_state_V={fig_voltage}_{num_simulation}.png",
-            )
+        # # Represento el estado cada 3000 pasos
+        # if k % num_pasos_guardar_estado == 0:
+        #     fig_voltage = round(vector_ddp[k], 3)
+        #     utils.guardar_representar_estado(
+        #         voltaje=fig_voltage,
+        #         config_state=actual_state,
+        #         save_path_pkl=rutas["data_simulation_path"]
+        #         / f"pp_reset_state_V={fig_voltage}_{num_simulation}.pkl",
+        #         save_path_figures=rutas["figures_path"]
+        #         / f"pp_reset_state_V={fig_voltage}_{num_simulation}.png",
+        #     )
 
-            Representate.RepresentateTwoStates(
-                matriz1=actual_state,
-                matriz2=oxygen_state,
-                voltage=fig_voltage,
-                filename=str(
-                    rutas["figures_path"]
-                    / f"pp_reset_full_state_V={fig_voltage}_{num_simulation}.png"
-                ),
-            )
+        #     Representate.RepresentateTwoStates(
+        #         matriz1=actual_state,
+        #         matriz2=oxygen_state,
+        #         voltage=fig_voltage,
+        #         filename=str(
+        #             rutas["figures_path"]
+        #             / f"pp_reset_full_state_V={fig_voltage}_{num_simulation}.png"
+        #         ),
+        #     )
 
-            print(
-                "Representando el estado de la simulación en el voltaje ",
-                fig_voltage,
-                " (V)",
-            )
+        #     print(
+        #         "Representando el estado de la simulación en el voltaje ",
+        #         fig_voltage,
+        #         " (V)",
+        #     )
 
     # Guardo los datos de la simulación
     save_path_pkl = (
@@ -1307,33 +1368,33 @@ def SP_reset(
         tiempo_total = simulation_time + tiempo_pp_reset
         data_sp_reset[k] = np.array([tiempo_total, voltage, current])
 
-        # Represento el estado cada 3000 pasos
-        if k % num_pasos_guardar_estado == 0:
-            fig_voltage = round(vector_ddp[k], 3)
-            utils.guardar_representar_estado(
-                voltaje=fig_voltage,
-                config_state=actual_state,
-                save_path_pkl=rutas["data_simulation_path"]
-                / f"sp_reset_state_V={fig_voltage}_{num_simulation}.pkl",
-                save_path_figures=rutas["figures_path"]
-                / f"sp_reset_state_V={fig_voltage}_{num_simulation}.png",
-            )
+        # # Represento el estado cada 3000 pasos
+        # if k % num_pasos_guardar_estado == 0:
+        #     fig_voltage = round(vector_ddp[k], 3)
+        #     utils.guardar_representar_estado(
+        #         voltaje=fig_voltage,
+        #         config_state=actual_state,
+        #         save_path_pkl=rutas["data_simulation_path"]
+        #         / f"sp_reset_state_V={fig_voltage}_{num_simulation}.pkl",
+        #         save_path_figures=rutas["figures_path"]
+        #         / f"sp_reset_state_V={fig_voltage}_{num_simulation}.png",
+        #     )
 
-            Representate.RepresentateTwoStates(
-                matriz1=actual_state,
-                matriz2=oxygen_state,
-                voltage=fig_voltage,
-                filename=str(
-                    rutas["figures_path"]
-                    / f"sp_reset_full_state_V={fig_voltage}_{num_simulation}.png"
-                ),
-            )
+        #     Representate.RepresentateTwoStates(
+        #         matriz1=actual_state,
+        #         matriz2=oxygen_state,
+        #         voltage=fig_voltage,
+        #         filename=str(
+        #             rutas["figures_path"]
+        #             / f"sp_reset_full_state_V={fig_voltage}_{num_simulation}.png"
+        #         ),
+        #     )
 
-            print(
-                "Representando el estado de la simulación en el voltaje: ",
-                fig_voltage,
-                " (V)",
-            )
+        #     print(
+        #         "Representando el estado de la simulación en el voltaje: ",
+        #         fig_voltage,
+        #         " (V)",
+        #     )
 
     # Guardo los datos de la simulación
     save_path_pkl = (
@@ -1440,9 +1501,9 @@ def simulation_IV(
     #     "s",
     # ]
 
-    puntos_x_set = {"a": 1e-7, "b": voltaje_percolacion, "c": 1.1}
-    puntos_x_pp_reset = {"d": -0.42, "e": roturas_dict[0]["voltaje"], "f": -1.4}
-    puntos_x_sp_reset = {"g": -0.001}
+    # puntos_x_set = {"a": 1e-7, "b": voltaje_percolacion, "c": 1.1}
+    # puntos_x_pp_reset = {"d": -0.42, "e": roturas_dict[0]["voltaje"], "f": -1.4}
+    # puntos_x_sp_reset = {"g": -0.001}
 
     # contador_pp = sum(1 for v in roturas_dict.values() if v["etapa"] == "pp")
 
@@ -1472,35 +1533,35 @@ def simulation_IV(
     # puntos_x_sp_reset[letras_ruptura[contador_pp + ultima_letra_usada]] = -0.001
 
     # Obtener puntos en cada curva
-    puntos_set = utils.obtener_puntos_en_curva(
-        data["pp_set"]["datos"][:, 1], abs(data["pp_set"]["datos"][:, 2]), puntos_x_set
-    )
+    # puntos_set = utils.obtener_puntos_en_curva(
+    #     data["pp_set"]["datos"][:, 1], abs(data["pp_set"]["datos"][:, 2]), puntos_x_set
+    # )
 
-    puntos_x_pp_reset = utils.obtener_puntos_en_curva(
-        data["pp_reset"]["datos"][:, 1],
-        abs(data["pp_reset"]["datos"][:, 2]),
-        puntos_x_pp_reset,
-    )
+    # puntos_x_pp_reset = utils.obtener_puntos_en_curva(
+    #     data["pp_reset"]["datos"][:, 1],
+    #     abs(data["pp_reset"]["datos"][:, 2]),
+    #     puntos_x_pp_reset,
+    # )
 
-    puntos_x_sp_reset = utils.obtener_puntos_en_curva(
-        data["sp_reset"]["datos"][:, 1],
-        abs(data["sp_reset"]["datos"][:, 2]),
-        puntos_x_sp_reset,
-    )
+    # puntos_x_sp_reset = utils.obtener_puntos_en_curva(
+    #     data["sp_reset"]["datos"][:, 1],
+    #     abs(data["sp_reset"]["datos"][:, 2]),
+    #     puntos_x_sp_reset,
+    # )
 
-    print("Puntos en la curva I-V:\n")
-    for label, (v, i) in {
-        **puntos_set,
-        **puntos_x_pp_reset,
-        **puntos_x_sp_reset,
-    }.items():
-        print(f"  Punto {label}: V = {v:.6f} V, I = {i:.6e} A")
+    # print("Puntos en la curva I-V:\n")
+    # for label, (v, i) in {
+    #     **puntos_set,
+    #     **puntos_x_pp_reset,
+    #     **puntos_x_sp_reset,
+    # }.items():
+    #     print(f"  Punto {label}: V = {v:.6f} V, I = {i:.6e} A")
 
-    # Crear un único diccionario combinando ambos
-    puntos_totales = {}
-    puntos_totales.update(puntos_set)
-    puntos_totales.update(puntos_x_pp_reset)
-    puntos_totales.update(puntos_x_sp_reset)
+    # # Crear un único diccionario combinando ambos
+    # puntos_totales = {}
+    # puntos_totales.update(puntos_set)
+    # puntos_totales.update(puntos_x_pp_reset)
+    # puntos_totales.update(puntos_x_sp_reset)
 
     Representate.plot_IV(
         v_set,
@@ -1511,15 +1572,15 @@ def simulation_IV(
         titulo_figura="",
         figures_path=str(save_path),
     )
-    Representate.plot_IV_marcado(
-        v_set,
-        i_set,
-        v_reset,
-        i_reset,
-        num_simulation - 1,
-        puntos_totales,
-        desplazamiento,
-        titulo_figura="",
-        figures_path=str(save_path_marcado),
-    )
+    # Representate.plot_IV_marcado(
+    #     v_set,
+    #     i_set,
+    #     v_reset,
+    #     i_reset,
+    #     num_simulation - 1,
+    #     puntos_totales,
+    #     desplazamiento,
+    #     titulo_figura="",
+    #     figures_path=str(save_path_marcado),
+    # )
     return None
