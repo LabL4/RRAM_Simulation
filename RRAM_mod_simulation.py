@@ -49,7 +49,6 @@ elif num_filamentos == 4:
 elif num_filamentos == 1:
     filamentos_ranges = [(4, 34)]
 
-# filamentos_ranges = [(0, 19), (20, 39)]  # Se incluye el ultimo valor
 CF_creado = np.full(len(filamentos_ranges), False, dtype=bool)
 
 final_state_pp_set = Simulation.PP_set(
@@ -72,11 +71,6 @@ final_state_pp_reset = Simulation.PP_reset(
     CF_ranges=filamentos_ranges,
 )
 
-# nuevo_I_0 = 0.0022
-# final_state_pp_reset["sim_ctes"] = final_state_pp_reset["sim_ctes"].update_I_0(
-#     nuevo_I_0
-# )
-
 final_state_sp_reset = Simulation.SP_reset(
     final_state_pp_reset=final_state_pp_reset,
     num_simulation=num_simulation + 1,
@@ -87,20 +81,6 @@ for key, valor in final_state_sp_reset["roturas_dict"].items():
     print(f"Filamento destruido {key}:")
     for campo, dato in valor.items():
         print(f"  {campo}: {dato}")
-
-
-# Diccionario de desplazamiento (dx, dy) para cada punto
-# desplazamiento = {
-#     "a": (0.025, 1.0),  # derecha, misma altura
-#     "b": (-0.005, 0.27),  # izquierda, un poco arriba
-#     "c": (-0.02, 0.35),  # derecha, un poco abajo
-#     "d": (0.02, 1.0),  # izquierda, misma altura
-#     "e": (0.0, 1.0),  # izquierda, misma altura
-#     "f": (0.0, 1.0),  # izquierda, un poco abajo
-#     "g": (0.0, 1.0),  # derecha, un poco arriba
-#     "h": (0.0, 1.0),  # derecha, un poco arriba
-#     "i": (0.0, 1.0),  # derecha, un poco arriba
-# }
 
 desplazamiento = {
     "a": (0.025, 1.0),  # derecha, misma altura

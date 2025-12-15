@@ -216,9 +216,9 @@ def generate_oxigen_old(oxygen_state: np.ndarray, num_oxygen: int):
         y[i] = np.random.randint(0, eje_y)
 
     if num_oxygen == 1:
-        prob = 0.5
+        prob = 0.75
     elif num_oxygen == 7:
-        prob = 0.8
+        prob = 0.9
     elif num_oxygen == 10:
         prob = 1
 

@@ -576,14 +576,15 @@ def plot_IV(
 
     # ---------- EJE Y ----------
     # Marcas en potencias de 10 de 10⁻⁷ a 10⁻²
-    y_ticks = [1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2]
-    axes.set_yscale("log")
+    y_ticks = [1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2]
     axes.set_yticks(y_ticks)
     axes.get_yaxis().set_major_formatter(ticker.FormatStrFormatter("$10^{%d}$"))
 
     # Esto imprime las etiquetas en forma 10⁻⁷, 10⁻⁶, etc.
     axes.set_yticklabels(
         [
+            r"$10^{-9}$",
+            r"$10^{-8}$",
             r"$10^{-7}$",
             r"$10^{-6}$",
             r"$10^{-5}$",
@@ -593,34 +594,38 @@ def plot_IV(
         ]
     )
 
-    # Scatter de SET y RESET
-    axes.scatter(
-        v_set,
-        i_set,
-        color="red",
-        s=15,
-        marker=markers.MarkerStyle("o"),
-        facecolors="white",
-        label="SET",
-    )
-    axes.scatter(
-        v_reset,
-        i_reset,
-        color="red",
-        s=15,
-        marker=markers.MarkerStyle("s"),
-        facecolors="white",
-        label="RESET",
-    )
+    # # Scatter de SET y RESET
+    # axes.scatter(
+    #     v_set,
+    #     i_set,
+    #     color="red",
+    #     s=15,
+    #     marker=markers.MarkerStyle("o"),
+    #     facecolors="white",
+    #     label="SET",
+    # )
+    # axes.scatter(
+    #     v_reset,
+    #     i_reset,
+    #     color="red",
+    #     s=15,
+    #     marker=markers.MarkerStyle("s"),
+    #     facecolors="white",
+    #     label="RESET",
+    # )
+
+    # Represento una línea para el set y otra para el reset
+    axes.plot(v_set, i_set, color="red", linewidth=4, label="SET")
+    axes.plot(v_reset, i_reset, color="red", linewidth=4, label="RESET")
 
     # Ruta de los datos experimentales
     # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Set_1t'
     # ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Reset_1.txt'
     ruta_archivo_set = (
-        os.getcwd() + "/Datos_Experimentales/Medidas Arturo/Mean_DC_Set_1.txt"
+        os.getcwd() + "/Datos_Experimentales/Medidas Arturo/MIM_Set_1_Run62.txt"
     )
     ruta_archivo_reset = (
-        os.getcwd() + "/Datos_Experimentales/Medidas Arturo/DC_Reset_1_Run40.txt"
+        os.getcwd() + "/Datos_Experimentales/Medidas Arturo/MIM_Reset_1_Run62.txt"
     )
 
     # Cargar datos experimentales
@@ -633,9 +638,9 @@ def plot_IV(
     y_reset = abs(data_reset[:, 1])
 
     # Curvas experimentales
-    axes.plot(x_set, y_set, "black", label="Set experimental", linewidth=2.5)
-    axes.plot(x_reset, y_reset, "black", label="Reset experimental", linewidth=2.5)
-
+    axes.plot(x_set, y_set, "black", label="Set experimental", linewidth=2)
+    axes.plot(x_reset, y_reset, "black", label="Reset experimental", linewidth=2)
+    # Antes ponia 2.5 de grosor de linea (antes de las medidas de arturo)
     # Leyenda ajustada en la parte inferior izquierda
     axes.legend(
         labelspacing=0.3,
@@ -703,7 +708,7 @@ def plot_IV_marcado(
 
     # ---------- EJE Y ----------
     # Marcas en potencias de 10 de 10⁻⁷ a 10⁻²
-    y_ticks = [1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2]
+    y_ticks = [1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2]
     axes.set_yscale("log")
     axes.set_yticks(y_ticks)
     axes.get_yaxis().set_major_formatter(ticker.FormatStrFormatter("$10^{%d}$"))
@@ -711,6 +716,8 @@ def plot_IV_marcado(
     # Esto imprime las etiquetas en forma 10⁻⁷, 10⁻⁶, etc.
     axes.set_yticklabels(
         [
+            r"$10^{-9}$",
+            r"$10^{-8}$",
             r"$10^{-7}$",
             r"$10^{-6}$",
             r"$10^{-5}$",
@@ -744,10 +751,10 @@ def plot_IV_marcado(
     # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Set_1t'
     # ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Reset_1.txt'
     ruta_archivo_set = (
-        os.getcwd() + "/Datos_Experimentales/Medidas Arturo/Mean_DC_Set_1.txt"
+        os.getcwd() + "/Datos_Experimentales/Medidas Arturo/DC_Set_2_Run19.txt"
     )
     ruta_archivo_reset = (
-        os.getcwd() + "/Datos_Experimentales/Medidas Arturo/Mean_DC_Reset_1.txt"
+        os.getcwd() + "/Datos_Experimentales/Medidas Arturo/DC_Reset_2_Run19.txt"
     )
 
     # Cargar datos experimentales

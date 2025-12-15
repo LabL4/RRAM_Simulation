@@ -44,10 +44,10 @@ ohm_resistence = 2.5  # este valor hay q bajarlo a entorno a 2 2.5 ohmios
 cte_red = 0.25e-9
 
 # the potential barrier at the metal and insulator interface [eV]
-pb_metal_insul = 0.5
+pb_metal_insul = 0.0551
 
-# Permitividad relativa del material HfOx
-permitividad_relativa = 20
+# Permitividad relativa del material
+permitividad_relativa = 192.2626
 
 # Término inicial de la ecuación de Poole-Frenkel
 I_0 = 2e-3  # 5e-7

@@ -303,14 +303,20 @@ def Poole_Frenkel(temperature: float, E_field: float, **kwargs) -> float:
         I_0 = cte.I_0
 
     k_b_ev = Boltzmann / elementary_charge
-    beta = math.sqrt(elementary_charge / (epsilon_0 * epsilon_r * math.pi))
-
-    exponencial = math.exp(
-        elementary_charge
-        * (beta * math.sqrt(E_field) - potential_barrier)
-        / (k_b_ev * temperature)
+    beta = math.sqrt(abs(E_field)) * math.sqrt(
+        elementary_charge / (epsilon_0 * epsilon_r * math.pi)
     )
 
+    exponencial = math.exp((beta - potential_barrier) / (k_b_ev * temperature))
+
     I_poole_frenkel = I_0 * E_field * exponencial
+
+    # print(f" Los valores empleados en Poole-Frenkel son:\n")
+    # print(f" Temperatura: {temperature} K")
+    # print(f" Campo eléctrico: {E_field} V/m")
+    # print(f" Los valores intermedios son:")
+    # print(f" beta: {beta} (V/m)^0.5")
+    # print(f" Exponencial: {exponencial}")
+    # print(f" La corriente Poole-Frenkel es: {I_poole_frenkel} A\n")
 
     return I_poole_frenkel

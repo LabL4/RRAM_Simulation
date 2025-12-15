@@ -53,7 +53,7 @@ os.makedirs(carpeta)
 device_size = np.ones(num_simulations) * 10e-9  # m
 # m TODO: Esto se deberia llamarse tamaño del grid mejor
 atom_size = np.ones(num_simulations) * 0.25e-9
-num_trampas = np.ones(num_simulations, dtype=int) * 50  # 130
+num_trampas = np.ones(num_simulations, dtype=int) * 100  # 130
 
 priv_y_sup_right = np.ones(num_simulations, dtype=int) * 15
 priv_y_inf_right = np.ones(num_simulations, dtype=int) * 15
@@ -148,10 +148,10 @@ for i in range(num_simulations):
         # ((23, 26, 0, eje_x[i]), 60),  # Segunda banda (filas 15-18)
         # ((33, 36, 0, eje_x[i]), 50),  # Tercera banda (filas 30-34)
         # Dos filamentos
-        # ((8, 13, 0, eje_x[i]), 40),  # Primera banda (filas 8-12)
-        # ((28, 33, 0, eje_x[i]), 40),  # Segunda banda (filas 28-34)
+        ((8, 13, 0, eje_x[i]), 40),  # Primera banda (filas 8-12)
+        ((28, 33, 0, eje_x[i]), 40),  # Segunda banda (filas 28-34)
         # Un filamento
-        ((15, 21, 0, eje_x[i]), 70),  # Primera banda (filas 8-12)
+        # ((15, 21, 0, eje_x[i]), 70),  # Primera banda (filas 8-12)
     ]
 
     # Ruta de las imagenes de cada simulación
@@ -234,6 +234,11 @@ with open(data_path + "I_0.pkl", "rb") as f:
     I_0 = pickle.load(f)
 # I_0 = np.ones(num_simulations) * cte.I_0
 
+# Término inicial de la ecuación de Poole-Frenkel para el reset
+with open(data_path + "I_0_reset.pkl", "rb") as f:
+    I_0_reset = pickle.load(f)
+# I_0_reset = np.ones(num_simulations) * cte.I_0_reset
+
 # Constante de resistencia térmica en K/W cuando el sistema no percola
 with open(data_path + "r_termica_no_percola.pkl", "rb") as f:
     r_termica_no_percola = pickle.load(f)
@@ -276,6 +281,7 @@ df_ctes = pd.DataFrame(
         "pb_metal_insul",
         "permitividad_relativa",
         "I_0",
+        "I_0_reset",
         "r_termica_percola",
         "r_termica_no_percola",
         "factor_generacion",
@@ -298,6 +304,7 @@ df_ctes["ohm_resistence"] = ohm_resistence
 df_ctes["pb_metal_insul"] = potential_barrier_metal_insul
 df_ctes["permitividad_relativa"] = permitividad_relativa
 df_ctes["I_0"] = I_0
+df_ctes["I_0_reset"] = I_0_reset
 df_ctes["r_termica_percola"] = r_termica_percola
 df_ctes["r_termica_no_percola"] = r_termica_no_percola
 df_ctes["factor_generacion"] = factor_generacion
