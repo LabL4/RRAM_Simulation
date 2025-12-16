@@ -44,10 +44,12 @@ ohm_resistence = 2.5  # este valor hay q bajarlo a entorno a 2 2.5 ohmios
 cte_red = 0.25e-9
 
 # the potential barrier at the metal and insulator interface [eV]
-pb_metal_insul = 0.0551
+pb_metal_insul = 0.2361
+pb_metal_insul_reset = 0.0551
 
 # Permitividad relativa del material
-permitividad_relativa = 192.2626
+permitividad_relativa = 499.9465
+permitividad_relativa_reset = 192.2626
 
 # Término inicial de la ecuación de Poole-Frenkel
 I_0 = 2e-3  # 5e-7

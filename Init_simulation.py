@@ -224,10 +224,12 @@ with open(data_path + "ohm_resistence.pkl", "rb") as f:
 # ohm_resistence = np.ones(num_simulations) * cte.ohm_resistence
 
 # Potential barrier at the metal and insulator interface
-potential_barrier_metal_insul = np.ones(num_simulations) * cte.pb_metal_insul
+pb_metal_insul = np.ones(num_simulations) * cte.pb_metal_insul
+pb_metal_insul_reset = np.ones(num_simulations) * cte.pb_metal_insul_reset
 
 # Permitividad relativa del material HfOx
 permitividad_relativa = np.ones(num_simulations) * cte.permitividad_relativa
+permitividad_relativa_reset = np.ones(num_simulations) * cte.permitividad_relativa_reset
 
 # Término inicial de la ecuación de Poole-Frenkel
 with open(data_path + "I_0.pkl", "rb") as f:
@@ -279,7 +281,9 @@ df_ctes = pd.DataFrame(
         "gamma",
         "ohm_resistence",
         "pb_metal_insul",
+        "pb_metal_insul_reset",
         "permitividad_relativa",
+        "permitividad_relativa_reset",
         "I_0",
         "I_0_reset",
         "r_termica_percola",
@@ -301,8 +305,10 @@ df_ctes["decaimiento_concentracion"] = L_p
 df_ctes["activation_energy"] = E_a
 df_ctes["gamma"] = gamma
 df_ctes["ohm_resistence"] = ohm_resistence
-df_ctes["pb_metal_insul"] = potential_barrier_metal_insul
+df_ctes["pb_metal_insul"] = pb_metal_insul
+df_ctes["pb_metal_insul_reset"] = pb_metal_insul_reset
 df_ctes["permitividad_relativa"] = permitividad_relativa
+df_ctes["permitividad_relativa_reset"] = permitividad_relativa_reset
 df_ctes["I_0"] = I_0
 df_ctes["I_0_reset"] = I_0_reset
 df_ctes["r_termica_percola"] = r_termica_percola

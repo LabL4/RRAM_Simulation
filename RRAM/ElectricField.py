@@ -11,7 +11,7 @@ def SimpleElectricField(DDP: float, espesor: float) -> float:
     - float: Campo eléctrico.
     """
 
-    ElectricField = DDP / espesor
+    ElectricField = abs(DDP / espesor)
 
     return ElectricField
 

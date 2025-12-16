@@ -122,7 +122,9 @@ class SimulationConstants:
     gamma: float
     ohm_resistence: float
     pb_metal_insul: float
+    pb_metal_insul_reset: float
     permitividad_relativa: float
+    permitividad_relativa_reset: float
     I_0: float
     I_0_reset: float
     r_termica_percola: float
@@ -164,6 +166,12 @@ class SimulationConstants:
 
     def update_I_0(self, nuevo_I_0: float):
         return replace(self, I_0=nuevo_I_0)
+
+    def update_pb_metal_insul(self, nuevo_pb_metal_insul: float):
+        return replace(self, pb_metal_insul=nuevo_pb_metal_insul)
+
+    def update_permitividad_relativa(self, permitividad_relativa_nuevo: float):
+        return replace(self, permitividad_relativa=permitividad_relativa_nuevo)
 
     def __repr__(self):
         # Crear lista de líneas con "nombre=valor" para cada atributo
@@ -1150,16 +1158,24 @@ def PP_reset(
             # Cambio el valor I_0 cuando el sistema ha roto todos los filamentos
             if np.all(CF_destruido) and not all_df_destruidos:
                 I_0_nuevo = sim_ctes.I_0_reset
+                permitividad_relativa_nuevo = sim_ctes.permitividad_relativa_reset
+                pb_metal_insul_nuevo = sim_ctes.pb_metal_insul_reset
                 print(
                     f"Se han destruido todos los filamentos en el paso",
                     k,
-                    "cambio de I_0 = {sim_ctes.I_0}, al valor nuevo de I_0 = {I_0_nuevo}",
+                    "con un voltaje de",
+                    round(voltage, 4),
+                    "los valores de la nueva corriente Poole-Frenkel son:",
+                    f"\n I_0: {I_0_nuevo}, permitividad_relativa: {permitividad_relativa_nuevo}, pb_metal_insul: {pb_metal_insul_nuevo}\n",
                 )
                 sim_ctes = sim_ctes.update_I_0(I_0_nuevo)
+                sim_ctes = sim_ctes.update_permitividad_relativa(
+                    permitividad_relativa_nuevo
+                )
+                sim_ctes = sim_ctes.update_pb_metal_insul(pb_metal_insul_nuevo)
+
                 sim_ctes_dict = asdict(sim_ctes)
                 all_df_destruidos = True
-                print("El nuevo valor de I_0 es:", sim_ctes_dict["I_0"], "\n")
-                print("La intensidad es:", current, "\n")
 
             # Si no ha percolado uso la corriente de Poole-Frenkel
             current = abs(
