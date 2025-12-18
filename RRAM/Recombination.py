@@ -399,11 +399,13 @@ def update_oxygen_state_old(
     #         break
 
     # Esto es un arreglo temporal para dar cuenta que hay un tiempo hasta que los iones de oxígeno se muevan
-    if abs(E_field * (10e-9)) > 0.5:
+    if abs(E_field * (5e-9)) > 0.5:
         # En la expresión original se multiplica por 2 lo he quitado para ver si sale algo mejor
-        oxigen_velocity = 3e-07  # 2 * t_0 * cte_red * (senoh * exp_velocity)
-    elif abs(E_field * (10e-9)) > 0.7:
-        oxigen_velocity = 5.2e-07  # 2 * t_0 * cte_red * (senoh * exp_velocity)
+        oxigen_velocity = 1.3e-07  # 3e-07  # 2 * t_0 * cte_red * (senoh * exp_velocity)
+    elif abs(E_field * (5e-9)) > 0.7:
+        oxigen_velocity = (
+            2.5e-07  # 5.2e-07  # 2 * t_0 * cte_red * (senoh * exp_velocity)
+        )
     else:
         oxigen_velocity = (
             0  # para que no se mueva hasta q se alcance un potencial concreto

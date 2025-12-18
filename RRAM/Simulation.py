@@ -534,8 +534,8 @@ def PP_set(
     total_vacantes_pp_set = False
 
     ocupacion_max_pp_set = 0.35  # 35% de ocupación máxima en PP set
-    factor_vecinos = 1  # Factor de aumento de la probabilidad si tiene vecino
-    factor_libre = 0.7  # Factor de disminución de la probabilidad si no tiene vecino
+    factor_vecinos = 1.2  # Factor de aumento de la probabilidad si tiene vecino
+    factor_libre = 0.5  # Factor de disminución de la probabilidad si no tiene vecino
     lim_voltage_percolacion = 0.5  # Si el voltaje de percolación es mayor que este valor la simulación no vale la pena seguirla
     temperatura = params.T_0
     current = 0.0
@@ -1000,7 +1000,7 @@ def PP_reset(
     final_state_sp_set: dict,
     num_simulation: int,
     CF_ranges: List[tuple],
-    num_pasos_guardar_estado: int = 3000,
+    num_pasos_guardar_estado: int = 2000,
 ):
     """
     Simulates the reset process of a resistive switching device, updating the system's state and tracking the evolution of various parameters over time.
@@ -1079,10 +1079,9 @@ def PP_reset(
     CF_destruido_index = 1
     roturas_dict = dict()
 
-    ohm_resistence_nuevo = 250
+    ohm_resistence_nuevo = 220
     sim_ctes = sim_ctes.update_ohm_resistence(ohm_resistence_nuevo)
     sim_ctes_dict = asdict(sim_ctes)
-    all_df_destruidos = False
     print(
         "\n El nuevo valor de resistencia de cada celda es:",
         sim_ctes_dict["ohm_resistence"],
@@ -1209,33 +1208,33 @@ def PP_reset(
         tiempo_total = simulation_time + tiempo_sp_set
         data_pp_reset[k] = np.array([tiempo_total, voltage, current])
 
-        # # Represento el estado cada 3000 pasos
-        # if k % num_pasos_guardar_estado == 0:
-        #     fig_voltage = round(vector_ddp[k], 3)
-        #     utils.guardar_representar_estado(
-        #         voltaje=fig_voltage,
-        #         config_state=actual_state,
-        #         save_path_pkl=rutas["data_simulation_path"]
-        #         / f"pp_reset_state_V={fig_voltage}_{num_simulation}.pkl",
-        #         save_path_figures=rutas["figures_path"]
-        #         / f"pp_reset_state_V={fig_voltage}_{num_simulation}.png",
-        #     )
+        # Represento el estado cada 3000 pasos
+        if k % num_pasos_guardar_estado == 0:
+            fig_voltage = round(vector_ddp[k], 3)
+            utils.guardar_representar_estado(
+                voltaje=fig_voltage,
+                config_state=actual_state,
+                save_path_pkl=rutas["data_simulation_path"]
+                / f"pp_reset_state_V={fig_voltage}_{num_simulation}.pkl",
+                save_path_figures=rutas["figures_path"]
+                / f"pp_reset_state_V={fig_voltage}_{num_simulation}.png",
+            )
 
-        #     Representate.RepresentateTwoStates(
-        #         matriz1=actual_state,
-        #         matriz2=oxygen_state,
-        #         voltage=fig_voltage,
-        #         filename=str(
-        #             rutas["figures_path"]
-        #             / f"pp_reset_full_state_V={fig_voltage}_{num_simulation}.png"
-        #         ),
-        #     )
+            Representate.RepresentateTwoStates(
+                matriz1=actual_state,
+                matriz2=oxygen_state,
+                voltage=fig_voltage,
+                filename=str(
+                    rutas["figures_path"]
+                    / f"pp_reset_full_state_V={fig_voltage}_{num_simulation}.png"
+                ),
+            )
 
-        #     print(
-        #         "Representando el estado de la simulación en el voltaje ",
-        #         fig_voltage,
-        #         " (V)",
-        #     )
+            print(
+                "Representando el estado de la simulación en el voltaje ",
+                fig_voltage,
+                " (V)",
+            )
 
     # Guardo los datos de la simulación
     save_path_pkl = (
@@ -1291,7 +1290,7 @@ def SP_reset(
     final_state_pp_reset: dict,
     num_simulation: int,
     CF_ranges: List[tuple],
-    num_pasos_guardar_estado: int = 3000,
+    num_pasos_guardar_estado: int = 2000,
 ):
     params = final_state_pp_reset["params"]
     sim_ctes = final_state_pp_reset["sim_ctes"]
@@ -1334,6 +1333,21 @@ def SP_reset(
     )
 
     print(f"\nSimulacion {num_simulation} - segunda parte del reset\n")
+
+    # Cambio el valor I_0 cuando el sistema ha roto todos los filamentos
+    if np.all(CF_destruido):
+        I_0_nuevo = sim_ctes.I_0_reset
+        permitividad_relativa_nuevo = sim_ctes.permitividad_relativa_reset
+        pb_metal_insul_nuevo = sim_ctes.pb_metal_insul_reset
+        print(
+            f"los valores de la nueva corriente Poole-Frenkel son:",
+            f"\n I_0: {I_0_nuevo}, permitividad_relativa: {permitividad_relativa_nuevo}, pb_metal_insul: {pb_metal_insul_nuevo}\n",
+        )
+        sim_ctes = sim_ctes.update_I_0(I_0_nuevo)
+        sim_ctes = sim_ctes.update_permitividad_relativa(permitividad_relativa_nuevo)
+        sim_ctes = sim_ctes.update_pb_metal_insul(pb_metal_insul_nuevo)
+
+        sim_ctes_dict = asdict(sim_ctes)
 
     # Ciclo para la primera parte del reset
     for k in range(0, params.num_pasos):
@@ -1431,33 +1445,33 @@ def SP_reset(
         tiempo_total = simulation_time + tiempo_pp_reset
         data_sp_reset[k] = np.array([tiempo_total, voltage, current])
 
-        # # Represento el estado cada 3000 pasos
-        # if k % num_pasos_guardar_estado == 0:
-        #     fig_voltage = round(vector_ddp[k], 3)
-        #     utils.guardar_representar_estado(
-        #         voltaje=fig_voltage,
-        #         config_state=actual_state,
-        #         save_path_pkl=rutas["data_simulation_path"]
-        #         / f"sp_reset_state_V={fig_voltage}_{num_simulation}.pkl",
-        #         save_path_figures=rutas["figures_path"]
-        #         / f"sp_reset_state_V={fig_voltage}_{num_simulation}.png",
-        #     )
+        # Represento el estado cada 3000 pasos
+        if k % num_pasos_guardar_estado == 0:
+            fig_voltage = round(vector_ddp[k], 3)
+            utils.guardar_representar_estado(
+                voltaje=fig_voltage,
+                config_state=actual_state,
+                save_path_pkl=rutas["data_simulation_path"]
+                / f"sp_reset_state_V={fig_voltage}_{num_simulation}.pkl",
+                save_path_figures=rutas["figures_path"]
+                / f"sp_reset_state_V={fig_voltage}_{num_simulation}.png",
+            )
 
-        #     Representate.RepresentateTwoStates(
-        #         matriz1=actual_state,
-        #         matriz2=oxygen_state,
-        #         voltage=fig_voltage,
-        #         filename=str(
-        #             rutas["figures_path"]
-        #             / f"sp_reset_full_state_V={fig_voltage}_{num_simulation}.png"
-        #         ),
-        #     )
+            Representate.RepresentateTwoStates(
+                matriz1=actual_state,
+                matriz2=oxygen_state,
+                voltage=fig_voltage,
+                filename=str(
+                    rutas["figures_path"]
+                    / f"sp_reset_full_state_V={fig_voltage}_{num_simulation}.png"
+                ),
+            )
 
-        #     print(
-        #         "Representando el estado de la simulación en el voltaje: ",
-        #         fig_voltage,
-        #         " (V)",
-        #     )
+            print(
+                "Representando el estado de la simulación en el voltaje: ",
+                fig_voltage,
+                " (V)",
+            )
 
     # Guardo los datos de la simulación
     save_path_pkl = (
@@ -1564,9 +1578,9 @@ def simulation_IV(
     #     "s",
     # ]
 
-    # puntos_x_set = {"a": 1e-7, "b": voltaje_percolacion, "c": 1.1}
-    # puntos_x_pp_reset = {"d": -0.42, "e": roturas_dict[0]["voltaje"], "f": -1.4}
-    # puntos_x_sp_reset = {"g": -0.001}
+    puntos_x_set = {"a": 1e-9, "b": voltaje_percolacion, "c": 1.1}
+    puntos_x_pp_reset = {"d": -0.44, "e": roturas_dict[0]["voltaje"], "f": -1.1}
+    puntos_x_sp_reset = {"g": -2e-8}
 
     # contador_pp = sum(1 for v in roturas_dict.values() if v["etapa"] == "pp")
 
@@ -1596,35 +1610,35 @@ def simulation_IV(
     # puntos_x_sp_reset[letras_ruptura[contador_pp + ultima_letra_usada]] = -0.001
 
     # Obtener puntos en cada curva
-    # puntos_set = utils.obtener_puntos_en_curva(
-    #     data["pp_set"]["datos"][:, 1], abs(data["pp_set"]["datos"][:, 2]), puntos_x_set
-    # )
+    puntos_set = utils.obtener_puntos_en_curva(
+        data["pp_set"]["datos"][:, 1], abs(data["pp_set"]["datos"][:, 2]), puntos_x_set
+    )
 
-    # puntos_x_pp_reset = utils.obtener_puntos_en_curva(
-    #     data["pp_reset"]["datos"][:, 1],
-    #     abs(data["pp_reset"]["datos"][:, 2]),
-    #     puntos_x_pp_reset,
-    # )
+    puntos_x_pp_reset = utils.obtener_puntos_en_curva(
+        data["pp_reset"]["datos"][:, 1],
+        abs(data["pp_reset"]["datos"][:, 2]),
+        puntos_x_pp_reset,
+    )
 
-    # puntos_x_sp_reset = utils.obtener_puntos_en_curva(
-    #     data["sp_reset"]["datos"][:, 1],
-    #     abs(data["sp_reset"]["datos"][:, 2]),
-    #     puntos_x_sp_reset,
-    # )
+    puntos_x_sp_reset = utils.obtener_puntos_en_curva(
+        data["sp_reset"]["datos"][:, 1],
+        abs(data["sp_reset"]["datos"][:, 2]),
+        puntos_x_sp_reset,
+    )
 
-    # print("Puntos en la curva I-V:\n")
-    # for label, (v, i) in {
-    #     **puntos_set,
-    #     **puntos_x_pp_reset,
-    #     **puntos_x_sp_reset,
-    # }.items():
-    #     print(f"  Punto {label}: V = {v:.6f} V, I = {i:.6e} A")
+    print("Puntos en la curva I-V:\n")
+    for label, (v, i) in {
+        **puntos_set,
+        **puntos_x_pp_reset,
+        **puntos_x_sp_reset,
+    }.items():
+        print(f"  Punto {label}: V = {v:.6f} V, I = {i:.6e} A")
 
-    # # Crear un único diccionario combinando ambos
-    # puntos_totales = {}
-    # puntos_totales.update(puntos_set)
-    # puntos_totales.update(puntos_x_pp_reset)
-    # puntos_totales.update(puntos_x_sp_reset)
+    # Crear un único diccionario combinando ambos
+    puntos_totales = {}
+    puntos_totales.update(puntos_set)
+    puntos_totales.update(puntos_x_pp_reset)
+    puntos_totales.update(puntos_x_sp_reset)
 
     Representate.plot_IV(
         v_set,
@@ -1635,15 +1649,15 @@ def simulation_IV(
         titulo_figura="",
         figures_path=str(save_path),
     )
-    # Representate.plot_IV_marcado(
-    #     v_set,
-    #     i_set,
-    #     v_reset,
-    #     i_reset,
-    #     num_simulation - 1,
-    #     puntos_totales,
-    #     desplazamiento,
-    #     titulo_figura="",
-    #     figures_path=str(save_path_marcado),
-    # )
+    Representate.plot_IV_marcado(
+        v_set,
+        i_set,
+        v_reset,
+        i_reset,
+        num_simulation - 1,
+        puntos_totales,
+        desplazamiento,
+        titulo_figura="",
+        figures_path=str(save_path_marcado),
+    )
     return None

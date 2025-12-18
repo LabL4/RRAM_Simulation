@@ -98,11 +98,12 @@ def setup_plt(plt, latex=True, scaling=1):
 setup_paper_plt(plt, latex=True, scaling=3)
 
 
+# (0.9647, 0.1725, 0.3059) color rojo original
 def RepresentateState(
     matriz: np.ndarray,
     voltaje: float,
     filename: str = None,  # type: ignore
-    color=(0.9647, 0.1725, 0.3059),
+    color=(0.0000, 0.0000, 0.5451),
     guardar_png: bool = False,
 ) -> None:  # type: ignore
     """
@@ -120,8 +121,11 @@ def RepresentateState(
     """
 
     nrows, ncols = matriz.shape
-    x = np.linspace(0, 10, ncols)  # Escala real de 10 nm en eje X
-    y = np.linspace(0, 10, nrows)  # Escala real de 10 nm en eje Y
+    # x = np.linspace(0, 10, ncols)  # Escala real de 10 nm en eje X
+    # y = np.linspace(0, 10, nrows)  # Escala real de 10 nm en eje Y
+
+    x = np.linspace(0, 5, ncols)  # Escala real de 10 nm en eje X
+    y = np.linspace(0, 5, nrows)  # Escala real de 10 nm en eje Y
 
     fig, ax = plt.subplots(figsize=(12, 9))
 
@@ -155,19 +159,19 @@ def RepresentateState(
     )
 
     # Configuración de electrodos con mayor altura
-    electrode_width = 0.2  # Se mantiene el ancho en X
-    electrode_height = 12  # Se extienden en Y (de -1 a 11)
-    electrode_color = "gray"  # Color de los electrodos
+    electrode_width = 0.1  # Se mantiene el ancho en X
+    electrode_height = 7  # Se extienden en Y (de -1 a 11)
+    electrode_color = "black"  # "gray"  # Color de los electrodos
 
     left_electrode = patches.Rectangle(
-        (-0.3, -0.5),  # Posición en X, Y (más abajo)
+        (-0.15, -0.5),  # Posición en X, Y (más abajo)
         electrode_width,
         electrode_height,  # Ancho y Alto aumentados
         color=electrode_color,
     )
 
     right_electrode = patches.Rectangle(
-        (10.13, -1),  # Posición en X, Y (más abajo)
+        (5.05, -0.5),  # Posición en X, Y (más abajo)
         electrode_width,
         electrode_height,  # Ancho y Alto aumentados
         color=electrode_color,
@@ -177,8 +181,8 @@ def RepresentateState(
     ax.add_patch(right_electrode)
 
     # Configurar etiquetas y título
-    ax.set_xticks(np.arange(0, 11, 2))  # 🔹 Ticks cada 2 nm en X
-    ax.set_yticks(np.arange(0, 11, 2))  # 🔹 Ticks cada 2 nm en Y
+    ax.set_xticks(np.arange(0, 6, 1))  # 🔹 Ticks cada 2 nm en X
+    ax.set_yticks(np.arange(0, 6, 1))  # 🔹 Ticks cada 2 nm en Y
     ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
     ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
     ax.set_title(rf"V_RRAM = {voltaje} V", pad=20)
@@ -188,8 +192,8 @@ def RepresentateState(
     ax.invert_yaxis()
 
     # Ajustar límites del eje X y Y para que los electrodos sean visibles
-    ax.set_xlim(-0.3, 10.33)
-    ax.set_ylim(-0, 10)  # 🔥 Extiende el gráfico en Y para acomodar los electrodos
+    ax.set_xlim(-0.15, 5.15)
+    ax.set_ylim(-0, 5)  # 🔥 Extiende el gráfico en Y para acomodar los electrodos
 
     # Aumentar margen superior para más espacio en el título
     plt.subplots_adjust(top=0.85)
@@ -709,7 +713,6 @@ def plot_IV_marcado(
     # ---------- EJE Y ----------
     # Marcas en potencias de 10 de 10⁻⁷ a 10⁻²
     y_ticks = [1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2]
-    axes.set_yscale("log")
     axes.set_yticks(y_ticks)
     axes.get_yaxis().set_major_formatter(ticker.FormatStrFormatter("$10^{%d}$"))
 
@@ -727,50 +730,54 @@ def plot_IV_marcado(
         ]
     )
 
-    # Scatter de SET y RESET
-    axes.scatter(
-        v_set,
-        i_set,
-        color="red",
-        s=15,
-        marker=markers.MarkerStyle("o"),
-        facecolors="white",
-        label="SET",
-    )
-    axes.scatter(
-        v_reset,
-        i_reset,
-        color="red",
-        s=15,
-        marker=markers.MarkerStyle("s"),
-        facecolors="white",
-        label="RESET",
-    )
+    # # Scatter de SET y RESET
+    # axes.scatter(
+    #     v_set,
+    #     i_set,
+    #     color="red",
+    #     s=15,
+    #     marker=markers.MarkerStyle("o"),
+    #     facecolors="white",
+    #     label="SET",
+    # )
+    # axes.scatter(
+    #     v_reset,
+    #     i_reset,
+    #     color="red",
+    #     s=15,
+    #     marker=markers.MarkerStyle("s"),
+    #     facecolors="white",
+    #     label="RESET",
+    # )
+
+    # Represento una línea para el set y otra para el reset
+    axes.plot(v_set, i_set, color="red", linewidth=4, label="SET")
+    axes.plot(v_reset, i_reset, color="red", linewidth=4, label="RESET")
 
     # Ruta de los datos experimentales
     # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Set_1t'
     # ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Reset_1.txt'
     ruta_archivo_set = (
-        os.getcwd() + "/Datos_Experimentales/Medidas Arturo/DC_Set_2_Run19.txt"
+        os.getcwd() + "/Datos_Experimentales/Medidas Arturo/MIM_Set_1_Run62.txt"
     )
     ruta_archivo_reset = (
-        os.getcwd() + "/Datos_Experimentales/Medidas Arturo/DC_Reset_2_Run19.txt"
+        os.getcwd() + "/Datos_Experimentales/Medidas Arturo/MIM_Reset_1_Run62.txt"
     )
 
     # Cargar datos experimentales
     data_set = np.loadtxt(ruta_archivo_set, skiprows=1)
     data_reset = np.loadtxt(ruta_archivo_reset, skiprows=1)
 
-    x_set = data_set[:, 0]
+    x_set = data_set[:, 2]
     y_set = data_set[:, 1]
-    x_reset = -data_reset[:, 0]
+    x_reset = data_reset[:, 2] * (-1.0)
     y_reset = abs(data_reset[:, 1])
 
     (x_0, y_0) = next(iter(lista_puntos.values()))
     # print("Punto de referencia (0,0): ", (x_0, y_0))
     axes.scatter(
-        1e-6,
-        1e-6,
+        1e-9,
+        1e-9,
         color="blue",
         s=80,
         marker=markers.MarkerStyle("D"),
@@ -778,8 +785,8 @@ def plot_IV_marcado(
     )
 
     # Curvas experimentales
-    axes.plot(x_set, y_set, "black", label="Set experimental", linewidth=2.5)
-    axes.plot(x_reset, y_reset, "black", label="Reset experimental", linewidth=2.5)
+    axes.plot(x_set, y_set, "black", label="Set Exp.", linewidth=2)
+    axes.plot(x_reset, y_reset, "black", label="Reset Exp.", linewidth=2)
 
     for label, (xp, yp) in lista_puntos.items():
         dx, factor_y = desplazamiento.get(
@@ -793,6 +800,7 @@ def plot_IV_marcado(
         #     "puntos finales: ",
         #     (xp + dx, yp * factor_y),
         # )
+        print("Marcando punto: ", label, " en (", xp, ",", yp, ")")
         axes.scatter(
             xp, yp, color="blue", s=80, marker=markers.MarkerStyle("D"), zorder=10
         )

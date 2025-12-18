@@ -16,7 +16,6 @@ E_a = 1  # puedo cambiar el valor
 E_r = 1  # puedo cambiar el valor
 
 # Tiene distintos valores dependiendo si el estado es FORMING/SET y RESET
-# La estoy modificando a mano para que el campo eléctrico tmb tenga algún papel en la dinámica
 gamma = 3
 
 # Factor de recombinación debido a la presencia de exceso de iones de oxígeno
@@ -32,27 +31,28 @@ gamma_drift = 10
 E_m = 0.6
 
 # Constante de resistencia térmica en K/W cuando el sistema no percola
-r_termica_no_percola = 5  # bajar dos órdenes de magnitud
+r_termica_no_percola = 10  # bajar dos órdenes de magnitud
 
 # Constante de resistencia térmica en K/W cuando el sistema percola
-r_termica_percola = 5e2
+r_termica_percola = 500
 
 # Constante de resistencia en ohmios
-ohm_resistence = 2.5  # este valor hay q bajarlo a entorno a 2 2.5 ohmios
+ohm_resistence = 350
 
 # Constante de red, el paper original propone 0.25 nm
-cte_red = 0.25e-9
+cte_red = 0.125e-9
 
 # the potential barrier at the metal and insulator interface [eV]
-pb_metal_insul = 0.2361
-pb_metal_insul_reset = 0.0551
+pb_metal_insul = 0.2688
+pb_metal_insul_reset = 0.2549
 
 # Permitividad relativa del material
-permitividad_relativa = 499.9465
-permitividad_relativa_reset = 192.2626
+permitividad_relativa = 499.9631
+permitividad_relativa_reset = 385.4334
 
 # Término inicial de la ecuación de Poole-Frenkel
-I_0 = 2e-3  # 5e-7
+I_0 = 1.6501e-01
+I_0_reset = 9.3536e-02
 
 # Factor por el que divido la gamma cuando el sistema percola o no
 factor_generacion = 1.5

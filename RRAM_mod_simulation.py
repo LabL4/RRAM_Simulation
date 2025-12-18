@@ -84,12 +84,12 @@ for key, valor in final_state_sp_reset["roturas_dict"].items():
 
 desplazamiento = {
     "a": (0.025, 1.0),  # derecha, misma altura
-    "b": (-0.005, 0.27),  # izquierda, un poco arriba
-    "c": (-0.02, 0.35),  # derecha, un poco abajo
+    "b": (+0.005, 0.27),  # izquierda, un poco arriba
+    "c": (0.02, 0.35),  # derecha, un poco abajo
     "d": (0.02, 1.0),  # izquierda, misma altura
     "e": (-0.11, 0.66),  # izquierda, misma altura
-    "f": (-0.025, 0.25),  # izquierda, un poco abajo
-    "g": (-0.12, 0.6),  # derecha, un poco arriba
+    "f": (0.025, 0.25),  # izquierda, un poco abajo
+    "g": (-0.12, 1),  # derecha, un poco arriba
 }
 
 Simulation.simulation_IV(
