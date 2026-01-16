@@ -1,5 +1,5 @@
-from cycler import V
 import numpy as np  # type: ignore
+from cycler import V
 # import math
 
 from RRAM import Constants as cte
@@ -216,10 +216,10 @@ def generate_oxigen_old(oxygen_state: np.ndarray, num_oxygen: int):
         y[i] = np.random.randint(0, eje_y)
 
     if num_oxygen == 1:
-        prob = 0.75
-    elif num_oxygen == 7:
-        prob = 0.9
-    elif num_oxygen == 10:
+        prob = 0.5  # 0.75
+    elif num_oxygen == 1:
+        prob = 0.7  # 0.9
+    elif num_oxygen == 3:
         prob = 1
 
     # Itero sobre cada par coordenada para asignar el valor de 1 que representa que se generó un oxígeno en esa posición

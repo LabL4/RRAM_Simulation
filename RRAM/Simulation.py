@@ -1,13 +1,13 @@
 from ast import And
 from . import (
     CurrentSolver,
+    ElectricField,
+    Recombination,
     Representate,
-    exceptions,
     Percolation,
     Temperature,
-    ElectricField,
+    exceptions,
     Generation,
-    Recombination,
     utils,
 )
 
@@ -421,6 +421,128 @@ def update_state_generate(
     return act_state
 
 
+def update_state_generate_favorecido(
+    state: np.ndarray,
+    params: SimulationParameters,
+    sim_ctes_cte: dict,
+    E_field_vector: np.ndarray,
+    temperatura: float,
+    factor_vecinos: float,
+    factor_sin_vecinos: float,
+    neighbor_mode: str = "both",  # Opciones: 'horizontal', 'vertical', 'both'
+    region_coords: tuple | None = None,  # (x_min, x_max, y_min, y_max)
+    factor_region: float = 1.0,  # factor extra en la región
+) -> np.ndarray:
+    """
+    Updates the state matrix by generating new vacancies based on the electric field,
+    temperature, neighboring conditions, and an optional favored rectangular region.
+    """
+
+    assert E_field_vector.shape[0] == state.shape[0], (
+        "El vector de campo eléctrico debe tener igual número de filas que la matriz de estado"
+    )
+
+    act_state = state.copy()
+
+    # Máscara posiciones libres (True donde actual_state == 0)
+    free_mask = state == 0
+
+    # Inicializamos la máscara de vecinos en Falso
+    vecino_mask = np.zeros_like(state, dtype=bool)
+
+    # --- Lógica Horizontal (Izquierda / Derecha) ---
+    if neighbor_mode in ["horizontal", "both"]:
+        # Vecinos a la izquierda: desplazamos matriz a la derecha (axis 1)
+        left_neighbor = np.zeros_like(state, dtype=bool)
+        left_neighbor[:, 1:] = state[:, :-1] == 1
+
+        # Vecinos a la derecha: desplazamos matriz a la izquierda (axis 1)
+        right_neighbor = np.zeros_like(state, dtype=bool)
+        right_neighbor[:, :-1] = state[:, 1:] == 1
+
+        # Acumulamos en la máscara total
+        vecino_mask |= left_neighbor | right_neighbor
+
+    # --- Lógica Vertical (Arriba / Abajo) ---
+    if neighbor_mode in ["vertical", "both"]:
+        # Vecino Arriba: desplazamos matriz hacia abajo (axis 0)
+        up_neighbor = np.zeros_like(state, dtype=bool)
+        up_neighbor[1:, :] = state[:-1, :] == 1
+
+        # Vecino Abajo: desplazamos matriz hacia arriba (axis 0)
+        down_neighbor = np.zeros_like(state, dtype=bool)
+        down_neighbor[:-1, :] = state[1:, :] == 1
+
+        # Acumulamos en la máscara total usando OR lógico
+        vecino_mask |= up_neighbor | down_neighbor
+
+    # Definir quiénes están libres CON vecinos y quiénes SIN vecinos
+    free_with_vecino = free_mask & vecino_mask
+    free_without_vecino = free_mask & (~vecino_mask)
+
+    # --- Cálculo de probabilidades ---
+
+    # Calcular las probabilidades por fila
+    prob_generacion_fila = np.minimum(
+        [
+            Generation.Generate(
+                params.paso_temporal,
+                E_field_vector[i],
+                temperatura,
+                **sim_ctes_cte,
+            )
+            for i in range(params.x_size)
+        ],
+        1,
+    )
+
+    # Probabilidad base expandida al tamaño de la matriz
+    prob_base_matrix = np.tile(prob_generacion_fila.reshape(-1, 1), (1, params.y_size))
+
+    # Crear matriz de probabilidad final
+    prob_final = np.zeros_like(prob_base_matrix)
+
+    # Aplicar factores condicionales
+    # 1. Si tiene vecinos (según el modo seleccionado), aumentamos prob
+    prob_final[free_with_vecino] = prob_base_matrix[free_with_vecino] * factor_vecinos
+
+    # 2. Si está aislado (según el modo seleccionado), reducimos prob
+    prob_final[free_without_vecino] = (
+        prob_base_matrix[free_without_vecino] * factor_sin_vecinos
+    )
+
+    # --- Región opcional favorecida ---
+    # region_coords se espera como (x_min, x_max, y_min, y_max) con x_max, y_max excluyentes (estilo slicing)
+    if region_coords is not None and factor_region != 1.0:
+        x_min, x_max, y_min, y_max = region_coords
+
+        # Clampeamos por seguridad para no salirnos de los límites
+        x_min = max(0, min(x_min, params.x_size))
+        x_max = max(0, min(x_max, params.x_size))
+        y_min = max(0, min(y_min, params.y_size))
+        y_max = max(0, min(y_max, params.y_size))
+
+        if x_min < x_max and y_min < y_max:
+            rect_mask = np.zeros_like(state, dtype=bool)
+            rect_mask[x_min:x_max, y_min:y_max] = True
+
+            # Opcional: solo afectar a posiciones libres
+            rect_mask &= free_mask
+
+            prob_final[rect_mask] *= factor_region
+
+    # Saturar probabilidad en 1
+    prob_final = np.minimum(prob_final, 1.0)
+
+    # Generación estocástica
+    aleatorios = np.random.rand(params.x_size, params.y_size)
+    nueva_vacante = aleatorios < prob_final
+
+    act_state[nueva_vacante] = 1
+
+    return act_state
+
+
 def update_state_recombinate(
     voltage: float,
     E_field: float,
@@ -534,14 +656,22 @@ def PP_set(
     total_vacantes_pp_set = False
 
     ocupacion_max_pp_set = 0.35  # 35% de ocupación máxima en PP set
-    factor_vecinos = 1.2  # Factor de aumento de la probabilidad si tiene vecino
-    factor_libre = 0.5  # Factor de disminución de la probabilidad si no tiene vecino
-    lim_voltage_percolacion = 0.5  # Si el voltaje de percolación es mayor que este valor la simulación no vale la pena seguirla
+    factor_vecinos = 1.1  # Factor de aumento de la probabilidad si tiene vecino
+    factor_libre = 0.9  # Factor de disminución de la probabilidad si no tiene vecino
+    lim_voltage_percolacion = 0.6  # Si el voltaje de percolación es mayor que este valor la simulación no vale la pena seguirla
     temperatura = params.T_0
     current = 0.0
     compliance_voltage = 1.2
     compliance = False
     cambiado_ohm_resistence = False
+
+    print(
+        "Los valores de factor vecinos y factor libre son:",
+        factor_vecinos,
+        "y",
+        factor_libre,
+        "\n",
+    )
 
     max_vancantes_pp_set = int(ocupacion_max_pp_set * params.num_max_vacantes)
     voltage_CF_creado = np.full(len(CF_ranges), 0.0)
@@ -616,6 +746,7 @@ def PP_set(
             # Si es la primera vez que percola, siste_percola será falso y entra aquí
             if sistema_percola is False:
                 voltaje_percolacion = voltage  # Guardo el voltaje de percolación
+                ocupacion_percola = np.sum(actual_state)
                 print(
                     "\nEl sistema ha percolado en la iteración:",
                     k,
@@ -623,7 +754,9 @@ def PP_set(
                     round(voltaje_percolacion, 4),
                     " con una ocupación del:",
                     round((np.sum(actual_state) / (params.num_max_vacantes)), 4) * 100,
-                    "%\n",
+                    "que corresponde con un numero de vacantes de:",
+                    int(np.sum(actual_state)),
+                    "\n",
                 )
 
                 if voltaje_percolacion >= lim_voltage_percolacion:
@@ -672,23 +805,28 @@ def PP_set(
             if sum(CF_creado) == indice_gamma:
                 if len(CF_ranges) == 1:
                     print("Todos los filamentos creados.")
-                    nueva_gamma = sim_ctes.gamma - 4
-                if len(CF_ranges) == 2:
-                    if sum(CF_creado) == 2 and not cambiado_ohm_resistence:
-                        print("Todos los filamentos creados.")
-                        actual_resistance = sim_ctes.ohm_resistence
-                        sim_ctes = sim_ctes.update_ohm_resistence(
-                            actual_resistance - 15
-                        )
-                        print("El nuevo valor de R_ohm es:", sim_ctes.ohm_resistence)
-                        sim_ctes_dict = asdict(sim_ctes)
-                        cambiado_ohm_resistence = True
-                    else:
-                        nueva_gamma = sim_ctes.gamma / 2
-                        sim_ctes = sim_ctes.update_gamma(nueva_gamma)
-                        sim_ctes_dict = asdict(sim_ctes)
-                        indice_gamma = indice_gamma + 1
-                        print("\n El nuevo valor de gamma es:", sim_ctes_dict["gamma"])
+                    nueva_gamma = sim_ctes.gamma - 6
+                    sim_ctes = sim_ctes.update_gamma(nueva_gamma)
+                    sim_ctes_dict = asdict(sim_ctes)
+                    indice_gamma = indice_gamma + 1
+                    print("\n El nuevo valor de gamma es:", sim_ctes_dict["gamma"])
+                    indice_gamma = indice_gamma + 1
+                # if len(CF_ranges) == 2:
+                #     if sum(CF_creado) == 2 and not cambiado_ohm_resistence:
+                #         print("Todos los filamentos creados.")
+                #         actual_resistance = sim_ctes.ohm_resistence
+                #         sim_ctes = sim_ctes.update_ohm_resistence(
+                #             actual_resistance - 15
+                #         )
+                #         print("El nuevo valor de R_ohm es:", sim_ctes.ohm_resistence)
+                #         sim_ctes_dict = asdict(sim_ctes)
+                #         cambiado_ohm_resistence = True
+                #     else:
+                #         nueva_gamma = sim_ctes.gamma / 2
+                #         sim_ctes = sim_ctes.update_gamma(nueva_gamma)
+                #         sim_ctes_dict = asdict(sim_ctes)
+                #         indice_gamma = indice_gamma + 1
+                #         print("\n El nuevo valor de gamma es:", sim_ctes_dict["gamma"])
                 else:
                     nueva_gamma = sim_ctes.gamma - 1
 
@@ -702,6 +840,9 @@ def PP_set(
                     current, _ = CurrentSolver.OmhCurrent(
                         voltage, cf_clean_matrix, **sim_ctes_dict
                     )
+                # print(
+                #     f"Corriente ohmica: {current} A en el voltaje {voltage} V a una temperatura de {temperatura} K"
+                # )
             except ZeroDivisionError:
                 raise exceptions.NullResistanceException(
                     simulation_path=rutas["simulation_path"],
@@ -713,9 +854,9 @@ def PP_set(
 
             if voltage <= compliance_voltage and compliance:
                 compliance = True
-                print(
-                    f"\nSe ha alcanzado el voltaje de compliance de {compliance_voltage} V en el paso {k} con una ocupación de {actual_state.sum}.\n"
-                )
+                # print(
+                #     f"\nSe ha alcanzado el voltaje de compliance de {compliance_voltage} V en el paso {k} con una ocupación de {actual_state.sum}.\n"
+                # )
 
         else:
             sistema_percola = False
@@ -724,15 +865,21 @@ def PP_set(
             current = CurrentSolver.Poole_Frenkel(
                 temperatura, mean_field, **sim_ctes_dict
             ) * (params.device_size)
+            print(
+                f"Corriente Poole-Frenkel: {current} A en el voltaje {voltage} V con campo medio {mean_field} V/m a una temperatura de {temperatura} K"
+            )
 
         # Obtengo los valores del campo eléctrico y la temperatura
         temperatura = Temperature.Temperature_Joule(
             voltage, current, sistema_percola, params.T_0, **sim_ctes_dict
         )
 
+        region_coords = (17, 22, 0, 40)
+        factor_region = 1.2
+
         if (total_vacantes < max_vancantes_pp_set) and (voltage <= compliance_voltage):
             # Actualizo el estado del sistema
-            actual_state = update_state_generate(
+            actual_state = update_state_generate_favorecido(
                 actual_state,
                 params,
                 sim_ctes_dict,
@@ -740,6 +887,9 @@ def PP_set(
                 temperatura,
                 factor_vecinos,
                 factor_libre,
+                neighbor_mode="both",
+                region_coords=region_coords,
+                factor_region=factor_region,
             )
         elif not total_vacantes_pp_set:
             print(
@@ -779,6 +929,7 @@ def PP_set(
         "voltaje_percolacion": voltaje_percolacion,
         "tiempo_pp_set": simulation_time,
         "current_final": current,
+        "ocupacion_percola": ocupacion_percola,
     }
     with open(
         rutas["simulation_path"] / f"final_state_pp_set_{num_simulation}.pkl", "wb"
@@ -847,11 +998,17 @@ def SP_set(
     voltaje_max_set = final_state_pp_set["voltaje_max_set"]
     tiempo_pp_set = final_state_pp_set["tiempo_pp_set"]
     current = final_state_pp_set["current_final"]
+    max_vancantes_pp_set = final_state_pp_set["ocupacion_percola"]
+
+    print("El numero de vacantes al inicio del SP set es:", np.sum(actual_state))
+    print("El numero de vacantes al percolar fue :", max_vancantes_pp_set)
 
     temperatura = final_state_pp_set["Temperatura_final"]
 
-    ocupacion_max_sp_set = 0.37
-    max_vancantes_sp_set = int(ocupacion_max_sp_set * params.num_max_vacantes)
+    ocupacion_max_sp_set = 0 + 0  # 0.35
+    max_vancantes_sp_set = max_vancantes_pp_set + int(
+        ocupacion_max_sp_set * params.num_max_vacantes
+    )
     factor_vecinos = 1.0  # Factor de aumento de la probabilidad si tiene vecino
     compliance_voltage = 1.2
     factor_libre = 0.9  # Factor de disminución de la probabilidad si no tiene vecino
@@ -873,6 +1030,7 @@ def SP_set(
     print(f"Simulacion {num_simulation} - Segunda parte del set\n")
     for k in range(0, k_max):
         total_vacantes = np.sum(actual_state)
+        # print("Número de vacantes en el paso", k, ":", total_vacantes)
 
         if total_vacantes > int(params.num_max_vacantes):
             # Si se llena el 90 del espacio de la matriz salto a otra simulación. Ponerlo aqui puede dar el problema de que nada mas empezar esté lleno y de error, pero eso NO debe pasar asi q no me preocupa.
@@ -894,8 +1052,7 @@ def SP_set(
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
-            # TODO: Si el sistema llega al maximo de vacante, como no genera mas, no hace falta recalcular los filamentos, ya que no van a cambiarif total_vacantes < max_vancantes_sp_set: estaba dando error lo he quitado
-
+            # TODO: Si el sistema llega al maximo de vacante, como no genera mas, no hace falta recalcular los filamentos, ya que no van a cambiar if total_vacantes < max_vancantes_sp_set: estaba dando error lo he quitado
             _, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
             filamentos = CurrentSolver.Clasificar_CF(
                 CF_graph, params.x_size, params.y_size, CF_ranges
@@ -910,6 +1067,9 @@ def SP_set(
                     current, _ = CurrentSolver.OmhCurrent(
                         voltage, cf_clean_matrix, **sim_ctes_dict
                     )
+                # print(
+                #     f"Corriente ohmica: {current} A en el voltaje {voltage} V a una temperatura de {temperatura} K"
+                # )
             except ZeroDivisionError:
                 raise exceptions.NullResistanceException(
                     simulation_path=rutas["simulation_path"],
@@ -927,6 +1087,9 @@ def SP_set(
             current = CurrentSolver.Poole_Frenkel(
                 temperatura, mean_field, **sim_ctes_dict
             ) * (params.device_size)
+            # print(
+            #     f"Corriente Poole-Frenkel: {current} A en el voltaje {voltage} V con campo medio {mean_field} V/m a una temperatura de {temperatura} K"
+            # )
 
         # Obtengo los valores del campo eléctrico y la temperatura
         temperatura = Temperature.Temperature_Joule(
@@ -1048,8 +1211,8 @@ def PP_reset(
     params_dict = asdict(params)
     sim_ctes_dict = asdict(sim_ctes)
 
-    sim_ctes_dict["voltaje_generar_oxigeno_1"] = 0.6
-    sim_ctes_dict["voltaje_generar_oxigeno_2"] = 0.8
+    sim_ctes_dict["voltaje_generar_oxigeno_1"] = 0.45
+    sim_ctes_dict["voltaje_generar_oxigeno_2"] = 0.55
 
     # CUIDADO Configuración de umbrales, tiene q estar ordenado de mayor a menor!!
     oxygen_config = {
@@ -1079,7 +1242,7 @@ def PP_reset(
     CF_destruido_index = 1
     roturas_dict = dict()
 
-    ohm_resistence_nuevo = 220
+    ohm_resistence_nuevo = sim_ctes.ohm_resistence - 20
     sim_ctes = sim_ctes.update_ohm_resistence(ohm_resistence_nuevo)
     sim_ctes_dict = asdict(sim_ctes)
     print(
@@ -1154,27 +1317,27 @@ def PP_reset(
         else:
             percola = False
 
-            # Cambio el valor I_0 cuando el sistema ha roto todos los filamentos
-            if np.all(CF_destruido) and not all_df_destruidos:
-                I_0_nuevo = sim_ctes.I_0_reset
-                permitividad_relativa_nuevo = sim_ctes.permitividad_relativa_reset
-                pb_metal_insul_nuevo = sim_ctes.pb_metal_insul_reset
-                print(
-                    f"Se han destruido todos los filamentos en el paso",
-                    k,
-                    "con un voltaje de",
-                    round(voltage, 4),
-                    "los valores de la nueva corriente Poole-Frenkel son:",
-                    f"\n I_0: {I_0_nuevo}, permitividad_relativa: {permitividad_relativa_nuevo}, pb_metal_insul: {pb_metal_insul_nuevo}\n",
-                )
-                sim_ctes = sim_ctes.update_I_0(I_0_nuevo)
-                sim_ctes = sim_ctes.update_permitividad_relativa(
-                    permitividad_relativa_nuevo
-                )
-                sim_ctes = sim_ctes.update_pb_metal_insul(pb_metal_insul_nuevo)
+            # # Cambio el valor I_0 cuando el sistema ha roto todos los filamentos
+            # if np.all(CF_destruido) and not all_df_destruidos:
+            #     I_0_nuevo = sim_ctes.I_0_reset
+            #     permitividad_relativa_nuevo = sim_ctes.permitividad_relativa_reset
+            #     pb_metal_insul_nuevo = sim_ctes.pb_metal_insul_reset
+            #     print(
+            #         f"Se han destruido todos los filamentos en el paso",
+            #         k,
+            #         "con un voltaje de",
+            #         round(voltage, 4),
+            #         "los valores de la nueva corriente Poole-Frenkel son:",
+            #         f"\n I_0: {I_0_nuevo}, permitividad_relativa: {permitividad_relativa_nuevo}, pb_metal_insul: {pb_metal_insul_nuevo}\n",
+            #     )
+            #     sim_ctes = sim_ctes.update_I_0(I_0_nuevo)
+            #     sim_ctes = sim_ctes.update_permitividad_relativa(
+            #         permitividad_relativa_nuevo
+            #     )
+            #     sim_ctes = sim_ctes.update_pb_metal_insul(pb_metal_insul_nuevo)
 
-                sim_ctes_dict = asdict(sim_ctes)
-                all_df_destruidos = True
+            #     sim_ctes_dict = asdict(sim_ctes)
+            #     all_df_destruidos = True
 
             # Si no ha percolado uso la corriente de Poole-Frenkel
             current = abs(

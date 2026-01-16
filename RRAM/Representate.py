@@ -625,11 +625,12 @@ def plot_IV(
     # Ruta de los datos experimentales
     # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Set_1t'
     # ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Reset_1.txt'
+
     ruta_archivo_set = (
-        os.getcwd() + "/Datos_Experimentales/Medidas Arturo/MIM_Set_1_Run62.txt"
+        os.getcwd() + "/Datos_Experimentales/Medidas_Arturo/D_Set_1_Run35.txt"
     )
     ruta_archivo_reset = (
-        os.getcwd() + "/Datos_Experimentales/Medidas Arturo/MIM_Reset_1_Run62.txt"
+        os.getcwd() + "/Datos_Experimentales/Medidas_Arturo/D_Reset_1_Run35.txt"
     )
 
     # Cargar datos experimentales
@@ -758,10 +759,10 @@ def plot_IV_marcado(
     # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Set_1t'
     # ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Reset_1.txt'
     ruta_archivo_set = (
-        os.getcwd() + "/Datos_Experimentales/Medidas Arturo/MIM_Set_1_Run62.txt"
+        os.getcwd() + "/Datos_Experimentales/Medidas_Arturo/D_Set_1_Run35.txt"
     )
     ruta_archivo_reset = (
-        os.getcwd() + "/Datos_Experimentales/Medidas Arturo/MIM_Reset_1_Run62.txt"
+        os.getcwd() + "/Datos_Experimentales/Medidas_Arturo/D_Reset_1_Run35.txt"
     )
 
     # Cargar datos experimentales

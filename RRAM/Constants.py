@@ -43,16 +43,16 @@ ohm_resistence = 350
 cte_red = 0.125e-9
 
 # the potential barrier at the metal and insulator interface [eV]
-pb_metal_insul = 0.2688
-pb_metal_insul_reset = 0.2549
+pb_metal_insul = 0.2547
+pb_metal_insul_reset = 0.2465
 
 # Permitividad relativa del material
-permitividad_relativa = 499.9631
-permitividad_relativa_reset = 385.4334
+permitividad_relativa = 250
+permitividad_relativa_reset = 299.9991
 
 # Término inicial de la ecuación de Poole-Frenkel
-I_0 = 1.6501e-01
-I_0_reset = 9.3536e-02
+I_0 = 1.8613e-01
+I_0_reset = 1.1221e-01
 
 # Factor por el que divido la gamma cuando el sistema percola o no
 factor_generacion = 1.5

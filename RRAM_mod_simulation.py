@@ -1,7 +1,7 @@
-from typing import final
 from RRAM import Simulation, utils
-from turtle import back
+from typing import final
 from pathlib import Path
+from turtle import back
 
 
 import matplotlib.pyplot as plt
@@ -47,7 +47,7 @@ if num_filamentos == 2:
 elif num_filamentos == 4:
     filamentos_ranges = [(0, 9), (10, 19), (20, 29), (30, 39)]
 elif num_filamentos == 1:
-    filamentos_ranges = [(4, 34)]
+    filamentos_ranges = [(0, 39)]
 
 CF_creado = np.full(len(filamentos_ranges), False, dtype=bool)
 
