@@ -66,9 +66,7 @@ def initial_state_priv(Eje_x: int, Eje_y: int, num_trampas: int, regiones_pesos:
     pesos_flat = pesos.flatten()
 
     # Generate random positions for the traps with weights
-    posiciones_unos = np.random.choice(
-        Eje_x * Eje_y, num_trampas, replace=False, p=pesos_flat / np.sum(pesos_flat)
-    )
+    posiciones_unos = np.random.choice(Eje_x * Eje_y, num_trampas, replace=False, p=pesos_flat / np.sum(pesos_flat))
 
     # Assign the value 1 to the selected positions
     for pos in posiciones_unos:
@@ -114,9 +112,7 @@ def Generate(time_stp: float, electric_field: float, temp: float, **kwargs) -> f
     return prob_generacion
 
 
-def Generate_vectorized(
-    time_stp: float, electric_field_matrix: np.ndarray, temp: float, **kwargs
-) -> np.ndarray:
+def Generate_vectorized(time_stp: float, electric_field_matrix: np.ndarray, temp: float, **kwargs) -> np.ndarray:
     """
     Calcula la matriz de probabilidades de generación para una matriz de campo eléctrico.
 
@@ -216,10 +212,10 @@ def generate_oxigen_old(oxygen_state: np.ndarray, num_oxygen: int):
         y[i] = np.random.randint(0, eje_y)
 
     if num_oxygen == 1:
-        prob = 0.5  # 0.75
-    elif num_oxygen == 1:
-        prob = 0.7  # 0.9
+        prob = 0.4  # 0.75
     elif num_oxygen == 3:
+        prob = 0.6  # 0.9
+    elif num_oxygen == 5:
         prob = 1
 
     # Itero sobre cada par coordenada para asignar el valor de 1 que representa que se generó un oxígeno en esa posición
