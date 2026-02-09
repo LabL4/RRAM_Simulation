@@ -205,6 +205,8 @@ def RepresentateState(
     cadena = filename
     ruta_pdf = os.path.splitext(cadena)[0] + ".pdf"
     plt.savefig(ruta_pdf, bbox_inches="tight")
+    ruta_svg = os.path.splitext(cadena)[0] + ".svg"
+    plt.savefig(ruta_svg, bbox_inches="tight")
 
     # Mostrar gráfico
     plt.close(fig)
@@ -274,9 +276,7 @@ def RepresentateState_parall(
     return im
 
 
-def RepresentateStateOxygen(
-    matriz: np.ndarray, fig, ax, im=None, filename: str = "grafica.png"
-) -> None:
+def RepresentateStateOxygen(matriz: np.ndarray, fig, ax, im=None, filename: str = "grafica.png") -> None:
     """
     Represent the state of a matrix as a colored plot. Es la misma funcion que arriba solo que pinta
     en rojo los oxigenos (solo los soxigenos pinta) para diferenciarlos de las trampas
@@ -340,9 +340,7 @@ def plot_regions(Eje_x: int, Eje_y: int, regiones_pesos: list, filename: str) ->
     # Draw grid
     for i in range(Eje_x):
         for j in range(Eje_y):
-            rect = patches.Rectangle(
-                (j, i), 1, 1, edgecolor="grey", facecolor="white", fill=True
-            )
+            rect = patches.Rectangle((j, i), 1, 1, edgecolor="grey", facecolor="white", fill=True)
             ax.add_patch(rect)
 
     # Highlight privileged regions
@@ -359,18 +357,14 @@ def plot_regions(Eje_x: int, Eje_y: int, regiones_pesos: list, filename: str) ->
         # Add text for weight
         cx = (y_start + y_end) / 2
         cy = (x_start + x_end) / 2
-        ax.text(
-            cx, cy, f"w={weight}", color="red", ha="center", va="center", fontsize=8
-        )
+        ax.text(cx, cy, f"w={weight}", color="red", ha="center", va="center", fontsize=8)
 
     plt.gca().set_aspect("equal", adjustable="box")
 
     plt.savefig(filename)
 
 
-def plot_privileged_regions(
-    Eje_x: int, Eje_y: int, regiones_pesos: list, filename: str
-) -> None:
+def plot_privileged_regions(Eje_x: int, Eje_y: int, regiones_pesos: list, filename: str) -> None:
     """
     Plot the privileged regions on a grid.
 
@@ -396,9 +390,7 @@ def plot_privileged_regions(
     # Draw grid
     for i in range(Eje_x):
         for j in range(Eje_y):
-            rect = patches.Rectangle(
-                (j, i), 1, 1, edgecolor="grey", facecolor="white", fill=True
-            )
+            rect = patches.Rectangle((j, i), 1, 1, edgecolor="grey", facecolor="white", fill=True)
             ax.add_patch(rect)
 
     # Highlight privileged regions
@@ -415,9 +407,7 @@ def plot_privileged_regions(
         # Add text for weight
         cx = (y_start + y_end) / 2
         cy = (x_start + x_end) / 2
-        ax.text(
-            cx, cy, f"w={weight}", color="red", ha="center", va="center", fontsize=8
-        )
+        ax.text(cx, cy, f"w={weight}", color="red", ha="center", va="center", fontsize=8)
 
     plt.gca().set_aspect("equal", adjustable="box")
     plt.savefig(filename)
@@ -453,12 +443,8 @@ def RepresentateTwoStates(
     setup_paper_plt(plt, latex=True, scaling=3)
 
     # Crear mapas de colores para cada matriz
-    cmap1 = LinearSegmentedColormap.from_list(
-        "cmap1", [(1, 1, 1), (0.9647, 0.1725, 0.3059)], N=2
-    )  # Rojo
-    cmap2 = LinearSegmentedColormap.from_list(
-        "cmap2", [(1, 1, 1), (0.2314, 0.2275, 0.9647)], N=2
-    )  # Azul
+    cmap1 = LinearSegmentedColormap.from_list("cmap1", [(1, 1, 1), (0.9647, 0.1725, 0.3059)], N=2)  # Rojo
+    cmap2 = LinearSegmentedColormap.from_list("cmap2", [(1, 1, 1), (0.2314, 0.2275, 0.9647)], N=2)  # Azul
 
     # Graficar la primera matriz
     ax.pcolormesh(
@@ -626,12 +612,8 @@ def plot_IV(
     # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Set_1t'
     # ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Reset_1.txt'
 
-    ruta_archivo_set = (
-        os.getcwd() + "/Datos_Experimentales/Medidas_Arturo/D_Set_1_Run35.txt"
-    )
-    ruta_archivo_reset = (
-        os.getcwd() + "/Datos_Experimentales/Medidas_Arturo/D_Reset_1_Run35.txt"
-    )
+    ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Medidas_Arturo/D_Set_1_Run35.txt"
+    ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Medidas_Arturo/D_Reset_1_Run35.txt"
 
     # Cargar datos experimentales
     data_set = np.loadtxt(ruta_archivo_set, skiprows=1)
@@ -656,14 +638,14 @@ def plot_IV(
     )
 
     # Guardar figura
-    fig.savefig(
-        figures_path + f"/I-V_{num_simulation + 1}.png", bbox_inches="tight", dpi=300
-    )
+    fig.savefig(figures_path + f"/I-V_{num_simulation + 1}.png", bbox_inches="tight", dpi=300)
+
+    # # Guardar figura
+    # fig.savefig(figures_path + f"/I-V_{num_simulation + 1}.pdf", bbox_inches="tight", dpi=300)
+    # plt.close(fig)  # Cierra para liberar memoria
 
     # Guardar figura
-    fig.savefig(
-        figures_path + f"/I-V_{num_simulation + 1}.pdf", bbox_inches="tight", dpi=300
-    )
+    fig.savefig(figures_path + f"/I-V_{num_simulation + 1}.svg", bbox_inches="tight", dpi=300)
     plt.close(fig)  # Cierra para liberar memoria
 
 
@@ -758,12 +740,8 @@ def plot_IV_marcado(
     # Ruta de los datos experimentales
     # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Set_1t'
     # ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Reset_1.txt'
-    ruta_archivo_set = (
-        os.getcwd() + "/Datos_Experimentales/Medidas_Arturo/D_Set_1_Run35.txt"
-    )
-    ruta_archivo_reset = (
-        os.getcwd() + "/Datos_Experimentales/Medidas_Arturo/D_Reset_1_Run35.txt"
-    )
+    ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Medidas_Arturo/D_Set_1_Run35.txt"
+    ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Medidas_Arturo/D_Reset_1_Run35.txt"
 
     # Cargar datos experimentales
     data_set = np.loadtxt(ruta_archivo_set, skiprows=1)
@@ -790,9 +768,7 @@ def plot_IV_marcado(
     axes.plot(x_reset, y_reset, "black", label="Reset Exp.", linewidth=2)
 
     for label, (xp, yp) in lista_puntos.items():
-        dx, factor_y = desplazamiento.get(
-            label, (0.02, 1.0)
-        )  # 1.0 = sin desplazamiento en y
+        dx, factor_y = desplazamiento.get(label, (0.02, 1.0))  # 1.0 = sin desplazamiento en y
         # print(
         #     label,
         #     "puntos: ",
@@ -802,9 +778,7 @@ def plot_IV_marcado(
         #     (xp + dx, yp * factor_y),
         # )
         print("Marcando punto: ", label, " en (", xp, ",", yp, ")")
-        axes.scatter(
-            xp, yp, color="blue", s=80, marker=markers.MarkerStyle("D"), zorder=10
-        )
+        axes.scatter(xp, yp, color="blue", s=80, marker=markers.MarkerStyle("D"), zorder=10)
         axes.text(
             xp + dx,  # Usar la posición calculada en x
             max(yp * factor_y, 1e-6),  # Usar la posición calculada en y con un mínimo
@@ -831,9 +805,17 @@ def plot_IV_marcado(
         dpi=300,
     )
 
+    # # Guardar figura
+    # fig.savefig(
+    #     figures_path + f"/I-V_marcado_{num_simulation + 1}.pdf",
+    #     bbox_inches="tight",
+    #     dpi=300,
+    # )
+    # plt.close(fig)  # Cierra para liberar memoria
+
     # Guardar figura
     fig.savefig(
-        figures_path + f"/I-V_marcado_{num_simulation + 1}.pdf",
+        figures_path + f"/I-V_marcado_{num_simulation + 1}.svg",
         bbox_inches="tight",
         dpi=300,
     )

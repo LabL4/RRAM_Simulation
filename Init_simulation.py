@@ -53,7 +53,7 @@ os.makedirs(carpeta)
 device_size = np.ones(num_simulations) * 5e-9  # m antes era 10e-9
 # m TODO: Esto se deberia llamarse tamaño del grid mejor
 atom_size = np.ones(num_simulations) * 0.125e-9
-num_trampas = np.ones(num_simulations, dtype=int) * 80  # 130
+num_trampas = np.ones(num_simulations, dtype=int) * 70  # 130
 
 priv_y_sup_right = np.ones(num_simulations, dtype=int) * 15
 priv_y_inf_right = np.ones(num_simulations, dtype=int) * 15

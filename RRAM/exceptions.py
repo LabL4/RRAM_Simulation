@@ -40,6 +40,20 @@ class HighPercolationVoltageException(Exception):
         super().__init__(self.message)
 
 
+# Excepción para cuando la resistencia de la parte óhmica es baja y no se reproduce la seguna parte del set
+class LowResistanceException(Exception):
+    def __init__(self, valor_resistencia=None):
+        if valor_resistencia is not None:
+            message = (
+                "La resistencia del sistema no reproduce la curva de la segunda parte del set\n"
+                f"El valor de la resistencia alcanzada es: {valor_resistencia}"
+            )
+        else:
+            message = "La resistencia del sistema no reproduce la curva de la segunda parte del set"
+        self.message = message
+        super().__init__(self.message)
+
+
 # Excepción para cuando la resistencia es cero y se ha usado corriente óhmica, donde supuestamente ya hay filamento y no debera ser cero
 class NullResistanceException(Exception):
     """Excepción para manejar casos de resistencia nula y detener la simulación"""
