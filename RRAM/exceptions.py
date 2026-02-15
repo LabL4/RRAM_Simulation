@@ -5,9 +5,7 @@ import pickle
 
 
 class NoPercolationException(Exception):
-    def __init__(
-        self, message="El sistema no ha percolado al alcanzar el voltaje final"
-    ):
+    def __init__(self, message="El sistema no ha percolado al alcanzar el voltaje final"):
         self.message = message
         super().__init__(self.message)
 
@@ -30,10 +28,7 @@ class MaxVacantesException(Exception):
 class HighPercolationVoltageException(Exception):
     def __init__(self, voltage_percola=None):
         if voltage_percola is not None:
-            message = (
-                "El voltaje de percolación es demasiado alto.\n"
-                f"El voltaje de percolación es: {voltage_percola}"
-            )
+            message = f"El voltaje de percolación es demasiado alto.\nEl voltaje de percolación es: {voltage_percola}"
         else:
             message = "El voltaje de percolación es demasiado alto"
         self.message = message
@@ -71,16 +66,12 @@ class NullResistanceException(Exception):
         self.simulation_path = simulation_path
         self.num_simulation = num_simulation + 1
         self.actual_state = actual_state
-        self.figures_path = (
-            str(figures_path) + f"/NULL_resistance_{self.num_simulation}.png"
-        )
+        self.figures_path = str(figures_path) + f"/NULL_resistance_{self.num_simulation}.png"
 
         print("Null resistance matrix in ", self.filename)
 
         # Generar representación visual
-        Representate.RepresentateState(
-            self.actual_state, round(self.voltage, 3), self.figures_path
-        )
+        Representate.RepresentateState(self.actual_state, round(self.voltage, 3), self.figures_path)
 
         # Guardar estado
         with open(self.filename, "wb") as f:
