@@ -44,14 +44,10 @@ def Clean_state_matrix(
                 for di, dj in dirs:
                     ni, nj = i + di, j + dj
                     if 0 <= ni < H and 0 <= nj < W and grid[ni, nj] == 1:
-                        actual_state_clean_grid.add_edge(
-                            (i, j), (ni, nj)
-                        )  # agregamos arista bidireccional
+                        actual_state_clean_grid.add_edge((i, j), (ni, nj))  # agregamos arista bidireccional
 
     # Elimino los nodos que no tienen aristas
-    actual_state_clean_grid.remove_nodes_from(
-        list(nx.isolates(actual_state_clean_grid))
-    )
+    actual_state_clean_grid.remove_nodes_from(list(nx.isolates(actual_state_clean_grid)))
 
     # ELimino componentes pequeños sueltos
     componentes = list(nx.connected_components(actual_state_clean_grid))
@@ -62,11 +58,7 @@ def Clean_state_matrix(
     # Nodos con grado 1 (hojas), excluyendo primera y última columna hasta que no quede ningún nodo sin conexión
     while True:
         # Encontrar nodos hoja excluyendo primera y última columna
-        leaf_nodes = [
-            n
-            for n, d in actual_state_clean_grid.degree()
-            if d == 1 and n[1] not in (0, W - 1)
-        ]
+        leaf_nodes = [n for n, d in actual_state_clean_grid.degree() if d == 1 and n[1] not in (0, W - 1)]
 
         # Si no hay más nodos hoja, salir del bucle
         if not leaf_nodes:
@@ -83,9 +75,7 @@ def Clean_state_matrix(
         actual_state_clean_matrix[i, j] = 1
 
     if plot_resmatrix:
-        rp.RepresentateState(
-            actual_state_clean_matrix, 0.00, os.getcwd() + "/Matriz_resistencia.pdf"
-        )
+        rp.RepresentateState(actual_state_clean_matrix, 0.00, os.getcwd() + "/Matriz_resistencia.pdf")
 
     return actual_state_clean_matrix, actual_state_clean_grid
 
@@ -170,17 +160,13 @@ def Existe_filamentos(resultados, num_filamentos) -> list[bool]:
     Percola_list_bool = []
 
     for i in range(1, num_filamentos + 1):
-        existe = any(
-            info["filamento"] == i and info["percola"] for info in resultados.values()
-        )
+        existe = any(info["filamento"] == i and info["percola"] for info in resultados.values())
         Percola_list_bool.append(existe)
 
     return Percola_list_bool
 
 
-def Eliminar_filamentos_incompletos(
-    grid_limpio, filamentos_ranges, percola_bools, W: int = 40
-):
+def Eliminar_filamentos_incompletos(grid_limpio, filamentos_ranges, percola_bools, W: int = 40):
     """
     Elimina los nodos y aristas de los rangos donde el filamento no se ha formado (no percola).
 
@@ -202,9 +188,7 @@ def Eliminar_filamentos_incompletos(
     for idx, percola in enumerate(percola_bools):
         if not percola:
             fila_min, fila_max = filamentos_ranges[idx]
-            nodos_a_borrar = [
-                (i, j) for i in range(fila_min, fila_max + 1) for j in range(W)
-            ]
+            nodos_a_borrar = [(i, j) for i in range(fila_min, fila_max + 1) for j in range(W)]
             G_limpio.remove_nodes_from(nodos_a_borrar)
 
     # Crear matriz vacía de ceros para la matriz resistencia
@@ -246,77 +230,66 @@ def calcular_resistencia(CF_matrix, ohm_resistence=11.5):
     return total_resistance
 
 
-def OmhCurrent(
-    potential: float, resistance_matrix: NDArray, **kwargs
-) -> tuple[float, float]:
+def OmhCurrent(potential: float, resistance_matrix: NDArray, ohm_resistence: float) -> tuple[float, float]:
     """
     Calculates the Ohmic current based on the given parameters.
 
     Parameters:
-    - DDP (float): The voltage difference across the circuit.
-    - config_state (np.array): The resistance matrix of the system.
-    - ohm_resistence (float): The default resistance value.
+    - potential (float): The voltage difference across the circuit.
+    - resistance_matrix (np.array): The matrix representing the conductive filaments.
+    - ohm_resistence (float): The resistance value of a single cell.
 
     Returns:
-    - float: The calculated Ohmic current.
+    - tuple[float, float]: A tuple containing the calculated Ohmic current and the total resistance.
     """
 
-    # Obtengo los valores de las constantes si las estoy pasando como argumentos
-    if kwargs:
-        # Obtengo el valor de las constantes que necesita la función
-        ohm_resistence = float(kwargs.get("ohm_resistence"))  # type: ignore
-    else:
-        ohm_resistence = 11.5  # Valor por defecto
-
+    # Se calcula la resistencia total usando el valor explícito que se le pasa
     total_resistance = calcular_resistencia(resistance_matrix, ohm_resistence)
 
+    # Se calcula la corriente de Ohm (I = V/R)
     intensidad_ohmica = potential / total_resistance
 
-    # Se calcula la corriente Ohmica
-    return intensidad_ohmica, total_resistance  # type: ignore
+    return intensidad_ohmica, total_resistance
 
 
-def Poole_Frenkel(temperature: float, E_field: float, **kwargs) -> float:
+# En RRAM/CurrentSolver.py
+def Poole_Frenkel(
+    temperature: float, E_field: float, pb_metal_insul: float, permitividad_relativa: float, I_0: float
+) -> float:
     """
-    Calculate the current using the Poole-Frenkel effect.
-    The Poole-Frenkel effect describes the lowering of the potential barrier in an insulator due to an applied electric field, which increases the current.
-    Parameters:
-    temperature (float): The temperature in Kelvin.
-    E_field (float): The electric field in V/m.
-    **kwargs: Optional keyword arguments for constants:
-        - pb_metal_insul (float): Potential barrier between metal and insulator.
-        - permitividad_relativa (float): Relative permittivity of the material.
-        - I_0 (float): Pre-exponential factor.
+    Calcula la corriente mediante el mecanismo de conducción Poole-Frenkel.
+
+    El efecto Poole-Frenkel describe la emisión de portadores de carga desde trampas
+    en un material aislante bajo la influencia de un campo eléctrico alto. Este modelo
+    es importante en la caracterización de materiales dieléctricos y semiconductores.
+
+    Args:
+        temperature (float): Temperatura absoluta en Kelvin [K]
+        E_field (float): Campo eléctrico aplicado en V/m [V/m]
+        pb_metal_insul (float): Barrera de potencial metal-aislante en eV [eV]
+        permitividad_relativa (float): Permitividad relativa del material dieléctrico [adimensional]
+        I_0 (float): Corriente de referencia o prefactor en Amperios [A]
+
     Returns:
-    float: The current calculated using the Poole-Frenkel effect.
-    """
+        float: Corriente Poole-Frenkel calculada en Amperios [A]
 
-    # Obtengo los valores de las constantes si las estoy pasando como argumentos
-    if kwargs:
-        # Obtengo el valor de las constantes que necesita la función hay q mejorarlo por si algun elemento fuera None
-        potential_barrier = float(kwargs.get("pb_metal_insul"))  # type: ignore
-        epsilon_r = float(kwargs.get("permitividad_relativa"))  # type: ignore
-        I_0 = float(kwargs.get("I_0"))  # type: ignore
-    else:
-        potential_barrier = cte.pb_metal_insul
-        epsilon_r = cte.permitividad_relativa
-        I_0 = cte.I_0
+    Fórmula:
+        I_PF = I_0 * E * exp((β - φ_b) / (k_B * T))
+        donde β = sqrt(e³ / (π * ε_0 * ε_r)) * sqrt(E)
+
+    Ejemplo:
+        >>> I = Poole_Frenkel(300, 1e6, 1.2, 3.9, 1e-9)
+        >>> print(f"Corriente PF: {I:.2e} A")
+
+    Referencias:
+        - Frenkel, J. (1938). "On Pre-Breakdown Phenomena in Insulators and Electronic Semi-Conductors"
+        - Sze, S.M. & Ng, K.K. (2006). "Physics of Semiconductor Devices"
+    """
 
     k_b_ev = Boltzmann / elementary_charge
-    beta = math.sqrt(abs(E_field)) * math.sqrt(
-        elementary_charge / (epsilon_0 * epsilon_r * math.pi)
-    )
+    beta = math.sqrt(abs(E_field)) * math.sqrt(elementary_charge / (epsilon_0 * permitividad_relativa * math.pi))
 
-    exponencial = math.exp((beta - potential_barrier) / (k_b_ev * temperature))
-
+    exponencial = math.exp((beta - pb_metal_insul) / (k_b_ev * temperature))
     I_poole_frenkel = I_0 * E_field * exponencial
-
-    # print(f" Los valores empleados en Poole-Frenkel son:\n")
-    # print(f" Temperatura: {temperature} K")
-    # print(f" Campo eléctrico: {E_field} V/m")
-    # print(f" Los valores intermedios son:")
-    # print(f" beta: {beta} (V/m)^0.5")
-    # print(f" Exponencial: {exponencial}")
-    # print(f" La corriente Poole-Frenkel es: {I_poole_frenkel} A\n")
 
     return I_poole_frenkel

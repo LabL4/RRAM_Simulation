@@ -44,26 +44,21 @@ class SimulationParameters:
     x_size: int
     y_size: int
     num_trampas: int
-    init_simulation_time: float
     total_simulation_time: float
     num_pasos: int
-    paso_guardar: int
     voltaje_final_reset: float
     voltaje_final_set: float
-    initial_voltaje: float
-    initial_current: float
-    initial_elec_field: float
-    initial_temperatura: float
-    T_0: float
+    init_temp: float
 
     num_max_vacantes: int = field(init=False)
     paso_temporal: float = field(init=False)
     paso_potencial: float = field(init=False)
 
     def __post_init__(self):
-        self.num_max_vacantes = int(0.9 * (self.device_size / self.atom_size) ** 2)
-        self.paso_temporal = self.total_simulation_time / self.num_pasos
-        self.paso_potencial = self.voltaje_final_reset / self.num_pasos
+        self.num_max_vacantes = int(0.95 * (self.x_size * self.x_size))  # 95% de la matriz puede llenarse de vacantes
+        self.paso_temporal = self.total_simulation_time / self.num_pasos  # Paso temporal en segundos
+        self.paso_potencial_set = self.voltaje_final_set / self.num_pasos  # Paso de voltaje para la parte de set
+        self.paso_potencial_reset = self.voltaje_final_reset / self.num_pasos  # Paso de voltaje para la parte de reset
 
     def __repr__(self):
         # Crear lista de líneas con "nombre=valor" para cada atributo
@@ -76,85 +71,76 @@ class SimulationParameters:
 
     @staticmethod
     def from_dict(d: dict):
-        # Usar get_type_hints para asegurar que obtienes tipos reales
-
         field_types = get_type_hints(SimulationParameters)
         init_fields = {f.name for f in fields(SimulationParameters) if f.init}
-
-        mapping = {
-            "voltaje_final_reset": "voltaje_final",
-            "T_0": "init_temp",
-            "initial_temperatura": "init_temp",
-        }
-
         kwargs = {}
         for k in init_fields:
-            src = mapping.get(k, k)
-
-            # Verificar que la clave existe en el diccionario
-            if src not in d:
-                raise KeyError(f"La clave '{src}' no existe en el diccionario")
-
-            # Debug: ver qué tipo y valor estamos procesando
-            # print(f"Campo: {k}, Tipo: {field_types[k]}, Fuente: {src}, Valor: {d[src]}")
-
-            try:
-                kwargs[k] = field_types[k](d[src])
-            except Exception as e:
-                print(f"Error al convertir {k}: {e}")
-                print(f"Tipo esperado: {field_types[k]}, tipo real: {type(field_types[k])}")
-                raise
-
+            if k not in d:
+                raise KeyError(f"La clave '{k}' no existe en el diccionario")
+            kwargs[k] = field_types[k](d[k])
         return SimulationParameters(**kwargs)
 
 
 @dataclass(frozen=True)
 class SimulationConstants:
     vibration_frequency: float
-    migration_energy: float
-    drift_coefficient: float
     cte_red: float
-    recom_enchancement_factor: float
-    decaimiento_concentracion: float
-    activation_energy: float
-    gamma: float
-    ohm_resistence: float
-    pb_metal_insul: float
-    pb_metal_insul_reset: float
-    permitividad_relativa: float
+    permitividad_relativa_set: float
     permitividad_relativa_reset: float
-    I_0: float
-    I_0_reset: float
-    r_termica_percola: float
-    r_termica_no_percola: float
-    factor_generacion: float
+    generation_energy: float
     recombination_energy: float
+    pb_metal_insul_set: float
+    pb_metal_insul_reset: float
+    recom_enchancement_factor: float
+    long_decaimiento_concentracion: float
+    ohm_resistence_set: float
+    ohm_resistence_reset: float
+    gamma: float
+    gamma_drift: float
+    E_m: float
+    I_0_set: float
+    I_0_reset: float
+    r_termica_no_percola: float
+    conductividad_termica_aire: float
+    conductividad_termica_CF: float
+    conductividad_termica_aislante: float
+    conductividad_termica_electrodo: float
+    Temperatura_electrodo: float
+    conductividad_electrica_CF_set: float
+    conductividad_electrica_CF_reset: float
+    ocupacion_max_pp_set: float
+    ocupacion_max_sp_set: float
+    factor_vecinos_pp_set: float
+    factor_libre_pp_set: float
+    factor_vecinos_sp_set: float
+    factor_libre_sp_set: float
+    lim_voltage_percolacion: float
+    compliance_voltage: float
+    voltaje_gen_oxigeno_pp_1: float
     num_oxigenos_pp_reset_1: int
+    voltaje_gen_oxigeno_pp_2: float
     num_oxigenos_pp_reset_2: int
+    voltaje_gen_oxigeno_sp: float
     num_oxigenos_sp_reset: int
 
     @staticmethod
     def from_dict(d: dict):
-        # Obtiene los tipos reales de SimulationConstants, no de SimulationParameters
         field_types = get_type_hints(SimulationConstants)
-
-        # Alias si es necesario; si no, mapa vacío sirve
-        mapping = {}
-
         kwargs = {}
         for k in field_types:
-            src = mapping.get(k, k)
-
-            if src not in d:
-                raise KeyError(f"La clave '{src}' no existe en el diccionario")
-
-            try:
-                kwargs[k] = field_types[k](d[src])
-            except Exception as e:
-                print(f"Error al convertir {k} con valor {d[src]}: {e}")
-                raise
-
+            if k not in d:
+                raise KeyError(f"La clave '{k}' no existe en el diccionario")
+            kwargs[k] = field_types[k](d[k])
         return SimulationConstants(**kwargs)
+
+    @property
+    def propiedades_termicas(self) -> dict:
+        return {
+            0: {"k": self.conductividad_termica_aire},
+            1: {"k": self.conductividad_termica_CF},
+            2: {"k": self.conductividad_termica_aislante},
+            3: {"k": self.conductividad_termica_electrodo},
+        }
 
     def update_gamma(self, nuevo_valor_gamma: float):
         return replace(self, gamma=nuevo_valor_gamma)
@@ -208,13 +194,6 @@ def procesar_filamentos_creados(
     """
 
     filamentos_nuevos = [i for i, v in enumerate(existentes) if v and not CF_creado[i]]
-
-    # imagen_path = (Path.cwd()
-    # / "Results copy"
-    # / f"simulation_{num_simulation}"
-    # / "Figures")
-
-    # pkl_path = Path.cwd() / "Results copy" / f"simulation_{num_simulation}" / "set"
 
     for i in filamentos_nuevos:
         CF_creado[i] = True
@@ -637,20 +616,12 @@ def PP_set(
     actual_state = utils.cargar_y_representar_estado(
         Path.cwd() / f"Init_data/init_state_{num_simulation - 1}",
         rutas["figures_path"] / f"Initial_state_{num_simulation}.png",
-        params.initial_voltaje,
+        0.0,
     )
 
     sistema_percola = False
     total_vacantes_pp_set = False
 
-    ocupacion_max_pp_set = 0.35  # 35% de ocupación máxima en PP set
-    factor_vecinos = 1.2  # Factor de aumento de la probabilidad si tiene vecino
-    factor_libre = 0.8  # Factor de disminución de la probabilidad si no tiene vecino
-    lim_voltage_percolacion = (
-        0.6  # Si el voltaje de percolación es mayor que este valor la simulación no vale la pena seguirla
-    )
-    temperatura = params.T_0
-    current = 0.0
     voltaje_percolacion = params.voltaje_final_set
     cambiado_ohm_resistence = False
     # AL inicio como la corriente es de tipo poole frenkel, la resitencia ohmica se considera nula
@@ -658,16 +629,18 @@ def PP_set(
 
     print(
         "Los valores de factor vecinos y factor libre son:",
-        factor_vecinos,
+        sim_ctes.factor_vecinos_pp_set,
         "y",
-        factor_libre,
+        sim_ctes.factor_libre_pp_set,
         "\n",
     )
 
-    max_vancantes_pp_set = int(ocupacion_max_pp_set * params.num_max_vacantes)
+    max_vancantes_pp_set = int(sim_ctes.ocupacion_max_pp_set * params.num_max_vacantes)
     voltage_CF_creado = np.full(len(CF_ranges), 0.0)
 
-    # Inicializo vectores donde almaceno datos
+    # Inicializo vectores donde almaceno datos y condiciones iniciales
+    temperatura = params.init_temp
+    current = 0.0
     E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
     vector_ddp = np.arange(0.000, params.voltaje_final_reset + params.paso_potencial, params.paso_potencial)
 
@@ -744,7 +717,7 @@ def PP_set(
                     "\n",
                 )
 
-                if voltaje_percolacion >= lim_voltage_percolacion:
+                if voltaje_percolacion >= sim_ctes.lim_voltage_percolacion:
                     # Si el voltaje de percolación es demasiado alto no va a coincidir con los datos experimentales, y no merece la pena seguir con la simulación
                     raise exceptions.HighPercolationVoltageException(voltage_percola=voltaje_percolacion)
 
@@ -815,7 +788,9 @@ def PP_set(
             # Si ha percolado uso la corriente de Ohm
             if not total_vacantes_pp_set:
                 try:
-                    current, resistencia = CurrentSolver.OmhCurrent(voltage, cf_clean_matrix, **sim_ctes_dict)
+                    current, resistencia = CurrentSolver.OmhCurrent(
+                        voltage, cf_clean_matrix, ohm_resistence=sim_ctes.ohm_resistence_set
+                    )
                     # print(
                     #     "OHM: Voltaje: ",
                     #     f"{voltage:.6f}",
@@ -838,53 +813,36 @@ def PP_set(
         else:
             sistema_percola = False
             mean_field = np.mean(E_field_vector).item()
-            simple_field = ElectricField.SimpleElectricField(voltage, params.device_size)
+            # simple_field = ElectricField.SimpleElectricField(voltage, params.device_size)
             # Si no ha percolado uso la corriente de Poole-Frenkel
             if not total_vacantes_pp_set:
-                current = CurrentSolver.Poole_Frenkel(temperatura, simple_field, **sim_ctes_dict) * (params.device_size)
-                # current = CurrentSolver.Poole_Frenkel(
-                #     temperatura, mean_field, **sim_ctes_dict
-                # ) * (params.device_size)
-                # print(
-                #     "POOLE-FRENKEL Voltaje: ",
-                #     f"{voltage:.6f}",
-                #     " Campo eléctrico: ",
-                #     f"{mean_field:.3f}",
-                #     " temperatura: ",
-                #     f"{temperatura:.5f}",
-                #     " intensidad: ",
-                #     f"{current:.4e}",
-                # )
+                current = CurrentSolver.Poole_Frenkel(
+                    temperatura,
+                    mean_field,
+                    pb_metal_insul=sim_ctes.pb_metal_insul_set,
+                    permitividad_relativa=sim_ctes.permitividad_relativa_set,
+                    I_0=sim_ctes.I_0_set,
+                ) * (params.device_size)
 
         # Obtengo los valores del campo eléctrico y la temperatura
-        temperatura = Temperature.Temperature_Joule(voltage, current, sistema_percola, params.T_0, **sim_ctes_dict)
+        temperatura = Temperature.Temperature_Joule(
+            voltage, current, sistema_percola, params.init_temp, **sim_ctes_dict
+        )
 
-        if voltage < voltaje_percolacion:
-            region_coords = (17, 22, 0, 40)
-            factor_region = 1
-            factor_vecinos = 1.2  # Factor de aumento de la probabilidad si tiene vecino
-            factor_libre = 0.8
-        else:
-            region_coords = (17, 22, 0, 40)
-            factor_region = 1
-
-        if total_vacantes < max_vancantes_pp_set and not (1400 <= resistencia <= 1600):
+        if total_vacantes < max_vancantes_pp_set:
             # Actualizo el estado del sistema
-            actual_state = update_state_generate_favorecido(
+            actual_state = update_state_generate(
                 actual_state,
                 params,
                 sim_ctes_dict,
                 E_field_vector,
                 temperatura,
-                factor_vecinos,
-                factor_libre,
-                neighbor_mode="vertical",
-                region_coords=region_coords,
-                factor_region=factor_region,
+                sim_ctes.factor_vecinos_pp_set,
+                sim_ctes.factor_libre_pp_set,
             )
         elif not total_vacantes_pp_set:
             print(
-                f"\nSe ha alcanzado la ocupación máxima del {ocupacion_max_pp_set * 100}% en la primera parte del set en el paso {k}.\n"
+                f"\nSe ha alcanzado la ocupación máxima del {sim_ctes.ocupacion_max_pp_set * 100}% en la primera parte del set en el paso {k}.\n"
             )
             total_vacantes_pp_set = True
 
@@ -1000,9 +958,7 @@ def SP_set(
 
     ocupacion_max_sp_set = 0 + 0  # 0.35
     max_vancantes_sp_set = max_vancantes_pp_set + int(ocupacion_max_sp_set * params.num_max_vacantes)
-    factor_vecinos = 1.0  # Factor de aumento de la probabilidad si tiene vecino
     compliance_voltage = 0.6
-    factor_libre = 0.9  # Factor de disminución de la probabilidad si no tiene vecino
     total_vacantes_sp_set = False
     num_columnas = 3  # Tiempo, Voltaje, Intensidad
 
@@ -1049,7 +1005,9 @@ def SP_set(
             # Si ha percolado uso la corriente de Ohm
             try:
                 if voltage <= compliance_voltage:
-                    current, resistencia = CurrentSolver.OmhCurrent(voltage, cf_clean_matrix, **sim_ctes_dict)
+                    current, resistencia = CurrentSolver.OmhCurrent(
+                        voltage, cf_clean_matrix, ohm_resistence=sim_ctes.ohm_resistence_set
+                    )
                     # print(
                     #     "OHM: Voltaje: ",
                     #     f"{voltage:.6f}",
@@ -1075,17 +1033,13 @@ def SP_set(
             mean_field = np.mean(E_field_vector).item()
             # Si no ha percolado uso la corriente de Poole-Frenkel
             if voltage <= compliance_voltage:
-                current = CurrentSolver.Poole_Frenkel(temperatura, mean_field, **sim_ctes_dict) * (params.device_size)
-                # print(
-                #     "POOLE-FRENKEL Voltaje: ",
-                #     f"{voltage:.6f}",
-                #     " Campo eléctrico: ",
-                #     f"{mean_field:.3f}",
-                #     " temperatura: ",
-                #     f"{temperatura:.5f}",
-                #     " intensidad: ",
-                #     f"{current:.4e}",
-                # )
+                current = CurrentSolver.Poole_Frenkel(
+                    temperatura,
+                    mean_field,
+                    pb_metal_insul=sim_ctes.pb_metal_insul_set,
+                    permitividad_relativa=sim_ctes.permitividad_relativa_set,
+                    I_0=sim_ctes.I_0_set,
+                ) * (params.device_size)
 
         # Obtengo los valores del campo eléctrico y la temperatura
         temperatura = Temperature.Temperature_Joule(voltage, current, sistema_percola, params.T_0, **sim_ctes_dict)
@@ -1097,8 +1051,8 @@ def SP_set(
                 sim_ctes_dict,
                 E_field_vector,
                 temperatura,
-                factor_vecinos,
-                factor_libre,
+                sim_ctes.factor_vecinos_sp_set,
+                sim_ctes.factor_libre_sp_set,
             )
         elif not total_vacantes_sp_set:
             print(
@@ -1201,13 +1155,10 @@ def PP_reset(
     params_dict = asdict(params)
     sim_ctes_dict = asdict(sim_ctes)
 
-    sim_ctes_dict["voltaje_generar_oxigeno_1"] = 0.45
-    sim_ctes_dict["voltaje_generar_oxigeno_2"] = 0.65
-
     # CUIDADO Configuración de umbrales, tiene q estar ordenado de mayor a menor!!
     oxygen_config = {
-        float(sim_ctes_dict["voltaje_generar_oxigeno_2"]): int(sim_ctes_dict["num_oxigenos_pp_reset_2"]),
-        float(sim_ctes_dict["voltaje_generar_oxigeno_1"]): int(sim_ctes_dict["num_oxigenos_pp_reset_1"]),
+        float(sim_ctes.voltaje_gen_oxigeno_pp_2): int(sim_ctes.num_oxigenos_pp_reset_2),
+        float(sim_ctes.voltaje_gen_oxigeno_pp_1): int(sim_ctes.num_oxigenos_pp_reset_1),
     }
 
     print("La configuración de generación de oxígeno es:")
@@ -1228,44 +1179,12 @@ def PP_reset(
     CF_destruido_index = 1
     roturas_dict = dict()
 
-    ohm_resistence_nuevo = sim_ctes.ohm_resistence - 100
-    sim_ctes = sim_ctes.update_ohm_resistence(ohm_resistence_nuevo)
-    sim_ctes_dict = asdict(sim_ctes)
-    print(
-        "\n El nuevo valor de resistencia de cada celda es:",
-        sim_ctes_dict["ohm_resistence"],
-        "\n",
-    )
-
     print(f"Simulacion {num_simulation} - primera parte del reset")
 
     # Ciclo para la primera parte del reset
     for k in range(0, params.num_pasos + 1):
         simulation_time = params.paso_temporal * k
         voltage = vector_ddp[k]
-
-        if abs(voltage) > 0.52 and k % 100 == 0:
-            ohm_resistence_nuevo = sim_ctes.ohm_resistence + 4
-            sim_ctes = sim_ctes.update_ohm_resistence(ohm_resistence_nuevo)
-            sim_ctes_dict = asdict(sim_ctes)
-            print(
-                "\n El nuevo valor de resistencia de cada celda es:",
-                sim_ctes_dict["ohm_resistence"],
-                " en el voltaje: ",
-                voltage,
-                "\n",
-            )
-        elif abs(voltage) > 0.80 and k % 100 == 0:
-            ohm_resistence_nuevo = sim_ctes.ohm_resistence + 6
-            sim_ctes = sim_ctes.update_ohm_resistence(ohm_resistence_nuevo)
-            sim_ctes_dict = asdict(sim_ctes)
-            print(
-                "\n El nuevo valor de resistencia de cada celda es:",
-                sim_ctes_dict["ohm_resistence"],
-                " en el voltaje: ",
-                voltage,
-                "\n",
-            )
 
         # Obtengo los valores del campo eléctrico
         E_field = abs(ElectricField.SimpleElectricField(voltage, params.device_size))
@@ -1302,7 +1221,9 @@ def PP_reset(
 
             # Si ha percolado uso la corriente de Ohm
             try:
-                current, resistencia = CurrentSolver.OmhCurrent(voltage, cf_clean_matrix, **sim_ctes_dict)
+                current, resistencia = CurrentSolver.OmhCurrent(
+                    voltage, cf_clean_matrix, ohm_resistence=sim_ctes.ohm_resistence_reset
+                )
                 print("Para el voltaje", voltage, "la resistencia es: ", resistencia)
 
                 if k == 0 and not (850 <= resistencia <= 1200):
@@ -1322,31 +1243,20 @@ def PP_reset(
 
         else:
             percola = False
+            all_df_destruidos = True
 
-            # Cambio el valor I_0 cuando el sistema ha roto todos los filamentos
-            if np.all(CF_destruido) and not all_df_destruidos:
-                I_0_nuevo = sim_ctes.I_0_reset
-                I_0_nuevo = 1.4917e-01
-                permitividad_relativa_nuevo = sim_ctes.permitividad_relativa_reset
-                pb_metal_insul_nuevo = sim_ctes.pb_metal_insul_reset
-                print(
-                    f"Se han destruido todos los filamentos en el paso",
-                    k,
-                    "con un voltaje de",
-                    round(voltage, 4),
-                    "los valores de la nueva corriente Poole-Frenkel son:",
-                    f"\n I_0: {I_0_nuevo}, permitividad_relativa: {permitividad_relativa_nuevo}, pb_metal_insul: {pb_metal_insul_nuevo}\n",
-                )
-                sim_ctes = sim_ctes.update_I_0(I_0_nuevo)
-                sim_ctes = sim_ctes.update_permitividad_relativa(permitividad_relativa_nuevo)
-                sim_ctes = sim_ctes.update_pb_metal_insul(pb_metal_insul_nuevo)
-
-                sim_ctes_dict = asdict(sim_ctes)
-                all_df_destruidos = True
-
-            # Si no ha percolado uso la corriente de Poole-Frenkel
+            # Si no percola uso la corriente de Poole-Frenkel
             # current = abs(CurrentSolver.Poole_Frenkel(temperatura,float(np.mean(E_field_vector)), **sim_ctes_dict)* (params.device_size))
-            current = abs(CurrentSolver.Poole_Frenkel(temperatura, E_field, **sim_ctes_dict) * (params.device_size))
+            current = abs(
+                CurrentSolver.Poole_Frenkel(
+                    temperatura,
+                    E_field,
+                    pb_metal_insul=sim_ctes.pb_metal_insul_reset,
+                    permitividad_relativa=sim_ctes.permitividad_relativa_reset,
+                    I_0=sim_ctes.I_0_reset,
+                )
+                * (params.device_size)
+            )
 
             # Calculo la temperatura cuando no hay percolación
             temperatura = Temperature.Temperature_Joule(voltage, current, percola, params.T_0, **sim_ctes_dict)
@@ -1535,7 +1445,9 @@ def SP_reset(
 
             # Si ha percolado uso la corriente de Ohm
             try:
-                current, _ = CurrentSolver.OmhCurrent(voltage, cf_clean_matrix, **sim_ctes_dict)
+                current, _ = CurrentSolver.OmhCurrent(
+                    voltage, cf_clean_matrix, ohm_resistence=sim_ctes.ohm_resistence_reset
+                )
             except ZeroDivisionError:
                 raise exceptions.NullResistanceException(
                     simulation_path=rutas["simulation_path"],
@@ -1551,9 +1463,10 @@ def SP_reset(
             current = abs(
                 CurrentSolver.Poole_Frenkel(
                     temperatura,
-                    ElectricField.SimpleElectricField(voltage, params.device_size),
-                    # float(np.mean(E_field_vector)),
-                    **sim_ctes_dict,
+                    E_field,
+                    pb_metal_insul=sim_ctes.pb_metal_insul_reset,
+                    permitividad_relativa=sim_ctes.permitividad_relativa_reset,
+                    I_0=sim_ctes.I_0_reset,
                 )
                 * (params.device_size)
             )
