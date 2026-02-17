@@ -97,63 +97,92 @@ def initial_state_priv(Eje_x: int, Eje_y: int, num_trampas: int, regiones_pesos:
     return InitialState
 
 
-def Generate(
+def calcular_probabilidad_generacion(
     time_stp: float,
-    electric_field: float,
-    temp: float,
+    electric_field: np.ndarray | float,
+    temp: np.ndarray | float,
     vibration_frequency: float,
     generation_energy: float,
     cte_red: float,
     gamma: float,
-) -> float:
+) -> np.ndarray | float:
     """
-    Calculates the generation probability of RRAM devices.
-    Args:
-        time_stp (float): The time step for the calculation.
-        electric_field (float): The electric field applied to the device.
-        temp (float): The temperature of the device.
-        **kwargs: Contains the constants needed for the calculation.
-    Keyword Args:
-        vibration_frequency (float): The vibration frequency constant. Required if kwargs is provided.
-        activation_energy (float): The activation energy constant. Required if kwargs is provided.
-        cte_red (float): The reduction constant. Required if kwargs is provided.
-        gamma (float): The gamma constant. Required if kwargs is provided.
-    Returns:
-        float: The generation probability of generate a vancancy.
+    Calcula la matriz de probabilidades de generación para una matriz de campo eléctrico.
+    Soporta tanto escalares (float) como matrices (np.ndarray) para el campo y la temperatura.
     """
 
     exponente = (generation_energy - (gamma * cte_red * electric_field)) / (k_b_ev * temp)
-    prob_generacion = time_stp * vibration_frequency * (np.exp(-exponente))
-
-    return prob_generacion
-
-
-def Generate_vectorized(
-    time_stp: float,
-    electric_field_matrix: np.ndarray,
-    temp: np.ndarray,
-    vibration_frequency: float,
-    generation_energy: float,
-    cte_red: float,
-    gamma: float,
-) -> np.ndarray:
-    """
-    Calcula la matriz de probabilidades de generación para una matriz de campo eléctrico.
-
-    Parámetros:
-        time_stp (float): Paso temporal.
-        electric_field_matrix (np.ndarray): Matriz 2D con valores del campo eléctrico, cada fila tiene el mimso valor de campo eléctrico.
-        temp (float): Temperatura (escala única para toda la matriz).
-        **kwargs: Constantes necesarias (vibration_frequency, activation_energy, cte_red, gamma).
-
-    Retorna:
-        np.ndarray: Matriz con probabilidades de generación (mismo tamaño que electric_field_matrix).
-    """
-
-    exponente = (generation_energy - (gamma * cte_red * electric_field_matrix)) / (k_b_ev * temp)
     prob_matrix = time_stp * vibration_frequency * np.exp(-exponente)
 
     # Limitar probabilidades máximas a 1
     prob_matrix = np.minimum(prob_matrix, 1.0)
 
     return prob_matrix
+
+
+def get_generation_probabilities_matrix(
+    state: np.ndarray,
+    paso_temporal: float,
+    Electric_field: np.ndarray | float,
+    temperatura: np.ndarray | float,
+    factor_vecinos: float,
+    factor_sin_vecinos: float,
+    vibration_frequency: float,
+    generation_energy: float,
+    cte_red: float,
+    gamma: float,
+    neighbor_mode: str = "both",
+) -> np.ndarray:
+    """
+    Calcula el mapa de probabilidades locales (0 a 1) para generar nuevas vacantes en la red,
+    teniendo en cuenta la temperatura, el campo eléctrico y la topología de vecinos.
+    """
+
+    # 1. Máscara de posiciones libres
+    free_mask = state == 0
+    vecino_mask = np.zeros_like(state, dtype=bool)
+
+    # 2. Lógica de Vecinos
+    if neighbor_mode in ["horizontal", "both"]:
+        left_neighbor = np.zeros_like(state, dtype=bool)
+        left_neighbor[:, 1:] = state[:, :-1] == 1
+        right_neighbor = np.zeros_like(state, dtype=bool)
+        right_neighbor[:, :-1] = state[:, 1:] == 1
+        vecino_mask |= left_neighbor | right_neighbor
+
+    if neighbor_mode in ["vertical", "both"]:
+        up_neighbor = np.zeros_like(state, dtype=bool)
+        up_neighbor[1:, :] = state[:-1, :] == 1
+        down_neighbor = np.zeros_like(state, dtype=bool)
+        down_neighbor[:-1, :] = state[1:, :] == 1
+        vecino_mask |= up_neighbor | down_neighbor
+
+    free_with_vecino = free_mask & vecino_mask
+    free_without_vecino = free_mask & (~vecino_mask)
+
+    # 3. Probabilidad base
+    prob_base_raw = calcular_probabilidad_generacion(
+        time_stp=paso_temporal,
+        electric_field=Electric_field,
+        temp=temperatura,
+        vibration_frequency=vibration_frequency,
+        generation_energy=generation_energy,
+        cte_red=cte_red,
+        gamma=gamma,
+    )
+
+    # Si la calculadora devolvió un escalar (float), lo expandimos a una matriz del mismo tamaño que 'state'
+    if not isinstance(prob_base_raw, np.ndarray) or prob_base_raw.ndim == 0:
+        prob_base_matrix = np.full(state.shape, prob_base_raw)
+    else:
+        prob_base_matrix = prob_base_raw
+
+    # 4. Aplicar factores condicionales (Topología)
+    prob_final = np.zeros_like(prob_base_matrix)
+    prob_final[free_with_vecino] = prob_base_matrix[free_with_vecino] * factor_vecinos
+    prob_final[free_without_vecino] = prob_base_matrix[free_without_vecino] * factor_sin_vecinos
+
+    # Saturamos a 1.0 por seguridad
+    prob_final = np.minimum(prob_final, 1.0)
+
+    return prob_final

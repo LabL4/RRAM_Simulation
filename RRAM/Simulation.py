@@ -1,5 +1,3 @@
-from tkinter import E
-from ast import And
 from . import (
     CurrentSolver,
     ElectricField,
@@ -22,7 +20,6 @@ import pandas as pd
 import numpy as np
 import pickle
 import time
-import csv
 
 
 def medir_tiempo(func):
@@ -266,219 +263,51 @@ def procesar_filamentos_destruidos(
     return None
 
 
-def update_state_generate(
+def update_state_generation(
     state: np.ndarray,
     params: SimulationParameters,
-    sim_ctes_cte: dict,
-    E_field_matrix: np.ndarray,
-    temperatura: np.ndarray,
+    sim_ctes: SimulationConstants,
+    E_field: np.ndarray | float,
+    temperatura: np.ndarray | float,
     factor_vecinos: float,
     factor_sin_vecinos: float,
     neighbor_mode: str = "both",
 ) -> np.ndarray:
     """
-    Updates the state matrix by generating new vacancies based on the electric field,
-    temperature, and neighboring conditions.
-
-    Args:
-        state (np.ndarray): Current state matrix where 0 represents free positions
-            and 1 represents occupied positions.
-        params (SimulationParameters): Object containing simulation parameters such as
-            `paso_temporal`, `x_size`, and `y_size`.
-        sim_ctes_cte (dict): Dictionary containing simulation constants required for
-            the generation process.
-        E_field_matrix (np.ndarray): Matrix representing the electric field for each
-            row of the state matrix.
-        temperatura (float): Temperature value used in the generation probability calculation.
-        factor_vecinos (float): Multiplicative factor to increase the probability of
-            generation for free positions with neighbors.
-        factor_sin_vecinos (float): Multiplicative factor to decrease the probability of
-            generation for free positions without neighbors.
-        neighbor_mode (str, optional): Mode to determine neighbor consideration.
-            Options are "horizontal", "vertical", or "both". Defaults to "both".
-
-    Returns:
-        np.ndarray: Updated state matrix with new vacancies generated based on the
-        calculated probabilities.
-
-    Raises:
-        AssertionError: If the number of rows in `E_field_vector` does not match the
-            number of rows in the `state` matrix.
+    Orquesta el proceso de generación de vacantes:
+    Abre las dataclasses (params y sim_ctes) y delega la física al módulo Generation.
     """
-
-    assert E_field_matrix.shape[0] == state.shape[0], (
-        "El vector de campo eléctrico debe tener igual número de filas que la matriz de estado"
-    )
 
     act_state = state.copy()
+    x_size, y_size = state.shape
 
-    # Máscara posiciones libres (True donde actual_state == 0)
-    free_mask = state == 0
+    # Solo necesitamos intervenir si nos pasan un vector 1D para generar una matriz 2D con el mismo valor en cada fila, si ya nos pasan un escalar o una matriz 2D, lo dejamos tal cual.
+    if isinstance(E_field, np.ndarray) and E_field.ndim == 1:
+        E_field_matrix = E_field.reshape(-1, 1)
+    else:
+        # Si es un float o ya es 2D, lo pasamos tal cual
+        E_field_matrix = E_field
 
-    # Inicializamos la máscara de vecinos en Falso
-    vecino_mask = np.zeros_like(state, dtype=bool)
-
-    # --- Lógica Horizontal (Izquierda / Derecha) ---
-    if neighbor_mode in ["horizontal", "both"]:
-        left_neighbor = np.zeros_like(state, dtype=bool)
-        left_neighbor[:, 1:] = state[:, :-1] == 1
-
-        right_neighbor = np.zeros_like(state, dtype=bool)
-        right_neighbor[:, :-1] = state[:, 1:] == 1
-
-        vecino_mask |= left_neighbor | right_neighbor
-
-    # --- Lógica Vertical (Arriba / Abajo) ---
-    if neighbor_mode in ["vertical", "both"]:
-        up_neighbor = np.zeros_like(state, dtype=bool)
-        up_neighbor[1:, :] = state[:-1, :] == 1
-
-        down_neighbor = np.zeros_like(state, dtype=bool)
-        down_neighbor[:-1, :] = state[1:, :] == 1
-
-        vecino_mask |= up_neighbor | down_neighbor
-
-    # Definir quiénes están libres CON vecinos y quiénes SIN vecinos
-    free_with_vecino = free_mask & vecino_mask
-    free_without_vecino = free_mask & (~vecino_mask)
-
-    # --- Cálculo de probabilidades VECTORIZADO ---
-
-    # Crear matriz de campo eléctrico expandida (cada fila repite su valor)
-    # E_field_matrix = np.tile(E_field_vector.reshape(-1, 1), (1, params.y_size))
-
-    # Calcular probabilidades usando la función vectorizada
-    prob_base_matrix = Generation.Generate_vectorized(params.paso_temporal, E_field_matrix, temperatura, **sim_ctes_cte)
-
-    # Crear matriz de probabilidad final
-    prob_final = np.zeros_like(prob_base_matrix)
-
-    # Aplicar factores condicionales
-    prob_final[free_with_vecino] = prob_base_matrix[free_with_vecino] * factor_vecinos
-    prob_final[free_without_vecino] = prob_base_matrix[free_without_vecino] * factor_sin_vecinos
-
-    # Generación estocástica
-    aleatorios = np.random.rand(params.x_size, params.y_size)
-    nueva_vacante = aleatorios < prob_final
-
-    act_state[nueva_vacante] = 1
-
-    return act_state
-
-
-def update_state_generate_favorecido(
-    state: np.ndarray,
-    params: SimulationParameters,
-    sim_ctes_cte: dict,
-    E_field_matrix: np.ndarray,
-    temperatura_matrix: np.ndarray,
-    factor_vecinos: float,
-    factor_sin_vecinos: float,
-    neighbor_mode: str = "both",
-    region_coords: tuple | None = None,
-    factor_region: float = 1.0,
-) -> np.ndarray:
-    """
-    Updates the state matrix by generating new vacancies based on the electric field,
-    temperature, neighboring conditions, and an optional favored rectangular region.
-
-    Args:
-        state (np.ndarray): Current state matrix where 0 represents free positions
-            and 1 represents occupied positions.
-        params (SimulationParameters): Simulation parameters including paso_temporal,
-            x_size, and y_size.
-        sim_ctes_cte (dict): Dictionary containing simulation constants for generation.
-        E_field_matrix (np.ndarray): Matrix representing the electric field (same shape as state).
-        temperatura_matrix (np.ndarray): Temperature value used in probability calculation.
-        factor_vecinos (float): Multiplicative factor for positions with neighbors.
-        factor_sin_vecinos (float): Multiplicative factor for isolated positions.
-        neighbor_mode (str, optional): Neighbor consideration mode. Options: "horizontal",
-            "vertical", or "both". Defaults to "both".
-        region_coords (tuple | None, optional): Rectangular region coordinates as
-            (x_min, x_max, y_min, y_max) with exclusive upper bounds. Defaults to None.
-        factor_region (float, optional): Additional multiplicative factor for the
-            specified region. Defaults to 1.0.
-
-    Returns:
-        np.ndarray: Updated state matrix with new vacancies generated.
-    """
-
-    assert E_field_matrix.shape[0] == state.shape[0], (
-        "El vector de campo eléctrico debe tener igual número de filas que la matriz de estado"
+    # Calculo la matriz de probabilidades de generación para cada posición
+    prob_final = Generation.get_generation_probabilities_matrix(
+        state=state,
+        paso_temporal=params.paso_temporal,
+        Electric_field=E_field_matrix,
+        temperatura=temperatura,
+        factor_vecinos=factor_vecinos,
+        factor_sin_vecinos=factor_sin_vecinos,
+        vibration_frequency=sim_ctes.vibration_frequency,
+        generation_energy=sim_ctes.generation_energy,
+        cte_red=sim_ctes.cte_red,
+        gamma=sim_ctes.gamma,
+        neighbor_mode=neighbor_mode,
     )
 
-    act_state = state.copy()
-
-    # Máscara posiciones libres (True donde actual_state == 0)
-    free_mask = state == 0
-
-    # Inicializamos la máscara de vecinos en Falso
-    vecino_mask = np.zeros_like(state, dtype=bool)
-
-    # --- Lógica Horizontal (Izquierda / Derecha) ---
-    if neighbor_mode in ["horizontal", "both"]:
-        left_neighbor = np.zeros_like(state, dtype=bool)
-        left_neighbor[:, 1:] = state[:, :-1] == 1
-
-        right_neighbor = np.zeros_like(state, dtype=bool)
-        right_neighbor[:, :-1] = state[:, 1:] == 1
-
-        vecino_mask |= left_neighbor | right_neighbor
-
-    # --- Lógica Vertical (Arriba / Abajo) ---
-    if neighbor_mode in ["vertical", "both"]:
-        up_neighbor = np.zeros_like(state, dtype=bool)
-        up_neighbor[1:, :] = state[:-1, :] == 1
-
-        down_neighbor = np.zeros_like(state, dtype=bool)
-        down_neighbor[:-1, :] = state[1:, :] == 1
-
-        vecino_mask |= up_neighbor | down_neighbor
-
-    # Definir quiénes están libres CON vecinos y quiénes SIN vecinos
-    free_with_vecino = free_mask & vecino_mask
-    free_without_vecino = free_mask & (~vecino_mask)
-
-    # --- Cálculo de probabilidades VECTORIZADO ---
-
-    # Calcular probabilidades usando la función vectorizada directamente
-    prob_base_matrix = Generation.Generate_vectorized(
-        params.paso_temporal, E_field_matrix, temperatura_matrix, **sim_ctes_cte
-    )
-
-    # Crear matriz de probabilidad final
-    prob_final = np.zeros_like(prob_base_matrix)
-
-    # Aplicar factores condicionales
-    prob_final[free_with_vecino] = prob_base_matrix[free_with_vecino] * factor_vecinos
-    prob_final[free_without_vecino] = prob_base_matrix[free_without_vecino] * factor_sin_vecinos
-
-    # --- Región opcional favorecida ---
-    if region_coords is not None and factor_region != 1.0:
-        x_min, x_max, y_min, y_max = region_coords
-
-        # Clampeamos por seguridad para no salirnos de los límites
-        x_min = max(0, min(x_min, params.x_size))
-        x_max = max(0, min(x_max, params.x_size))
-        y_min = max(0, min(y_min, params.y_size))
-        y_max = max(0, min(y_max, params.y_size))
-
-        if x_min < x_max and y_min < y_max:
-            rect_mask = np.zeros_like(state, dtype=bool)
-            rect_mask[x_min:x_max, y_min:y_max] = True
-
-            # Solo afectar a posiciones libres
-            rect_mask &= free_mask
-
-            prob_final[rect_mask] *= factor_region
-
-    # Saturar probabilidad en 1
-    prob_final = np.minimum(prob_final, 1.0)
-
-    # Generación estocástica
-    aleatorios = np.random.rand(params.x_size, params.y_size)
+    # 5. Generación de nuevas vacantes de forma estocástica
+    aleatorios = np.random.rand(x_size, y_size)
     nueva_vacante = aleatorios < prob_final
 
+    # 6. Actualizar estado
     act_state[nueva_vacante] = 1
 
     return act_state
@@ -508,7 +337,7 @@ def update_state_recombinate(
             break  # Solo usar el umbral más alto superado
 
     # 2. Movemos los iones
-    oxygen_state, velocidad = Recombination.move_oxygen_ions_update(
+    oxygen_state, velocidad = Recombination.move_oxygen_ions(
         paso_temp=params.paso_temporal,
         oxygen_state=oxygen_state,
         temperature=temperatura,
@@ -615,10 +444,7 @@ def PP_set(
     data_pp_set = np.zeros((params.num_pasos, num_columnas), dtype=np.float64)
     # config_matrix_pp_set = np.zeros((int((params.num_pasos / params.paso_guardar)), params.x_size, params.y_size))
 
-    params_dict = asdict(params)
-    sim_ctes_dict = asdict(sim_ctes)
-
-    print("El valor de gamma es:", sim_ctes_dict["gamma"], "\n")
+    print("El valor de gamma es:", sim_ctes.gamma, "\n")
 
     indice_gamma = 1
 
@@ -724,32 +550,30 @@ def PP_set(
                     num_simulation=num_simulation,
                 )
 
-            # if sum(CF_creado) == indice_gamma:
-            #     if len(CF_ranges) == 1:
-            #         print("Todos los filamentos creados.")
-            #         nueva_gamma = sim_ctes.gamma + 2
-            #         sim_ctes = sim_ctes.update_gamma(nueva_gamma)
-            #         sim_ctes_dict = asdict(sim_ctes)
-            #         indice_gamma = indice_gamma + 1
-            #         print("\n El nuevo valor de gamma es:", sim_ctes_dict["gamma"])
-            # if len(CF_ranges) == 2:
-            #     if sum(CF_creado) == 2 and not cambiado_ohm_resistence:
-            #         print("Todos los filamentos creados.")
-            #         actual_resistance = sim_ctes.ohm_resistence
-            #         sim_ctes = sim_ctes.update_ohm_resistence(
-            #             actual_resistance - 15
-            #         )
-            #         print("El nuevo valor de R_ohm es:", sim_ctes.ohm_resistence)
-            #         sim_ctes_dict = asdict(sim_ctes)
-            #         cambiado_ohm_resistence = True
-            #     else:
-            #         nueva_gamma = sim_ctes.gamma / 2
-            #         sim_ctes = sim_ctes.update_gamma(nueva_gamma)
-            #         sim_ctes_dict = asdict(sim_ctes)
-            #         indice_gamma = indice_gamma + 1
-            #         print("\n El nuevo valor de gamma es:", sim_ctes_dict["gamma"])
-            # else:
-            #     nueva_gamma = sim_ctes.gamma - 1
+            if sum(CF_creado) == indice_gamma:
+                if len(CF_ranges) == 1:
+                    print("Todos los filamentos creados.")
+                    nueva_gamma = sim_ctes.gamma + 2
+                    sim_ctes = sim_ctes.update_gamma(nueva_gamma)
+                    sim_ctes_dict = asdict(sim_ctes)
+                    indice_gamma = indice_gamma + 1
+                    print("\n El nuevo valor de gamma es:", sim_ctes_dict["gamma"])
+            if len(CF_ranges) == 2:
+                if sum(CF_creado) == 2 and not cambiado_ohm_resistence:
+                    print("Todos los filamentos creados.")
+                    actual_resistance = sim_ctes.ohm_resistence_set
+                    sim_ctes = sim_ctes.update_ohm_resistence(actual_resistance - 15)
+                    print("El nuevo valor de R_ohm es:", sim_ctes.ohm_resistence_set)
+                    sim_ctes_dict = asdict(sim_ctes)
+                    cambiado_ohm_resistence = True
+                else:
+                    nueva_gamma = sim_ctes.gamma / 2
+                    sim_ctes = sim_ctes.update_gamma(nueva_gamma)
+                    sim_ctes_dict = asdict(sim_ctes)
+                    indice_gamma = indice_gamma + 1
+                    print("\n El nuevo valor de gamma es:", sim_ctes_dict["gamma"])
+            else:
+                nueva_gamma = sim_ctes.gamma - 1
 
             cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf)
 
@@ -759,16 +583,6 @@ def PP_set(
                     current, resistencia = CurrentSolver.OmhCurrent(
                         voltage, cf_clean_matrix, ohm_resistence=sim_ctes.ohm_resistence_set
                     )
-                    # print(
-                    #     "OHM: Voltaje: ",
-                    #     f"{voltage:.6f}",
-                    #     " Resistencia: ",
-                    #     f"{resistencia:4f}",
-                    #     " temperatura: ",
-                    #     f"{temperatura:.5f}",
-                    #     " intensidad: ",
-                    #     f"{current:.4e}",
-                    # )
                 except ZeroDivisionError:
                     raise exceptions.NullResistanceException(
                         simulation_path=rutas["simulation_path"],
@@ -803,10 +617,10 @@ def PP_set(
 
         if total_vacantes < max_vancantes_pp_set:
             # Actualizo el estado del sistema
-            actual_state = update_state_generate(
+            actual_state = update_state_generation(
                 actual_state,
                 params,
-                sim_ctes_dict,
+                sim_ctes,
                 E_field_matrix,
                 temperatura_matrix,
                 sim_ctes.factor_vecinos_pp_set,
@@ -982,16 +796,6 @@ def SP_set(
                     current, resistencia = CurrentSolver.OmhCurrent(
                         voltage, cf_clean_matrix, ohm_resistence=sim_ctes.ohm_resistence_set
                     )
-                    # print(
-                    #     "OHM: Voltaje: ",
-                    #     f"{voltage:.6f}",
-                    #     " Resistencia: ",
-                    #     f"{resistencia:4f}",
-                    #     " temperatura: ",
-                    #     f"{temperatura:.5f}",
-                    #     " intensidad: ",
-                    #     f"{current:.4e}",
-                    # )
             except ZeroDivisionError:
                 raise exceptions.NullResistanceException(
                     simulation_path=rutas["simulation_path"],
@@ -1027,10 +831,10 @@ def SP_set(
 
         if total_vacantes < max_vancantes_sp_set:
             # Actualizo el estado del sistema
-            actual_state = update_state_generate(
+            actual_state = update_state_generation(
                 actual_state,
                 params,
-                sim_ctes_dict,
+                sim_ctes,
                 E_field_matrix,
                 temperatura_matrix,
                 sim_ctes.factor_vecinos_sp_set,
@@ -1133,9 +937,6 @@ def PP_reset(
 
     num_columnas = 3  # Tiempo, Voltaje, Intensidad
     data_pp_reset = np.zeros((params.num_pasos + 1, num_columnas), dtype=np.float64)
-
-    params_dict = asdict(params)
-    sim_ctes_dict = asdict(sim_ctes)
 
     # CUIDADO Configuración de umbrales, tiene q estar ordenado de mayor a menor!!
     oxygen_config = {
@@ -1361,7 +1162,7 @@ def SP_reset(
 
     params_dict = asdict(params)
     sim_ctes_dict = asdict(sim_ctes)
-
+    # TODO: cambiar esto y ponerlo como en el pp reset
     sim_ctes_dict["voltaje_generar_oxigeno"] = -0.2
 
     # Configuración de umbrales

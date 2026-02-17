@@ -125,8 +125,8 @@ def Recombine_opt(
     # =========================================================================
     active_probs = Prob_Recombination(
         paso_temporal=paso_temp,
-        velocidad=active_vels,  # <--- Le pasamos la velocidad filtrada (ej. lista de 4 elems)
-        temp=active_temps,  # <--- Le pasamos la temperatura filtrada (ej. lista de 4 elems)
+        velocidad=active_vels,
+        temp=active_temps,
         vibration_frequency=vibration_frequency,
         recom_enchancement_factor=recom_enchancement_factor,
         recombination_energy=recombination_energy,
@@ -153,72 +153,6 @@ def Recombine_opt(
 
 
 def move_oxygen_ions(
-    paso_temp: float,
-    oxygen_state: np.ndarray,
-    temperature: np.ndarray | float,
-    E_field: float,
-    grid_size: float,
-    vibration_frequency: float,
-    gamma_drift: float,
-    migration_energy: float,
-    cte_red: float,
-):  # type: ignore
-    """
-    Move the oxygen ions in the simulation based on the given parameters.
-    Parameters:
-        - simu_time (float): The simulation time.
-        - oxygen_state (np.ndarray): The matrix representing the state of oxygen ions.
-        - temperature (float): The temperature of the system.
-        - E_field (float): The electric field strength.
-        - atom_size (float): The size of each atom.
-    Returns:
-    np.ndarray: The updated matrix representing the state of oxygen ions after the movement.
-    """
-
-    # Obtengo la velocidad de los iones de oxígeno v = ((2 * a)/t0)*exp(−Em/kT) sinh((d * γ_drift * F)/2kT)
-    try:
-        # Obtengo la velocidad de los iones de oxígeno v = ((2 * a)/t0)*exp(−Em/kT) sinh((d * γ_drift * F)/2kT)
-        senoh = np.sinh((cte_red * E_field * gamma_drift) / (2 * k_b_ev * temperature))
-        exp_velocity = np.exp(-migration_energy / (k_b_ev * temperature))
-        oxygen_velocity = 2 * cte_red * vibration_frequency * (senoh * exp_velocity)
-    except OverflowError as Overflow_exception:
-        print("\n Error en el cálculo de la velocidad de los iones de oxígeno, los valores empleados son:")
-        print(f"OverflowError: {Overflow_exception}")
-        print(f"cte_red: {cte_red}")
-        print(f"E_field: {E_field}")
-        print(f"gamma_drift: {gamma_drift}")
-        print(f"k_b_ev: {k_b_ev}")
-        print(f"temperature: {temperature}")
-        print(f"E_m: {migration_energy}")
-        sys.exit(1)  # Termina la ejecución del programa con un código de salida 1
-
-    print("Velocidad de los iones de oxígeno: ", oxygen_velocity)
-    # Esto es un arreglo temporal para dar cuenta que hay un tiempo hasta que los iones de oxígeno se muevan
-
-    valor_prueba = abs(E_field * (10e-9))
-    if valor_prueba > 0.7:
-        oxygen_velocity = 5.2e-07
-    elif valor_prueba > 0.5:
-        oxygen_velocity = 3e-07
-    else:
-        oxygen_velocity = 0
-
-    # Calculo la cantidad de "casillas" que se moverá el ion de oxígeno
-    displacement = int(round((oxygen_velocity * paso_temp) / grid_size))
-
-    # Generar nueva matriz vacía para estado actualizado
-    oxygen_state_new = np.zeros_like(oxygen_state)
-
-    if displacement > 0:
-        oxygen_state_new[:, displacement:] = oxygen_state[:, :-displacement]
-    else:
-        # Sin desplazamiento, copiar directamente
-        oxygen_state_new = oxygen_state.copy()
-
-    return oxygen_state_new, oxygen_velocity
-
-
-def move_oxygen_ions_update(
     paso_temp: float,
     oxygen_state: np.ndarray,
     temperature: np.ndarray | float,
