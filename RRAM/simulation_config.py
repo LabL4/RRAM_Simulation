@@ -43,7 +43,7 @@ ELECTRICAL_DEFAULTS = {
 # ============================================================================
 THERMAL_DEFAULTS = {
     "init_temp": 300.0,
-    "r_termica_no_percola": 2500.0,
+    "r_termica_no_percola": 1000.0,
     "conductividad_termica_aire": 0.02,
     "conductividad_termica_CF": 1.0,
     "conductividad_termica_aislante": 0.0,
@@ -56,7 +56,7 @@ THERMAL_DEFAULTS = {
 # ============================================================================
 SIMULATION_DEFAULTS = {
     "device_size": 5e-9,
-    "atom_size": 0.125e-9,
+    "atom_size": 0.125e-9,  # Se deberia llamar tamaño de red
     "num_trampas": 70,
     "total_simulation_time": 10.0,
     "num_pasos": 10000,
@@ -66,7 +66,7 @@ SIMULATION_DEFAULTS = {
 }
 
 # ============================================================================
-# PARÁMETROS HEURÍSTICOS Y ALGORÍTMICOS (SET / RESET)
+# PARÁMETROS SET / RESET
 # ============================================================================
 SET_RESET_DEFAULTS = {
     "ocupacion_max_pp_set": 0.35,

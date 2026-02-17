@@ -17,7 +17,7 @@ def SimpleElectricField(DDP: float, espesor: float) -> float:
 
 
 def GapElectricField(
-    potential: float, pos_y: int, actual_state: np.ndarray, **kwargs
+    potential: float, pos_y: int, actual_state: np.ndarray, device_size: float, grid_size: float
 ) -> float:
     """
     Calculate the No-normal electric field the device.
@@ -31,7 +31,7 @@ def GapElectricField(
         - pos_y (int): The y-axis position to evaluate the gap.
          -actual_state (np.array): The current state of the device, represented as a 2D array.
 
-    **kwargs: Optional keyword arguments for:
+    **kwargs:
         - 'device_size' (float): The size of the device in meters. Default is 10e-9.
         - 'atom_size' (float): The size of an atom in meters. Default is 0.25e-9.
 
@@ -39,22 +39,9 @@ def GapElectricField(
         - float: The electric field across the gap in the device.
     """
 
-    # Obtengo los valores de las constantes si las estoy pasando como argumentos
-    if kwargs:
-        size_device = float(kwargs.get("device_size", 10e-9))
-        cte_red = float(kwargs.get("atom_size", 0.25e-9))
-    else:
-        size_device = 10e-9
-        cte_red = 0.25e-9
-
-    # Como solo tengo 0 y 1 la cantidad de 1 es directamente la suma de la fila
-    gap = cte_red * (np.sum(actual_state[pos_y]))
-
-    L = size_device - gap
-
+    gap = grid_size * (np.sum(actual_state[pos_y]))
+    L = device_size - gap
     if L == 0:
-        E_field = potential / size_device
+        return potential / device_size
     else:
-        E_field = potential / L
-
-    return E_field
+        return potential / L

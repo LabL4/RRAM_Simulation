@@ -276,14 +276,6 @@ def Poole_Frenkel(
     Fórmula:
         I_PF = I_0 * E * exp((β - φ_b) / (k_B * T))
         donde β = sqrt(e³ / (π * ε_0 * ε_r)) * sqrt(E)
-
-    Ejemplo:
-        >>> I = Poole_Frenkel(300, 1e6, 1.2, 3.9, 1e-9)
-        >>> print(f"Corriente PF: {I:.2e} A")
-
-    Referencias:
-        - Frenkel, J. (1938). "On Pre-Breakdown Phenomena in Insulators and Electronic Semi-Conductors"
-        - Sze, S.M. & Ng, K.K. (2006). "Physics of Semiconductor Devices"
     """
 
     k_b_ev = Boltzmann / elementary_charge

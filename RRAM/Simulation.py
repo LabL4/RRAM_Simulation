@@ -270,15 +270,16 @@ def update_state_generate(
     state: np.ndarray,
     params: SimulationParameters,
     sim_ctes_cte: dict,
-    E_field_vector: np.ndarray,
-    temperatura: float,
+    E_field_matrix: np.ndarray,
+    temperatura: np.ndarray,
     factor_vecinos: float,
     factor_sin_vecinos: float,
-    neighbor_mode: str = "both",  # Opciones: 'horizontal', 'vertical', 'both'
+    neighbor_mode: str = "both",
 ) -> np.ndarray:
     """
     Updates the state matrix by generating new vacancies based on the electric field,
     temperature, and neighboring conditions.
+
     Args:
         state (np.ndarray): Current state matrix where 0 represents free positions
             and 1 represents occupied positions.
@@ -286,7 +287,7 @@ def update_state_generate(
             `paso_temporal`, `x_size`, and `y_size`.
         sim_ctes_cte (dict): Dictionary containing simulation constants required for
             the generation process.
-        E_field_vector (np.ndarray): Vector representing the electric field for each
+        E_field_matrix (np.ndarray): Matrix representing the electric field for each
             row of the state matrix.
         temperatura (float): Temperature value used in the generation probability calculation.
         factor_vecinos (float): Multiplicative factor to increase the probability of
@@ -294,23 +295,18 @@ def update_state_generate(
         factor_sin_vecinos (float): Multiplicative factor to decrease the probability of
             generation for free positions without neighbors.
         neighbor_mode (str, optional): Mode to determine neighbor consideration.
-            Options are "horizontal", "vertical", or "both". Defaults to "horizontal".
+            Options are "horizontal", "vertical", or "both". Defaults to "both".
+
     Returns:
         np.ndarray: Updated state matrix with new vacancies generated based on the
         calculated probabilities.
+
     Raises:
         AssertionError: If the number of rows in `E_field_vector` does not match the
             number of rows in the `state` matrix.
-    Notes:
-        - The function calculates the probability of vacancy generation for each free
-          position in the state matrix based on the electric field, temperature, and
-          neighboring conditions.
-        - Neighboring conditions are determined based on the `neighbor_mode` parameter.
-        - The generation process is stochastic, using random numbers to determine
-          whether a vacancy is generated at each position.
     """
 
-    assert E_field_vector.shape[0] == state.shape[0], (
+    assert E_field_matrix.shape[0] == state.shape[0], (
         "El vector de campo eléctrico debe tener igual número de filas que la matriz de estado"
     )
 
@@ -324,61 +320,41 @@ def update_state_generate(
 
     # --- Lógica Horizontal (Izquierda / Derecha) ---
     if neighbor_mode in ["horizontal", "both"]:
-        # Vecinos a la izquierda: desplazamos matriz a la derecha (axis 1)
         left_neighbor = np.zeros_like(state, dtype=bool)
         left_neighbor[:, 1:] = state[:, :-1] == 1
 
-        # Vecinos a la derecha: desplazamos matriz a la izquierda (axis 1)
         right_neighbor = np.zeros_like(state, dtype=bool)
         right_neighbor[:, :-1] = state[:, 1:] == 1
 
-        # Acumulamos en la máscara total
         vecino_mask |= left_neighbor | right_neighbor
 
     # --- Lógica Vertical (Arriba / Abajo) ---
     if neighbor_mode in ["vertical", "both"]:
-        # Vecino Arriba: desplazamos matriz hacia abajo (axis 0)
         up_neighbor = np.zeros_like(state, dtype=bool)
         up_neighbor[1:, :] = state[:-1, :] == 1
 
-        # Vecino Abajo: desplazamos matriz hacia arriba (axis 0)
         down_neighbor = np.zeros_like(state, dtype=bool)
         down_neighbor[:-1, :] = state[1:, :] == 1
 
-        # Acumulamos en la máscara total usando OR lógico
         vecino_mask |= up_neighbor | down_neighbor
 
     # Definir quiénes están libres CON vecinos y quiénes SIN vecinos
     free_with_vecino = free_mask & vecino_mask
     free_without_vecino = free_mask & (~vecino_mask)
 
-    # --- Cálculo de probabilidades ---
+    # --- Cálculo de probabilidades VECTORIZADO ---
 
-    # Calcular las probabilidades por fila
-    prob_generacion_fila = np.minimum(
-        [
-            Generation.Generate(
-                params.paso_temporal,
-                E_field_vector[i],
-                temperatura,
-                **sim_ctes_cte,
-            )
-            for i in range(params.x_size)
-        ],
-        1,
-    )
+    # Crear matriz de campo eléctrico expandida (cada fila repite su valor)
+    # E_field_matrix = np.tile(E_field_vector.reshape(-1, 1), (1, params.y_size))
 
-    # Probabilidad base expandida al tamaño de la matriz
-    prob_base_matrix = np.tile(prob_generacion_fila.reshape(-1, 1), (1, params.y_size))
+    # Calcular probabilidades usando la función vectorizada
+    prob_base_matrix = Generation.Generate_vectorized(params.paso_temporal, E_field_matrix, temperatura, **sim_ctes_cte)
 
     # Crear matriz de probabilidad final
     prob_final = np.zeros_like(prob_base_matrix)
 
     # Aplicar factores condicionales
-    # 1. Si tiene vecinos (según el modo seleccionado), aumentamos prob
     prob_final[free_with_vecino] = prob_base_matrix[free_with_vecino] * factor_vecinos
-
-    # 2. Si está aislado (según el modo seleccionado), reducimos prob
     prob_final[free_without_vecino] = prob_base_matrix[free_without_vecino] * factor_sin_vecinos
 
     # Generación estocástica
@@ -394,20 +370,40 @@ def update_state_generate_favorecido(
     state: np.ndarray,
     params: SimulationParameters,
     sim_ctes_cte: dict,
-    E_field_vector: np.ndarray,
-    temperatura: float,
+    E_field_matrix: np.ndarray,
+    temperatura_matrix: np.ndarray,
     factor_vecinos: float,
     factor_sin_vecinos: float,
-    neighbor_mode: str = "both",  # Opciones: 'horizontal', 'vertical', 'both'
-    region_coords: tuple | None = None,  # (x_min, x_max, y_min, y_max)
-    factor_region: float = 1.0,  # factor extra en la región
+    neighbor_mode: str = "both",
+    region_coords: tuple | None = None,
+    factor_region: float = 1.0,
 ) -> np.ndarray:
     """
     Updates the state matrix by generating new vacancies based on the electric field,
     temperature, neighboring conditions, and an optional favored rectangular region.
+
+    Args:
+        state (np.ndarray): Current state matrix where 0 represents free positions
+            and 1 represents occupied positions.
+        params (SimulationParameters): Simulation parameters including paso_temporal,
+            x_size, and y_size.
+        sim_ctes_cte (dict): Dictionary containing simulation constants for generation.
+        E_field_matrix (np.ndarray): Matrix representing the electric field (same shape as state).
+        temperatura_matrix (np.ndarray): Temperature value used in probability calculation.
+        factor_vecinos (float): Multiplicative factor for positions with neighbors.
+        factor_sin_vecinos (float): Multiplicative factor for isolated positions.
+        neighbor_mode (str, optional): Neighbor consideration mode. Options: "horizontal",
+            "vertical", or "both". Defaults to "both".
+        region_coords (tuple | None, optional): Rectangular region coordinates as
+            (x_min, x_max, y_min, y_max) with exclusive upper bounds. Defaults to None.
+        factor_region (float, optional): Additional multiplicative factor for the
+            specified region. Defaults to 1.0.
+
+    Returns:
+        np.ndarray: Updated state matrix with new vacancies generated.
     """
 
-    assert E_field_vector.shape[0] == state.shape[0], (
+    assert E_field_matrix.shape[0] == state.shape[0], (
         "El vector de campo eléctrico debe tener igual número de filas que la matriz de estado"
     )
 
@@ -421,65 +417,43 @@ def update_state_generate_favorecido(
 
     # --- Lógica Horizontal (Izquierda / Derecha) ---
     if neighbor_mode in ["horizontal", "both"]:
-        # Vecinos a la izquierda: desplazamos matriz a la derecha (axis 1)
         left_neighbor = np.zeros_like(state, dtype=bool)
         left_neighbor[:, 1:] = state[:, :-1] == 1
 
-        # Vecinos a la derecha: desplazamos matriz a la izquierda (axis 1)
         right_neighbor = np.zeros_like(state, dtype=bool)
         right_neighbor[:, :-1] = state[:, 1:] == 1
 
-        # Acumulamos en la máscara total
         vecino_mask |= left_neighbor | right_neighbor
 
     # --- Lógica Vertical (Arriba / Abajo) ---
     if neighbor_mode in ["vertical", "both"]:
-        # Vecino Arriba: desplazamos matriz hacia abajo (axis 0)
         up_neighbor = np.zeros_like(state, dtype=bool)
         up_neighbor[1:, :] = state[:-1, :] == 1
 
-        # Vecino Abajo: desplazamos matriz hacia arriba (axis 0)
         down_neighbor = np.zeros_like(state, dtype=bool)
         down_neighbor[:-1, :] = state[1:, :] == 1
 
-        # Acumulamos en la máscara total usando OR lógico
         vecino_mask |= up_neighbor | down_neighbor
 
     # Definir quiénes están libres CON vecinos y quiénes SIN vecinos
     free_with_vecino = free_mask & vecino_mask
     free_without_vecino = free_mask & (~vecino_mask)
 
-    # --- Cálculo de probabilidades ---
+    # --- Cálculo de probabilidades VECTORIZADO ---
 
-    # Calcular las probabilidades por fila
-    prob_generacion_fila = np.minimum(
-        [
-            Generation.Generate(
-                params.paso_temporal,
-                E_field_vector[i],
-                temperatura,
-                **sim_ctes_cte,
-            )
-            for i in range(params.x_size)
-        ],
-        1,
+    # Calcular probabilidades usando la función vectorizada directamente
+    prob_base_matrix = Generation.Generate_vectorized(
+        params.paso_temporal, E_field_matrix, temperatura_matrix, **sim_ctes_cte
     )
-
-    # Probabilidad base expandida al tamaño de la matriz
-    prob_base_matrix = np.tile(prob_generacion_fila.reshape(-1, 1), (1, params.y_size))
 
     # Crear matriz de probabilidad final
     prob_final = np.zeros_like(prob_base_matrix)
 
     # Aplicar factores condicionales
-    # 1. Si tiene vecinos (según el modo seleccionado), aumentamos prob
     prob_final[free_with_vecino] = prob_base_matrix[free_with_vecino] * factor_vecinos
-
-    # 2. Si está aislado (según el modo seleccionado), reducimos prob
     prob_final[free_without_vecino] = prob_base_matrix[free_without_vecino] * factor_sin_vecinos
 
     # --- Región opcional favorecida ---
-    # region_coords se espera como (x_min, x_max, y_min, y_max) con x_max, y_max excluyentes (estilo slicing)
     if region_coords is not None and factor_region != 1.0:
         x_min, x_max, y_min, y_max = region_coords
 
@@ -493,7 +467,7 @@ def update_state_generate_favorecido(
             rect_mask = np.zeros_like(state, dtype=bool)
             rect_mask[x_min:x_max, y_min:y_max] = True
 
-            # Opcional: solo afectar a posiciones libres
+            # Solo afectar a posiciones libres
             rect_mask &= free_mask
 
             prob_final[rect_mask] *= factor_region
@@ -514,57 +488,49 @@ def update_state_recombinate(
     voltage: float,
     E_field: float,
     oxygen_config: dict,
-    sim_ctes_dict: dict,
+    sim_ctes: SimulationConstants,
     params: SimulationParameters,
     actual_state: np.ndarray,
     oxygen_state: np.ndarray,
-    temperatura: float,
-) -> tuple[np.ndarray, np.ndarray]:  # type: ignore
+    temperatura: float | np.ndarray,
+) -> tuple[np.ndarray, np.ndarray]:
     """
-    Updates the state of the system by generating oxygen, moving oxygen atoms,
-    and recombining states based on the provided parameters.
-    Args:
-        voltage (float): The applied voltage in the system.
-        E_field (float): The electric field in the system.
-        oxygen_config (dict): A dictionary mapping threshold voltages to the
-            number of oxygen atoms to generate when the threshold is exceeded.
-        sim_ctes_dict (dict): A dictionary containing simulation constants.
-        params (SimulationParameters): An object containing simulation parameters
-            such as time step and atom size.
-        actual_state (np.ndarray): The current state of the system.
-        oxygen_state (np.ndarray): The current state of oxygen atoms in the system.
-        temperatura (float): The temperature of the system.
-    Returns:
-        tuple: A tuple containing:
-            - actual_state_update (np.ndarray): The updated state of the system.
-            - oxygen_state_update (np.ndarray): The updated state of oxygen atoms.
+    Orquesta el proceso completo de RESET en un paso de tiempo:
+    1. Generación de iones oxígenos por voltaje.
+    2. Movimiento de iones.
+    3. Recombinación.
     """
 
-    # Genera oxígenos según voltaje
-    for threshold_voltage, num_oxigenos in oxygen_config.items():
+    # 1. Se generan oxígenos según el voltaje
+    for threshold_voltage, max_oxigenos in oxygen_config.items():
         if abs(voltage) > threshold_voltage:
-            # print("Se van a generar", num_oxigenos, "oxígenos por voltaje de", voltage)
-            oxygen_state = Generation.generate_oxigen_old(oxygen_state, num_oxigenos)
-            break  # Solo generar una vez por paso temporal
+            oxygen_state = Recombination.generate_oxygen(oxygen_state, max_oxigenos)
+            break  # Solo usar el umbral más alto superado
 
-    # Muevo los oxígenos
-    oxygen_state, velocidad = Recombination.update_oxygen_state_old(
+    # 2. Movemos los iones
+    oxygen_state, velocidad = Recombination.move_oxygen_ions_update(
         paso_temp=params.paso_temporal,
         oxygen_state=oxygen_state,
         temperature=temperatura,
         E_field=E_field,
         grid_size=params.atom_size,
-        **sim_ctes_dict,
+        vibration_frequency=sim_ctes.vibration_frequency,
+        gamma_drift=sim_ctes.gamma_drift,
+        migration_energy=sim_ctes.E_m,
+        cte_red=sim_ctes.cte_red,
     )
 
-    # Obtengo la nueva configuración
+    # 3.Recombinación de iones con vacantes
     actual_state_update, oxygen_state_update = Recombination.Recombine_opt(
         vacancy_state=actual_state,
         oxygen_state=oxygen_state,
         paso_temp=params.paso_temporal,
         velocidad=velocidad,
-        temp=temperatura,
-        **sim_ctes_dict,
+        temperatura=temperatura,
+        vibration_frequency=sim_ctes.vibration_frequency,
+        recom_enchancement_factor=sim_ctes.recom_enchancement_factor,
+        recombination_energy=sim_ctes.recombination_energy,
+        long_decaimiento_concentracion=sim_ctes.long_decaimiento_concentracion,
     )
 
     return actual_state_update, oxygen_state_update
@@ -675,7 +641,9 @@ def PP_set(
 
         # Genero el vector campo eléctrico
         for i in range(0, params.x_size):
-            E_field_vector[i] = ElectricField.GapElectricField(voltage, i, actual_state, **params_dict)
+            E_field_vector[i] = ElectricField.GapElectricField(
+                voltage, i, actual_state, device_size=params.device_size, grid_size=params.atom_size
+            )
 
         # Verifica si el sistema ha percolado
         if voltage >= params.voltaje_final_set:
@@ -826,8 +794,12 @@ def PP_set(
 
         # Obtengo los valores del campo eléctrico y la temperatura
         temperatura = Temperature.Temperature_Joule(
-            voltage, current, sistema_percola, params.init_temp, **sim_ctes_dict
+            voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola
         )
+
+        # Construyo una matriz de temperatura con el mismo valor en todas las posiciones para usarla en la función de generación
+        temperatura_matrix = np.full_like(actual_state, fill_value=temperatura)
+        E_field_matrix = np.tile(E_field_vector.reshape(-1, 1), (1, params.y_size))
 
         if total_vacantes < max_vancantes_pp_set:
             # Actualizo el estado del sistema
@@ -835,8 +807,8 @@ def PP_set(
                 actual_state,
                 params,
                 sim_ctes_dict,
-                E_field_vector,
-                temperatura,
+                E_field_matrix,
+                temperatura_matrix,
                 sim_ctes.factor_vecinos_pp_set,
                 sim_ctes.factor_libre_pp_set,
             )
@@ -993,7 +965,9 @@ def SP_set(
 
         # Genero el vector campo eléctrico
         for i in range(0, params.x_size):
-            E_field_vector[i] = ElectricField.GapElectricField(voltage, i, actual_state, **asdict(params))
+            E_field_vector[i] = ElectricField.GapElectricField(
+                voltage, i, actual_state, device_size=params.device_size, grid_size=params.atom_size
+            )
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
@@ -1042,15 +1016,23 @@ def SP_set(
                 ) * (params.device_size)
 
         # Obtengo los valores del campo eléctrico y la temperatura
-        temperatura = Temperature.Temperature_Joule(voltage, current, sistema_percola, params.T_0, **sim_ctes_dict)
+        temperatura = Temperature.Temperature_Joule(
+            voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola
+        )
+
+        # Construyo una matriz de temperatura con el mismo valor en todas las posiciones para usarla en la función de generación
+        temperatura_matrix = np.full_like(actual_state, fill_value=temperatura)
+        # Construyo una matriz del campo eléctrico con el mismo valor en todas las filas para usarla en la función de generación
+        E_field_matrix = np.tile(E_field_vector.reshape(-1, 1), (1, params.y_size))
+
         if total_vacantes < max_vancantes_sp_set:
             # Actualizo el estado del sistema
             actual_state = update_state_generate(
                 actual_state,
                 params,
                 sim_ctes_dict,
-                E_field_vector,
-                temperatura,
+                E_field_matrix,
+                temperatura_matrix,
                 sim_ctes.factor_vecinos_sp_set,
                 sim_ctes.factor_libre_sp_set,
             )
@@ -1177,7 +1159,7 @@ def PP_reset(
     )
 
     CF_destruido_index = 1
-    roturas_dict = dict()
+    roturas_dict = {}
 
     print(f"Simulacion {num_simulation} - primera parte del reset")
 
@@ -1191,7 +1173,11 @@ def PP_reset(
 
         # Genero el vector campo eléctrico
         for i in range(0, actual_state.shape[0]):
-            E_field_vector[i] = abs(ElectricField.GapElectricField(voltage, i, actual_state, **params_dict))
+            E_field_vector[i] = abs(
+                ElectricField.GapElectricField(
+                    voltage, i, actual_state, device_size=params.device_size, grid_size=params.atom_size
+                )
+            )
 
         _, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
 
@@ -1239,7 +1225,9 @@ def PP_reset(
                 )
 
             # Calculo la temperatura cuando hay percolación
-            temperatura = Temperature.Temperature_Joule(voltage, current, percola, params.T_0, **sim_ctes_dict)
+            temperatura = Temperature.Temperature_Joule(
+                voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola
+            )
 
         else:
             percola = False
@@ -1259,14 +1247,16 @@ def PP_reset(
             )
 
             # Calculo la temperatura cuando no hay percolación
-            temperatura = Temperature.Temperature_Joule(voltage, current, percola, params.T_0, **sim_ctes_dict)
+            temperatura = Temperature.Temperature_Joule(
+                voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola
+            )
 
         # Actualizo el estado del sistema con la recombinación
         actual_state, oxygen_state = update_state_recombinate(
             voltage=voltage,
             E_field=E_field,
             oxygen_config=oxygen_config,
-            sim_ctes_dict=sim_ctes_dict,
+            sim_ctes=sim_ctes,
             params=params,
             actual_state=actual_state,
             oxygen_state=oxygen_state,
@@ -1388,21 +1378,6 @@ def SP_reset(
 
     print(f"\nSimulacion {num_simulation} - segunda parte del reset\n")
 
-    # Cambio el valor I_0 cuando el sistema ha roto todos los filamentos
-    if np.all(CF_destruido):
-        I_0_nuevo = sim_ctes.I_0_reset
-        permitividad_relativa_nuevo = sim_ctes.permitividad_relativa_reset
-        pb_metal_insul_nuevo = sim_ctes.pb_metal_insul_reset
-        print(
-            f"los valores de la nueva corriente Poole-Frenkel son:",
-            f"\n I_0: {I_0_nuevo}, permitividad_relativa: {permitividad_relativa_nuevo}, pb_metal_insul: {pb_metal_insul_nuevo}\n",
-        )
-        sim_ctes = sim_ctes.update_I_0(I_0_nuevo)
-        sim_ctes = sim_ctes.update_permitividad_relativa(permitividad_relativa_nuevo)
-        sim_ctes = sim_ctes.update_pb_metal_insul(pb_metal_insul_nuevo)
-
-        sim_ctes_dict = asdict(sim_ctes)
-
     # Ciclo para la primera parte del reset
     for k in range(0, params.num_pasos):
         simulation_time = params.paso_temporal * k
@@ -1413,7 +1388,11 @@ def SP_reset(
 
         # Genero el vector campo eléctrico
         for i in range(0, actual_state.shape[0]):
-            E_field_vector[i] = abs(ElectricField.GapElectricField(voltage, i, actual_state, **params_dict))
+            E_field_vector[i] = abs(
+                ElectricField.GapElectricField(
+                    voltage, i, actual_state, device_size=params.device_size, grid_size=params.atom_size
+                )
+            )
 
         _, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
 
@@ -1456,7 +1435,9 @@ def SP_reset(
                     num_simulation=num_simulation,
                     actual_state=actual_state,
                 )
-            temperatura = Temperature.Temperature_Joule(voltage, current, percola, params.T_0, **sim_ctes_dict)
+            temperatura = Temperature.Temperature_Joule(
+                voltage, current, params.T_0, r_termica=sim_ctes.r_termica_no_percola
+            )
 
         else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
@@ -1472,14 +1453,16 @@ def SP_reset(
             )
 
             percola = False
-            temperatura = Temperature.Temperature_Joule(voltage, current, percola, params.T_0, **sim_ctes_dict)
+            temperatura = Temperature.Temperature_Joule(
+                voltage, current, params.T_0, r_termica=sim_ctes.r_termica_no_percola
+            )
 
         # Actualizo el estado del sistema con la recombinación
         actual_state, oxygen_state = update_state_recombinate(
             voltage=voltage,
             E_field=E_field,
             oxygen_config=oxygen_config,
-            sim_ctes_dict=sim_ctes_dict,
+            sim_ctes=sim_ctes,
             params=params,
             actual_state=actual_state,
             oxygen_state=oxygen_state,

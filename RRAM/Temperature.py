@@ -1,27 +1,24 @@
-from RRAM import Constants as cte
+def Temperature_Joule(potencial: float, intensidad: float, T_0: float, r_termica: float) -> float:
+    """
+    Calcula el incremento de temperatura debido al calentamiento por efecto Joule.
 
+    Esta función determina el aumento de temperatura en un dispositivo causado por
+    la disipación de potencia eléctrica (efecto Joule), considerando la resistencia
+    térmica del sistema.
 
-def Temperature_Joule(potencial: float, intensidad: float, percola: bool, T_0: float = 315, **kwargs) -> float:
+    Args:
+        potencial (float): Diferencia de potencial aplicada en Voltios [V]
+        intensidad (float): Corriente eléctrica que circula en Amperios [A]
+        T_0 (float): Temperatura inicial o ambiente en Kelvin [K] (parámetro no utilizado)
+        r_termica (float): Resistencia térmica del dispositivo en K/W [K/W]
 
-    # Obtengo los valores de las constantes si las estoy pasando como argumentos
-    if kwargs:
-        if percola:
-            r_termica = float(kwargs.get('r_termica_percola')) # type: ignore
-        else:
-            r_termica = float(kwargs.get('r_termica_no_percola')) # type: ignore
-    else:
-        if percola:
-            r_termica = cte.r_termica_percola
-        else:
-            r_termica = cte.r_termica_no_percola
+    Returns:
+        float: Incremento de temperatura por efecto Joule en Kelvin [K]
 
-    Temperature_Joule = T_0 + abs(potencial * intensidad) * r_termica
-    
-    # print(f"Resistencia termica: {r_termica}")
-    # print(f"voltaje: {abs(potencial)}")
-    # print(f"EL sistema percola: {percola}")
-    # print(f"Temperatura base: {T_0}")
-    # print(f"La intensidad es: {intensidad:.5f}")
-    # print(f"La temperatura es: {Temperature_Joule:.5f}\n")
+    Fórmula:
+        ΔT = |V * I| * R_th
+        donde P = V * I es la potencia disipada y R_th es la resistencia térmica del sistema.
+    """
+    temperatura_disipacion = T_0 + abs(potencial * intensidad) * r_termica
 
-    return Temperature_Joule
+    return temperatura_disipacion
