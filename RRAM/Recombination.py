@@ -186,7 +186,7 @@ def move_oxygen_ions(
         print(f"k_b_ev: {k_b_ev}, temperature: {temperature}, E_m: {migration_energy}")
         sys.exit(1)
 
-    print("Velocidad de los iones de oxígeno: ", oxygen_velocity)
+    # print("Velocidad de los iones de oxígeno: ", oxygen_velocity)
     # Esto es un arreglo temporal para dar cuenta que hay un tiempo hasta que los iones de oxígeno se muevan
     valor_prueba = abs(E_field * (10e-9))
     if valor_prueba > 0.7:

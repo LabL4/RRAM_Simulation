@@ -49,7 +49,8 @@ class SimulationParameters:
 
     num_max_vacantes: int = field(init=False)
     paso_temporal: float = field(init=False)
-    paso_potencial: float = field(init=False)
+    paso_potencial_set: float = field(init=False)
+    paso_potencial_reset: float = field(init=False)
 
     def __post_init__(self):
         self.num_max_vacantes = int(0.95 * (self.x_size * self.x_size))  # 95% de la matriz puede llenarse de vacantes
@@ -437,7 +438,8 @@ def PP_set(
     temperatura = params.init_temp
     current = 0.0
     E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
-    vector_ddp = np.arange(0.000, params.voltaje_final_reset + params.paso_potencial, params.paso_potencial)
+    vector_ddp = np.arange(0.000, params.voltaje_final_reset + params.paso_potencial_set, params.paso_potencial_set)
+    print("El paso de potencial para la parte de set es:", params.paso_potencial_set, "\n")
 
     num_columnas = 3  # Tiempo, Voltaje, Intensidad
     # Defino la matriz para almacenar los datos
@@ -634,10 +636,10 @@ def PP_set(
 
         # Guardo los datos de la simulación
         data_pp_set[k] = np.array([simulation_time, voltage, current])
-
-    if not (1400 <= resistencia <= 1600):
-        # No se ha llegado a la resistencia necesaria para la segunda parte del set, directamelo lo descarto
-        raise exceptions.LowResistanceException(valor_resistencia=resistencia)
+    # Se decarta la simulación si no se ha llegado a la resistencia mínima necesaria para la segunda parte del set, ya que no va a coincidir con los datos experimentales.
+    # if not (10 <= resistencia <= 160000):
+    #     # No se ha llegado a la resistencia necesaria para la segunda parte del set, directamelo lo descarto
+    #     raise exceptions.LowResistanceException(valor_resistencia=resistencia)
 
     # Guardo los datos de la simulación
     save_path_pkl = rutas["data_simulation_path"] / f"Data_pp_set_{num_simulation}.pkl"
@@ -750,7 +752,9 @@ def SP_set(
 
     rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="set")
 
-    vector_ddp = np.arange(voltaje_max_set, 0.000, -params.paso_potencial)
+    vector_ddp = np.arange(voltaje_max_set, 0.000, -params.paso_potencial_set)
+    print("El paso de potencial para la parte de set es:", params.paso_potencial_set, "\n")
+
     E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
 
     # Defino la matriz para almacenar los datos
@@ -955,9 +959,10 @@ def PP_reset(
     E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
     vector_ddp = np.arange(
         -0,
-        -(params.voltaje_final_reset + params.paso_potencial),
-        -params.paso_potencial,
+        -(params.voltaje_final_reset + params.paso_potencial_reset),
+        -params.paso_potencial_reset,
     )
+    print("El paso de potencial para la parte de set es:", params.paso_potencial_reset, "\n")
 
     CF_destruido_index = 1
     roturas_dict = {}
@@ -1011,11 +1016,11 @@ def PP_reset(
                 current, resistencia = CurrentSolver.OmhCurrent(
                     voltage, cf_clean_matrix, ohm_resistence=sim_ctes.ohm_resistence_reset
                 )
-                print("Para el voltaje", voltage, "la resistencia es: ", resistencia)
+                # print("Para el voltaje", voltage, "la resistencia es: ", resistencia)
 
-                if k == 0 and not (850 <= resistencia <= 1200):
-                    print("La resistencia es demasiado baja, No se reproduce pp reset.")
-                    raise exceptions.LowResistanceException(valor_resistencia=resistencia)
+                # if k == 0 and not (850 <= resistencia <= 1200):
+                #     print("La resistencia es demasiado baja, No se reproduce pp reset.")
+                #     raise exceptions.LowResistanceException(valor_resistencia=resistencia)
             except ZeroDivisionError:
                 raise exceptions.NullResistanceException(
                     simulation_path=rutas["simulation_path"],
@@ -1174,8 +1179,9 @@ def SP_reset(
     vector_ddp = np.arange(
         -params.voltaje_final_reset,
         0,
-        params.paso_potencial,
+        params.paso_potencial_reset,
     )
+    print("El paso de potencial para la parte de set es:", params.paso_potencial_reset, "\n")
 
     print(f"\nSimulacion {num_simulation} - segunda parte del reset\n")
 
@@ -1237,7 +1243,7 @@ def SP_reset(
                     actual_state=actual_state,
                 )
             temperatura = Temperature.Temperature_Joule(
-                voltage, current, params.T_0, r_termica=sim_ctes.r_termica_no_percola
+                voltage, current, params.init_temp, r_termica=sim_ctes.r_termica_no_percola
             )
 
         else:
@@ -1255,7 +1261,7 @@ def SP_reset(
 
             percola = False
             temperatura = Temperature.Temperature_Joule(
-                voltage, current, params.T_0, r_termica=sim_ctes.r_termica_no_percola
+                voltage, current, params.init_temp, r_termica=sim_ctes.r_termica_no_percola
             )
 
         # Actualizo el estado del sistema con la recombinación

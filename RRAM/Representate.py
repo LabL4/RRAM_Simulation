@@ -205,8 +205,8 @@ def RepresentateState(
     cadena = filename
     ruta_pdf = os.path.splitext(cadena)[0] + ".pdf"
     plt.savefig(ruta_pdf, bbox_inches="tight")
-    ruta_svg = os.path.splitext(cadena)[0] + ".svg"
-    plt.savefig(ruta_svg, bbox_inches="tight")
+    # ruta_svg = os.path.splitext(cadena)[0] + ".svg"
+    # plt.savefig(ruta_svg, bbox_inches="tight")
 
     # Mostrar gráfico
     plt.close(fig)
@@ -612,8 +612,8 @@ def plot_IV(
     # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Set_1t'
     # ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Reset_1.txt'
 
-    ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Medidas_Arturo/D_Set_1_Run35.txt"
-    ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Medidas_Arturo/D_Reset_1_Run35.txt"
+    ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Medidas_Eduardo/D_Set_1_Run35.txt"
+    ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Medidas_Eduardo/D_Reset_1_Run35.txt"
 
     # Cargar datos experimentales
     data_set = np.loadtxt(ruta_archivo_set, skiprows=1)
@@ -621,7 +621,7 @@ def plot_IV(
 
     x_set = data_set[:, 2]
     y_set = data_set[:, 1]
-    x_reset = data_reset[:, 2] * (-1.0)
+    x_reset = data_reset[:, 2] * (-1.0)  # TODO: IMportante comprobar si las medidas se leen con el signo ya o no
     y_reset = abs(data_reset[:, 1])
 
     # Curvas experimentales
@@ -645,8 +645,8 @@ def plot_IV(
     # plt.close(fig)  # Cierra para liberar memoria
 
     # Guardar figura
-    fig.savefig(figures_path + f"/I-V_{num_simulation + 1}.svg", bbox_inches="tight", dpi=300)
-    plt.close(fig)  # Cierra para liberar memoria
+    # fig.savefig(figures_path + f"/I-V_{num_simulation + 1}.svg", bbox_inches="tight", dpi=300)
+    # plt.close(fig)  # Cierra para liberar memoria
 
 
 def plot_IV_marcado(
@@ -740,8 +740,9 @@ def plot_IV_marcado(
     # Ruta de los datos experimentales
     # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Set_1t'
     # ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Reset_1.txt'
-    ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Medidas_Arturo/D_Set_1_Run35.txt"
-    ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Medidas_Arturo/D_Reset_1_Run35.txt"
+    # TODO: Seria ideal que estas rutas se pasaran como parámetros a la función para no tener que modificar el código cada vez que quiera cambiar los datos experimentales a mostrar, pero por ahora lo dejo así para avanzar con el resto de cosas
+    ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Medidas_Eduardo/D_Set_1_Run35.txt"
+    ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Medidas_Eduardo/D_Reset_1_Run35.txt"
 
     # Cargar datos experimentales
     data_set = np.loadtxt(ruta_archivo_set, skiprows=1)
@@ -814,11 +815,11 @@ def plot_IV_marcado(
     # plt.close(fig)  # Cierra para liberar memoria
 
     # Guardar figura
-    fig.savefig(
-        figures_path + f"/I-V_marcado_{num_simulation + 1}.svg",
-        bbox_inches="tight",
-        dpi=300,
-    )
+    # fig.savefig(
+    #     figures_path + f"/I-V_marcado_{num_simulation + 1}.svg",
+    #     bbox_inches="tight",
+    #     dpi=300,
+    # )
     plt.close(fig)  # Cierra para liberar memoria
 
 

@@ -1,13 +1,9 @@
 from RRAM import Simulation, utils
-from typing import final
 from pathlib import Path
-from turtle import back
-
 
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib
-import shutil
 import sys
 
 matplotlib.use("Agg")
