@@ -38,8 +38,6 @@ def medir_tiempo(func):
 class SimulationParameters:
     device_size: float
     atom_size: float
-    x_size: int
-    y_size: int
     num_trampas: int
     total_simulation_time: float
     num_pasos: int
@@ -47,12 +45,16 @@ class SimulationParameters:
     voltaje_final_set: float
     init_temp: float
 
+    x_size: int = field(init=False)
+    y_size: int = field(init=False)
     num_max_vacantes: int = field(init=False)
     paso_temporal: float = field(init=False)
     paso_potencial_set: float = field(init=False)
     paso_potencial_reset: float = field(init=False)
 
     def __post_init__(self):
+        self.x_size = int(self.device_size / self.atom_size)  # Número de "casillas" en la dimensión x
+        self.y_size = int(self.device_size / self.atom_size)  # Número de "casillas" en la dimensión y
         self.num_max_vacantes = int(0.95 * (self.x_size * self.x_size))  # 95% de la matriz puede llenarse de vacantes
         self.paso_temporal = self.total_simulation_time / self.num_pasos  # Paso temporal en segundos
         self.paso_potencial_set = self.voltaje_final_set / self.num_pasos  # Paso de voltaje para la parte de set
@@ -104,8 +106,6 @@ class SimulationConstants:
     conductividad_termica_aislante: float
     conductividad_termica_electrodo: float
     Temperatura_electrodo: float
-    conductividad_electrica_CF_set: float
-    conductividad_electrica_CF_reset: float
     ocupacion_max_pp_set: float
     ocupacion_max_sp_set: float
     factor_vecinos_pp_set: float
@@ -417,9 +417,8 @@ def PP_set(
 
     sistema_percola = False
     total_vacantes_pp_set = False
-
+    num_pasos_guardar_estado = 2000
     voltaje_percolacion = params.voltaje_final_set
-    cambiado_ohm_resistence = False
     # AL inicio como la corriente es de tipo poole frenkel, la resitencia ohmica se considera nula
     resistencia = 0.0
 
@@ -523,6 +522,8 @@ def PP_set(
                     str(rutas["figures_path"]) + f"/Percola_state_{num_simulation}.png",
                 )
 
+                temperatura_inicial_heat_equation = temperatura
+
                 # nueva_gamma = sim_ctes.gamma - 1  # / sim_ctes.factor_generacion
                 # sim_ctes = sim_ctes.update_gamma(nueva_gamma)
                 # sim_ctes_dict = asdict(sim_ctes)
@@ -561,13 +562,12 @@ def PP_set(
                     indice_gamma = indice_gamma + 1
                     print("\n El nuevo valor de gamma es:", sim_ctes_dict["gamma"])
             if len(CF_ranges) == 2:
-                if sum(CF_creado) == 2 and not cambiado_ohm_resistence:
+                if sum(CF_creado) == 2:
                     print("Todos los filamentos creados.")
                     actual_resistance = sim_ctes.ohm_resistence_set
                     sim_ctes = sim_ctes.update_ohm_resistence(actual_resistance - 15)
                     print("El nuevo valor de R_ohm es:", sim_ctes.ohm_resistence_set)
                     sim_ctes_dict = asdict(sim_ctes)
-                    cambiado_ohm_resistence = True
                 else:
                     nueva_gamma = sim_ctes.gamma / 2
                     sim_ctes = sim_ctes.update_gamma(nueva_gamma)
@@ -593,10 +593,50 @@ def PP_set(
                         num_simulation=num_simulation,
                         actual_state=actual_state,
                     )
+            # El sistema percola por lo que resuelvo la ecuación del calor. Primero se obtiene el mapa de materiales
+            materials_map = Temperature.crear_matriz_materiales(cf_clean_matrix)
+
+            # Cáculo de las fuentes de calor (el filamento)
+            Q_source_map = Temperature.calculate_heat_source(
+                types_map=materials_map, atom_size=params.atom_size, I_total=current, R_cell=sim_ctes.ohm_resistence_set
+            )
+
+            # Obtengo la matriz de temperatura
+            temperatura = Temperature.solve_thermal_state(
+                types_map=materials_map,
+                Q_map=Q_source_map,
+                thermal_props=sim_ctes.propiedades_termicas,
+                atom_size=params.atom_size,
+                T_ambient=sim_ctes.Temperatura_electrodo,
+            )
+
+        if k % num_pasos_guardar_estado == 0:
+            fig_voltage = round(vector_ddp[k], 3)
+            Representate.plot_heatmap(
+                temperatura,
+                "Mapa de temperatura",
+                save_path=rutas["figures_path"] / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_pp_set.png",
+            )
+            Representate.plot_heatmap(
+                Q_source_map,
+                "Mapa de fuentes de calor",
+                save_path=rutas["figures_path"] / f"Mapa_fuentes_calor_{num_simulation}_{round(voltage, 4)}_pp_set.png",
+            )
+            Representate.plot_heatmap(
+                materials_map,
+                "Mapa de materiales",
+                save_path=rutas["figures_path"] / f"Mapa_materiales_{num_simulation}_{round(voltage, 4)}_pp_set.png",
+            )
 
         else:
             sistema_percola = False
             mean_field = np.mean(E_field_vector).item()
+
+            # Obtengo los valores del campo eléctrico y la temperatura
+            temperatura = Temperature.Temperature_Joule(
+                voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola
+            )
+
             # simple_field = ElectricField.SimpleElectricField(voltage, params.device_size)
             # Si no ha percolado uso la corriente de Poole-Frenkel
             if not total_vacantes_pp_set:
@@ -608,23 +648,14 @@ def PP_set(
                     I_0=sim_ctes.I_0_set,
                 ) * (params.device_size)
 
-        # Obtengo los valores del campo eléctrico y la temperatura
-        temperatura = Temperature.Temperature_Joule(
-            voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola
-        )
-
-        # Construyo una matriz de temperatura con el mismo valor en todas las posiciones para usarla en la función de generación
-        temperatura_matrix = np.full_like(actual_state, fill_value=temperatura)
-        E_field_matrix = np.tile(E_field_vector.reshape(-1, 1), (1, params.y_size))
-
         if total_vacantes < max_vancantes_pp_set:
             # Actualizo el estado del sistema
             actual_state = update_state_generation(
                 actual_state,
                 params,
                 sim_ctes,
-                E_field_matrix,
-                temperatura_matrix,
+                E_field_vector,
+                temperatura,
                 sim_ctes.factor_vecinos_pp_set,
                 sim_ctes.factor_libre_pp_set,
             )
@@ -636,6 +667,7 @@ def PP_set(
 
         # Guardo los datos de la simulación
         data_pp_set[k] = np.array([simulation_time, voltage, current])
+
     # Se decarta la simulación si no se ha llegado a la resistencia mínima necesaria para la segunda parte del set, ya que no va a coincidir con los datos experimentales.
     # if not (10 <= resistencia <= 160000):
     #     # No se ha llegado a la resistencia necesaria para la segunda parte del set, directamelo lo descarto
@@ -749,7 +781,7 @@ def SP_set(
     compliance_voltage = 0.6
     total_vacantes_sp_set = False
     num_columnas = 3  # Tiempo, Voltaje, Intensidad
-
+    num_pasos_guardar_estado = 2000
     rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="set")
 
     vector_ddp = np.arange(voltaje_max_set, 0.000, -params.paso_potencial_set)
@@ -762,7 +794,6 @@ def SP_set(
 
     # nueva_gamma = sim_ctes.gamma / sim_ctes.factor_generacion
     # sim_ctes = sim_ctes.update_gamma(nueva_gamma)
-    sim_ctes_dict = asdict(sim_ctes)
 
     print(f"Simulacion {num_simulation} - Segunda parte del set\n")
     for k in range(0, k_max):
@@ -809,9 +840,47 @@ def SP_set(
                     actual_state=actual_state,
                 )
 
-        else:
-            sistema_percola = False
+            # El sistema percola por lo que resuelvo la ecuación del calor. Primero se obtiene el mapa de materiales
+            materials_map = Temperature.crear_matriz_materiales(cf_clean_matrix)
 
+            # Cáculo de las fuentes de calor (el filamento)
+            Q_source_map = Temperature.calculate_heat_source(
+                types_map=materials_map, atom_size=params.atom_size, I_total=current, R_cell=sim_ctes.ohm_resistence_set
+            )
+
+            # Obtengo la matriz de temperatura
+            temperatura = Temperature.solve_thermal_state(
+                types_map=materials_map,
+                Q_map=Q_source_map,
+                thermal_props=sim_ctes.propiedades_termicas,
+                atom_size=params.atom_size,
+                T_ambient=sim_ctes.Temperatura_electrodo,
+            )
+
+        if k % num_pasos_guardar_estado == 0:
+            fig_voltage = round(vector_ddp[k], 3)
+            Representate.plot_heatmap(
+                temperatura,
+                "Mapa de temperatura",
+                save_path=rutas["figures_path"] / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_sp_set.png",
+            )
+            Representate.plot_heatmap(
+                Q_source_map,
+                "Mapa de fuentes de calor",
+                save_path=rutas["figures_path"] / f"Mapa_fuentes_calor_{num_simulation}_{round(voltage, 4)}_sp_set.png",
+            )
+            Representate.plot_heatmap(
+                materials_map,
+                "Mapa de materiales",
+                save_path=rutas["figures_path"] / f"Mapa_materiales_{num_simulation}_{round(voltage, 4)}_sp_set.png",
+            )
+
+        else:
+            # Obtengo los valores del campo eléctrico y la temperatura
+            temperatura = Temperature.Temperature_Joule(
+                voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola
+            )
+            sistema_percola = False
             mean_field = np.mean(E_field_vector).item()
             # Si no ha percolado uso la corriente de Poole-Frenkel
             if voltage <= compliance_voltage:
@@ -823,24 +892,14 @@ def SP_set(
                     I_0=sim_ctes.I_0_set,
                 ) * (params.device_size)
 
-        # Obtengo los valores del campo eléctrico y la temperatura
-        temperatura = Temperature.Temperature_Joule(
-            voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola
-        )
-
-        # Construyo una matriz de temperatura con el mismo valor en todas las posiciones para usarla en la función de generación
-        temperatura_matrix = np.full_like(actual_state, fill_value=temperatura)
-        # Construyo una matriz del campo eléctrico con el mismo valor en todas las filas para usarla en la función de generación
-        E_field_matrix = np.tile(E_field_vector.reshape(-1, 1), (1, params.y_size))
-
         if total_vacantes < max_vancantes_sp_set:
             # Actualizo el estado del sistema
             actual_state = update_state_generation(
                 actual_state,
                 params,
                 sim_ctes,
-                E_field_matrix,
-                temperatura_matrix,
+                E_field_vector,
+                temperatura,
                 sim_ctes.factor_vecinos_sp_set,
                 sim_ctes.factor_libre_sp_set,
             )
@@ -1030,14 +1089,50 @@ def PP_reset(
                     actual_state=actual_state,
                 )
 
-            # Calculo la temperatura cuando hay percolación
-            temperatura = Temperature.Temperature_Joule(
-                voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola
+            # El sistema percola por lo que resuelvo la ecuación del calor. Primero se obtiene el mapa de materiales
+            materials_map = Temperature.crear_matriz_materiales(cf_clean_matrix)
+
+            # Cáculo de las fuentes de calor (el filamento)
+            Q_source_map = Temperature.calculate_heat_source(
+                types_map=materials_map, atom_size=params.atom_size, I_total=current, R_cell=sim_ctes.ohm_resistence_set
+            )
+
+            # Obtengo la matriz de temperatura
+            temperatura = Temperature.solve_thermal_state(
+                types_map=materials_map,
+                Q_map=Q_source_map,
+                thermal_props=sim_ctes.propiedades_termicas,
+                atom_size=params.atom_size,
+                T_ambient=sim_ctes.Temperatura_electrodo,
+            )
+
+        if k % num_pasos_guardar_estado == 0:
+            fig_voltage = round(vector_ddp[k], 3)
+            Representate.plot_heatmap(
+                temperatura,
+                "Mapa de temperatura",
+                save_path=rutas["figures_path"] / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_pp_reset.png",
+            )
+            Representate.plot_heatmap(
+                Q_source_map,
+                "Mapa de fuentes de calor",
+                save_path=rutas["figures_path"]
+                / f"Mapa_fuentes_calor_{num_simulation}_{round(voltage, 4)}_pp_reset.png",
+            )
+            Representate.plot_heatmap(
+                materials_map,
+                "Mapa de materiales",
+                save_path=rutas["figures_path"] / f"Mapa_materiales_{num_simulation}_{round(voltage, 4)}_pp_reset.png",
             )
 
         else:
             percola = False
             all_df_destruidos = True
+
+            # Calculo la temperatura cuando no hay percolación
+            temperatura = Temperature.Temperature_Joule(
+                voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola
+            )
 
             # Si no percola uso la corriente de Poole-Frenkel
             # current = abs(CurrentSolver.Poole_Frenkel(temperatura,float(np.mean(E_field_vector)), **sim_ctes_dict)* (params.device_size))
@@ -1050,11 +1145,6 @@ def PP_reset(
                     I_0=sim_ctes.I_0_reset,
                 )
                 * (params.device_size)
-            )
-
-            # Calculo la temperatura cuando no hay percolación
-            temperatura = Temperature.Temperature_Joule(
-                voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola
             )
 
         # Actualizo el estado del sistema con la recombinación
@@ -1165,13 +1255,8 @@ def SP_reset(
     num_columnas = 3  # Tiempo, Voltaje, Intensidad
     data_sp_reset = np.zeros((params.num_pasos, num_columnas), dtype=np.float64)
 
-    params_dict = asdict(params)
-    sim_ctes_dict = asdict(sim_ctes)
-    # TODO: cambiar esto y ponerlo como en el pp reset
-    sim_ctes_dict["voltaje_generar_oxigeno"] = -0.2
-
-    # Configuración de umbrales
-    oxygen_config = {float(sim_ctes_dict["voltaje_generar_oxigeno"]): int(sim_ctes_dict["num_oxigenos_sp_reset"])}
+    # configuración de generación de oxígeno, si el voltaje supera el umbral se generan el número de oxígenos indicados, si hay varios umbrales se comprueba de mayor a menor y se asigna el número de oxígenos correspondiente al primer umbral que se supere
+    oxygen_config = {float(sim_ctes.voltaje_gen_oxigeno_sp): int(sim_ctes.num_oxigenos_sp_reset)}
 
     print("Los filamentos destruidos al inicio del SP reset son: ", CF_destruido)
 
@@ -1242,11 +1327,50 @@ def SP_reset(
                     num_simulation=num_simulation,
                     actual_state=actual_state,
                 )
+
+            # El sistema percola por lo que resuelvo la ecuación del calor. Primero se obtiene el mapa de materiales
+            materials_map = Temperature.crear_matriz_materiales(cf_clean_matrix)
+
+            # Cáculo de las fuentes de calor (el filamento)
+            Q_source_map = Temperature.calculate_heat_source(
+                types_map=materials_map, atom_size=params.atom_size, I_total=current, R_cell=sim_ctes.ohm_resistence_set
+            )
+
+            # Obtengo la matriz de temperatura
+            temperatura = Temperature.solve_thermal_state(
+                types_map=materials_map,
+                Q_map=Q_source_map,
+                thermal_props=sim_ctes.propiedades_termicas,
+                atom_size=params.atom_size,
+                T_ambient=sim_ctes.Temperatura_electrodo,
+            )
+
+        if k % num_pasos_guardar_estado == 0:
+            fig_voltage = round(vector_ddp[k], 3)
+            Representate.plot_heatmap(
+                temperatura,
+                "Mapa de temperatura",
+                save_path=rutas["figures_path"] / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_sp_reset.png",
+            )
+            Representate.plot_heatmap(
+                Q_source_map,
+                "Mapa de fuentes de calor",
+                save_path=rutas["figures_path"]
+                / f"Mapa_fuentes_calor_{num_simulation}_{round(voltage, 4)}_sp_reset.png",
+            )
+            Representate.plot_heatmap(
+                materials_map,
+                "Mapa de materiales",
+                save_path=rutas["figures_path"] / f"Mapa_materiales_{num_simulation}_{round(voltage, 4)}_sp_reset.png",
+            )
+
+        else:
+            percola = False
+
             temperatura = Temperature.Temperature_Joule(
                 voltage, current, params.init_temp, r_termica=sim_ctes.r_termica_no_percola
             )
 
-        else:
             # Si no ha percolado uso la corriente de Poole-Frenkel
             current = abs(
                 CurrentSolver.Poole_Frenkel(
@@ -1257,11 +1381,6 @@ def SP_reset(
                     I_0=sim_ctes.I_0_reset,
                 )
                 * (params.device_size)
-            )
-
-            percola = False
-            temperatura = Temperature.Temperature_Joule(
-                voltage, current, params.init_temp, r_termica=sim_ctes.r_termica_no_percola
             )
 
         # Actualizo el estado del sistema con la recombinación

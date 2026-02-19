@@ -95,33 +95,17 @@ DEFAULT_PARAMS = {
 }
 
 
+# Esta clase no es mas que un contenedor vacío, inicialmente se creó para tener un lugar donde crear nuevos oarámetros a partir de los
+# base pero ya se hace en las clases SimulationParameters y SimulationConstants, por lo que esta clase ya no tiene sentido para no tardar en eliminarla, se deja como un contenedor de parámetros que no hace nada.
 class SimulationConfig:
     def __init__(self, sim_id: int):
         self.sim_id = sim_id
+        # Solo copiamos los valores por defecto. NO calculamos nada derivado.
         self.params = DEFAULT_PARAMS.copy()
-        self._recalculate_derived()
-
-    def _recalculate_derived(self):
-        self.params["x_size"] = int(round(self.params["device_size"] / self.params["atom_size"]))
-        self.params["y_size"] = int(round(self.params["device_size"] / self.params["atom_size"]))
-
-        self.params["conductividad_electrica_CF_set"] = 1.0 / (
-            self.params["ohm_resistence_set"] * self.params["atom_size"]
-        )
-        self.params["conductividad_electrica_CF_reset"] = 1.0 / (
-            self.params["ohm_resistence_reset"] * self.params["atom_size"]
-        )
-
-        self.params["propiedades_termicas"] = {
-            0: {"k": self.params["conductividad_termica_aire"]},
-            1: {"k": self.params["conductividad_termica_CF"]},
-            2: {"k": self.params["conductividad_termica_aislante"]},
-            3: {"k": self.params["conductividad_termica_electrodo"]},
-        }
 
     def update(self, modifications: Dict[str, Any]):
         self.params.update(modifications)
-        self._recalculate_derived()
+        # Ya no llamamos a recalculate_derived porque NO existe.
 
     @classmethod
     def from_base(cls, sim_id: int, modifications: Optional[Dict[str, Any]] = None):
@@ -139,28 +123,26 @@ class ConfigManager:
         self.simulations.append(config)
 
     def add_sweep(self, sweep_params: Dict[str, List[Any]]):
-        """Genera el producto cartesiano exacto de las listas proporcionadas."""
+        # ... (Este método se queda igual) ...
         keys = list(sweep_params.keys())
         values = list(sweep_params.values())
-
         casos_totales = 0
         for combinacion in itertools.product(*values):
             mods = dict(zip(keys, combinacion))
             sim_id = len(self.simulations)
             self.simulations.append(SimulationConfig.from_base(sim_id, mods))
             casos_totales += 1
-
-        print(f"-> Generadas {casos_totales} combinaciones para el experimento.")
+        print(f"-> Generadas {casos_totales} combinaciones.")
 
     def export_to_init_data(self, output_dir: str = "Init_data"):
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
+        # === LIMPIEZA: SOLO EXPORTAMOS LOS INPUTS ===
+        # Quitamos x_size, y_size, etc. porque se calcularán solos al cargar.
         cols_params = [
             "device_size",
             "atom_size",
-            "x_size",
-            "y_size",
             "num_trampas",
             "total_simulation_time",
             "num_pasos",
@@ -170,6 +152,7 @@ class ConfigManager:
             "init_temp",
         ]
 
+        # Quitamos conductividades calculadas y diccionarios complejos
         cols_ctes = [
             "cte_red",
             "permitividad_relativa_set",
@@ -194,8 +177,6 @@ class ConfigManager:
             "conductividad_termica_aislante",
             "conductividad_termica_electrodo",
             "Temperatura_electrodo",
-            "conductividad_electrica_CF_set",
-            "conductividad_electrica_CF_reset",
             "ocupacion_max_pp_set",
             "ocupacion_max_sp_set",
             "factor_vecinos_pp_set",

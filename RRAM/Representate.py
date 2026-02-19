@@ -1,5 +1,7 @@
+import matplotlib.patches as mpatches
 import matplotlib.patches as patches
 import matplotlib.ticker as ticker
+import matplotlib.pyplot as plt
 import matplotlib.pyplot as plt
 from matplotlib import markers
 
@@ -7,6 +9,7 @@ from matplotlib import markers
 import numpy as np
 
 from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.lines import Line2D
 # from RRAM import Montecarlo
 
 import os
@@ -214,68 +217,6 @@ def RepresentateState(
     return None
 
 
-def RepresentateState_parall(
-    matriz: np.ndarray,
-    fig,
-    ax,
-    im=None,
-    color=(0.478, 0.627, 0.870),
-    filename: str = "grafica.png",
-) -> None:
-    """
-    Represent the state of a matrix as a colored plot.
-
-    Parameters:
-    - matriz (np.ndarray): The input matrix to be represented.
-    - filename (str, optional): The name of the file to save the plot. Default is "grafica.png".
-
-    Returns:
-    None
-    """
-    # Crear una figura y un eje con plt.subplots()
-
-    # Crear un mapa de colores personalizado
-    colors = [
-        (1, 1, 1),  # Color para el valor 0 que representa que No hay trampa
-        color,  # Color para el valor 1 que representa que hay trampa (azul por defeto)
-    ]
-    if np.all(matriz == 1):
-        colors = list(reversed(colors))
-
-    if False:
-        im.set_data(matriz)
-    else:
-        cmap_name = "my_list"
-        cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=2)
-
-        # Usar imshow en lugar de pcolormesh para una representación más eficiente
-        im = ax.imshow(matriz, cmap=cmap, origin="upper")
-
-        # Establecer la relación de aspecto para que las celdas sean cuadradas
-        ax.set_aspect("equal")
-
-    # Colocar las etiquetas del eje x en la parte superior
-    # ax.xaxis.tick_top()
-
-    # sim_parmtrs = Montecarlo.read_csv_to_dic("Init_data/simulation_parameters.csv")
-    # num_simulation = 0
-
-    # num_pasos = int(sim_parmtrs[num_simulation]['num_pasos'])
-    # voltaje_final = float(sim_parmtrs[num_simulation]['voltaje_final'])
-
-    # vector_ddp = np.linspace(0, voltaje_final, num_pasos + 1)
-    # # vector_ddp = np.linspace(voltaje_final, 0, num_pasos + 1)
-    iteracion = int(filename.split("_")[1].split(".")[0])
-    # potencial = vector_ddp[iteracion-1]
-
-    plt.title(f"iteracion {iteracion}")
-    # plt.title(f"potencial: {potencial:.4f} V, iteracion {iteracion}")
-
-    # plt.title("Iteracion {}".format(filename.split("_")[1].split(".")[0]))
-
-    return im
-
-
 def RepresentateStateOxygen(matriz: np.ndarray, fig, ax, im=None, filename: str = "grafica.png") -> None:
     """
     Represent the state of a matrix as a colored plot. Es la misma funcion que arriba solo que pinta
@@ -320,98 +261,6 @@ def RepresentateStateOxygen(matriz: np.ndarray, fig, ax, im=None, filename: str 
     plt.title("Iteracion {}".format(filename.split("_")[1].split(".")[0]))
 
     return im
-
-
-def plot_regions(Eje_x: int, Eje_y: int, regiones_pesos: list, filename: str) -> None:
-    """
-    Plot the regions with privileged probability.
-
-    Args:
-        Eje_x (int): The size of the x-axis.
-        Eje_y (int): The size of the y-axis.
-        regiones_pesos (list): A list of tuples defining regions and their weights.
-                               Each tuple should be ((x_start, x_end, y_start, y_end), weight).
-    """
-    fig, ax = plt.subplots()
-    ax.set_xlim(0, Eje_y)
-    ax.set_ylim(0, Eje_x)
-    ax.invert_yaxis()
-
-    # Draw grid
-    for i in range(Eje_x):
-        for j in range(Eje_y):
-            rect = patches.Rectangle((j, i), 1, 1, edgecolor="grey", facecolor="white", fill=True)
-            ax.add_patch(rect)
-
-    # Highlight privileged regions
-    for (x_start, x_end, y_start, y_end), weight in regiones_pesos:
-        rect = patches.Rectangle(
-            (y_start, x_start),
-            y_end - y_start,
-            x_end - x_start,
-            linewidth=4,
-            edgecolor="r",
-            facecolor="none",
-        )
-        ax.add_patch(rect)
-        # Add text for weight
-        cx = (y_start + y_end) / 2
-        cy = (x_start + x_end) / 2
-        ax.text(cx, cy, f"w={weight}", color="red", ha="center", va="center", fontsize=8)
-
-    plt.gca().set_aspect("equal", adjustable="box")
-
-    plt.savefig(filename)
-
-
-def plot_privileged_regions(Eje_x: int, Eje_y: int, regiones_pesos: list, filename: str) -> None:
-    """
-    Plot the privileged regions on a grid.
-
-    Args:
-        Eje_x (int): The size of the x-axis.
-        Eje_y (int): The size of the y-axis.
-        regiones_pesos (list): A list of tuples defining regions and their weights.
-                               Each tuple should be ((x_start, x_end, y_start, y_end), weight).
-        filename (str): The name of the file to save the plot.
-    """
-    fig, ax = plt.subplots()
-
-    # Verificar que los límites no sean iguales
-    if Eje_y == 0:
-        Eje_y = 1
-    if Eje_x == 0:
-        Eje_x = 1
-
-    ax.set_xlim(0, Eje_y)
-    ax.set_ylim(0, Eje_x)
-    ax.invert_yaxis()
-
-    # Draw grid
-    for i in range(Eje_x):
-        for j in range(Eje_y):
-            rect = patches.Rectangle((j, i), 1, 1, edgecolor="grey", facecolor="white", fill=True)
-            ax.add_patch(rect)
-
-    # Highlight privileged regions
-    for (x_start, x_end, y_start, y_end), weight in regiones_pesos:
-        rect = patches.Rectangle(
-            (y_start, x_start),
-            y_end - y_start,
-            x_end - x_start,
-            linewidth=4,
-            edgecolor="r",
-            facecolor="none",
-        )
-        ax.add_patch(rect)
-        # Add text for weight
-        cx = (y_start + y_end) / 2
-        cy = (x_start + x_end) / 2
-        ax.text(cx, cy, f"w={weight}", color="red", ha="center", va="center", fontsize=8)
-
-    plt.gca().set_aspect("equal", adjustable="box")
-    plt.savefig(filename)
-    plt.close(fig)
 
 
 def RepresentateTwoStates(
@@ -506,7 +355,7 @@ def RepresentateTwoStates(
 
     # Ajustar límites del eje X y Y para que los electrodos sean visibles
     ax.set_xlim(-0.3, 10.33)
-    ax.set_ylim(-0, 10)  # 🔥 Extiende el gráfico en Y para acomodar los electrodos
+    ax.set_ylim(-0, 10)  # Extiende el gráfico en Y para acomodar los electrodos
 
     # Aumentar margen superior para más espacio en el título
     plt.subplots_adjust(top=0.85)
@@ -823,22 +672,128 @@ def plot_IV_marcado(
     plt.close(fig)  # Cierra para liberar memoria
 
 
-if __name__ == "__main__":
-    Longitud_Dispositivo = 10
-    atom_size = 0.5
+import matplotlib.patches as mpatches
+from matplotlib.lines import Line2D
+import matplotlib.pyplot as plt
+import numpy as np
+import os
 
-    Eje_x, Eje_y = (
-        round(Longitud_Dispositivo / atom_size),
-        round(Longitud_Dispositivo / atom_size),
+
+def plot_thermal_state(T_map, types_map, title="Simulación Térmica RRAM", num_levels=20, save_path=None):
+    """
+    Visualiza el mapa de temperatura con superposición de materiales e isotermas alineadas.
+
+    Argumentos:
+    - T_map: Matriz de temperaturas (resultado del solver).
+    - types_map: Matriz de materiales (ID 1: Filamento, ID 3: Electrodo).
+    - title: Título del gráfico.
+    - num_levels: Cantidad de líneas de contorno para las isotermas.
+    - save_path: (Opcional) Ruta completa con nombre de archivo para guardar la imagen (ej: 'img/termico.png').
+    """
+    # 1. Configuración de dimensiones y límites (Alineación perfecta)
+    Ny, Nx = T_map.shape
+    extent = (0, Nx, 0, Ny)
+
+    # 2. Aplicar los estilos globales ANTES de crear la figura
+    setup_paper_plt(plt, latex=True, scaling=3)
+
+    # 3. Crear la figura y los ejes
+    fig, ax = plt.subplots(figsize=(11, 7))
+
+    # 4. Aplicar configuración de estilo específica para los ejes
+    config_ax_state(ax)
+
+    # 5. Capa base: Temperatura
+    im = ax.imshow(T_map, cmap="Reds", origin="lower", extent=extent, aspect="equal")
+    cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    # Eliminado el fontsize=10 para que dependa de tu configuración global
+    cbar.set_label("Temperatura (K)")
+
+    # 6. Capa de materiales (Overlay)
+    overlay = np.zeros((Ny, Nx, 4))
+    overlay[types_map == 3] = [0.2, 0.2, 0.2, 0.8]  # Electrodos: Gris oscuro
+    overlay[types_map == 1] = [0.5, 0.5, 0.5, 0.4]  # Filamento: Gris claro
+    ax.imshow(overlay, origin="lower", extent=extent, aspect="equal")
+
+    # 7. Capa de Isotermas
+    niveles = np.linspace(np.min(T_map), np.max(T_map), num_levels)
+    contours = ax.contour(
+        T_map,
+        levels=niveles,
+        colors="black",
+        linewidths=0.5,
+        alpha=0.3,
+        origin="lower",
+        extent=extent,
     )
-    num_trampas = 10
+    # Eliminado el fontsize=7 para que herede la proporción del documento
+    ax.clabel(contours, inline=True, fmt="%1.1f")
 
-    # Crear una matriz de ceros de tamaño Eje_x x Eje_y
-    InitialState = np.zeros((Eje_x, Eje_y), dtype=int)
-    # Generar 5 posiciones aleatorias para los unos
-    posiciones_unos = np.random.choice(Eje_x * Eje_y, num_trampas, replace=False)
+    # 8. Estética y Leyenda (Usando 'ax' en lugar de 'plt')
+    ax.set_title(title, pad=15)  # Eliminado fontsize=14
+    ax.set_xlabel("Ancho del Dispositivo (Nodos / nm)")
+    ax.set_ylabel("Grosor del Óxido (Nodos / nm)")
 
-    # Asignar el valor 1 a las posiciones seleccionadas
-    for pos in posiciones_unos:
-        fila, columna = divmod(pos, Eje_x)
-        InitialState[fila, columna] = 1
+    patches = [
+        mpatches.Patch(color=(0.2, 0.2, 0.2, 0.8), label="Electrodos"),
+        mpatches.Patch(color=(0.5, 0.5, 0.5, 0.4), label="Filamento"),
+        Line2D([0], [0], color="black", lw=0.5, alpha=0.3, label="Isotermas"),
+    ]
+    ax.legend(handles=patches, loc="upper right", bbox_to_anchor=(1.4, 1))
+
+    plt.tight_layout()
+
+    # 9. Guardar si se especifica la ruta
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        # bbox_inches='tight' es crucial para que no recorte la leyenda exterior
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        print(f"Gráfico térmico guardado en: {save_path}")
+
+    plt.show()
+
+
+def plot_heatmap(data_map, title="Mapa de Distribución", cbar_label="Valor", cmap="viridis", save_path=None):
+    """
+    Visualiza un mapa de calor simple. Ideal para ver probabilidades (SET/RESET),
+    distribución de campos eléctricos, densidad de corriente, etc.
+
+    Argumentos:
+    - data_map: Matriz 2D de datos a representar (ej: mapa de probabilidades).
+    - title: Título del gráfico.
+    - cbar_label: Etiqueta de la barra de color (ej: 'Probabilidad', 'Campo (V/m)').
+    - cmap: Mapa de color de matplotlib (recomendados: 'viridis', 'plasma', 'magma', 'coolwarm').
+    - save_path: (Opcional) Ruta completa para guardar la imagen.
+    """
+
+    # 1. Aplicar los estilos globales ANTES de crear la figura
+    setup_paper_plt(plt, latex=True, scaling=3)
+
+    # 2. Crear la figura y los ejes
+    fig, ax = plt.subplots(figsize=(12, 9))
+
+    # 3. Aplicar configuración de estilo específica para los ejes
+    config_ax_state(ax)
+
+    # 4. Representación de la matriz usando el objeto 'ax'
+    # Usamos origin='lower' para mantener la consistencia física donde y=0 es la base
+    im = ax.imshow(data_map, cmap=cmap, origin="lower", aspect="equal")
+
+    # 5. Barra de color asociada al objeto 'im' y al eje 'ax'
+    cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    cbar.set_label(cbar_label)  # El tamaño de fuente ahora lo controla setup_paper_plt
+
+    # 6. Estética y etiquetas
+    ax.set_title(title, pad=15)
+    ax.set_xlabel("Ancho del Dispositivo (X)")
+    ax.set_ylabel("Grosor del Óxido (Y)")
+
+    plt.tight_layout()
+
+    # 7. Guardar si se especifica la ruta
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        print(f"Mapa de calor guardado en: {save_path}")
+
+    plt.show()
