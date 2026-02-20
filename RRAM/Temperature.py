@@ -145,7 +145,7 @@ def calculate_heat_source(types_map: np.ndarray, atom_size: float, I_total: floa
         Q_val_local = sigma_material * (E_local**2)
 
         # Factor de escala (0.01)
-        Q_map_global[fil_indices, j] = Q_val_local * 0.01
+        Q_map_global[fil_indices, j] = Q_val_local
 
     return Q_map_global
 

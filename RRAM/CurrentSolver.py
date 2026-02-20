@@ -217,16 +217,19 @@ def calcular_resistencia(CF_matrix, ohm_resistence=11.5):
         float: Resistencia total calculada a partir de la matriz CF_matrix.
     """
     total_resistance = 0.0
-    # Sobre cada columna de la matriz
-    for row in CF_matrix.T:
-        # Se calcula la resistencia paralela de los elementos de la columna
-        num_resistence = sum(row)
-        parallel_resistance = 1 / (num_resistence / ohm_resistence)
+    Ny, Nx = CF_matrix.shape
+    for j in range(1, Nx - 1):
+        fil_indices = np.where(CF_matrix == 1)[0]
+        N_total_columna = len(fil_indices)
+
+        if N_total_columna == 0:
+            continue
+
+        # R equivalente de la columna (N resistencias en paralelo)
+        R_col = ohm_resistence / N_total_columna
 
         # Se suma la resistencia paralela a la resistencia total
-        total_resistance += parallel_resistance
-
-        # Se calcula la corriente Ohmica
+        total_resistance += R_col
     return total_resistance
 
 

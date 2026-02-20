@@ -1,3 +1,4 @@
+from matplotlib.pyplot import plot
 from . import (
     CurrentSolver,
     ElectricField,
@@ -141,19 +142,43 @@ class SimulationConstants:
         }
 
     def update_gamma(self, nuevo_valor_gamma: float):
+        # gamma no tiene distinción de set/reset en los atributos originales,
+        # por lo que este se queda igual, pero asegurándonos de que la variable exista.
         return replace(self, gamma=nuevo_valor_gamma)
 
-    def update_ohm_resistence(self, nuevo_valor_ohm_resistence: float):
-        return replace(self, ohm_resistence=nuevo_valor_ohm_resistence)
+    def update_ohm_resistence(self, nuevo_valor: float, fase: str = "set"):
+        """Actualiza la resistencia óhmica dependiendo de la fase ('set' o 'reset')."""
+        if fase not in ["set", "reset"]:
+            raise ValueError("El parámetro 'fase' debe ser 'set' o 'reset'.")
 
-    def update_I_0(self, nuevo_I_0: float):
-        return replace(self, I_0=nuevo_I_0)
+        # Construimos el nombre exacto del atributo: "ohm_resistence_set" o "ohm_resistence_reset"
+        atributo = f"ohm_resistence_{fase}"
 
-    def update_pb_metal_insul(self, nuevo_pb_metal_insul: float):
-        return replace(self, pb_metal_insul=nuevo_pb_metal_insul)
+        # Usamos un diccionario para pasar el argumento dinámicamente a replace()
+        return replace(self, **{atributo: nuevo_valor})
 
-    def update_permitividad_relativa(self, permitividad_relativa_nuevo: float):
-        return replace(self, permitividad_relativa=permitividad_relativa_nuevo)
+    def update_I_0(self, nuevo_I_0: float, fase: str = "set"):
+        """Actualiza la corriente de referencia I_0 dependiendo de la fase ('set' o 'reset')."""
+        if fase not in ["set", "reset"]:
+            raise ValueError("El parámetro 'fase' debe ser 'set' o 'reset'.")
+
+        atributo = f"I_0_{fase}"
+        return replace(self, **{atributo: nuevo_I_0})
+
+    def update_pb_metal_insul(self, nuevo_pb_metal_insul: float, fase: str = "set"):
+        """Actualiza la barrera de potencial dependiendo de la fase ('set' o 'reset')."""
+        if fase not in ["set", "reset"]:
+            raise ValueError("El parámetro 'fase' debe ser 'set' o 'reset'.")
+
+        atributo = f"pb_metal_insul_{fase}"
+        return replace(self, **{atributo: nuevo_pb_metal_insul})
+
+    def update_permitividad_relativa(self, permitividad_relativa_nuevo: float, fase: str = "set"):
+        """Actualiza la permitividad relativa dependiendo de la fase ('set' o 'reset')."""
+        if fase not in ["set", "reset"]:
+            raise ValueError("El parámetro 'fase' debe ser 'set' o 'reset'.")
+        atributo = f"permitividad_relativa_{fase}"
+        return replace(self, **{atributo: permitividad_relativa_nuevo})
 
     def __repr__(self):
         # Crear lista de líneas con "nombre=valor" para cada atributo
@@ -272,29 +297,40 @@ def update_state_generation(
     temperatura: np.ndarray | float,
     factor_vecinos: float,
     factor_sin_vecinos: float,
-    neighbor_mode: str = "both",
+    neighbor_mode: str = "horizontal",
+    plot_probabilidad: bool = False,
+    ruta_figura: Path = Path("C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/"),
+    k: int = 0,
 ) -> np.ndarray:
     """
     Orquesta el proceso de generación de vacantes:
     Abre las dataclasses (params y sim_ctes) y delega la física al módulo Generation.
     """
-
+    num_pasos_guardar_estado = 2500
     act_state = state.copy()
     x_size, y_size = state.shape
 
-    # Solo necesitamos intervenir si nos pasan un vector 1D para generar una matriz 2D con el mismo valor en cada fila, si ya nos pasan un escalar o una matriz 2D, lo dejamos tal cual.
+    # 1. Ajuste del Campo Eléctrico (lo que ya arreglamos)
     if isinstance(E_field, np.ndarray) and E_field.ndim == 1:
-        E_field_matrix = E_field.reshape(-1, 1)
+        E_field_matrix = np.repeat(E_field[:, np.newaxis], y_size, axis=1)
     else:
-        # Si es un float o ya es 2D, lo pasamos tal cual
         E_field_matrix = E_field
+
+    # 2. NUEVO: Ajuste de la matriz de Temperatura
+    # Si es una matriz y tiene distinto tamaño que state (ej: trae los electrodos)
+    if isinstance(temperatura, np.ndarray) and temperatura.shape != state.shape:
+        # Recortamos todas las filas, pero quitamos la primera (0) y última columna (-1)
+        temp_matrix = temperatura[:, 1:-1]
+    else:
+        # Si ya era del tamaño correcto o era un float escalar, la dejamos igual
+        temp_matrix = temperatura
 
     # Calculo la matriz de probabilidades de generación para cada posición
     prob_final = Generation.get_generation_probabilities_matrix(
         state=state,
         paso_temporal=params.paso_temporal,
         Electric_field=E_field_matrix,
-        temperatura=temperatura,
+        temperatura=temp_matrix,  # <--- Usamos la matriz de temperatura ya recortada
         factor_vecinos=factor_vecinos,
         factor_sin_vecinos=factor_sin_vecinos,
         vibration_frequency=sim_ctes.vibration_frequency,
@@ -303,6 +339,13 @@ def update_state_generation(
         gamma=sim_ctes.gamma,
         neighbor_mode=neighbor_mode,
     )
+
+    if k % num_pasos_guardar_estado == 0:
+        Representate.plot_heatmap(
+            prob_final,
+            "Mapa de fuentes de calor",
+            save_path=ruta_figura,
+        )
 
     # 5. Generación de nuevas vacantes de forma estocástica
     aleatorios = np.random.rand(x_size, y_size)
@@ -553,29 +596,29 @@ def PP_set(
                     num_simulation=num_simulation,
                 )
 
-            if sum(CF_creado) == indice_gamma:
-                if len(CF_ranges) == 1:
-                    print("Todos los filamentos creados.")
-                    nueva_gamma = sim_ctes.gamma + 2
-                    sim_ctes = sim_ctes.update_gamma(nueva_gamma)
-                    sim_ctes_dict = asdict(sim_ctes)
-                    indice_gamma = indice_gamma + 1
-                    print("\n El nuevo valor de gamma es:", sim_ctes_dict["gamma"])
-            if len(CF_ranges) == 2:
-                if sum(CF_creado) == 2:
-                    print("Todos los filamentos creados.")
-                    actual_resistance = sim_ctes.ohm_resistence_set
-                    sim_ctes = sim_ctes.update_ohm_resistence(actual_resistance - 15)
-                    print("El nuevo valor de R_ohm es:", sim_ctes.ohm_resistence_set)
-                    sim_ctes_dict = asdict(sim_ctes)
-                else:
-                    nueva_gamma = sim_ctes.gamma / 2
-                    sim_ctes = sim_ctes.update_gamma(nueva_gamma)
-                    sim_ctes_dict = asdict(sim_ctes)
-                    indice_gamma = indice_gamma + 1
-                    print("\n El nuevo valor de gamma es:", sim_ctes_dict["gamma"])
-            else:
-                nueva_gamma = sim_ctes.gamma - 1
+            # if sum(CF_creado) == indice_gamma:
+            #     if len(CF_ranges) == 1:
+            #         print("Todos los filamentos creados.")
+            #         nueva_gamma = sim_ctes.gamma + 2
+            #         sim_ctes = sim_ctes.update_gamma(nueva_gamma)
+            #         sim_ctes_dict = asdict(sim_ctes)
+            #         indice_gamma = indice_gamma + 1
+            #         print("\n El nuevo valor de gamma es:", sim_ctes_dict["gamma"])
+            # if len(CF_ranges) == 2:
+            #     if sum(CF_creado) == 2:
+            #         print("Todos los filamentos creados.")
+            #         actual_resistance = sim_ctes.ohm_resistence_set
+            #         sim_ctes = sim_ctes.update_ohm_resistence(actual_resistance - 15)
+            #         print("El nuevo valor de R_ohm es:", sim_ctes.ohm_resistence_set)
+            #         sim_ctes_dict = asdict(sim_ctes)
+            #     else:
+            #         nueva_gamma = sim_ctes.gamma / 2
+            #         sim_ctes = sim_ctes.update_gamma(nueva_gamma)
+            #         sim_ctes_dict = asdict(sim_ctes)
+            #         indice_gamma = indice_gamma + 1
+            #         print("\n El nuevo valor de gamma es:", sim_ctes_dict["gamma"])
+            # else:
+            #     nueva_gamma = sim_ctes.gamma - 1
 
             cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf)
 
@@ -610,23 +653,28 @@ def PP_set(
                 T_ambient=sim_ctes.Temperatura_electrodo,
             )
 
-        if k % num_pasos_guardar_estado == 0:
-            fig_voltage = round(vector_ddp[k], 3)
-            Representate.plot_heatmap(
-                temperatura,
-                "Mapa de temperatura",
-                save_path=rutas["figures_path"] / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_pp_set.png",
-            )
-            Representate.plot_heatmap(
-                Q_source_map,
-                "Mapa de fuentes de calor",
-                save_path=rutas["figures_path"] / f"Mapa_fuentes_calor_{num_simulation}_{round(voltage, 4)}_pp_set.png",
-            )
-            Representate.plot_heatmap(
-                materials_map,
-                "Mapa de materiales",
-                save_path=rutas["figures_path"] / f"Mapa_materiales_{num_simulation}_{round(voltage, 4)}_pp_set.png",
-            )
+            if k % num_pasos_guardar_estado == 0:
+                fig_voltage = round(vector_ddp[k], 3)
+                Representate.plot_thermal_state(
+                    temperatura,
+                    materials_map,
+                    "Mapa de temperatura",
+                    20,
+                    save_path=rutas["figures_path"]
+                    / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_pp_set.png",
+                )
+                Representate.plot_heatmap(
+                    Q_source_map,
+                    "Mapa de fuentes de calor",
+                    save_path=rutas["figures_path"]
+                    / f"Mapa_fuentes_calor_{num_simulation}_{round(voltage, 4)}_pp_set.png",
+                )
+                Representate.plot_heatmap(
+                    materials_map,
+                    "Mapa de materiales",
+                    save_path=rutas["figures_path"]
+                    / f"Mapa_materiales_{num_simulation}_{round(voltage, 4)}_pp_set.png",
+                )
 
         else:
             sistema_percola = False
@@ -658,6 +706,10 @@ def PP_set(
                 temperatura,
                 sim_ctes.factor_vecinos_pp_set,
                 sim_ctes.factor_libre_pp_set,
+                plot_probabilidad=sistema_percola,
+                ruta_figura=rutas["figures_path"]
+                / f"Mapa_probabilidad_{num_simulation}_{round(voltage, 4)}_sp_set.png",
+                k=k,
             )
         elif not total_vacantes_pp_set:
             print(
@@ -669,9 +721,9 @@ def PP_set(
         data_pp_set[k] = np.array([simulation_time, voltage, current])
 
     # Se decarta la simulación si no se ha llegado a la resistencia mínima necesaria para la segunda parte del set, ya que no va a coincidir con los datos experimentales.
-    # if not (10 <= resistencia <= 160000):
-    #     # No se ha llegado a la resistencia necesaria para la segunda parte del set, directamelo lo descarto
-    #     raise exceptions.LowResistanceException(valor_resistencia=resistencia)
+    if not (35 <= resistencia <= 55):
+        # No se ha llegado a la resistencia necesaria para la segunda parte del set, directamelo lo descarto
+        raise exceptions.LowResistanceException(valor_resistencia=resistencia)
 
     # Guardo los datos de la simulación
     save_path_pkl = rutas["data_simulation_path"] / f"Data_pp_set_{num_simulation}.pkl"
@@ -857,23 +909,28 @@ def SP_set(
                 T_ambient=sim_ctes.Temperatura_electrodo,
             )
 
-        if k % num_pasos_guardar_estado == 0:
-            fig_voltage = round(vector_ddp[k], 3)
-            Representate.plot_heatmap(
-                temperatura,
-                "Mapa de temperatura",
-                save_path=rutas["figures_path"] / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_sp_set.png",
-            )
-            Representate.plot_heatmap(
-                Q_source_map,
-                "Mapa de fuentes de calor",
-                save_path=rutas["figures_path"] / f"Mapa_fuentes_calor_{num_simulation}_{round(voltage, 4)}_sp_set.png",
-            )
-            Representate.plot_heatmap(
-                materials_map,
-                "Mapa de materiales",
-                save_path=rutas["figures_path"] / f"Mapa_materiales_{num_simulation}_{round(voltage, 4)}_sp_set.png",
-            )
+            if k % num_pasos_guardar_estado == 0:
+                fig_voltage = round(vector_ddp[k], 3)
+                Representate.plot_thermal_state(
+                    temperatura,
+                    materials_map,
+                    "Mapa de temperatura",
+                    20,
+                    save_path=rutas["figures_path"]
+                    / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_sp_set.png",
+                )
+                Representate.plot_heatmap(
+                    Q_source_map,
+                    "Mapa de fuentes de calor",
+                    save_path=rutas["figures_path"]
+                    / f"Mapa_fuentes_calor_{num_simulation}_{round(voltage, 4)}_sp_set.png",
+                )
+                Representate.plot_heatmap(
+                    materials_map,
+                    "Mapa de materiales",
+                    save_path=rutas["figures_path"]
+                    / f"Mapa_materiales_{num_simulation}_{round(voltage, 4)}_sp_set.png",
+                )
 
         else:
             # Obtengo los valores del campo eléctrico y la temperatura
@@ -902,6 +959,10 @@ def SP_set(
                 temperatura,
                 sim_ctes.factor_vecinos_sp_set,
                 sim_ctes.factor_libre_sp_set,
+                plot_probabilidad=sistema_percola,
+                ruta_figura=rutas["figures_path"]
+                / f"Mapa_probabilidad_{num_simulation}_{round(voltage, 4)}_sp_set.png",
+                k=k,
             )
         elif not total_vacantes_sp_set:
             print(
@@ -1106,24 +1167,28 @@ def PP_reset(
                 T_ambient=sim_ctes.Temperatura_electrodo,
             )
 
-        if k % num_pasos_guardar_estado == 0:
-            fig_voltage = round(vector_ddp[k], 3)
-            Representate.plot_heatmap(
-                temperatura,
-                "Mapa de temperatura",
-                save_path=rutas["figures_path"] / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_pp_reset.png",
-            )
-            Representate.plot_heatmap(
-                Q_source_map,
-                "Mapa de fuentes de calor",
-                save_path=rutas["figures_path"]
-                / f"Mapa_fuentes_calor_{num_simulation}_{round(voltage, 4)}_pp_reset.png",
-            )
-            Representate.plot_heatmap(
-                materials_map,
-                "Mapa de materiales",
-                save_path=rutas["figures_path"] / f"Mapa_materiales_{num_simulation}_{round(voltage, 4)}_pp_reset.png",
-            )
+            if k % num_pasos_guardar_estado == 0:
+                fig_voltage = round(vector_ddp[k], 3)
+                Representate.plot_thermal_state(
+                    temperatura,
+                    materials_map,
+                    "Mapa de temperatura",
+                    20,
+                    save_path=rutas["figures_path"]
+                    / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_pp_reset.png",
+                )
+                Representate.plot_heatmap(
+                    Q_source_map,
+                    "Mapa de fuentes de calor",
+                    save_path=rutas["figures_path"]
+                    / f"Mapa_fuentes_calor_{num_simulation}_{round(voltage, 4)}_pp_reset.png",
+                )
+                Representate.plot_heatmap(
+                    materials_map,
+                    "Mapa de materiales",
+                    save_path=rutas["figures_path"]
+                    / f"Mapa_materiales_{num_simulation}_{round(voltage, 4)}_pp_reset.png",
+                )
 
         else:
             percola = False
@@ -1345,24 +1410,28 @@ def SP_reset(
                 T_ambient=sim_ctes.Temperatura_electrodo,
             )
 
-        if k % num_pasos_guardar_estado == 0:
-            fig_voltage = round(vector_ddp[k], 3)
-            Representate.plot_heatmap(
-                temperatura,
-                "Mapa de temperatura",
-                save_path=rutas["figures_path"] / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_sp_reset.png",
-            )
-            Representate.plot_heatmap(
-                Q_source_map,
-                "Mapa de fuentes de calor",
-                save_path=rutas["figures_path"]
-                / f"Mapa_fuentes_calor_{num_simulation}_{round(voltage, 4)}_sp_reset.png",
-            )
-            Representate.plot_heatmap(
-                materials_map,
-                "Mapa de materiales",
-                save_path=rutas["figures_path"] / f"Mapa_materiales_{num_simulation}_{round(voltage, 4)}_sp_reset.png",
-            )
+            if k % num_pasos_guardar_estado == 0:
+                fig_voltage = round(vector_ddp[k], 3)
+                Representate.plot_thermal_state(
+                    temperatura,
+                    materials_map,
+                    "Mapa de temperatura",
+                    20,
+                    save_path=rutas["figures_path"]
+                    / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_sp_reset.png",
+                )
+                Representate.plot_heatmap(
+                    Q_source_map,
+                    "Mapa de fuentes de calor",
+                    save_path=rutas["figures_path"]
+                    / f"Mapa_fuentes_calor_{num_simulation}_{round(voltage, 4)}_sp_reset.png",
+                )
+                Representate.plot_heatmap(
+                    materials_map,
+                    "Mapa de materiales",
+                    save_path=rutas["figures_path"]
+                    / f"Mapa_materiales_{num_simulation}_{round(voltage, 4)}_sp_reset.png",
+                )
 
         else:
             percola = False

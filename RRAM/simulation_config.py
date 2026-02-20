@@ -7,17 +7,17 @@ import os
 # PARÁMETROS MATERIALES (HfOx)
 # ============================================================================
 MATERIAL_DEFAULTS = {
-    "cte_red": 0.125e-9,
-    "permitividad_relativa_set": 250.0,
-    "permitividad_relativa_reset": 299.9991,
+    "cte_red": 0.25e-9,
+    "permitividad_relativa_set": 299.8037,
+    "permitividad_relativa_reset": 158.9084,
     "generation_energy": 1.0,
     "recombination_energy": 0.955,
-    "pb_metal_insul_set": 0.2547,
-    "pb_metal_insul_reset": 0.2465,
+    "pb_metal_insul_set": 0.0010,
+    "pb_metal_insul_reset": 0.0858,
     "recom_enchancement_factor": 3e3,
     "long_decaimiento_concentracion": 1e-9,
-    "ohm_resistence_set": 250.0,
-    "ohm_resistence_reset": 250.0,
+    "ohm_resistence_set": 150.0,
+    "ohm_resistence_reset": 150.0,
 }
 
 # ============================================================================
@@ -34,8 +34,8 @@ PHYSICAL_CONSTANTS = {
 # PARÁMETROS ELÉCTRICOS
 # ============================================================================
 ELECTRICAL_DEFAULTS = {
-    "I_0_set": 1.8613e-01,
-    "I_0_reset": 1.1221e-01,
+    "I_0_set": 1.1179e-03,
+    "I_0_reset": 4.2425e-03,
 }
 
 # ============================================================================
@@ -43,11 +43,11 @@ ELECTRICAL_DEFAULTS = {
 # ============================================================================
 THERMAL_DEFAULTS = {
     "init_temp": 300.0,
-    "r_termica_no_percola": 1000.0,
-    "conductividad_termica_aire": 0.02,
-    "conductividad_termica_CF": 1.0,
-    "conductividad_termica_aislante": 0.0,
-    "conductividad_termica_electrodo": 1.0,
+    "r_termica_no_percola": 100000.0,
+    "conductividad_termica_aire": 2.3,
+    "conductividad_termica_CF": 15.0,
+    "conductividad_termica_aislante": 0.000001,
+    "conductividad_termica_electrodo": 5.0,
     "Temperatura_electrodo": 300,
 }
 
@@ -55,14 +55,14 @@ THERMAL_DEFAULTS = {
 # PARÁMETROS GEOMÉTRICOS Y DE SIMULACIÓN
 # ============================================================================
 SIMULATION_DEFAULTS = {
-    "device_size": 5e-9,
-    "atom_size": 0.125e-9,  # Se deberia llamar tamaño de red
-    "num_trampas": 70,
+    "device_size": 10e-9,
+    "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
+    "num_trampas": 120,
     "total_simulation_time": 10.0,
     "num_pasos": 10000,
     "voltaje_final": 1.1,
     "voltaje_final_set": 1.1,
-    "voltaje_final_reset": 1.5,
+    "voltaje_final_reset": 1.4,
 }
 
 # ============================================================================

@@ -461,8 +461,11 @@ def plot_IV(
     # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Set_1t'
     # ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Reset_1.txt'
 
-    ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Medidas_Eduardo/D_Set_1_Run35.txt"
-    ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Medidas_Eduardo/D_Reset_1_Run35.txt"
+    ruta_archivo_set = os.getcwd() + "Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt"
+    ruta_archivo_reset = os.getcwd() + "Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt"
+
+    # ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Medidas_Eduardo/D_Set_1_Run35.txt"
+    # ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Medidas_Eduardo/D_Reset_1_Run35.txt"
 
     # Cargar datos experimentales
     data_set = np.loadtxt(ruta_archivo_set, skiprows=1)
@@ -590,8 +593,11 @@ def plot_IV_marcado(
     # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Set_1t'
     # ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Reset_1.txt'
     # TODO: Seria ideal que estas rutas se pasaran como parámetros a la función para no tener que modificar el código cada vez que quiera cambiar los datos experimentales a mostrar, pero por ahora lo dejo así para avanzar con el resto de cosas
-    ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Medidas_Eduardo/D_Set_1_Run35.txt"
-    ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Medidas_Eduardo/D_Reset_1_Run35.txt"
+    # ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Medidas_Eduardo/D_Set_1_Run35.txt"
+    # ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Medidas_Eduardo/D_Reset_1_Run35.txt"
+
+    ruta_archivo_set = os.getcwd() + "Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt"
+    ruta_archivo_reset = os.getcwd() + "Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt"
 
     # Cargar datos experimentales
     data_set = np.loadtxt(ruta_archivo_set, skiprows=1)
@@ -695,17 +701,17 @@ def plot_thermal_state(T_map, types_map, title="Simulación Térmica RRAM", num_
     extent = (0, Nx, 0, Ny)
 
     # 2. Aplicar los estilos globales ANTES de crear la figura
-    setup_paper_plt(plt, latex=True, scaling=3)
+    setup_paper_plt(plt, latex=True, scaling=2)
 
     # 3. Crear la figura y los ejes
-    fig, ax = plt.subplots(figsize=(11, 7))
+    fig, ax = plt.subplots(figsize=(22, 14))
 
     # 4. Aplicar configuración de estilo específica para los ejes
     config_ax_state(ax)
 
     # 5. Capa base: Temperatura
-    im = ax.imshow(T_map, cmap="Reds", origin="lower", extent=extent, aspect="equal")
-    cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    im = ax.imshow(T_map, cmap="coolwarm", origin="lower", extent=extent, aspect="equal")
+    cbar = fig.colorbar(im, ax=ax, fraction=0.05, pad=0.04)
     # Eliminado el fontsize=10 para que dependa de tu configuración global
     cbar.set_label("Temperatura (K)")
 
@@ -721,15 +727,15 @@ def plot_thermal_state(T_map, types_map, title="Simulación Térmica RRAM", num_
         T_map,
         levels=niveles,
         colors="black",
-        linewidths=0.5,
-        alpha=0.3,
+        linewidths=1.0,
+        alpha=0.5,
         origin="lower",
         extent=extent,
     )
     # Eliminado el fontsize=7 para que herede la proporción del documento
     ax.clabel(contours, inline=True, fmt="%1.1f")
 
-    # 8. Estética y Leyenda (Usando 'ax' en lugar de 'plt')
+    # 8. Estética y Leyenda
     ax.set_title(title, pad=15)  # Eliminado fontsize=14
     ax.set_xlabel("Ancho del Dispositivo (Nodos / nm)")
     ax.set_ylabel("Grosor del Óxido (Nodos / nm)")
@@ -737,7 +743,7 @@ def plot_thermal_state(T_map, types_map, title="Simulación Térmica RRAM", num_
     patches = [
         mpatches.Patch(color=(0.2, 0.2, 0.2, 0.8), label="Electrodos"),
         mpatches.Patch(color=(0.5, 0.5, 0.5, 0.4), label="Filamento"),
-        Line2D([0], [0], color="black", lw=0.5, alpha=0.3, label="Isotermas"),
+        Line2D([0], [0], color="black", lw=0.75, alpha=0.7, label="Isotermas"),
     ]
     ax.legend(handles=patches, loc="upper right", bbox_to_anchor=(1.4, 1))
 
@@ -750,7 +756,7 @@ def plot_thermal_state(T_map, types_map, title="Simulación Térmica RRAM", num_
         plt.savefig(save_path, dpi=300, bbox_inches="tight")
         print(f"Gráfico térmico guardado en: {save_path}")
 
-    plt.show()
+    plt.close(fig)  # Cierra para liberar memoria
 
 
 def plot_heatmap(data_map, title="Mapa de Distribución", cbar_label="Valor", cmap="viridis", save_path=None):
@@ -766,11 +772,11 @@ def plot_heatmap(data_map, title="Mapa de Distribución", cbar_label="Valor", cm
     - save_path: (Opcional) Ruta completa para guardar la imagen.
     """
 
-    # 1. Aplicar los estilos globales ANTES de crear la figura
-    setup_paper_plt(plt, latex=True, scaling=3)
+    # 2. Aplicar los estilos globales ANTES de crear la figura
+    setup_paper_plt(plt, latex=True, scaling=2)
 
-    # 2. Crear la figura y los ejes
-    fig, ax = plt.subplots(figsize=(12, 9))
+    # 3. Crear la figura y los ejes
+    fig, ax = plt.subplots(figsize=(22, 14))
 
     # 3. Aplicar configuración de estilo específica para los ejes
     config_ax_state(ax)
@@ -794,6 +800,5 @@ def plot_heatmap(data_map, title="Mapa de Distribución", cbar_label="Valor", cm
     if save_path:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         plt.savefig(save_path, dpi=300, bbox_inches="tight")
-        print(f"Mapa de calor guardado en: {save_path}")
 
-    plt.show()
+    plt.close(fig)  # Cierra para liberar memoria
