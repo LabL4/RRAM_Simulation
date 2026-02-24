@@ -54,8 +54,8 @@ class SimulationParameters:
     paso_potencial_reset: float = field(init=False)
 
     def __post_init__(self):
-        self.x_size = int(self.device_size / self.atom_size)  # Número de "casillas" en la dimensión x
-        self.y_size = int(self.device_size / self.atom_size)  # Número de "casillas" en la dimensión y
+        self.x_size = int(np.ceil(self.device_size / self.atom_size))  # Número de "casillas" en la dimensión x
+        self.y_size = int(np.ceil(self.device_size / self.atom_size))  # Número de "casillas" en la dimensión y
         self.num_max_vacantes = int(0.95 * (self.x_size * self.x_size))  # 95% de la matriz puede llenarse de vacantes
         self.paso_temporal = self.total_simulation_time / self.num_pasos  # Paso temporal en segundos
         self.paso_potencial_set = self.voltaje_final_set / self.num_pasos  # Paso de voltaje para la parte de set
@@ -470,6 +470,7 @@ def PP_set(
         Path.cwd() / f"Init_data/init_state_{num_simulation - 1}",
         rutas["figures_path"] / f"Initial_state_{num_simulation}.png",
         0.0,
+        device_size=params.device_size,
     )
 
     sistema_percola = False
@@ -1386,7 +1387,6 @@ def SP_reset(
     CF_destruido = final_state_pp_reset["CF_destruido"]
     voltage_CF_destruido = final_state_pp_reset["voltage_CF_destruido"]
     roturas_dict = final_state_pp_reset["roturas_dict"]
-    temperatura = final_state_pp_reset["temperatura_final"]
 
     print("Lol voltaje de rotura de pp reset son: ", voltage_CF_destruido)
 

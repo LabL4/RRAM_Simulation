@@ -215,7 +215,7 @@ def RepresentateState(
     voltaje: float,
     filename: str | None = None,
     color=(0.0000, 0.0000, 0.5451),
-    guardar_png: bool = False,
+    guardar_png: bool = True,
     device_size: float = 10e-9,
 ) -> None:
     """
@@ -288,6 +288,7 @@ def RepresentateState(
 
     plt.subplots_adjust(top=0.85)
 
+    # TODO Cambiar esto y que se guarde siempre
     # Guardar archivos
     if filename:
         if guardar_png:
