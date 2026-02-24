@@ -166,7 +166,7 @@ def Existe_filamentos(resultados, num_filamentos) -> list[bool]:
     return Percola_list_bool
 
 
-def Eliminar_filamentos_incompletos(grid_limpio, filamentos_ranges, percola_bools, W: int = 40):
+def Eliminar_filamentos_incompletos(grid_limpio, filamentos_ranges, percola_bools, W=None):
     """
     Elimina los nodos y aristas de los rangos donde el filamento no se ha formado (no percola).
 
@@ -183,6 +183,17 @@ def Eliminar_filamentos_incompletos(grid_limpio, filamentos_ranges, percola_bool
         G_limpio : nx.Graph
             Grafo con los nodos (y sus aristas) solo de los filamentos completos.
     """
+    # Si no se pasa W, lo calcula automáticamente del tamaño real de la matriz
+
+    # Si no se pasa W, calcularlo del grafo
+    if W is None:
+        nodos = list(grid_limpio.nodes())
+        if nodos:
+            max_dim = max(max(n[0], n[1]) for n in nodos)
+            W = max_dim + 1
+        else:
+            raise ValueError("El grafo está vacío y no se proporcionó la dimensión W")
+
     G_limpio = grid_limpio.copy()
 
     for idx, percola in enumerate(percola_bools):

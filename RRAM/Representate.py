@@ -1,8 +1,10 @@
 import matplotlib.patches as mpatches
 import matplotlib.patches as patches
+import matplotlib.patches as patches
 import matplotlib.ticker as ticker
 import matplotlib.pyplot as plt
-import matplotlib.pyplot as plt
+
+from matplotlib.colors import ListedColormap
 from matplotlib import markers
 
 # import pandas as pd
@@ -72,7 +74,7 @@ def setup_plt(plt, latex=True, scaling=1):
         {
             "pgf.texsystem": "pdflatex",
             "text.usetex": latex,
-            "font.family": "fourier",
+            "font.family": "mathpazo",
             "text.latex.preamble": "\n".join(
                 [
                     r"\usepackage[utf8]{inputenc}",
@@ -101,166 +103,202 @@ def setup_plt(plt, latex=True, scaling=1):
 setup_paper_plt(plt, latex=True, scaling=3)
 
 
-# (0.9647, 0.1725, 0.3059) color rojo original
+# # (0.9647, 0.1725, 0.3059) color rojo original
+# def RepresentateState(
+#     matriz: np.ndarray,
+#     voltaje: float,
+#     filename: str = None,  # type: ignore
+#     color=(0.0000, 0.0000, 0.5451),
+#     guardar_png: bool = False,
+# ) -> None:  # type: ignore
+#     """
+#     Representa el estado de una matriz con un estilo gráfico personalizado.
+
+#     Parámetros:
+#     - matriz (np.ndarray): Matriz a representar.
+#     - k (int): Índice de iteración para el voltaje.
+#     - paso_voltaje (float): Incremento de voltaje por iteración.
+#     - filename (str, opcional): Nombre del archivo para guardar la gráfica.
+#     - color (tuple, opcional): Color de las vacantes.
+
+#     Retorna:
+#     - None
+#     """
+
+#     nrows, ncols = matriz.shape
+#     # x = np.linspace(0, 10, ncols)  # Escala real de 10 nm en eje X
+#     # y = np.linspace(0, 10, nrows)  # Escala real de 10 nm en eje Y
+
+#     x = np.linspace(0, 10, ncols)  # Escala real de 10 nm en eje X
+#     y = np.linspace(0, 10, nrows)  # Escala real de 10 nm en eje Y
+
+#     fig, ax = plt.subplots(figsize=(12, 9))
+
+#     setup_paper_plt(plt, latex=True, scaling=3)
+#     config_ax_state(ax)
+#     # CUSTOM_SIZE = 32
+
+#     # plt.rc("axes", labelsize=CUSTOM_SIZE)
+#     # plt.rc("xtick", labelsize=CUSTOM_SIZE)
+#     # plt.rc("ytick", labelsize=CUSTOM_SIZE)
+#     # Desactivar minorticks para evitar sobrecarga visual
+
+#     # Crear mapa de colores
+#     colors = [(1, 1, 1), color]  # Blanco (0) y Color dado (1)
+#     if np.all(matriz == 1):
+#         colors.reverse()
+
+#     cmap = LinearSegmentedColormap.from_list("custom_cmap", colors, N=2)
+
+#     # Graficar la matriz
+#     ax.pcolormesh(
+#         x,
+#         y,
+#         matriz,
+#         shading="nearest",
+#         vmin=matriz.min(),
+#         vmax=matriz.max(),
+#         cmap=cmap,
+#         # edgecolors="gray",  # bordes negros
+#         # linewidth=0.52,  # grosor del borde
+#     )
+
+#     # Configuración de electrodos
+#     electrode_width = 0.2
+#     electrode_height = 11
+
+#     # Electrodo izquierdo
+#     left_electrode = patches.Rectangle((-0.2, -0.5), electrode_width, electrode_height, color="gray", zorder=3)
+
+#     # Electrodo derecho
+#     right_electrode = patches.Rectangle((10.0, -0.5), electrode_width, electrode_height, color="gray", zorder=3)
+
+#     ax.add_patch(left_electrode)
+#     ax.add_patch(right_electrode)
+
+#     # Configurar etiquetas y título
+#     ax.set_xticks(np.arange(0, 11, 2))  # 🔹 Ticks cada 2 nm en X
+#     ax.set_yticks(np.arange(0, 11, 2))  # 🔹 Ticks cada 2 nm en Y
+#     ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
+#     ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
+#     ax.set_title(rf"V_RRAM = {voltaje} V", pad=20)
+
+#     # Ajustar formato visual
+#     ax.set_aspect("equal")
+#     ax.invert_yaxis()
+
+#     # Ajustar límites del eje X y Y para que los electrodos sean visibles
+#     ax.set_xlim(-0.15, 10.15)
+#     ax.set_ylim(-0, 10)  # 🔥 Extiende el gráfico en Y para acomodar los electrodos
+
+#     # Aumentar margen superior para más espacio en el título
+#     plt.subplots_adjust(top=0.85)
+
+#     # Guardar si se especifica un archivo
+#     if filename and guardar_png:
+#         plt.savefig(filename, bbox_inches="tight")
+
+#     cadena = filename
+#     ruta_pdf = os.path.splitext(cadena)[0] + ".pdf"
+#     plt.savefig(ruta_pdf, bbox_inches="tight")
+#     # ruta_svg = os.path.splitext(cadena)[0] + ".svg"
+#     # plt.savefig(ruta_svg, bbox_inches="tight")
+
+#     # Mostrar gráfico
+#     plt.close(fig)
+
+#     return None
+
+
 def RepresentateState(
     matriz: np.ndarray,
     voltaje: float,
-    filename: str = None,  # type: ignore
+    filename: str | None = None,
     color=(0.0000, 0.0000, 0.5451),
     guardar_png: bool = False,
-) -> None:  # type: ignore
+    device_size: float = 10e-9,
+) -> None:
     """
-    Representa el estado de una matriz con un estilo gráfico personalizado.
-
-    Parámetros:
-    - matriz (np.ndarray): Matriz a representar.
-    - k (int): Índice de iteración para el voltaje.
-    - paso_voltaje (float): Incremento de voltaje por iteración.
-    - filename (str, opcional): Nombre del archivo para guardar la gráfica.
-    - color (tuple, opcional): Color de las vacantes.
-
-    Retorna:
-    - None
+    Representa el estado de una matriz de RRAM.
+    Optimizado para publicación: electrodos ajustables, cero absoluto en la base,
+    y colores estables independientemente de la ocupación de la matriz.
     """
 
-    nrows, ncols = matriz.shape
-    # x = np.linspace(0, 10, ncols)  # Escala real de 10 nm en eje X
-    # y = np.linspace(0, 10, nrows)  # Escala real de 10 nm en eje Y
-
-    x = np.linspace(0, 5, ncols)  # Escala real de 10 nm en eje X
-    y = np.linspace(0, 5, nrows)  # Escala real de 10 nm en eje Y
-
+    # El blanco SIEMPRE será el valor 0, y tu color SIEMPRE será el valor 1.
+    cmap = ListedColormap([(1, 1, 1), color])
     fig, ax = plt.subplots(figsize=(12, 9))
 
-    setup_paper_plt(plt, latex=True, scaling=3)
-    config_ax_state(ax)
-    # CUSTOM_SIZE = 32
+    # Descomenta estas líneas según tu entorno
+    # setup_paper_plt(plt, latex=True, scaling=3)
+    # config_ax_state(ax)
 
-    # plt.rc("axes", labelsize=CUSTOM_SIZE)
-    # plt.rc("xtick", labelsize=CUSTOM_SIZE)
-    # plt.rc("ytick", labelsize=CUSTOM_SIZE)
-    # Desactivar minorticks para evitar sobrecarga visual
+    size_nm = device_size * 1e9  # Convertir a nm ya que siempre se representa en nm
 
-    # Crear mapa de colores
-    colors = [(1, 1, 1), color]  # Blanco (0) y Color dado (1)
-    if np.all(matriz == 1):
-        colors.reverse()
-
-    cmap = LinearSegmentedColormap.from_list("custom_cmap", colors, N=2)
-
-    # Graficar la matriz
-    ax.pcolormesh(
-        x,
-        y,
+    # 1. MATRIZ
+    ax.imshow(
         matriz,
-        shading="nearest",
-        vmin=matriz.min(),
-        vmax=matriz.max(),
         cmap=cmap,
-        # edgecolors="gray",  # bordes negros
-        # linewidth=0.52,  # grosor del borde
+        vmin=0,
+        vmax=1,
+        extent=[0, size_nm, 0, size_nm],
+        origin="lower",
+        interpolation="nearest",
+        aspect="equal",
+        zorder=2,
     )
 
-    # Configuración de electrodos con mayor altura
-    electrode_width = 0.1  # Se mantiene el ancho en X
-    electrode_height = 7  # Se extienden en Y (de -1 a 11)
-    electrode_color = "black"  # "gray"  # Color de los electrodos
+    # 2. ELECTRODOS
+    electrode_width = 0.2
+    y_start = 0
+    electrode_height = size_nm
 
     left_electrode = patches.Rectangle(
-        (-0.15, -0.5),  # Posición en X, Y (más abajo)
-        electrode_width,
-        electrode_height,  # Ancho y Alto aumentados
-        color=electrode_color,
+        (-electrode_width, y_start), electrode_width, electrode_height, color="gray", zorder=1
     )
 
-    right_electrode = patches.Rectangle(
-        (5.05, -0.5),  # Posición en X, Y (más abajo)
-        electrode_width,
-        electrode_height,  # Ancho y Alto aumentados
-        color=electrode_color,
-    )
+    right_electrode = patches.Rectangle((size_nm, y_start), electrode_width, electrode_height, color="gray", zorder=1)
 
     ax.add_patch(left_electrode)
     ax.add_patch(right_electrode)
 
-    # Configurar etiquetas y título
-    ax.set_xticks(np.arange(0, 6, 1))  # 🔹 Ticks cada 2 nm en X
-    ax.set_yticks(np.arange(0, 6, 1))  # 🔹 Ticks cada 2 nm en Y
-    ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
-    ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
-    ax.set_title(rf"V_RRAM = {voltaje} V", pad=20)
-
     # Ajustar formato visual
     ax.set_aspect("equal")
-    ax.invert_yaxis()
 
-    # Ajustar límites del eje X y Y para que los electrodos sean visibles
-    ax.set_xlim(-0.15, 5.15)
-    ax.set_ylim(-0, 5)  # 🔥 Extiende el gráfico en Y para acomodar los electrodos
+    # 3. LÍMITES AJUSTADOS
+    ax.set_xlim(-electrode_width, size_nm + electrode_width)
 
-    # Aumentar margen superior para más espacio en el título
+    # MEJORA 2: Un margen vertical invisible (0.05) para que el marco negro del gráfico
+    # no "pise" ni ampute los píxeles de las vacantes en los extremos.
+    margen_y = 0.05
+    ax.set_ylim(-margen_y, size_nm + margen_y)
+
+    # 4. MARCAS AUTOMÁTICAS
+    paso_ticks = 2 if size_nm <= 15 else (5 if size_nm <= 30 else 10)
+    ax.set_xticks(np.arange(0, size_nm + 1, paso_ticks))
+    ax.set_yticks(np.arange(0, size_nm + 1, paso_ticks))
+
+    # Configurar etiquetas y título
+    ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
+    ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
+
+    ax.set_title(
+        rf"$V_{{RRAM}}$ = {voltaje} V",
+        pad=20,
+    )
+
     plt.subplots_adjust(top=0.85)
 
-    # Guardar si se especifica un archivo
-    if filename and guardar_png:
-        plt.savefig(filename, bbox_inches="tight")
+    # Guardar archivos
+    if filename:
+        if guardar_png:
+            plt.savefig(filename, bbox_inches="tight", dpi=150)
 
-    cadena = filename
-    ruta_pdf = os.path.splitext(cadena)[0] + ".pdf"
-    plt.savefig(ruta_pdf, bbox_inches="tight")
-    # ruta_svg = os.path.splitext(cadena)[0] + ".svg"
-    # plt.savefig(ruta_svg, bbox_inches="tight")
+        # ruta_pdf = os.path.splitext(filename)[0] + ".pdf"
+        # plt.savefig(ruta_pdf, bbox_inches="tight")
 
-    # Mostrar gráfico
     plt.close(fig)
 
     return None
-
-
-def RepresentateStateOxygen(matriz: np.ndarray, fig, ax, im=None, filename: str = "grafica.png") -> None:
-    """
-    Represent the state of a matrix as a colored plot. Es la misma funcion que arriba solo que pinta
-    en rojo los oxigenos (solo los soxigenos pinta) para diferenciarlos de las trampas
-
-    Parameters:
-    - matriz (np.ndarray): The input matrix to be represented.
-    - filename (str, optional): The name of the file to save the plot. Default is "grafica.png".
-
-    Returns:
-    None
-    """
-    # Crear una figura y un eje con plt.subplots()
-
-    # Crear un mapa de colores personalizado
-    colors = [
-        (1, 1, 1),  # Color para el valor 0 que representa que No hay trampa
-        (
-            0.9922,
-            0.2157,
-            0.2157,
-        ),  # Color para el valor 1 que representa que hay oxigeno (rojo)
-    ]
-    if np.all(matriz == 1):
-        colors = list(reversed(colors))
-
-    if False:
-        im.set_data(matriz)
-    else:
-        cmap_name = "my_list"
-        cmap = LinearSegmentedColormap.from_list(cmap_name, colors, N=2)
-
-        # Usar imshow en lugar de pcolormesh para una representación más eficiente
-        im = ax.imshow(matriz, cmap=cmap, origin="upper")
-
-        # Establecer la relación de aspecto para que las celdas sean cuadradas
-        ax.set_aspect("equal")
-
-    # Colocar las etiquetas del eje x en la parte superior
-    # ax.xaxis.tick_top()
-
-    plt.title("Iteracion {}".format(filename.split("_")[1].split(".")[0]))
-
-    return im
 
 
 def RepresentateTwoStates(
@@ -269,6 +307,7 @@ def RepresentateTwoStates(
     voltage: float,
     filename: str = None,  # type: ignore
     guardar_png: bool = False,
+    device_size: float = 10e-9,
 ) -> None:
     """
     Representa el estado de dos matrices con un estilo gráfico personalizado en el mismo plot.
@@ -284,12 +323,15 @@ def RepresentateTwoStates(
     - None
     """
 
-    nrows, ncols = matriz1.shape
-    x = np.linspace(0, 10, ncols)  # Escala real de 10 nm en eje X
-    y = np.linspace(0, 10, nrows)  # Escala real de 10 nm en eje Y
-
-    fig, ax = plt.subplots(figsize=(12, 9))  # Tamaño de la figura ajustado
     setup_paper_plt(plt, latex=True, scaling=3)
+    fig, ax = plt.subplots(figsize=(12, 9))  # Tamaño de la figura ajustado
+    config_ax_state(ax)
+
+    size_nm = device_size * 1e9  # Convertir a nm ya que siempre se representa en nm
+
+    nrows, ncols = matriz1.shape
+    x = np.linspace(0, size_nm, ncols)  # Escala real de 10 nm en eje X
+    y = np.linspace(0, size_nm, nrows)  # Escala real de 10 nm en eje Y
 
     # Crear mapas de colores para cada matriz
     cmap1 = LinearSegmentedColormap.from_list("cmap1", [(1, 1, 1), (0.9647, 0.1725, 0.3059)], N=2)  # Rojo
@@ -320,31 +362,22 @@ def RepresentateTwoStates(
 
     # Configuración de electrodos con mayor altura
     electrode_width = 0.2  # Se mantiene el ancho en X
-    electrode_height = 12  # Se extienden en Y (de -1 a 11)
+    electrode_height = size_nm  # Se extienden en Y (de -1 a 11)
     electrode_color = "gray"  # Color de los electrodos
 
-    left_electrode = patches.Rectangle(
-        (-0.3, -0.5),  # Posición en X, Y (más abajo)
-        electrode_width,
-        electrode_height,  # Ancho y Alto aumentados
-        color=electrode_color,
-    )
+    left_electrode = patches.Rectangle((-0.3, -0.5), electrode_width, electrode_height + 1, color=electrode_color)
 
     right_electrode = patches.Rectangle(
-        (10.13, -1),  # Posición en X, Y (más abajo)
-        electrode_width,
-        electrode_height,  # Ancho y Alto aumentados
-        color=electrode_color,
+        (device_size, -0.5), electrode_width, electrode_height + 1, color=electrode_color
     )
 
     ax.add_patch(left_electrode)
     ax.add_patch(right_electrode)
     # Aplicar configuración de ejes
-    config_ax_state(ax)
 
     # Configurar etiquetas y título
-    ax.set_xticks(np.arange(0, 11, 2))  # Ticks cada 2 nm en X
-    ax.set_yticks(np.arange(0, 11, 2))  # Ticks cada 2 nm en Y
+    ax.set_xticks(np.arange(0, 26, 2))  # Ticks cada 2 nm en X
+    ax.set_yticks(np.arange(0, 26, 2))  # Ticks cada 2 nm en Y
     ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
     ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
     ax.set_title(rf"V = {voltage} (V)", pad=20)
@@ -354,8 +387,8 @@ def RepresentateTwoStates(
     ax.invert_yaxis()
 
     # Ajustar límites del eje X y Y para que los electrodos sean visibles
-    ax.set_xlim(-0.3, 10.33)
-    ax.set_ylim(-0, 10)  # Extiende el gráfico en Y para acomodar los electrodos
+    ax.set_xlim(-0.3, device_size + 0.3)
+    ax.set_ylim(-0, device_size)
 
     # Aumentar margen superior para más espacio en el título
     plt.subplots_adjust(top=0.85)
@@ -365,8 +398,11 @@ def RepresentateTwoStates(
         plt.savefig(filename, bbox_inches="tight")
 
     cadena = filename
-    ruta_pdf = os.path.splitext(cadena)[0] + ".pdf"
-    plt.savefig(ruta_pdf, bbox_inches="tight")
+    # ruta_pdf = os.path.splitext(cadena)[0] + ".pdf"
+    # plt.savefig(ruta_pdf, bbox_inches="tight")
+
+    ruta_pdf = os.path.splitext(cadena)[0] + ".png"
+    plt.savefig(ruta_pdf, bbox_inches="tight", dpi=150)
 
     # Mostrar gráfico
     plt.close(fig)
@@ -490,14 +526,14 @@ def plot_IV(
     )
 
     # Guardar figura
-    fig.savefig(figures_path + f"/I-V_{num_simulation + 1}.png", bbox_inches="tight", dpi=300)
+    fig.savefig(figures_path + f"/I-V_{num_simulation + 1}.png", bbox_inches="tight", dpi=150)
 
     # # Guardar figura
-    # fig.savefig(figures_path + f"/I-V_{num_simulation + 1}.pdf", bbox_inches="tight", dpi=300)
+    # fig.savefig(figures_path + f"/I-V_{num_simulation + 1}.pdf", bbox_inches="tight", dpi=150)
     # plt.close(fig)  # Cierra para liberar memoria
 
     # Guardar figura
-    # fig.savefig(figures_path + f"/I-V_{num_simulation + 1}.svg", bbox_inches="tight", dpi=300)
+    # fig.savefig(figures_path + f"/I-V_{num_simulation + 1}.svg", bbox_inches="tight", dpi=150)
     # plt.close(fig)  # Cierra para liberar memoria
 
 
@@ -658,14 +694,14 @@ def plot_IV_marcado(
     fig.savefig(
         figures_path + f"/I-V_marcado_{num_simulation + 1}.png",
         bbox_inches="tight",
-        dpi=300,
+        dpi=150,
     )
 
     # # Guardar figura
     # fig.savefig(
     #     figures_path + f"/I-V_marcado_{num_simulation + 1}.pdf",
     #     bbox_inches="tight",
-    #     dpi=300,
+    #     dpi=150,
     # )
     # plt.close(fig)  # Cierra para liberar memoria
 
@@ -673,19 +709,12 @@ def plot_IV_marcado(
     # fig.savefig(
     #     figures_path + f"/I-V_marcado_{num_simulation + 1}.svg",
     #     bbox_inches="tight",
-    #     dpi=300,
+    #     dpi=150,
     # )
     plt.close(fig)  # Cierra para liberar memoria
 
 
-import matplotlib.patches as mpatches
-from matplotlib.lines import Line2D
-import matplotlib.pyplot as plt
-import numpy as np
-import os
-
-
-def plot_thermal_state(T_map, types_map, title="Simulación Térmica RRAM", num_levels=20, save_path=None):
+def plot_thermal_state(T_map, types_map, voltage, num_levels=10, device_size: float = 10e-9, save_path=None):
     """
     Visualiza el mapa de temperatura con superposición de materiales e isotermas alineadas.
 
@@ -696,23 +725,24 @@ def plot_thermal_state(T_map, types_map, title="Simulación Térmica RRAM", num_
     - num_levels: Cantidad de líneas de contorno para las isotermas.
     - save_path: (Opcional) Ruta completa con nombre de archivo para guardar la imagen (ej: 'img/termico.png').
     """
-    # 1. Configuración de dimensiones y límites (Alineación perfecta)
-    Ny, Nx = T_map.shape
-    extent = (0, Nx, 0, Ny)
 
     # 2. Aplicar los estilos globales ANTES de crear la figura
-    setup_paper_plt(plt, latex=True, scaling=2)
+    setup_paper_plt(plt, latex=True, scaling=3)
 
     # 3. Crear la figura y los ejes
-    fig, ax = plt.subplots(figsize=(22, 14))
+    fig, ax = plt.subplots(figsize=(12, 12))
 
     # 4. Aplicar configuración de estilo específica para los ejes
     config_ax_state(ax)
 
+    # 1. Configuración de dimensiones y límites (Alineación perfecta)
+    Ny, Nx = T_map.shape
+    size_nm = device_size * 1e9  # Convertir a nm
+    extent = [0, size_nm, 0, size_nm]
+
     # 5. Capa base: Temperatura
     im = ax.imshow(T_map, cmap="coolwarm", origin="lower", extent=extent, aspect="equal")
     cbar = fig.colorbar(im, ax=ax, fraction=0.05, pad=0.04)
-    # Eliminado el fontsize=10 para que dependa de tu configuración global
     cbar.set_label("Temperatura (K)")
 
     # 6. Capa de materiales (Overlay)
@@ -726,26 +756,34 @@ def plot_thermal_state(T_map, types_map, title="Simulación Térmica RRAM", num_
     contours = ax.contour(
         T_map,
         levels=niveles,
-        colors="black",
-        linewidths=1.0,
-        alpha=0.5,
+        colors="white",
+        linewidths=1.5,
+        alpha=1,
         origin="lower",
         extent=extent,
     )
     # Eliminado el fontsize=7 para que herede la proporción del documento
-    ax.clabel(contours, inline=True, fmt="%1.1f")
+    ax.clabel(contours, fontsize=18, inline=True, fmt="%d")
+
+    paso_ticks = 2 if size_nm <= 15 else (5 if size_nm <= 30 else 10)
+    ax.set_xticks(np.arange(0, size_nm + 1, paso_ticks))
+    ax.set_yticks(np.arange(0, size_nm + 1, paso_ticks))
 
     # 8. Estética y Leyenda
-    ax.set_title(title, pad=15)  # Eliminado fontsize=14
-    ax.set_xlabel("Ancho del Dispositivo (Nodos / nm)")
-    ax.set_ylabel("Grosor del Óxido (Nodos / nm)")
+    ax.set_title(f"$V_{{RRAM}}$ = {voltage} V", pad=25)  # Eliminado fontsize=14
+    ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
+    ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
 
-    patches = [
-        mpatches.Patch(color=(0.2, 0.2, 0.2, 0.8), label="Electrodos"),
-        mpatches.Patch(color=(0.5, 0.5, 0.5, 0.4), label="Filamento"),
-        Line2D([0], [0], color="black", lw=0.75, alpha=0.7, label="Isotermas"),
-    ]
-    ax.legend(handles=patches, loc="upper right", bbox_to_anchor=(1.4, 1))
+    # Ajustar formato visual
+    ax.set_aspect("equal")
+    # ax.invert_yaxis()
+
+    # patches = [
+    #     mpatches.Patch(color=(0.2, 0.2, 0.2, 0.8), label="Electrodos"),
+    #     mpatches.Patch(color=(0.5, 0.5, 0.5, 0.4), label="Filamento"),
+    #     Line2D([0], [0], color="black", lw=0.75, alpha=0.7, label="Isotermas"),
+    # ]
+    # ax.legend(handles=patches, loc="upper right", bbox_to_anchor=(1.4, 1))
 
     plt.tight_layout()
 
@@ -753,52 +791,164 @@ def plot_thermal_state(T_map, types_map, title="Simulación Térmica RRAM", num_
     if save_path:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         # bbox_inches='tight' es crucial para que no recorte la leyenda exterior
-        plt.savefig(save_path, dpi=300, bbox_inches="tight")
-        print(f"Gráfico térmico guardado en: {save_path}")
+        plt.savefig(save_path, dpi=150, bbox_inches="tight")
 
     plt.close(fig)  # Cierra para liberar memoria
 
 
-def plot_heatmap(data_map, title="Mapa de Distribución", cbar_label="Valor", cmap="viridis", save_path=None):
+# def plot_heatmap(data_map, title="Mapa de Distribución", cbar_label="Valor", cmap="viridis", save_path=None):
+#     """
+#     Visualiza un mapa de calor simple. Ideal para ver probabilidades (SET/RESET),
+#     distribución de campos eléctricos, densidad de corriente, etc.
+
+#     Argumentos:
+#     - data_map: Matriz 2D de datos a representar (ej: mapa de probabilidades).
+#     - title: Título del gráfico.
+#     - cbar_label: Etiqueta de la barra de color (ej: 'Probabilidad', 'Campo (V/m)').
+#     - cmap: Mapa de color de matplotlib (recomendados: 'viridis', 'plasma', 'magma', 'coolwarm').
+#     - save_path: (Opcional) Ruta completa para guardar la imagen.
+#     """
+
+#     x = np.linspace(0, 25, 100)  # Escala real de 10 nm en eje X
+#     y = np.linspace(0, 25, 100)  # Escala real de 10 nm en eje Y
+
+#     # 2. Aplicar los estilos globales ANTES de crear la figura
+#     setup_paper_plt(plt, latex=True, scaling=2.5)
+
+#     # 3. Crear la figura y los ejes
+#     fig, ax = plt.subplots(figsize=(12, 12))
+
+#     # 3. Aplicar configuración de estilo específica para los ejes
+#     config_ax_state(ax)
+
+#     # 4. Representación de la matriz usando el objeto 'ax'
+#     # Usamos origin='lower' para mantener la consistencia física donde y=0 es la base
+#     im = ax.imshow(data_map, cmap=cmap, origin="lower", aspect="equal")
+
+#     # 5. Barra de color asociada al objeto 'im' y al eje 'ax'
+#     cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+#     cbar.set_label(cbar_label)  # El tamaño de fuente ahora lo controla setup_paper_plt
+
+#     # 6. Estética y etiquetas
+#     ax.set_title(title, pad=15)
+#     ax.set_xlabel("Ancho del Dispositivo (X)")
+#     ax.set_ylabel("Grosor del Óxido (Y)")
+
+#     plt.tight_layout()
+
+#     # 7. Guardar si se especifica la ruta
+#     if save_path:
+#         os.makedirs(os.path.dirname(save_path), exist_ok=True)
+#         plt.savefig(save_path, dpi=150, bbox_inches="tight")
+
+#     plt.close(fig)  # Cierra para liberar memoria
+
+
+def RepresentateHeatmap(
+    matriz: np.ndarray,
+    voltaje: float,
+    titulo: str = "Heatmap",
+    filename: str | None = None,
+    cmap_name: str = "hot",
+    label_colorbar: str = "",
+    vmin: float | None = None,
+    vmax: float | None = None,
+    guardar_png: bool = False,
+    electrode_width: float = 0.2,
+    cero_blanco: bool = True,
+    device_size: float = 10e-09,
+) -> None:
     """
-    Visualiza un mapa de calor simple. Ideal para ver probabilidades (SET/RESET),
-    distribución de campos eléctricos, densidad de corriente, etc.
-
-    Argumentos:
-    - data_map: Matriz 2D de datos a representar (ej: mapa de probabilidades).
-    - title: Título del gráfico.
-    - cbar_label: Etiqueta de la barra de color (ej: 'Probabilidad', 'Campo (V/m)').
-    - cmap: Mapa de color de matplotlib (recomendados: 'viridis', 'plasma', 'magma', 'coolwarm').
-    - save_path: (Opcional) Ruta completa para guardar la imagen.
+    Representa una matriz de valores continuos.
+    Permite forzar que el valor 0 exacto se represente en color blanco.
     """
+    fig, ax = plt.subplots(figsize=(12, 9))
 
-    # 2. Aplicar los estilos globales ANTES de crear la figura
-    setup_paper_plt(plt, latex=True, scaling=2)
-
-    # 3. Crear la figura y los ejes
-    fig, ax = plt.subplots(figsize=(22, 14))
-
-    # 3. Aplicar configuración de estilo específica para los ejes
+    # Descomenta estas líneas según tu entorno si usas LaTeX
+    setup_paper_plt(plt, latex=True, scaling=3)
     config_ax_state(ax)
 
-    # 4. Representación de la matriz usando el objeto 'ax'
-    # Usamos origin='lower' para mantener la consistencia física donde y=0 es la base
-    im = ax.imshow(data_map, cmap=cmap, origin="lower", aspect="equal")
+    size_nm = device_size * 1e9  # Convertir a nm
 
-    # 5. Barra de color asociada al objeto 'im' y al eje 'ax'
+    # 1. GESTIÓN DEL COLOR Y MÁSCARA PARA EL CERO
+    # Obtenemos una copia del mapa de colores para poder modificarlo de forma segura
+    cmap = plt.get_cmap(cmap_name).copy()
+
+    if cero_blanco:
+        # Le decimos al mapa de colores que los valores "inválidos" o enmascarados sean blancos
+        cmap.set_bad(color="white")
+        # Enmascaramos (ocultamos) todos los valores de la matriz que sean exactamente 0
+        matriz_dibujo = np.ma.masked_where(matriz == 0, matriz)
+    else:
+        matriz_dibujo = matriz
+
+    # Si no se pasan vmin/vmax, se calculan automáticamente
+    val_min = vmin if vmin is not None else matriz.min()
+    val_max = vmax if vmax is not None else matriz.max()
+
+    # 2. MATRIZ
+    im = ax.imshow(
+        matriz_dibujo,  # <-- Usamos la matriz enmascarada
+        cmap=cmap,
+        vmin=val_min,
+        vmax=val_max,
+        extent=[0, size_nm, 0, size_nm],
+        origin="lower",
+        interpolation="nearest",
+        aspect="equal",
+        zorder=2,
+    )
+
+    # 3. ELECTRODOS
+    y_start = 0
+    electrode_height = size_nm
+
+    left_electrode = patches.Rectangle(
+        (-electrode_width, y_start), electrode_width, electrode_height, color="gray", zorder=1
+    )
+
+    right_electrode = patches.Rectangle((size_nm, y_start), electrode_width, electrode_height, color="gray", zorder=1)
+
+    ax.add_patch(left_electrode)
+    ax.add_patch(right_electrode)
+
+    # Ajustar formato visual
+    ax.set_aspect("equal")
+
+    # 4. LÍMITES AJUSTADOS
+    ax.set_xlim(-electrode_width, size_nm + electrode_width)
+    margen_y = 0.05
+    ax.set_ylim(-margen_y, size_nm + margen_y)
+
+    # Configurar marcas (ticks)
+    paso_ticks = 2 if size_nm <= 15 else (5 if size_nm <= 30 else 10)
+    ax.set_xticks(np.arange(0, size_nm + 1, paso_ticks))
+    ax.set_yticks(np.arange(0, size_nm + 1, paso_ticks))
+
+    # Configurar etiquetas y título
+    ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
+    ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
+
+    ax.set_title(
+        rf"{titulo} ($V_{{RRAM}}$ = {voltaje} V)",
+        pad=20,
+    )
+
+    # 5. COLORBAR
     cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-    cbar.set_label(cbar_label)  # El tamaño de fuente ahora lo controla setup_paper_plt
+    if label_colorbar:
+        cbar.set_label(label_colorbar)
 
-    # 6. Estética y etiquetas
-    ax.set_title(title, pad=15)
-    ax.set_xlabel("Ancho del Dispositivo (X)")
-    ax.set_ylabel("Grosor del Óxido (Y)")
+    plt.subplots_adjust(top=0.85)
 
-    plt.tight_layout()
+    # Guardar archivos
+    if filename:
+        if guardar_png:
+            plt.savefig(filename, bbox_inches="tight", dpi=150)
 
-    # 7. Guardar si se especifica la ruta
-    if save_path:
-        os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        # ruta_pdf = os.path.splitext(filename)[0] + ".pdf"
+        # plt.savefig(ruta_pdf, bbox_inches="tight")
 
-    plt.close(fig)  # Cierra para liberar memoria
+    plt.close(fig)
+
+    return None

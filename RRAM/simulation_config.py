@@ -43,8 +43,8 @@ ELECTRICAL_DEFAULTS = {
 # ============================================================================
 THERMAL_DEFAULTS = {
     "init_temp": 300.0,
-    "r_termica_no_percola": 100000.0,
-    "conductividad_termica_aire": 2.3,
+    "r_termica_no_percola": 10000.0,
+    "conductividad_termica_dielectrico": 2.3,
     "conductividad_termica_CF": 15.0,
     "conductividad_termica_aislante": 0.000001,
     "conductividad_termica_electrodo": 5.0,
@@ -57,7 +57,7 @@ THERMAL_DEFAULTS = {
 SIMULATION_DEFAULTS = {
     "device_size": 10e-9,
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
-    "num_trampas": 120,
+    "num_trampas": 100,
     "total_simulation_time": 10.0,
     "num_pasos": 10000,
     "voltaje_final": 1.1,
@@ -75,7 +75,7 @@ SET_RESET_DEFAULTS = {
     "factor_libre_pp_set": 0.8,
     "factor_vecinos_sp_set": 1.0,
     "factor_libre_sp_set": 0.9,
-    "lim_voltage_percolacion": 0.6,
+    "lim_voltage_percolacion": 1.2,
     "compliance_voltage": 0.6,
     "voltaje_gen_oxigeno_pp_1": 0.45,
     "num_oxigenos_pp_reset_1": 1,
@@ -172,7 +172,7 @@ class ConfigManager:
             "I_0_set",
             "I_0_reset",
             "r_termica_no_percola",
-            "conductividad_termica_aire",
+            "conductividad_termica_dielectrico",
             "conductividad_termica_CF",
             "conductividad_termica_aislante",
             "conductividad_termica_electrodo",

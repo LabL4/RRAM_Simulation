@@ -102,7 +102,7 @@ class SimulationConstants:
     I_0_set: float
     I_0_reset: float
     r_termica_no_percola: float
-    conductividad_termica_aire: float
+    conductividad_termica_dielectrico: float
     conductividad_termica_CF: float
     conductividad_termica_aislante: float
     conductividad_termica_electrodo: float
@@ -135,7 +135,7 @@ class SimulationConstants:
     @property
     def propiedades_termicas(self) -> dict:
         return {
-            0: {"k": self.conductividad_termica_aire},
+            0: {"k": self.conductividad_termica_dielectrico},
             1: {"k": self.conductividad_termica_CF},
             2: {"k": self.conductividad_termica_aislante},
             3: {"k": self.conductividad_termica_electrodo},
@@ -180,6 +180,14 @@ class SimulationConstants:
         atributo = f"permitividad_relativa_{fase}"
         return replace(self, **{atributo: permitividad_relativa_nuevo})
 
+    def update_generation_energy(self, nueva_energia: float):
+        """Actualiza la energía de generación."""
+        return replace(self, generation_energy=nueva_energia)
+
+    def update_recombination_energy(self, nueva_energia: float):
+        """Actualiza la energía de generación."""
+        return replace(self, recombination_energy=nueva_energia)
+
     def __repr__(self):
         # Crear lista de líneas con "nombre=valor" para cada atributo
         atributos = []
@@ -199,6 +207,7 @@ def procesar_filamentos_creados(
     voltage_CF_creado,
     actual_state,
     num_simulation,
+    params: SimulationParameters,
 ):
     """
     Detecta filamentos nuevos, actualiza su estado y guarda imágenes e
@@ -225,7 +234,7 @@ def procesar_filamentos_creados(
 
         nombre_img = imagen_path / f"Filamento_{i + 1}_creado_set_{num_simulation}.png"
 
-        Representate.RepresentateState(actual_state, round(voltage, 3), str(nombre_img))
+        Representate.RepresentateState(actual_state, round(voltage, 5), str(nombre_img), device_size=params.device_size)
 
         # Guardar estado actual en archivo pkl
         nombre_pkl = pkl_path / f"filamento_{i + 1}_creado_set_{num_simulation}.pkl"
@@ -247,6 +256,7 @@ def procesar_filamentos_destruidos(
     num_simulation,
     roturas_dict,
     etapa,
+    params: SimulationParameters,
 ):
     """
     Detecta filamentos rotos, actualiza su estado y guarda imágenes e
@@ -280,7 +290,7 @@ def procesar_filamentos_destruidos(
             print(f"\nEl filamento {i + 1} se ha roto en el voltaje {round(voltage, 4)} (V)")
 
         nombre_img = imagen_path / f"Filamento_{i + 1}_roto_reset_{num_simulation}.png"
-        Representate.RepresentateState(actual_state, round(voltage, 3), str(nombre_img))
+        Representate.RepresentateState(actual_state, round(voltage, 5), str(nombre_img), device_size=params.device_size)
 
         nombre_pkl = pkl_path / f"filamento_{i + 1}_roto_reset_{num_simulation}.pkl"
         with open(nombre_pkl, "wb") as f:
@@ -330,7 +340,7 @@ def update_state_generation(
         state=state,
         paso_temporal=params.paso_temporal,
         Electric_field=E_field_matrix,
-        temperatura=temp_matrix,  # <--- Usamos la matriz de temperatura ya recortada
+        temperatura=temp_matrix,
         factor_vecinos=factor_vecinos,
         factor_sin_vecinos=factor_sin_vecinos,
         vibration_frequency=sim_ctes.vibration_frequency,
@@ -340,11 +350,15 @@ def update_state_generation(
         neighbor_mode=neighbor_mode,
     )
 
-    if k % num_pasos_guardar_estado == 0:
-        Representate.plot_heatmap(
+    # Paso de variable tipo path a string para que no de error al guardar la figura, pero se puede seguir usando como path en el resto del código
+    str_filename = str(ruta_figura)
+
+    if k % num_pasos_guardar_estado == 0 and plot_probabilidad:
+        Representate.RepresentateHeatmap(
             prob_final,
-            "Mapa de fuentes de calor",
-            save_path=ruta_figura,
+            round(k * 0.00011, 5),
+            "Probability of Vacancy Generation",
+            filename=str_filename,
         )
 
     # 5. Generación de nuevas vacantes de forma estocástica
@@ -460,7 +474,7 @@ def PP_set(
 
     sistema_percola = False
     total_vacantes_pp_set = False
-    num_pasos_guardar_estado = 2000
+    num_pasos_guardar_estado = 500
     voltaje_percolacion = params.voltaje_final_set
     # AL inicio como la corriente es de tipo poole frenkel, la resitencia ohmica se considera nula
     resistencia = 0.0
@@ -475,6 +489,7 @@ def PP_set(
 
     max_vancantes_pp_set = int(sim_ctes.ocupacion_max_pp_set * params.num_max_vacantes)
     voltage_CF_creado = np.full(len(CF_ranges), 0.0)
+    filamentos_previos = 0
 
     # Inicializo vectores donde almaceno datos y condiciones iniciales
     temperatura = params.init_temp
@@ -490,9 +505,10 @@ def PP_set(
 
     print("El valor de gamma es:", sim_ctes.gamma, "\n")
 
-    indice_gamma = 1
-
     print(f"Simulacion {num_simulation} - Primera parte del set\n")
+
+    primero_percola = False
+    all_CFs_created = False
 
     for k in range(0, params.num_pasos + 1):
         total_vacantes = np.sum(actual_state)
@@ -541,13 +557,14 @@ def PP_set(
         if Percolation.is_path(actual_state):
             # Si es la primera vez que percola, siste_percola será falso y entra aquí
             if sistema_percola is False:
+                primero_percola = True
                 voltaje_percolacion = voltage  # Guardo el voltaje de percolación
                 ocupacion_percola = np.sum(actual_state)
                 print(
                     "\nEl sistema ha percolado en la iteración:",
                     k,
                     " que corresponde con el voltaje:",
-                    round(voltaje_percolacion, 4),
+                    round(voltaje_percolacion, 5),
                     " con una ocupación del:",
                     round((np.sum(actual_state) / (params.num_max_vacantes)), 4) * 100,
                     "que corresponde con un numero de vacantes de:",
@@ -561,19 +578,10 @@ def PP_set(
 
                 Representate.RepresentateState(
                     actual_state,
-                    round(voltaje_percolacion, 3),
+                    round(voltaje_percolacion, 5),
                     str(rutas["figures_path"]) + f"/Percola_state_{num_simulation}.png",
+                    device_size=params.device_size,
                 )
-
-                temperatura_inicial_heat_equation = temperatura
-
-                # nueva_gamma = sim_ctes.gamma - 1  # / sim_ctes.factor_generacion
-                # sim_ctes = sim_ctes.update_gamma(nueva_gamma)
-                # sim_ctes_dict = asdict(sim_ctes)
-
-                # indice_gamma = indice_gamma + 1
-
-                # print("El nuevo valor de gamma es:", sim_ctes_dict["gamma"], "\n")
 
             sistema_percola = True
 
@@ -594,31 +602,55 @@ def PP_set(
                     voltage_CF_creado=voltage_CF_creado,
                     actual_state=actual_state,
                     num_simulation=num_simulation,
+                    params=params,
                 )
 
-            # if sum(CF_creado) == indice_gamma:
-            #     if len(CF_ranges) == 1:
-            #         print("Todos los filamentos creados.")
-            #         nueva_gamma = sim_ctes.gamma + 2
-            #         sim_ctes = sim_ctes.update_gamma(nueva_gamma)
-            #         sim_ctes_dict = asdict(sim_ctes)
-            #         indice_gamma = indice_gamma + 1
-            #         print("\n El nuevo valor de gamma es:", sim_ctes_dict["gamma"])
-            # if len(CF_ranges) == 2:
-            #     if sum(CF_creado) == 2:
-            #         print("Todos los filamentos creados.")
-            #         actual_resistance = sim_ctes.ohm_resistence_set
-            #         sim_ctes = sim_ctes.update_ohm_resistence(actual_resistance - 15)
-            #         print("El nuevo valor de R_ohm es:", sim_ctes.ohm_resistence_set)
-            #         sim_ctes_dict = asdict(sim_ctes)
-            #     else:
-            #         nueva_gamma = sim_ctes.gamma / 2
-            #         sim_ctes = sim_ctes.update_gamma(nueva_gamma)
-            #         sim_ctes_dict = asdict(sim_ctes)
-            #         indice_gamma = indice_gamma + 1
-            #         print("\n El nuevo valor de gamma es:", sim_ctes_dict["gamma"])
-            # else:
-            #     nueva_gamma = sim_ctes.gamma - 1
+            filamentos_actuales = sum(CF_creado)
+
+            # Solo entramos si el número de filamentos ha AUMENTADO en este paso
+            if filamentos_actuales > filamentos_previos:
+                # 1. Caso para un solo filamento
+                if len(CF_ranges) == 1:
+                    if filamentos_actuales == 1:
+                        print("Todos los filamentos creados.")
+                        sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma + 2)
+                        # sim_ctes = sim_ctes.update_generation_energy(sim_ctes.generation_energy + 0.1) # Ejemplo de energía
+                        print(f"\nEl nuevo valor de gamma es: {sim_ctes.gamma}")
+
+                # 2. Caso para dos filamentos
+                elif len(CF_ranges) == 2:
+                    if filamentos_actuales == 1:
+                        # Se acaba de formar el PRIMERO
+                        print("Se ha formado el primer filamento de dos.")
+                        sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 2)
+                        sim_ctes = sim_ctes.update_generation_energy(1.75)
+                        print(f"El nuevo valor de gamma es: {sim_ctes.gamma}")
+                        print("El nuevo valor de la energía de generación es:", sim_ctes.generation_energy, "\n")
+
+                    elif filamentos_actuales == 2:
+                        # Se acaba de formar el SEGUNDO
+                        print("Se ha formado el segundo filamento de dos.")
+                        sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 2)
+                        sim_ctes = sim_ctes.update_generation_energy(2)
+                        print(f"El nuevo valor de gamma es: {sim_ctes.gamma}")
+                        print("El nuevo valor de la energía de generación es:", sim_ctes.generation_energy, "\n")
+                        all_CFs_created = True
+
+                # 3. Caso general para 3 o más filamentos
+                else:
+                    nuevos_formados = filamentos_actuales - filamentos_previos
+                    for _ in range(nuevos_formados):
+                        sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma - 1)
+                    print(
+                        f"\nNuevos filamentos detectados {filamentos_actuales}. El nuevo valor de gamma es: {sim_ctes.gamma} \n"
+                    )
+
+                    if filamentos_actuales == len(CF_ranges):
+                        print("Todos los filamentos creados.")
+
+                # Actualizamos el historial para que no vuelva a entrar en iteraciones futuras
+                filamentos_previos = filamentos_actuales
+            # ---------------------------------------------------
 
             cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf)
 
@@ -644,36 +676,63 @@ def PP_set(
                 types_map=materials_map, atom_size=params.atom_size, I_total=current, R_cell=sim_ctes.ohm_resistence_set
             )
 
-            # Obtengo la matriz de temperatura
-            temperatura = Temperature.solve_thermal_state(
-                types_map=materials_map,
-                Q_map=Q_source_map,
-                thermal_props=sim_ctes.propiedades_termicas,
-                atom_size=params.atom_size,
-                T_ambient=sim_ctes.Temperatura_electrodo,
-            )
+            if all_CFs_created:
+                # Obtengo la matriz de temperatura
+                temperatura = Temperature.solve_thermal_state(
+                    types_map=materials_map,
+                    Q_map=Q_source_map,
+                    thermal_props=sim_ctes.propiedades_termicas,
+                    atom_size=params.atom_size,
+                    T_ambient=sim_ctes.Temperatura_electrodo,
+                )
+                if k % num_pasos_guardar_estado == 0 or primero_percola:
+                    fig_voltage = round(vector_ddp[k], 5)
+                    Representate.plot_thermal_state(
+                        temperatura,
+                        materials_map,
+                        fig_voltage,
+                        10,
+                        save_path=rutas["figures_path"]
+                        / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_pp_set.png",
+                        device_size=params.device_size,
+                    )
+            else:
+                temperatura = Temperature.Temperature_Joule(
+                    voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola * 10
+                )
+                # Extiendo el valor para formar una matriz del mismo tamaño que el estado, para que no de error al usarlo en la función de generación
+                temperatura = np.full_like(actual_state, temperatura)
+                # print(
+                #     f"El valor de la temperatura no forma todos CF es {temperatura} K, se usa el modelo de temperatura de Joule\n"
+                # )
 
-            if k % num_pasos_guardar_estado == 0:
-                fig_voltage = round(vector_ddp[k], 3)
-                Representate.plot_thermal_state(
-                    temperatura,
-                    materials_map,
-                    "Mapa de temperatura",
-                    20,
-                    save_path=rutas["figures_path"]
-                    / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_pp_set.png",
+            if k % num_pasos_guardar_estado == 0 or primero_percola:
+                fig_voltage = round(vector_ddp[k], 5)
+                primero_percola = False
+
+                Representate.RepresentateState(
+                    actual_state,
+                    round(voltage, 5),
+                    str(rutas["figures_path"]) + f"/state_pp_set_{num_simulation}_{round(voltage, 4)}.png",
+                    guardar_png=True,
+                    device_size=params.device_size,
                 )
-                Representate.plot_heatmap(
-                    Q_source_map,
-                    "Mapa de fuentes de calor",
-                    save_path=rutas["figures_path"]
-                    / f"Mapa_fuentes_calor_{num_simulation}_{round(voltage, 4)}_pp_set.png",
+
+                Representate.RepresentateHeatmap(
+                    matriz=Q_source_map,
+                    voltaje=fig_voltage,
+                    titulo="Heat Source",
+                    filename=rutas["figures_path"] / f"Heat_source_map_{num_simulation}_{round(voltage, 4)}_pp_set.png",
+                    cmap_name="coolwarm",
+                    label_colorbar="Temperature (K)",
+                    guardar_png=True,
                 )
-                Representate.plot_heatmap(
+
+                Representate.RepresentateHeatmap(
                     materials_map,
-                    "Mapa de materiales",
-                    save_path=rutas["figures_path"]
-                    / f"Mapa_materiales_{num_simulation}_{round(voltage, 4)}_pp_set.png",
+                    fig_voltage,
+                    "Materials Map V_RRAM = " + str(fig_voltage) + " V",
+                    filename=rutas["figures_path"] / f"Mapa_materiales_{num_simulation}_{round(voltage, 4)}_pp_set.png",
                 )
 
         else:
@@ -684,6 +743,7 @@ def PP_set(
             temperatura = Temperature.Temperature_Joule(
                 voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola
             )
+            # print(f"El valor de la temperatura es {temperatura} K, se usa el modelo de temperatura de Joule\n")
 
             # simple_field = ElectricField.SimpleElectricField(voltage, params.device_size)
             # Si no ha percolado uso la corriente de Poole-Frenkel
@@ -721,9 +781,9 @@ def PP_set(
         data_pp_set[k] = np.array([simulation_time, voltage, current])
 
     # Se decarta la simulación si no se ha llegado a la resistencia mínima necesaria para la segunda parte del set, ya que no va a coincidir con los datos experimentales.
-    if not (35 <= resistencia <= 55):
-        # No se ha llegado a la resistencia necesaria para la segunda parte del set, directamelo lo descarto
-        raise exceptions.LowResistanceException(valor_resistencia=resistencia)
+    # if not (35 <= resistencia <= 55):
+    #     # No se ha llegado a la resistencia necesaria para la segunda parte del set, directamelo lo descarto
+    #     raise exceptions.LowResistanceException(valor_resistencia=resistencia)
 
     # Guardo los datos de la simulación
     save_path_pkl = rutas["data_simulation_path"] / f"Data_pp_set_{num_simulation}.pkl"
@@ -760,8 +820,9 @@ def PP_set(
 
     Representate.RepresentateState(
         actual_state,
-        round(voltage, 3),
+        round(voltage, 5),
         str(rutas["figures_path"]) + f"/final_state_pp_set_{num_simulation}.png",
+        device_size=params.device_size,
     )
 
     return final_state_pp_set
@@ -833,7 +894,7 @@ def SP_set(
     compliance_voltage = 0.6
     total_vacantes_sp_set = False
     num_columnas = 3  # Tiempo, Voltaje, Intensidad
-    num_pasos_guardar_estado = 2000
+    num_pasos_guardar_estado = 500
     rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="set")
 
     vector_ddp = np.arange(voltaje_max_set, 0.000, -params.paso_potencial_set)
@@ -910,26 +971,27 @@ def SP_set(
             )
 
             if k % num_pasos_guardar_estado == 0:
-                fig_voltage = round(vector_ddp[k], 3)
+                fig_voltage = round(vector_ddp[k], 5)
                 Representate.plot_thermal_state(
                     temperatura,
                     materials_map,
-                    "Mapa de temperatura",
-                    20,
+                    voltage=fig_voltage,
                     save_path=rutas["figures_path"]
                     / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_sp_set.png",
+                    device_size=params.device_size,
                 )
-                Representate.plot_heatmap(
+                Representate.RepresentateHeatmap(
                     Q_source_map,
-                    "Mapa de fuentes de calor",
-                    save_path=rutas["figures_path"]
+                    fig_voltage,
+                    "Heat Source",
+                    filename=rutas["figures_path"]
                     / f"Mapa_fuentes_calor_{num_simulation}_{round(voltage, 4)}_sp_set.png",
                 )
-                Representate.plot_heatmap(
+                Representate.RepresentateHeatmap(
                     materials_map,
-                    "Mapa de materiales",
-                    save_path=rutas["figures_path"]
-                    / f"Mapa_materiales_{num_simulation}_{round(voltage, 4)}_sp_set.png",
+                    fig_voltage,
+                    "Materials",
+                    filename=rutas["figures_path"] / f"Mapa_materiales_{num_simulation}_{round(voltage, 4)}_sp_set.png",
                 )
 
         else:
@@ -1004,8 +1066,9 @@ def SP_set(
 
     Representate.RepresentateState(
         actual_state,
-        round(voltage, 3),
+        round(voltage, 5),
         str(rutas["figures_path"]) + f"/final_state_sp_set_{num_simulation}.png",
+        device_size=params.device_size,
     )
 
     print("\nSimulación del set finalizada correctamente.\n")
@@ -1017,7 +1080,7 @@ def PP_reset(
     final_state_sp_set: dict,
     num_simulation: int,
     CF_ranges: List[tuple],
-    num_pasos_guardar_estado: int = 2000,
+    num_pasos_guardar_estado: int = 500,  # Antes era cada 2000
 ):
     """
     Simulates the reset process of a resistive switching device, updating the system's state and tracking the evolution of various parameters over time.
@@ -1123,6 +1186,7 @@ def PP_reset(
                 num_simulation=num_simulation,
                 roturas_dict=roturas_dict,
                 etapa="pp",
+                params=params,
             )
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
@@ -1155,7 +1219,10 @@ def PP_reset(
 
             # Cáculo de las fuentes de calor (el filamento)
             Q_source_map = Temperature.calculate_heat_source(
-                types_map=materials_map, atom_size=params.atom_size, I_total=current, R_cell=sim_ctes.ohm_resistence_set
+                types_map=materials_map,
+                atom_size=params.atom_size,
+                I_total=current,
+                R_cell=sim_ctes.ohm_resistence_reset,
             )
 
             # Obtengo la matriz de temperatura
@@ -1172,22 +1239,27 @@ def PP_reset(
                 Representate.plot_thermal_state(
                     temperatura,
                     materials_map,
-                    "Mapa de temperatura",
-                    20,
+                    fig_voltage,
+                    10,
                     save_path=rutas["figures_path"]
                     / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_pp_reset.png",
+                    device_size=params.device_size,
                 )
-                Representate.plot_heatmap(
+                Representate.RepresentateHeatmap(
                     Q_source_map,
-                    "Mapa de fuentes de calor",
-                    save_path=rutas["figures_path"]
+                    fig_voltage,
+                    "Heat Source",
+                    filename=rutas["figures_path"]
                     / f"Mapa_fuentes_calor_{num_simulation}_{round(voltage, 4)}_pp_reset.png",
+                    device_size=params.device_size,
                 )
-                Representate.plot_heatmap(
+                Representate.RepresentateHeatmap(
                     materials_map,
+                    fig_voltage,
                     "Mapa de materiales",
-                    save_path=rutas["figures_path"]
+                    filename=rutas["figures_path"]
                     / f"Mapa_materiales_{num_simulation}_{round(voltage, 4)}_pp_reset.png",
+                    device_size=params.device_size,
                 )
 
         else:
@@ -1280,14 +1352,16 @@ def PP_reset(
         "voltage_CF_destruido": voltage_CF_destruido,
         "CF_destruido_index": CF_destruido_index,
         "roturas_dict": roturas_dict,
+        "temperatura_final": temperatura,
     }
     with open(rutas["simulation_path"] / f"final_state_pp_reset_{num_simulation}.pkl", "wb") as f:
         pickle.dump(actual_state, f)
 
     Representate.RepresentateState(
         actual_state,
-        round(voltage, 3),
+        round(voltage, 5),
         str(rutas["figures_path"]) + f"/final_state_pp_reset_{num_simulation}.png",
+        device_size=params.device_size,
     )
     print("La temperatura final del pp reset es:", temperatura, "\n")
     print("La intensidad al final de la primera parte del reset es:", current, "\n")
@@ -1312,6 +1386,7 @@ def SP_reset(
     CF_destruido = final_state_pp_reset["CF_destruido"]
     voltage_CF_destruido = final_state_pp_reset["voltage_CF_destruido"]
     roturas_dict = final_state_pp_reset["roturas_dict"]
+    temperatura = final_state_pp_reset["temperatura_final"]
 
     print("Lol voltaje de rotura de pp reset son: ", voltage_CF_destruido)
 
@@ -1371,6 +1446,7 @@ def SP_reset(
                 num_simulation=num_simulation,
                 roturas_dict=roturas_dict,
                 etapa="sp",
+                params=params,
             )
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
@@ -1398,7 +1474,10 @@ def SP_reset(
 
             # Cáculo de las fuentes de calor (el filamento)
             Q_source_map = Temperature.calculate_heat_source(
-                types_map=materials_map, atom_size=params.atom_size, I_total=current, R_cell=sim_ctes.ohm_resistence_set
+                types_map=materials_map,
+                atom_size=params.atom_size,
+                I_total=current,
+                R_cell=sim_ctes.ohm_resistence_reset,
             )
 
             # Obtengo la matriz de temperatura
@@ -1411,34 +1490,29 @@ def SP_reset(
             )
 
             if k % num_pasos_guardar_estado == 0:
-                fig_voltage = round(vector_ddp[k], 3)
+                fig_voltage = round(vector_ddp[k], 4)
                 Representate.plot_thermal_state(
                     temperatura,
                     materials_map,
-                    "Mapa de temperatura",
-                    20,
-                    save_path=rutas["figures_path"]
-                    / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_sp_reset.png",
+                    fig_voltage,
+                    save_path=rutas["figures_path"] / f"Mapa_temperatura_{num_simulation}_{fig_voltage}_sp_reset.png",
+                    device_size=params.device_size,
                 )
-                Representate.plot_heatmap(
+                Representate.RepresentateHeatmap(
                     Q_source_map,
-                    "Mapa de fuentes de calor",
-                    save_path=rutas["figures_path"]
-                    / f"Mapa_fuentes_calor_{num_simulation}_{round(voltage, 4)}_sp_reset.png",
+                    fig_voltage,
+                    "Heat Source",
+                    filename=rutas["figures_path"] / f"Mapa_fuentes_calor_{num_simulation}_{fig_voltage}_sp_reset.png",
                 )
-                Representate.plot_heatmap(
+                Representate.RepresentateHeatmap(
                     materials_map,
+                    fig_voltage,
                     "Mapa de materiales",
-                    save_path=rutas["figures_path"]
-                    / f"Mapa_materiales_{num_simulation}_{round(voltage, 4)}_sp_reset.png",
+                    filename=rutas["figures_path"] / f"Mapa_materiales_{num_simulation}_{fig_voltage}_sp_reset.png",
                 )
 
         else:
             percola = False
-
-            temperatura = Temperature.Temperature_Joule(
-                voltage, current, params.init_temp, r_termica=sim_ctes.r_termica_no_percola
-            )
 
             # Si no ha percolado uso la corriente de Poole-Frenkel
             current = abs(
@@ -1450,6 +1524,10 @@ def SP_reset(
                     I_0=sim_ctes.I_0_reset,
                 )
                 * (params.device_size)
+            )
+
+            temperatura = Temperature.Temperature_Joule(
+                voltage, current, params.init_temp, r_termica=sim_ctes.r_termica_no_percola
             )
 
         # Actualizo el estado del sistema con la recombinación
@@ -1511,8 +1589,9 @@ def SP_reset(
 
     Representate.RepresentateState(
         actual_state,
-        round(voltage, 3),
+        round(voltage, 5),
         str(rutas["figures_path"]) + f"/final_state_sp_reset_{num_simulation}.png",
+        device_size=params.device_size,
     )
 
     print(f"\nSimulación {num_simulation} finalizada correctamente.\n")

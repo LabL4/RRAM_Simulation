@@ -43,6 +43,7 @@ for i, row in df_params.iterrows():
         # ((17, 24, 0, 12), 75),  # Primera aprte del filamento
         # ((17, 24, eje_x - 12, eje_x), 70),  # Segunda parte del filamento
         # ((17, 24, 12, eje_x[i] - 12), 30),  # Segunda entre del filamento
+        # ((46, 54, 0, eje_x), 70),  # Segunda banda (filas 28-34)        # ((28, 33, 0, eje_x), 70),  # Segunda banda (filas 28-34)
     ]
 
     init_state = gn.initial_state_priv(eje_x, eje_y, num_trampas, regiones_pesos)
