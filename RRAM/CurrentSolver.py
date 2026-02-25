@@ -10,7 +10,7 @@ from RRAM import Constants as cte
 
 
 def Clean_state_matrix(
-    config_matrix: np.ndarray, min_size: int = 20, plot_resmatrix: bool = False
+    config_matrix: np.ndarray, min_size: int = 60, plot_resmatrix: bool = False
 ) -> tuple[np.ndarray, nx.Graph]:
     """
     Cleans and processes a state matrix by removing small disconnected components

@@ -105,7 +105,9 @@ def crear_matriz_materiales(matriz_filamentos):
     return types_map
 
 
-def calculate_heat_source(types_map: np.ndarray, atom_size: float, I_total: float, R_cell: float) -> np.ndarray:
+def calculate_heat_source(
+    types_map: np.ndarray, atom_size: float, I_total: float, R_cell: float, factor_generar_calor: float
+) -> np.ndarray:
     """
     Calcula el mapa de calor Q [W/m^3] usando aproximación resistiva por columnas.
     Recibe la resistencia de celda y deduce la conductividad internamente para garantizar consistencia.
@@ -145,7 +147,7 @@ def calculate_heat_source(types_map: np.ndarray, atom_size: float, I_total: floa
         Q_val_local = sigma_material * (E_local**2)
 
         # Factor de escala (0.01)
-        Q_map_global[fil_indices, j] = Q_val_local * 0.000001
+        Q_map_global[fil_indices, j] = Q_val_local * factor_generar_calor
 
     return Q_map_global
 

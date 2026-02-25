@@ -49,6 +49,7 @@ THERMAL_DEFAULTS = {
     "conductividad_termica_aislante": 0.000001,
     "conductividad_termica_electrodo": 5.0,
     "Temperatura_electrodo": 300,
+    "Factor_generar_calor": 0.000001,
 }
 
 # ============================================================================
@@ -71,8 +72,8 @@ SIMULATION_DEFAULTS = {
 SET_RESET_DEFAULTS = {
     "ocupacion_max_pp_set": 0.35,
     "ocupacion_max_sp_set": 0.35,
-    "factor_vecinos_pp_set": 1.2,
-    "factor_libre_pp_set": 0.8,
+    "factor_vecinos_pp_set": 1.0,
+    "factor_libre_pp_set": 1.0,
     "factor_vecinos_sp_set": 1.0,
     "factor_libre_sp_set": 0.9,
     "lim_voltage_percolacion": 1.2,
@@ -177,6 +178,7 @@ class ConfigManager:
             "conductividad_termica_aislante",
             "conductividad_termica_electrodo",
             "Temperatura_electrodo",
+            "factor_generar_calor",
             "ocupacion_max_pp_set",
             "ocupacion_max_sp_set",
             "factor_vecinos_pp_set",
