@@ -685,6 +685,7 @@ def PP_set(
             materials_map = Temperature.crear_matriz_materiales(cf_clean_matrix)
 
             # Cáculo de las fuentes de calor (el filamento)
+
             Q_source_map = Temperature.calculate_heat_source(
                 types_map=materials_map,
                 atom_size=params.atom_size,
@@ -734,7 +735,8 @@ def PP_set(
                     guardar_png=True,
                     device_size=params.device_size,
                 )
-
+                # Elimino la primera y última columna de la matriz de Q_source_map para que tenga el mismo tamaño que el estado, y así representarlo sin error
+                Q_source_map = Q_source_map[:, 1:-1]
                 Representate.RepresentateHeatmap(
                     matriz=Q_source_map,
                     voltaje=fig_voltage,
@@ -742,13 +744,12 @@ def PP_set(
                     filename=rutas["figures_path"] / f"Heat_source_map_{num_simulation}_{round(voltage, 4)}_pp_set.png",
                     cmap_name="coolwarm",
                     label_colorbar="Temperature (K)",
-                    guardar_png=True,
                 )
 
                 Representate.RepresentateHeatmap(
-                    materials_map,
-                    fig_voltage,
-                    "Materials Map",
+                    matriz=materials_map,
+                    voltaje=fig_voltage,
+                    titulo="Materials Map",
                     filename=rutas["figures_path"] / f"Mapa_materiales_{num_simulation}_{round(voltage, 4)}_pp_set.png",
                 )
 

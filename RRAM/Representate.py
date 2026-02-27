@@ -854,7 +854,6 @@ def RepresentateHeatmap(
     label_colorbar: str = "",
     vmin: float | None = None,
     vmax: float | None = None,
-    guardar_png: bool = False,
     electrode_width: float = 0.2,
     cero_blanco: bool = True,
     device_size: float = 10e-09,
@@ -944,8 +943,7 @@ def RepresentateHeatmap(
 
     # Guardar archivos
     if filename:
-        if guardar_png:
-            plt.savefig(filename, bbox_inches="tight", dpi=150)
+        plt.savefig(filename, bbox_inches="tight", dpi=150)
 
         # ruta_pdf = os.path.splitext(filename)[0] + ".pdf"
         # plt.savefig(ruta_pdf, bbox_inches="tight")

@@ -13,21 +13,8 @@ def Clean_state_matrix(
     config_matrix: np.ndarray, min_size: int = 60, plot_resmatrix: bool = False
 ) -> tuple[np.ndarray, nx.Graph]:
     """
-    Cleans and processes a state matrix by removing small disconnected components
-    and simplifying the graph representation of the matrix.
-    Args:
-        config_matrix (np.ndarray): A 2D numpy array representing the configuration
-            matrix, where `1` indicates a walkable cell and `0` indicates a non-walkable cell.
-        min_size (int, optional): The minimum size of connected components to retain.
-            Components smaller than this size will be removed. Defaults to 20.
-        plot_resmatrix (bool, optional): If True, generates a PDF visualization of the
-            resulting cleaned matrix. Defaults to False.
-    Returns:
-        tuple[np.ndarray, nx.Graph]:
-            - A 2D numpy array representing the cleaned state matrix, where `1` indicates
-              retained nodes and `0` indicates removed nodes.
-            - A NetworkX graph representing the cleaned grid, with nodes and edges
-              corresponding to the retained walkable cells and their connections.
+    Limpia la matriz de estado eliminando clústeres aislados y pseudo-filamentos.
+    Garantiza que solo sobreviven las estructuras ancladas a AMBOS electrodos.
     """
 
     # Preparar el grafo no dirigido (A-B es igual que B-A)
@@ -46,18 +33,31 @@ def Clean_state_matrix(
                     if 0 <= ni < H and 0 <= nj < W and grid[ni, nj] == 1:
                         actual_state_clean_grid.add_edge((i, j), (ni, nj))  # agregamos arista bidireccional
 
-    # Elimino los nodos que no tienen aristas
+    # Elimino los nodos que no tienen aristas (puntos totalmente aislados)
     actual_state_clean_grid.remove_nodes_from(list(nx.isolates(actual_state_clean_grid)))
 
-    # ELimino componentes pequeños sueltos
+    # -------------------------------------------------------------------------
+    # NUEVO FILTRO : Eliminar filamentos sin terminar y agrupaciones flotantes
+    # -------------------------------------------------------------------------
     componentes = list(nx.connected_components(actual_state_clean_grid))
-    validos = [c for c in componentes if len(c) > min_size]
+    validos = []
+
+    for c in componentes:
+        # Obtenemos todas las columnas (coordenada j) que ocupa este componente
+        columnas = {n[1] for n in c}
+
+        # CONDICIÓN FÍSICA: El componente DEBE tocar ambos electrodos (0 y W-1)
+        # Opcionalmente, podemos mantener la condición de min_size para mayor robustez
+        if (0 in columnas) and ((W - 1) in columnas):
+            validos.append(c)
+
+    # Reconstruimos el grafo solo con los componentes que percola
     nodos_finales = set().union(*validos)
     actual_state_clean_grid = actual_state_clean_grid.subgraph(nodos_finales).copy()
 
-    # Nodos con grado 1 (hojas), excluyendo primera y última columna hasta que no quede ningún nodo sin conexión
+    # Nodos con grado 1 (hojas), excluyendo primera y última columna para "podar" ramas muertas
     while True:
-        # Encontrar nodos hoja excluyendo primera y última columna
+        # Encontrar nodos hoja excluyendo primera y última columna (electrodos)
         leaf_nodes = [n for n, d in actual_state_clean_grid.degree() if d == 1 and n[1] not in (0, W - 1)]
 
         # Si no hay más nodos hoja, salir del bucle
@@ -73,9 +73,6 @@ def Clean_state_matrix(
     # Poner 1 en las posiciones de los nodos que siguen en G
     for i, j in actual_state_clean_grid.nodes():
         actual_state_clean_matrix[i, j] = 1
-
-    if plot_resmatrix:
-        rp.RepresentateState(actual_state_clean_matrix, 0.00, os.getcwd() + "/Matriz_resistencia.pdf")
 
     return actual_state_clean_matrix, actual_state_clean_grid
 
@@ -214,7 +211,7 @@ def Eliminar_filamentos_incompletos(grid_limpio, filamentos_ranges, percola_bool
     return CF_matrix
 
 
-def calcular_resistencia(CF_matrix, ohm_resistence=11.5):
+def calcular_resistencia(CF_matrix, ohm_resistence):
     """
     Calcula la resistencia total de una matriz de formación de filamentos conductores (CF_matrix).
     Este método asume que cada columna de la matriz representa un conjunto de resistencias en paralelo.
