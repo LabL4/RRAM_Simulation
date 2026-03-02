@@ -508,9 +508,9 @@ def plot_IV(
     data_set = np.loadtxt(ruta_archivo_set, skiprows=1)
     data_reset = np.loadtxt(ruta_archivo_reset, skiprows=1)
 
-    x_set = data_set[:, 2]
+    x_set = data_set[:, 0]
     y_set = data_set[:, 1]
-    x_reset = data_reset[:, 2] * (-1.0)  # TODO: IMportante comprobar si las medidas se leen con el signo ya o no
+    x_reset = data_reset[:, 0] * (-1.0)  # TODO: Importante comprobar si las medidas se leen con el signo ya o no
     y_reset = abs(data_reset[:, 1])
 
     # Curvas experimentales
@@ -640,9 +640,9 @@ def plot_IV_marcado(
     data_set = np.loadtxt(ruta_archivo_set, skiprows=1)
     data_reset = np.loadtxt(ruta_archivo_reset, skiprows=1)
 
-    x_set = data_set[:, 2]
+    x_set = data_set[:, 0]
     y_set = data_set[:, 1]
-    x_reset = data_reset[:, 2] * (-1.0)
+    x_reset = data_reset[:, 0] * (-1.0)  # TODO: Importante comprobar si las medidas se leen con el signo ya o no
     y_reset = abs(data_reset[:, 1])
 
     (x_0, y_0) = next(iter(lista_puntos.values()))
