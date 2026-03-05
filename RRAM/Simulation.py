@@ -824,7 +824,7 @@ def PP_set(
         # Guardo los datos de la simulación
         data_pp_set[k] = np.array([simulation_time, voltage, current])
 
-        if k % 1 == 0:
+        if k % 50 == 0:
             np.save(rutas["figures_path"] / f"temperatura_{k}_pp_set.npy", temperatura)
 
     # Se decarta la simulación si no se ha llegado a la resistencia mínima necesaria para la segunda parte del set, ya que no va a coincidir con los datos experimentales.
@@ -1092,7 +1092,7 @@ def SP_set(
         # Guardo los datos de la simulación
         data_sp_set[k] = np.array([simulation_time + tiempo_pp_set, voltage, current])
 
-        if k % 1 == 0:
+        if k % 50 == 0:
             np.save(rutas["figures_path"] / f"temperatura_{k}_sp_set.npy", temperatura)
 
     tiempo_sp_set = simulation_time + tiempo_pp_set
@@ -1363,7 +1363,7 @@ def PP_reset(
         tiempo_total = simulation_time + tiempo_sp_set
         data_pp_reset[k] = np.array([tiempo_total, voltage, current])
 
-        if k % 1 == 0:
+        if k % 50 == 0:
             np.save(rutas["figures_path"] / f"temperatura_{k}_pp_reset.npy", temperatura)
 
         # Represento el estado cada 3000 pasos
@@ -1618,7 +1618,7 @@ def SP_reset(
         data_sp_reset[k] = np.array([tiempo_total, voltage, current])
 
         fig_voltage = round(vector_ddp[k], 4)
-        if k % 1 == 0:
+        if k % 50 == 0:
             np.save(rutas["figures_path"] / f"temperatura_{k}_sp_reset.npy", temperatura)
 
         # Represento el estado cada 3000 pasos
