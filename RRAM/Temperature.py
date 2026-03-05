@@ -1,5 +1,6 @@
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import coo_matrix
+from collections import Counter
 from typing import Optional
 import numpy as np
 
@@ -28,20 +29,6 @@ def Temperature_Joule(potencial: float, intensidad: float, T_0: float, r_termica
     temperatura_disipacion = T_0 + abs(potencial * intensidad) * r_termica
 
     return temperatura_disipacion
-
-
-# =============================================================================
-# SOLVER TÉRMICO (ECUACIÓN DEL CALOR FVM)
-# =============================================================================
-
-from RRAM.Simulation import SimulationParameters, SimulationConstants
-from scipy.sparse.linalg import spsolve
-from scipy.sparse import coo_matrix
-import numpy as np
-
-# =============================================================================
-# SOLVER TÉRMICO FVM (Basado en Temperature_Final.ipynb)
-# =============================================================================
 
 
 def legacy_matriz_materiales(matriz_filamentos: np.ndarray) -> np.ndarray:
@@ -272,7 +259,7 @@ def solve_thermal_state(
     thermal_props: dict,
     atom_size: float,
     T_ambient: float,
-    matriz_muros: Optional[np.ndarray] = None,  # <--- 1. NUEVO ARGUMENTO
+    matriz_muros: Optional[np.ndarray] = None,
 ) -> np.ndarray:
     """
     Ensambla y resuelve la ecuación del calor en estado estacionario (FVM).
@@ -359,3 +346,246 @@ def solve_thermal_state(
 
     # Aseguramos el tipo np.ndarray para satisfacer al linter (Pylance)
     return np.asarray(T_final)
+
+
+def obtener_centro_CF(types_map: np.ndarray, cf_ranges: list) -> list:
+    """
+    Calcula los centros de los filamentos identificando bloques contiguos en cada columna,
+    y obteniendo la coordenada (fila) central que más se repite a lo largo de cada rango definido.
+
+    Argumentos:
+    - types_map: Matriz 2D del sistema donde 1 indica filamento y 0 vacío.
+    - cf_ranges: (OBLIGATORIO) Lista de tuplas indicando el límite físico de cada filamento en el eje Y.
+                 Ejemplo para 1 filamento: [(0, 99)].
+                 Ejemplo para 2 filamentos: [(0, 49), (50, 99)].
+
+    Retorna:
+    - Una lista con los centros (números enteros de fila). Devuelve un centro exacto por cada rango.
+    """
+    Ny, Nx = types_map.shape
+    todos_los_centros = []
+
+    # Recorremos columnas (evitando electrodos 0 y Nx-1)
+    for j in range(1, Nx - 1):
+        column_data = types_map[:, j]
+
+        # Encontramos los índices (filas) donde hay filamento en esta columna
+        fil_indices = np.where(column_data == 1)[0]
+
+        if len(fil_indices) == 0:
+            continue
+
+        # --- 1. ALGORITMO DE AGRUPACIÓN (CLUSTERING) ---
+        clusters = []
+        current_group = [fil_indices[0]]
+
+        for i in range(1, len(fil_indices)):
+            # Si el índice actual es consecutivo al anterior, pertenece al mismo bloque
+            if fil_indices[i] == fil_indices[i - 1] + 1:
+                current_group.append(fil_indices[i])
+            else:
+                # Se rompió la continuidad: guardamos el bloque y empezamos uno nuevo
+                clusters.append(current_group)
+                current_group = [fil_indices[i]]
+        clusters.append(current_group)  # Guardar el último bloque
+
+        # --- 2. CÁLCULO DEL CENTRO LOCAL DE CADA CLUSTER ---
+        for cluster in clusters:
+            # Calculamos la media aritmética de los índices (Ej: [18,19,20] -> 19.0)
+            media = np.mean(cluster)
+
+            # Redondeamos al entero más cercano y forzamos a que sea tipo 'int'
+            centro_entero = int(np.round(media))
+
+            # Guardamos el centro en la lista global del sistema
+            todos_los_centros.append(centro_entero)
+
+    # Si la matriz estaba vacía o no había filamentos en el interior
+    if not todos_los_centros:
+        return [None] * len(cf_ranges)
+
+    # --- 3. OBTENER EL/LOS CENTROS MÁS REPETIDOS SEGÚN LOS RANGOS ---
+    centros_por_filamento = []
+
+    for fila_min, fila_max in cf_ranges:
+        # Filtramos solo los centros que caen estrictamente dentro de este filamento físico
+        centros_en_rango = [c for c in todos_los_centros if fila_min <= c <= fila_max]
+
+        if centros_en_rango:
+            # Obtenemos el que MAS se repite en esta región
+            centro_ganador = Counter(centros_en_rango).most_common(1)[0][0]
+            centros_por_filamento.append(centro_ganador)
+        else:
+            # Si un rango no tiene filamento formado, devolvemos None
+            centros_por_filamento.append(None)
+
+    return centros_por_filamento
+
+
+def calcular_filas_intermedias(centros: list) -> tuple[list, list]:
+    """
+    Calcula la fila central (punto medio) entre los centros de filamentos consecutivos
+    y las distancias físicas desde los centros hasta dicha fila media.
+
+    Argumentos:
+    - centros: Lista de enteros con los centros de cada filamento (Ej: [20, 50, 80]).
+    - atom_size: Tamaño físico de cada celda del grid (Ej: 0.25).
+
+    Retorna:
+    - filas_medias: Lista de enteros con las filas intermedias (Ej: [35, 65]).
+    - distancias: Lista de tuplas con las distancias desde cada filamento a la fila media (Ej: [(15, 15), (15, 15)]).
+                  Formato: [(dist_centro1_a_medio, dist_centro2_a_medio), ...]
+    """
+    filas_medias = []
+    distancias = []
+
+    # Si hay menos de 2 filamentos, no hay distancia intermedia que calcular
+    if not centros or len(centros) < 2:
+        return filas_medias, distancias
+
+    # Recorremos la lista emparejando el elemento actual con el siguiente
+    for i in range(len(centros) - 1):
+        centro_actual = centros[i]
+        centro_siguiente = centros[i + 1]
+
+        # En caso de que un filamento no se haya formado (None), no podemos calcular el medio
+        if centro_actual is None or centro_siguiente is None:
+            continue
+
+        # Calculamos la media aritmética entre ambos centros
+        medio = (centro_actual + centro_siguiente) / 2.0
+
+        # Redondeamos al entero más cercano (fila de la matriz)
+        fila_media = int(np.round(medio))
+        filas_medias.append(fila_media)
+
+        # Calculamos cuántas casillas hay de diferencia usando valor absoluto (abs)
+        # y lo multiplicamos por el tamaño físico de la celda (atom_size)
+        distancia_actual = abs(fila_media - centro_actual)
+        distancia_siguiente = abs(centro_siguiente - fila_media)
+
+        # Guardamos ambas distancias en la lista
+        distancias.append((distancia_actual, distancia_siguiente))
+
+    return filas_medias, distancias
+
+
+def calcular_perfiles_muro(
+    perfiles_filamentos: list, distancias_casillas: list, pendiente_temperatura: float, atom_size: float
+) -> list:
+    """
+    Calcula el perfil de temperatura 1D para cada muro térmico basándose en
+    la temperatura de su filamento correspondiente columna a columna.
+    """
+
+    # BLOQUE 1: Preparación del contenedor de resultados
+    # -----------------------------------------------------------------
+    # Crearemos una lista que almacenará tuplas. Cada tupla contendrá
+    # (perfil_muro_arriba, perfil_muro_abajo) en formato de array 1D.
+    perfiles_muros = []
+
+    # Verificación de seguridad: debe haber un perfil de filamento más que distancias
+    if len(perfiles_filamentos) < 2 or not distancias_casillas:
+        return perfiles_muros
+
+    # BLOQUE 2: Iteración sobre las interfaces (muros)
+    # -----------------------------------------------------------------
+    # Recorremos la lista de distancias. El índice 'i' representa el espacio
+    # INTERMEDIO entre el filamento 'i' (arriba) y el filamento 'i+1' (abajo).
+    for i in range(len(distancias_casillas)):
+        casillas_arriba, casillas_abajo = distancias_casillas[i]
+
+        # BLOQUE 3: Extracción de los perfiles de los filamentos origen
+        # -----------------------------------------------------------------
+        # El muro superior está influenciado por el filamento que tiene encima (i)
+        T_filamento_arriba = perfiles_filamentos[i]
+
+        # El muro inferior está influenciado por el filamento que tiene debajo (i+1)
+        T_filamento_abajo = perfiles_filamentos[i + 1]
+
+        # BLOQUE 4: Cálculo vectorizado de la temperatura
+        # -----------------------------------------------------------------
+        # Como T_filamento es un array de numpy (ej: 100 valores, uno por columna),
+        # al sumar el término matemático se realiza la operación celda por celda
+        # instantáneamente sin necesidad de hacer un bucle for anidado.
+
+        # Ecuación: T_muro = T_filamento + factor * distancia
+        # (Nota física: 'factor_temp' debería ser negativo si el calor cae al alejarse)
+        T_muro_arriba = T_filamento_arriba + pendiente_temperatura * (casillas_arriba * atom_size)
+        T_muro_abajo = T_filamento_abajo + pendiente_temperatura * (casillas_abajo * atom_size)
+
+        # Guardamos el par de perfiles calculados para esta interfaz
+        perfiles_muros.append((T_muro_arriba, T_muro_abajo))
+
+    return perfiles_muros
+
+
+def colocar_muro_termico(
+    matriz_molde: np.ndarray, filas_intermedias: list, perfiles_muros_calculados: list
+) -> np.ndarray:
+    """
+    Coloca los perfiles 1D de temperatura en las filas correspondientes de la matriz 2D.
+    """
+    matriz_muros = np.zeros_like(matriz_molde, dtype=float)
+    Ny, Nx = matriz_muros.shape
+
+    for i, fila_mid in enumerate(filas_intermedias):
+        if fila_mid is None:
+            continue
+
+        # Extraemos los perfiles 1D ya calculados por tu nueva función
+        perfil_muro_arriba, perfil_muro_abajo = perfiles_muros_calculados[i]
+
+        # 1er Muro: Fila Intermedia
+        mask_vacio_arriba = matriz_molde[fila_mid, :] == 0
+        # Numpy asigna el valor del perfil SOLO en las columnas donde la máscara es True
+        matriz_muros[fila_mid, mask_vacio_arriba] = perfil_muro_arriba[mask_vacio_arriba]
+
+        # 2do Muro: Una fila por debajo
+        fila_debajo = fila_mid - 1
+        if 0 <= fila_debajo < Ny:
+            mask_vacio_abajo = matriz_molde[fila_debajo, :] == 0
+            matriz_muros[fila_debajo, mask_vacio_abajo] = perfil_muro_abajo[mask_vacio_abajo]
+
+    return matriz_muros
+
+
+def extraer_perfiles_filamentos(matriz_temperaturas: np.ndarray, filas_centros: list) -> list:
+    """
+    Extrae los perfiles de temperatura 1D (fila completa) de una matriz térmica 2D,
+    basándose en una lista de filas específicas (centros de los filamentos).
+
+    Argumentos:
+    - matriz_temperaturas: Matriz 2D con los resultados del solver térmico.
+    - filas_centros: Lista de enteros indicando las filas a extraer (Ej: [20, 80]).
+
+    Retorna:
+    - perfiles: Lista de arrays 1D correspondientes a la temperatura de cada filamento.
+    """
+
+    # BLOQUE 1: Preparación
+    perfiles = []
+    Ny, Nx = matriz_temperaturas.shape
+
+    # BLOQUE 2: Iteración y Extracción
+    for fila in filas_centros:
+        # Caso A: El filamento no se formó (su centro es None)
+        if fila is None:
+            # Añadimos None a la lista para mantener la correspondencia de índices
+            perfiles.append(None)
+            print("Advertencia: Se detectó un filamento no formado (None). Perfil omitido.")
+
+        # Caso B: La fila es un índice válido dentro de la matriz
+        elif 0 <= fila < Ny:
+            # Extraemos la fila completa (todas las columnas de esa fila)
+            # Usamos .copy() para evitar modificar la matriz original accidentalmente
+            perfil_1d = matriz_temperaturas[fila, :].copy()
+            perfiles.append(perfil_1d)
+
+        # Caso C: Índice fuera de los límites de la matriz (Error de entrada)
+        else:
+            raise IndexError(
+                f"La fila solicitada ({fila}) está fuera de los límites de la matriz térmica (0 a {Ny - 1})."
+            )
+
+    return perfiles
