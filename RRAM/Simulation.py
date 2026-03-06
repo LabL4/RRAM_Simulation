@@ -491,6 +491,8 @@ def PP_set(
     voltaje_percolacion = params.voltaje_final_set
     # AL inicio como la corriente es de tipo poole frenkel, la resitencia ohmica se considera nula
     resistencia = 0.0
+    temperatura_anterior = params.init_temp
+    pendiente_temperatura = -26.6667
 
     print(
         "Los valores de factor vecinos y factor libre son:",
@@ -596,6 +598,10 @@ def PP_set(
                     device_size=params.device_size,
                 )
 
+                # Verificar si temperatura es un float y convertirlo a matriz
+                if isinstance(temperatura, (float, int)):
+                    temperatura_anterior = np.full_like(actual_state, temperatura, dtype=float)
+
             sistema_percola = True
 
             _, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
@@ -697,40 +703,99 @@ def PP_set(
                     num_simulation=num_simulation,
                     actual_state=actual_state,
                 )
-            # El sistema percola por lo que resuelvo la ecuación del calor. Primero se obtiene el mapa de materiales
-            materials_map = Temperature.crear_matriz_materiales(cf_clean_matrix)
-
-            # Cáculo de las fuentes de calor (el filamento)
-
-            Q_source_map = Temperature.calculate_heat_source(
-                types_map=materials_map,
-                atom_size=params.atom_size,
-                I_total=current,
-                R_cell=sim_ctes.ohm_resistence_set,
-                factor_generar_calor=sim_ctes.factor_generar_calor,
-            )
 
             if all_CFs_created:
-                # Obtengo la matriz de temperatura
+                # El sistema percola por lo que resuelvo la ecuación del calor. Primero se obtiene el mapa de materiales
+                materials_map = Temperature.crear_matriz_materiales(cf_clean_matrix)
+
+                # Cáculo de las fuentes de calor (el filamento es el que emite calor, el resto no)
+                Q_source_map = Temperature.calculate_heat_source(
+                    types_map=materials_map,
+                    atom_size=params.atom_size,
+                    I_total=current,
+                    R_cell=sim_ctes.ohm_resistence_set,
+                    factor_generar_calor=sim_ctes.factor_generar_calor,
+                )
+
+                # Preparo el muro térmico, obtengo los centros de los CF
+                centros_calculados = Temperature.obtener_centro_CF(actual_state, cf_ranges=CF_ranges)
+
+                filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(centros_calculados)
+
+                print(f"Filas intermedias: {filas_intermedias}")
+                print(f"Distancias en casillas al centro: {dist_casillas}")
+
+                # 4. LLAMAMOS A LA FUNCIÓN DE EXTRACCIÓN
+                mis_perfiles_extraidos = Temperature.extraer_perfiles_filamentos(
+                    matriz_temperaturas=temperatura_anterior, filas_centros=centros_calculados
+                )
+                print("\n--- Resultados de la Extracción ---")
+                for i, (centro, perfil) in enumerate(zip(centros_calculados, mis_perfiles_extraidos)):
+                    if perfil is not None:
+                        print(f"Filamento {i + 1} (Fila {centro}): Extraído un perfil de {len(perfil)} columnas.")
+                        print(f"   -> Primeros 5 valores térmicos: {np.round(perfil[:40], 1)} K")
+                    else:
+                        print(f"Filamento {i + 1} (Fila {centro}): No se formó (None).")
+
+                # =====================================================================
+                # 5. CÁLCULO DE LOS PERFILES PARA LOS MUROS Y COLOCACIÓN
+                # =====================================================================
+                perfiles_muros_calculados = Temperature.calcular_perfiles_muro(
+                    perfiles_filamentos=mis_perfiles_extraidos,
+                    distancias_casillas=dist_casillas,
+                    pendiente_temperatura=pendiente_temperatura,
+                    atom_size=params.atom_size,
+                )
+
+                print(
+                    f"Perfiles de muros calculados para cada interfaz: {perfiles_muros_calculados} pares de perfiles."
+                )
+
+                matriz_temperaturas_fijas = Temperature.colocar_muro_termico(
+                    matriz_molde=actual_state,
+                    filas_intermedias=filas_intermedias,
+                    perfiles_muros_calculados=perfiles_muros_calculados,
+                )
+
+                print(f"Matriz de temperaturas fijas para el muro térmico:\n{matriz_temperaturas_fijas}")
+                # Temperature.plot_muro_termico(
+                #     matriz_temperaturas_fijas,
+                #     actual_state,
+                #     rutas["figures_path"] / f"Muro_termico_{num_simulation}_{round(voltage, 4)}_pp_set.png",
+                # )
+
+                # Añadimos columnas de ceros (donde no hay muro) en las posiciones de los electrodos
+                Ny = matriz_temperaturas_fijas.shape[0]
+                columna_ceros = np.zeros((Ny, 1))
+                matriz_temperaturas_fijas = np.hstack([columna_ceros, matriz_temperaturas_fijas, columna_ceros])
+
                 temperatura = Temperature.solve_thermal_state(
                     types_map=materials_map,
-                    Q_map=Q_source_map,
+                    Q_map=materials_map,
                     thermal_props=sim_ctes.propiedades_termicas,
                     atom_size=params.atom_size,
-                    T_ambient=sim_ctes.Temperatura_electrodo,
+                    T_ambient=params.init_temp,
+                    matriz_muros=matriz_temperaturas_fijas,
                 )
-                # if k % (num_pasos_guardar_estado + 1) == 0:
-                #     fig_voltage = round(vector_ddp[k], 5)
-                #     print(f"Representando el mapa de temperatura para el paso {k} con voltaje {fig_voltage} V\n")
-                #     Representate.plot_thermal_state(
-                #         temperatura,
-                #         materials_map,
-                #         fig_voltage,
-                #         10,
-                #         save_path=rutas["figures_path"]
-                #         / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_pp_set.png",
-                #         device_size=params.device_size,
-                #     )
+                # # Obtengo la matriz de temperatura
+                # temperatura = Temperature.solve_thermal_state(
+                #     types_map=materials_map,
+                #     Q_map=Q_source_map,
+                #     thermal_props=sim_ctes.propiedades_termicas,
+                #     atom_size=params.atom_size,
+                #     T_ambient=sim_ctes.Temperatura_electrodo,
+                # )
+                fig_voltage = round(vector_ddp[k], 5)
+                print(f"Representando el mapa de temperatura para el paso {k} con voltaje {fig_voltage} V\n")
+                Representate.plot_thermal_state(
+                    temperatura,
+                    materials_map,
+                    fig_voltage,
+                    10,
+                    save_path=rutas["figures_path"]
+                    / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_pp_set.png",
+                    device_size=params.device_size,
+                )
             else:
                 temperatura = Temperature.Temperature_Joule(
                     voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola * 10

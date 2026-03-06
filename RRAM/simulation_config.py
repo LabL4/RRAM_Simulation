@@ -56,9 +56,9 @@ THERMAL_DEFAULTS = {
 # PARÁMETROS GEOMÉTRICOS Y DE SIMULACIÓN
 # ============================================================================
 SIMULATION_DEFAULTS = {
-    "device_size": 25e-9,
+    "device_size": 10e-9,
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
-    "num_trampas": 300,
+    "num_trampas": 100,
     "total_simulation_time": 10.0,
     "num_pasos": 10000,
     "voltaje_final": 1.1,

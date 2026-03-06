@@ -1,6 +1,7 @@
 from scipy.sparse.linalg import spsolve
 from scipy.sparse import coo_matrix
 from collections import Counter
+import matplotlib.pyplot as plt
 from typing import Optional
 import numpy as np
 
@@ -589,3 +590,106 @@ def extraer_perfiles_filamentos(matriz_temperaturas: np.ndarray, filas_centros: 
             )
 
     return perfiles
+
+
+def plot_muro_termico(
+    matriz_muros: np.ndarray, matriz_molde: np.ndarray = None, save_path: str = "resultados/muro_termico.png"
+) -> None:
+    """
+    Dibuja la matriz resaltando la ubicación y temperatura de los muros térmicos.
+    """
+    fig, ax = plt.subplots(figsize=(10, 12))
+
+    # 1. Si pasamos el molde, lo dibujamos en un gris muy suave de fondo
+    if matriz_molde is not None:
+        ax.imshow(matriz_molde, cmap="Greys", origin="lower", alpha=0.15)
+
+    # 2. Enmascaramos los ceros para que la matriz de muros sea transparente donde no hay muro
+    muros_visibles = np.ma.masked_where(matriz_muros == 0, matriz_muros)
+
+    # 3. Ploteamos los muros usando un mapa de calor (ej. 'hot' o 'plasma')
+    im = ax.imshow(muros_visibles, cmap="plasma", origin="lower")
+
+    # Barra de color indicando la temperatura de los muros
+    cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    cbar.set_label("Fixed Boundary Temperature (K)", fontsize=12)
+
+    # Estética
+    ax.set_title("Thermal Walls Placement & Temperature", pad=15, fontsize=14)
+    ax.set_xlabel("Eje X (Columnas)")
+    ax.set_ylabel("Eje Y (Filas)")
+    ax.grid(color="gray", linestyle="--", alpha=0.3)
+
+    plt.tight_layout()
+
+    # guardo la figura en la carpeta de resultados
+    plt.savefig(save_path)
+
+
+def plot_centros_filamento(matriz_test, rangos_test, centros_calculados, filas_intermedias):
+    """
+    Genera un gráfico visualizando los centros de filamentos calculados.
+
+    Parameters:
+    -----------
+    matriz_test : numpy.ndarray
+        Matriz de datos a visualizar
+    rangos_test : list of tuples
+        Lista de tuplas (ymin, ymax) que definen los rangos de cada filamento
+    centros_calculados : list
+        Lista con las posiciones de los centros calculados
+    filas_intermedias : list
+        Lista con las posiciones de las filas intermedias
+    """
+    # Creamos el plot
+    fig, ax = plt.subplots(figsize=(10, 12))
+
+    # origin="lower" asegura que la fila 0 esté abajo y la 99 arriba
+    cax = ax.imshow(matriz_test, cmap="Blues", origin="lower", aspect="equal")
+
+    # Configuramos títulos y etiquetas
+    ax.set_title(f"Test de Centros de Filamento ({len(rangos_test)} Filamentos)", pad=15, fontsize=14)
+    ax.set_xlabel("Eje X - Columnas (Atraviesa de Electrodo a Electrodo)", fontsize=12)
+    ax.set_ylabel("Eje Y - Filas (Grosor del Dieléctrico)", fontsize=12)
+
+    # Dibujamos los límites de los rangos (Líneas grises punteadas)
+    for idx, (ymin, ymax) in enumerate(rangos_test):
+        if idx < len(rangos_test) - 1:
+            ax.axhline(
+                y=ymax + 0.5,
+                color="gray",
+                linestyle=":",
+                alpha=0.8,
+                linewidth=1.5,
+                label="Límite de Rango" if idx == 0 else "",
+            )
+
+    # Dibujamos los CENTROS calculados (Líneas gruesas rojas)
+    for idx, centro in enumerate(centros_calculados):
+        if centro is not None:
+            ax.axhline(
+                y=centro,
+                color="#D32F2F",
+                linestyle="-",
+                alpha=0.9,
+                linewidth=2.5,
+                label="Centro Calculado" if idx == 0 else "",
+            )
+
+    # Dibujamos las filas intermedias (Líneas verdes)
+    for idx, fila_mid in enumerate(filas_intermedias):
+        ax.axhline(
+            y=fila_mid,
+            color="#388E3C",
+            linestyle="-.",
+            alpha=0.9,
+            linewidth=2,
+            label="Fila Intermedia" if idx == 0 else "",
+        )
+
+    # Ajustes visuales (Grid y Leyenda)
+    ax.grid(color="gray", linestyle="--", alpha=0.2)
+    ax.legend(loc="upper right", framealpha=0.95)
+
+    plt.tight_layout()
+    plt.show()
