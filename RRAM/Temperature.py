@@ -510,10 +510,14 @@ def calcular_perfiles_muro(
         # al sumar el término matemático se realiza la operación celda por celda
         # instantáneamente sin necesidad de hacer un bucle for anidado.
 
-        # Ecuación: T_muro = T_filamento + factor * distancia
-        # (Nota física: 'factor_temp' debería ser negativo si el calor cae al alejarse)
+        # Ecuación: T_muro = T_filamento + pendiente_temperatura * distancia
+        # (Nota: 'pendiente_temperatura' debe ser negativo ya que la temperatura cae al alejarse)
         T_muro_arriba = T_filamento_arriba + pendiente_temperatura * (casillas_arriba * atom_size)
         T_muro_abajo = T_filamento_abajo + pendiente_temperatura * (casillas_abajo * atom_size)
+
+        # Si la temperatura calculada para el muro es mayor que la del filamento, la limitamos a la temperatura del filamento
+        T_muro_arriba = np.minimum(T_muro_arriba, T_filamento_arriba)
+        T_muro_abajo = np.minimum(T_muro_abajo, T_filamento_abajo)
 
         # Guardamos el par de perfiles calculados para esta interfaz
         perfiles_muros.append((T_muro_arriba, T_muro_abajo))

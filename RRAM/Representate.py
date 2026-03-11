@@ -951,3 +951,236 @@ def RepresentateHeatmap(
     plt.close(fig)
 
     return None
+
+
+def plot_centros_filamento(
+    matriz_state: np.ndarray,
+    rangos_CF: list,
+    centros_calculados: list,
+    filas_intermedias: list,
+    filename: str | None = None,
+    device_size: float = 10e-9,
+    atom_size: float = 0.25e-9,
+) -> None:
+    """
+    Genera un gráfico visualizando los centros de filamentos calculados y las
+    filas donde se colocarán los muros térmicos.
+    """
+    # 1. Aplicar estilos y crear figura (Estándar RRAM)
+    setup_paper_plt(plt, latex=True, scaling=3)
+    fig, ax = plt.subplots(figsize=(12, 9))
+    config_ax_state(ax)
+
+    size_nm = device_size * 1e9
+    atom_size = atom_size * 1e9
+
+    # 2. Dibujo de la matriz
+    ax.imshow(matriz_state, cmap="Blues", origin="lower", aspect="equal", extent=[0, size_nm, 0, size_nm])
+
+    # 4. Dibujar los límites de los rangos (Líneas grises punteadas)
+    for idx, (ymin, ymax) in enumerate(rangos_CF):
+        if idx < len(rangos_CF) - 1:
+            ax.axhline(
+                y=(ymax + 0.5) * atom_size,
+                color="gray",
+                linestyle=":",
+                alpha=0.8,
+                linewidth=2,
+                label="Límite de Rango" if idx == 0 else "",
+            )
+
+    # 5. Dibujar los CENTROS calculados (Líneas gruesas rojas)
+    for idx, centro in enumerate(centros_calculados):
+        y_fisico = centro + 0.5
+        print(f"Centro calculado: {centro} (posición física: {y_fisico * atom_size:.12f} nm)")
+        if centro is not None:
+            ax.axhline(
+                y=y_fisico * atom_size,
+                color="#D32F2F",
+                linestyle="-",
+                alpha=0.9,
+                linewidth=3,
+                label="Centro Calculado" if idx == 0 else "",
+            )
+
+    # 6. Dibujar las filas intermedias / muros (Líneas verdes)
+    for idx, fila_mid in enumerate(filas_intermedias):
+        y_mid_fisico = fila_mid + 0.5
+        ax.axhline(
+            y=y_mid_fisico * atom_size,
+            color="#388E3C",
+            linestyle="-.",
+            alpha=0.9,
+            linewidth=2.5,
+            label="Fila Muro Térmico" if idx == 0 else "",
+        )
+
+    # 7. Configuración de estética
+    paso_ticks = 2 if size_nm <= 15 else (5 if size_nm <= 30 else 10)
+    ax.set_xticks(np.arange(0, size_nm + 1, paso_ticks))
+    ax.set_yticks(np.arange(0, size_nm + 1, paso_ticks))
+
+    ax.set_title("Centros de Filamento y Límites", pad=20)
+    ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
+    ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
+    # ax.legend(loc="upper right", framealpha=0.95)
+
+    plt.subplots_adjust(top=0.85)
+
+    # 8. Guardado y liberación de memoria
+    if filename:
+        plt.savefig(filename, bbox_inches="tight", dpi=150)
+
+    plt.close(fig)
+    return None
+
+
+def plot_muro_termico(
+    matriz_muros: np.ndarray,
+    matriz_molde: np.ndarray = None,
+    filename: str | None = None,
+    device_size: float = 10e-9,
+) -> None:
+    """
+    Dibuja la matriz resaltando la ubicación y el gradiente de temperatura
+    de los muros térmicos superpuestos sobre el material base.
+
+    """
+    # 1. Aplicar estilos y crear figura (Estándar RRAM)
+    setup_paper_plt(plt, latex=True, scaling=3)
+    fig, ax = plt.subplots(figsize=(12, 9))
+    config_ax_state(ax)
+
+    size_nm = device_size * 1e9
+
+    # 2. Dibujar el molde de fondo (si se proporciona)
+    if matriz_molde is not None:
+        ax.imshow(
+            matriz_molde, cmap="Greys", origin="lower", alpha=0.15, extent=[0, size_nm, 0, size_nm], aspect="equal"
+        )
+
+    # 3. Enmascarar ceros y dibujar los muros
+    muros_visibles = np.ma.masked_where(matriz_muros == 0, matriz_muros)
+    im = ax.imshow(muros_visibles, cmap="plasma", origin="lower", extent=[0, size_nm, 0, size_nm], aspect="equal")
+
+    # 4. Barra de color
+    cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+    cbar.set_label("Fixed Boundary Temperature (K)")
+
+    # 5. Estética estandarizada
+    paso_ticks = 2 if size_nm <= 15 else (5 if size_nm <= 30 else 10)
+    ax.set_xticks(np.arange(0, size_nm + 1, paso_ticks))
+    ax.set_yticks(np.arange(0, size_nm + 1, paso_ticks))
+
+    ax.set_title("Thermal Walls Placement Temperature", pad=20)
+    ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
+    ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
+
+    plt.subplots_adjust(top=0.85)
+
+    # 6. Guardado y liberación de memoria
+    if filename:
+        plt.savefig(filename, bbox_inches="tight", dpi=150)
+
+    plt.close(fig)
+    return None
+
+
+def plot_thermal_state_muro(
+    T_map,
+    types_map,
+    voltage,
+    num_levels=10,
+    device_size: float = 10e-9,
+    save_path=None,
+    atom_size: float = 0.25e-9,  # <-- Añadido parámetro atom_size
+    filas_intermedias: list | None = None,  # <-- Añadido parámetro de muros
+):
+    """
+    Visualiza el mapa de temperatura con superposición de materiales e isotermas alineadas.
+    Permite visualizar la ubicación de los muros térmicos si se proporcionan las filas.
+    """
+
+    # 1. Aplicar los estilos globales ANTES de crear la figura
+    setup_paper_plt(plt, latex=True, scaling=3)
+
+    # 2. Crear la figura y los ejes
+    fig, ax = plt.subplots(figsize=(12, 12))
+
+    # 3. Aplicar configuración de estilo específica para los ejes
+    config_ax_state(ax)
+
+    # 4. Configuración de dimensiones y límites (Alineación perfecta)
+    Ny, Nx = T_map.shape
+    size_nm = device_size * 1e9  # Convertir a nm
+    atom_size_nm = atom_size * 1e9  # Convertir la celda a nm
+    extent = [0, size_nm, 0, size_nm]
+
+    # 5. Capa base: Temperatura
+    im = ax.imshow(T_map, cmap="coolwarm", origin="lower", extent=extent, aspect="equal", zorder=1)
+    cbar = fig.colorbar(im, ax=ax, fraction=0.05, pad=0.04)
+    cbar.set_label("Temperatura (K)")
+
+    # 6. Capa de materiales (Overlay)
+    overlay = np.zeros((Ny, Nx, 4))
+    overlay[types_map == 3] = [0.2, 0.2, 0.2, 0.8]  # Electrodos: Gris oscuro
+    overlay[types_map == 1] = [0.5, 0.5, 0.5, 0.4]  # Filamento: Gris claro
+    ax.imshow(overlay, origin="lower", extent=extent, aspect="equal", zorder=2)
+
+    # 7. Capa de Isotermas
+    niveles = np.linspace(np.min(T_map), np.max(T_map), num_levels)
+    contours = ax.contour(
+        T_map, levels=niveles, colors="white", linewidths=1.5, alpha=1, origin="lower", extent=extent, zorder=3
+    )
+    ax.clabel(contours, fontsize=18, inline=True, fmt="%d")
+
+    # ==========================================================
+    # 8. DIBUJO DE LOS MUROS TÉRMICOS
+    # ==========================================================
+    if filas_intermedias is not None:
+        for idx, fila_mid in enumerate(filas_intermedias):
+            if fila_mid is not None:
+                # Línea superior del muro (fila_mid)
+                y_mid_fisico = fila_mid + 0.5
+                ax.axhline(
+                    y=y_mid_fisico * atom_size_nm,
+                    color="#00FFFF",  # Cian brillante (contrasta muy bien con el coolwarm)
+                    linestyle="--",
+                    alpha=0.9,
+                    linewidth=3,  # Línea gruesa para que se vea bien
+                    zorder=4,  # Por encima de las isotermas y el heatmap
+                    label="Thermal Wall" if idx == 0 else "",
+                )
+
+                # Línea inferior del muro (justo la fila de abajo: fila_mid - 1)
+                y_mid_debajo_fisico = (fila_mid - 1) + 0.5
+                ax.axhline(
+                    y=y_mid_debajo_fisico * atom_size_nm,
+                    color="#00FFFF",
+                    linestyle="--",
+                    alpha=0.9,
+                    linewidth=3,
+                    zorder=4,
+                )
+    # ==========================================================
+
+    # 9. Estética y marcas (Ticks)
+    paso_ticks = 2 if size_nm <= 15 else (5 if size_nm <= 30 else 10)
+    ax.set_xticks(np.arange(0, size_nm + 1, paso_ticks))
+    ax.set_yticks(np.arange(0, size_nm + 1, paso_ticks))
+
+    ax.set_title(f"$V_{{RRAM}}$ = {voltage} V", pad=25)
+    ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
+    ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
+
+    ax.set_aspect("equal")
+
+    plt.tight_layout()
+
+    # 10. Guardar si se especifica la ruta
+    if save_path:
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        # bbox_inches='tight' es crucial para que no recorte la leyenda exterior
+        plt.savefig(save_path, dpi=150, bbox_inches="tight")
+
+    plt.close(fig)  # Cierra para liberar memoria
