@@ -1,4 +1,6 @@
 from matplotlib.pyplot import plot
+from scipy import constants
+import sys
 from . import (
     CurrentSolver,
     ElectricField,
@@ -108,6 +110,7 @@ class SimulationConstants:
     conductividad_termica_electrodo: float
     Temperatura_electrodo: float
     factor_generar_calor: float
+    pendiente_temperatura: float
     ocupacion_max_pp_set: float
     ocupacion_max_sp_set: float
     factor_vecinos_pp_set: float
@@ -469,7 +472,7 @@ def PP_set(
     Returns:
         None
     """
-
+    np.set_printoptions(threshold=sys.maxsize)
     # Declaro todas las variables que voy a usar exclusivamente en la primera parte (PP) del set.
     rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="set")
 
@@ -487,12 +490,12 @@ def PP_set(
 
     sistema_percola = False
     total_vacantes_pp_set = False
-    num_pasos_guardar_estado = 455
+    num_pasos_guardar_estado = 400
     voltaje_percolacion = params.voltaje_final_set
     # AL inicio como la corriente es de tipo poole frenkel, la resitencia ohmica se considera nula
     resistencia = 0.0
     temperatura_anterior = params.init_temp
-    pendiente_temperatura = -26.6667
+    pendiente_temperatura = sim_ctes.pendiente_temperatura
 
     print(
         "Los valores de factor vecinos y factor libre son:",
@@ -721,24 +724,6 @@ def PP_set(
                 # Preparo el muro térmico, obtengo los centros de los CF
                 centros_calculados = Temperature.obtener_centro_CF(actual_state_clean_CF, cf_ranges=CF_ranges)
                 filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(centros_calculados)
-                print(
-                    f"Las filas intermedias calculadas son: {filas_intermedias} y la distancia entre centros en casillas es de: {dist_casillas} casillas\n"
-                )
-                Representate.plot_centros_filamento(
-                    matriz_state=actual_state,
-                    rangos_CF=CF_ranges,
-                    filas_intermedias=filas_intermedias,
-                    centros_calculados=centros_calculados,
-                    filename=rutas["figures_path"] / f"Centros_filamentos_{num_simulation}_{fig_voltage}.png",
-                    device_size=params.device_size,
-                )
-
-                # print(
-                # f"Centros de los filamentos calculados: {centros_calculados}, la distancia entre centros es de {dist_casillas} casillas, que corresponde con {dist_casillas} casillas, y las filas intermedias son: {filas_intermedias}"
-                # )
-
-                # print(f"Filas intermedias: {filas_intermedias}")
-                # print(f"Distancias en casillas al centro: {dist_casillas}")
 
                 # 4. LLAMAMOS A LA FUNCIÓN DE EXTRACCIÓN
                 # Compruebo si temperatura es un float, si es así se lanza una excepción porque no se puede extraer el perfil, si no es así se asume que es una matriz y se lanza la función de extracción
@@ -768,6 +753,7 @@ def PP_set(
                     pendiente_temperatura=pendiente_temperatura,
                     atom_size=params.atom_size,
                 )
+                print(f"ANTES  el pefil de temperaturas es : {perfiles_muros_calculados}\n")
 
                 matriz_temperaturas_fijas = Temperature.colocar_muro_termico(
                     matriz_molde=actual_state_clean_CF,
@@ -775,41 +761,27 @@ def PP_set(
                     perfiles_muros_calculados=perfiles_muros_calculados,
                 )
 
+                print(f"DESPUÉS  el pefil de temperaturas es : {matriz_temperaturas_fijas}\n")
+
                 # Añadimos columnas de ceros (donde no hay muro) en las posiciones de los electrodos
                 Ny = matriz_temperaturas_fijas.shape[0]
                 columna_ceros = np.zeros((Ny, 1))
-                matriz_temperaturas_fijas = np.hstack([columna_ceros, matriz_temperaturas_fijas, columna_ceros])
-                if k % num_pasos_guardar_estado == 0:
-                    print(f"Representando el estado para el paso {k} con voltaje {fig_voltage} V\n")
-                    Representate.RepresentateState(
-                        matriz=actual_state,
-                        voltaje=fig_voltage,
-                        filename=str(rutas["figures_path"]) + f"/State_{num_simulation}_{fig_voltage}.png",
-                        device_size=params.device_size,
-                    )
+                matriz_temperaturas_fijas_final = np.hstack([columna_ceros, matriz_temperaturas_fijas, columna_ceros])
 
-                    Representate.RepresentateState(
-                        matriz=actual_state_clean_CF,
-                        voltaje=fig_voltage,
-                        filename=str(rutas["figures_path"]) + f"/state_limpio_{num_simulation}_{fig_voltage}.png",
-                        device_size=params.device_size,
-                    )
+                print(f"DESPUÉS 2 el pefil de temperaturas es : {matriz_temperaturas_fijas}\n")
 
-                    Representate.plot_muro_termico(
-                        matriz_muros=matriz_temperaturas_fijas,
-                        matriz_molde=actual_state,
-                        filename=rutas["figures_path"] / f"Muro_termico_{num_simulation}_{fig_voltage}_pp_set.png",
-                        device_size=params.device_size,
-                    )
+                temperatura = Temperature.solve_thermal_state(
+                    types_map=materials_map,
+                    Q_map=Q_source_map,
+                    thermal_props=sim_ctes.propiedades_termicas,
+                    atom_size=params.atom_size,
+                    T_ambient=params.init_temp,
+                    matriz_muros=matriz_temperaturas_fijas_final,
+                )
 
-                    temperatura = Temperature.solve_thermal_state(
-                        types_map=materials_map,
-                        Q_map=Q_source_map,
-                        thermal_props=sim_ctes.propiedades_termicas,
-                        atom_size=params.atom_size,
-                        T_ambient=params.init_temp,
-                        matriz_muros=matriz_temperaturas_fijas,
-                    )
+                # Actualizo la temperatura anterior para el siguiente paso, NO guardo las columnas primera y ultima ya q corresponden a los electrodos
+                temperatura_anterior = temperatura[:, 1:-1]
+
                 # # Obtengo la matriz de temperatura
                 # temperatura = Temperature.solve_thermal_state(
                 #     types_map=materials_map,
@@ -820,7 +792,7 @@ def PP_set(
                 # )
                 if k % num_pasos_guardar_estado == 0:
                     print(
-                        f"Representando el mapa de temperatura para el paso {k} con voltaje {fig_voltage} V las filas intermedias son {filas_intermedias}\n"
+                        f"Representando para el paso {k} con voltaje {fig_voltage} V las filas intermedias son {filas_intermedias}\n"
                     )
                     Representate.plot_thermal_state_muro(
                         temperatura,
@@ -831,6 +803,49 @@ def PP_set(
                         / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_pp_set.png",
                         device_size=params.device_size,
                         filas_intermedias=filas_intermedias,
+                    )
+
+                    Representate.RepresentateState(
+                        matriz=actual_state,
+                        voltaje=fig_voltage,
+                        filename=str(rutas["figures_path"]) + f"/State_{num_simulation}_{fig_voltage}_pp_set.png",
+                        device_size=params.device_size,
+                    )
+
+                    Representate.RepresentateState(
+                        matriz=actual_state_clean_CF,
+                        voltaje=fig_voltage,
+                        filename=str(rutas["figures_path"]) + f"/State_Clean_{num_simulation}_{fig_voltage}_pp_set.png",
+                        device_size=params.device_size,
+                    )
+
+                    print(f"EL muro contiene {perfiles_muros_calculados} perfiles calculados\n")
+                    Representate.plot_muro_termico(
+                        matriz_muros=matriz_temperaturas_fijas,
+                        matriz_molde=actual_state_clean_CF,
+                        filename=rutas["figures_path"] / f"Muro_termico_{num_simulation}_{fig_voltage}_pp_set.png",
+                        device_size=params.device_size,
+                    )
+
+                    Representate.plot_centros_filamento(
+                        matriz_state=actual_state,
+                        rangos_CF=CF_ranges,
+                        filas_intermedias=filas_intermedias,
+                        centros_calculados=centros_calculados,
+                        filename=rutas["figures_path"]
+                        / f"Centros_filamentos_{num_simulation}_{fig_voltage}_pp_set.png",
+                        device_size=params.device_size,
+                    )
+                    # Llamas a la función metiendo la matriz y el string entre corchetes []
+                    distancias, perfiles = Temperature.extraer_perfiles_temperatura(
+                        lista_matrices=[temperatura], etiquetas=[f"{fig_voltage}"], columna_x=21, atom_size=0.25
+                    )
+
+                    # 2. Se lo pasamos directamente a la función de dibujo
+                    Representate.plot_perfil_temperatura(
+                        distancias=distancias,
+                        perfiles=perfiles,  # Pasamos el diccionario tal cual
+                        save_path=rutas["figures_path"] / f"Perfil_termico_{num_simulation}_{fig_voltage}_pp_set.png",
                     )
             else:
                 temperatura = Temperature.Temperature_Joule(
@@ -1000,15 +1015,15 @@ def SP_set(
     print("El numero de vacantes al inicio del SP set es:", np.sum(actual_state))
     print("El numero de vacantes al percolar fue :", max_vancantes_pp_set)
 
-    temperatura = final_state_pp_set["Temperatura_final"]
-
     ocupacion_max_sp_set = 0 + 0  # 0.35
     max_vancantes_sp_set = max_vancantes_pp_set + int(ocupacion_max_sp_set * params.num_max_vacantes)
     compliance_voltage = 2
     total_vacantes_sp_set = False
     num_columnas = 3  # Tiempo, Voltaje, Intensidad
-    num_pasos_guardar_estado = 2000
+    num_pasos_guardar_estado = 400
     rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="set")
+    temperatura_anterior = final_state_pp_set["Temperatura_final"]
+    pendiente_temperatura = sim_ctes.pendiente_temperatura
 
     vector_ddp = np.arange(voltaje_max_set, 0.000, -params.paso_potencial_set)
     print("El paso de potencial para la parte de set es:", params.paso_potencial_set, "\n")
@@ -1024,6 +1039,7 @@ def SP_set(
     print(f"Simulacion {num_simulation} - Segunda parte del set\n")
     for k in range(0, k_max):
         total_vacantes = np.sum(actual_state)
+        fig_voltage = round(vector_ddp[k], 5)
         # print("Número de vacantes en el paso", k, ":", total_vacantes)
 
         if total_vacantes > int(params.num_max_vacantes):
@@ -1047,7 +1063,7 @@ def SP_set(
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
             # TODO: Si el sistema llega al maximo de vacante, como no genera mas, no hace falta recalcular los filamentos, ya que no van a cambiar if total_vacantes < max_vancantes_sp_set: estaba dando error lo he quitado
-            _, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
+            actual_state_clean_CF, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
             filamentos = CurrentSolver.Clasificar_CF(CF_graph, params.x_size, params.y_size, CF_ranges)
             exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(CF_ranges))
             cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf)
@@ -1068,8 +1084,7 @@ def SP_set(
 
             # El sistema percola por lo que resuelvo la ecuación del calor. Primero se obtiene el mapa de materiales
             materials_map = Temperature.crear_matriz_materiales(cf_clean_matrix)
-
-            # Cáculo de las fuentes de calor (el filamento)
+            # Cáculo de las fuentes de calor (el filamento es el que emite calor, el resto no)
             Q_source_map = Temperature.calculate_heat_source(
                 types_map=materials_map,
                 atom_size=params.atom_size,
@@ -1077,15 +1092,117 @@ def SP_set(
                 R_cell=sim_ctes.ohm_resistence_set,
                 factor_generar_calor=sim_ctes.factor_generar_calor,
             )
+            # Preparo el muro térmico, obtengo los centros de los CF
+            centros_calculados = Temperature.obtener_centro_CF(actual_state_clean_CF, cf_ranges=CF_ranges)
+            filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(centros_calculados)
 
-            # Obtengo la matriz de temperatura
+            # 4. LLAMAMOS A LA FUNCIÓN DE EXTRACCIÓN
+            # Compruebo si temperatura es un float, si es así se lanza una excepción porque no se puede extraer el perfil, si no es así se asume que es una matriz y se lanza la función de extracción
+            if isinstance(temperatura_anterior, (float, int)):
+                raise ValueError(
+                    "La temperatura no se ha calculado como matriz, no se pueden extraer los perfiles de los filamentos. Se esperaba una matriz de temperaturas, pero se ha recibido un valor escalar."
+                )
+            else:
+                mis_perfiles_extraidos = Temperature.extraer_perfiles_filamentos(
+                    matriz_temperaturas=temperatura_anterior, filas_centros=centros_calculados
+                )
+
+            # print("\n--- Resultados de la Extracción ---")
+            # for i, (centro, perfil) in enumerate(zip(centros_calculados, mis_perfiles_extraidos)):
+            #     if perfil is not None:
+            #         print(f"Filamento {i + 1} (Fila {centro}): Extraído un perfil de {len(perfil)} columnas.")
+            #         print(f"   -> Primeros 5 valores térmicos: {np.round(perfil[:40], 1)} K")
+            #     else:
+            #         print(f"Filamento {i + 1} (Fila {centro}): No se formó (None).")
+
+            # =====================================================================
+            # 5. CÁLCULO DE LOS PERFILES PARA LOS MUROS Y COLOCACIÓN
+            # =====================================================================
+            perfiles_muros_calculados = Temperature.calcular_perfiles_muro(
+                perfiles_filamentos=mis_perfiles_extraidos,
+                distancias_casillas=dist_casillas,
+                pendiente_temperatura=pendiente_temperatura,
+                atom_size=params.atom_size,
+            )
+            matriz_temperaturas_fijas = Temperature.colocar_muro_termico(
+                matriz_molde=actual_state_clean_CF,
+                filas_intermedias=filas_intermedias,
+                perfiles_muros_calculados=perfiles_muros_calculados,
+            )
+            # Añadimos columnas de ceros (donde no hay muro) en las posiciones de los electrodos
+            Ny = matriz_temperaturas_fijas.shape[0]
+            columna_ceros = np.zeros((Ny, 1))
+            matriz_temperaturas_fijas = np.hstack([columna_ceros, matriz_temperaturas_fijas, columna_ceros])
             temperatura = Temperature.solve_thermal_state(
                 types_map=materials_map,
                 Q_map=Q_source_map,
                 thermal_props=sim_ctes.propiedades_termicas,
                 atom_size=params.atom_size,
-                T_ambient=sim_ctes.Temperatura_electrodo,
+                T_ambient=params.init_temp,
+                matriz_muros=matriz_temperaturas_fijas,
             )
+
+            temperatura_anterior = temperatura
+
+            # # Obtengo la matriz de temperatura
+            # temperatura = Temperature.solve_thermal_state(
+            #     types_map=materials_map,
+            #     Q_map=Q_source_map,
+            #     thermal_props=sim_ctes.propiedades_termicas,
+            #     atom_size=params.atom_size,
+            #     T_ambient=sim_ctes.Temperatura_electrodo,
+            # )
+            if k % num_pasos_guardar_estado == 0:
+                print(
+                    f"Representando para el paso {k} con voltaje {fig_voltage} V las filas intermedias son {filas_intermedias}\n"
+                )
+                Representate.plot_thermal_state_muro(
+                    temperatura,
+                    materials_map,
+                    fig_voltage,
+                    10,
+                    save_path=rutas["figures_path"]
+                    / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_sp_set.png",
+                    device_size=params.device_size,
+                    filas_intermedias=filas_intermedias,
+                )
+                Representate.RepresentateState(
+                    matriz=actual_state,
+                    voltaje=fig_voltage,
+                    filename=str(rutas["figures_path"]) + f"/State_{num_simulation}_{fig_voltage}_sp_set.png",
+                    device_size=params.device_size,
+                )
+                Representate.RepresentateState(
+                    matriz=actual_state_clean_CF,
+                    voltaje=fig_voltage,
+                    filename=str(rutas["figures_path"]) + f"/State_Clean_{num_simulation}_{fig_voltage}_sp_set.png",
+                    device_size=params.device_size,
+                )
+                Representate.plot_muro_termico(
+                    matriz_muros=matriz_temperaturas_fijas,
+                    matriz_molde=actual_state_clean_CF,
+                    filename=rutas["figures_path"] / f"Muro_termico_{num_simulation}_{fig_voltage}_sp_set.png",
+                    device_size=params.device_size,
+                )
+                Representate.plot_centros_filamento(
+                    matriz_state=actual_state,
+                    rangos_CF=CF_ranges,
+                    filas_intermedias=filas_intermedias,
+                    centros_calculados=centros_calculados,
+                    filename=rutas["figures_path"] / f"Centros_filamentos_{num_simulation}_{fig_voltage}_sp_set.png",
+                    device_size=params.device_size,
+                )
+                # Llamas a la función metiendo la matriz y el string entre corchetes []
+                distancias, perfiles = Temperature.extraer_perfiles_temperatura(
+                    lista_matrices=[temperatura], etiquetas=[f"{fig_voltage}"], columna_x=50, atom_size=0.25
+                )
+
+                # 2. Se lo pasamos directamente a la función de dibujo
+                Representate.plot_perfil_temperatura(
+                    distancias=distancias,
+                    perfiles=perfiles,  # Pasamos el diccionario tal cual
+                    save_path=rutas["figures_path"] / f"Perfil_termico_{num_simulation}_{fig_voltage}_sp_set.png",
+                )
 
         else:
             # Obtengo los valores del campo eléctrico y la temperatura
@@ -1126,8 +1243,13 @@ def SP_set(
         # Guardo los datos de la simulación
         data_sp_set[k] = np.array([simulation_time + tiempo_pp_set, voltage, current])
 
-        if k % 50 == 0:
+        if k % 250 == 0:
             np.save(rutas["figures_path"] / f"temperatura_{k}_sp_set.npy", temperatura)
+            np.save(rutas["figures_path"] / f"actual_state_{k}_sp_set.npy", actual_state)
+
+            # si existe, guardo la matriz de clean CF
+            if "cf_clean_matrix" in locals():
+                np.save(rutas["figures_path"] / f"cf_clean_matrix_{k}_sp_set.npy", cf_clean_matrix)
 
     tiempo_sp_set = simulation_time + tiempo_pp_set
 
@@ -1367,7 +1489,7 @@ def PP_reset(
         tiempo_total = simulation_time + tiempo_sp_set
         data_pp_reset[k] = np.array([tiempo_total, voltage, current])
 
-        if k % 50 == 0:
+        if k % 250 == 0:
             np.save(rutas["figures_path"] / f"temperatura_{k}_pp_reset.npy", temperatura)
 
         # Represento el estado cada 3000 pasos
@@ -1488,7 +1610,7 @@ def SP_reset(
                 )
             )
 
-        _, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
+        actual_state_clean_CF, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
 
         max_x, max_y = actual_state.shape
         filamentos = CurrentSolver.Clasificar_CF(CF_graph, max_x, max_y, CF_ranges)

@@ -50,6 +50,7 @@ THERMAL_DEFAULTS = {
     "conductividad_termica_electrodo": 5.0,
     "Temperatura_electrodo": 300,
     "Factor_generar_calor": 0.000001,
+    "pendiente_temperatura": -25,
 }
 
 # ============================================================================
@@ -179,6 +180,7 @@ class ConfigManager:
             "conductividad_termica_electrodo",
             "Temperatura_electrodo",
             "factor_generar_calor",
+            "pendiente_temperatura",
             "ocupacion_max_pp_set",
             "ocupacion_max_sp_set",
             "factor_vecinos_pp_set",
