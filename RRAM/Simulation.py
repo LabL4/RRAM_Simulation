@@ -747,13 +747,13 @@ def PP_set(
                 # =====================================================================
                 # 5. CÁLCULO DE LOS PERFILES PARA LOS MUROS Y COLOCACIÓN
                 # =====================================================================
+
                 perfiles_muros_calculados = Temperature.calcular_perfiles_muro(
                     perfiles_filamentos=mis_perfiles_extraidos,
                     distancias_casillas=dist_casillas,
                     pendiente_temperatura=pendiente_temperatura,
                     atom_size=params.atom_size,
                 )
-                print(f"ANTES  el pefil de temperaturas es : {perfiles_muros_calculados}\n")
 
                 matriz_temperaturas_fijas = Temperature.colocar_muro_termico(
                     matriz_molde=actual_state_clean_CF,
@@ -761,14 +761,10 @@ def PP_set(
                     perfiles_muros_calculados=perfiles_muros_calculados,
                 )
 
-                print(f"DESPUÉS  el pefil de temperaturas es : {matriz_temperaturas_fijas}\n")
-
                 # Añadimos columnas de ceros (donde no hay muro) en las posiciones de los electrodos
                 Ny = matriz_temperaturas_fijas.shape[0]
                 columna_ceros = np.zeros((Ny, 1))
                 matriz_temperaturas_fijas_final = np.hstack([columna_ceros, matriz_temperaturas_fijas, columna_ceros])
-
-                print(f"DESPUÉS 2 el pefil de temperaturas es : {matriz_temperaturas_fijas}\n")
 
                 temperatura = Temperature.solve_thermal_state(
                     types_map=materials_map,
@@ -790,6 +786,7 @@ def PP_set(
                 #     atom_size=params.atom_size,
                 #     T_ambient=sim_ctes.Temperatura_electrodo,
                 # )
+
                 if k % num_pasos_guardar_estado == 0:
                     print(
                         f"Representando para el paso {k} con voltaje {fig_voltage} V las filas intermedias son {filas_intermedias}\n"
@@ -819,9 +816,17 @@ def PP_set(
                         device_size=params.device_size,
                     )
 
-                    print(f"EL muro contiene {perfiles_muros_calculados} perfiles calculados\n")
+                    # 1. Hacemos una copia de la matriz de muros para proteger la original
+                    matriz_para_plot_muro = np.copy(matriz_temperaturas_fijas)
+
+                    # 2. Recorremos a la vez los centros y los perfiles que ya tenías guardados
+                    for centro, perfil_filamento in zip(centros_calculados, mis_perfiles_extraidos):
+                        if centro is not None and perfil_filamento is not None:
+                            # Insertamos el array 1D del perfil en la fila exacta del centro
+                            matriz_para_plot_muro[centro, :] = perfil_filamento
+
                     Representate.plot_muro_termico(
-                        matriz_muros=matriz_temperaturas_fijas,
+                        matriz_muros=matriz_para_plot_muro,
                         matriz_molde=actual_state_clean_CF,
                         filename=rutas["figures_path"] / f"Muro_termico_{num_simulation}_{fig_voltage}_pp_set.png",
                         device_size=params.device_size,
