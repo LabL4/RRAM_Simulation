@@ -490,7 +490,7 @@ def PP_set(
 
     sistema_percola = False
     total_vacantes_pp_set = False
-    num_pasos_guardar_estado = 400
+    num_pasos_guardar_estado = 500
     voltaje_percolacion = params.voltaje_final_set
     # AL inicio como la corriente es de tipo poole frenkel, la resitencia ohmica se considera nula
     resistencia = 0.0
@@ -679,21 +679,6 @@ def PP_set(
 
             cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf)
 
-            # # Si ha percolado uso la corriente de Ohm
-            # if not total_vacantes_pp_set:
-            #     try:
-            #         current, resistencia = CurrentSolver.OmhCurrent(
-            #             voltage, cf_clean_matrix, ohm_resistence=sim_ctes.ohm_resistence_set
-            #         )
-            #     except ZeroDivisionError:
-            #         raise exceptions.NullResistanceException(
-            #             simulation_path=rutas["simulation_path"],
-            #             figures_path=rutas["figures_path"],
-            #             voltage=voltage,
-            #             num_simulation=num_simulation,
-            #             actual_state=actual_state,
-            #         )
-
             # Si ha percolado uso la corriente de Ohm
             try:
                 current, resistencia = CurrentSolver.OmhCurrent(
@@ -777,15 +762,6 @@ def PP_set(
 
                 # Actualizo la temperatura anterior para el siguiente paso, NO guardo las columnas primera y ultima ya q corresponden a los electrodos
                 temperatura_anterior = temperatura[:, 1:-1]
-
-                # # Obtengo la matriz de temperatura
-                # temperatura = Temperature.solve_thermal_state(
-                #     types_map=materials_map,
-                #     Q_map=Q_source_map,
-                #     thermal_props=sim_ctes.propiedades_termicas,
-                #     atom_size=params.atom_size,
-                #     T_ambient=sim_ctes.Temperatura_electrodo,
-                # )
 
                 if k % num_pasos_guardar_estado == 0:
                     print(
@@ -905,7 +881,7 @@ def PP_set(
         # Guardo los datos de la simulación
         data_pp_set[k] = np.array([simulation_time, voltage, current])
 
-        if k % 250 == 0:
+        if k % num_pasos_guardar_estado == 0:
             np.save(rutas["figures_path"] / f"temperatura_{k}_pp_set.npy", temperatura)
             np.save(rutas["figures_path"] / f"actual_state_{k}_pp_set.npy", actual_state)
 
@@ -917,6 +893,17 @@ def PP_set(
     # if not (35 <= resistencia <= 55):
     #     # No se ha llegado a la resistencia necesaria para la segunda parte del set, directamelo lo descarto
     #     raise exceptions.LowResistanceException(valor_resistencia=resistencia)
+
+    if filamentos_actuales < len(CF_ranges):
+        raise exceptions.FilamentosNoFormadosException(
+            simulation_path=rutas["simulation_path"],
+            figures_path=rutas["figures_path"],
+            voltage=voltage,
+            num_simulation=num_simulation,
+            actual_state=actual_state,
+            CF_formados=filamentos_actuales,
+            CF_esperados=len(CF_ranges),
+        )
 
     # Guardo los datos de la simulación
     save_path_pkl = rutas["data_simulation_path"] / f"Data_pp_set_{num_simulation}.pkl"
@@ -1025,13 +1012,21 @@ def SP_set(
     compliance_voltage = 2
     total_vacantes_sp_set = False
     num_columnas = 3  # Tiempo, Voltaje, Intensidad
-    num_pasos_guardar_estado = 400
+    num_pasos_guardar_estado = 500
     rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="set")
+
+    # print("El valor de las rutas para guardar la simulación es:", rutas, "\n")
+
     temperatura_anterior = final_state_pp_set["Temperatura_final"]
+    # Elimino las columnas 0 y ultima de la matriz de temperatura porque corresponden a los electrodos
+    temperatura_anterior = final_state_pp_set["Temperatura_final"][:, 1:-1]
+    # Imprimo las dimensiones de la matriz de temperatura para comprobar que es correcta
+    # print("Las dimensiones de la matriz de temperatura son:", temperatura_anterior.shape)
+
     pendiente_temperatura = sim_ctes.pendiente_temperatura
 
     vector_ddp = np.arange(voltaje_max_set, 0.000, -params.paso_potencial_set)
-    print("El paso de potencial para la parte de set es:", params.paso_potencial_set, "\n")
+    print("El paso de potencial para sp set es:", params.paso_potencial_set, "\n")
 
     E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
 
@@ -1066,9 +1061,18 @@ def SP_set(
             )
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
+        # print(f"Comprobando si el sistema percola para calcular la corriente: {Percolation.is_path(actual_state)} \n ")
         if Percolation.is_path(actual_state):
             # TODO: Si el sistema llega al maximo de vacante, como no genera mas, no hace falta recalcular los filamentos, ya que no van a cambiar if total_vacantes < max_vancantes_sp_set: estaba dando error lo he quitado
             actual_state_clean_CF, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
+
+            # Representate.RepresentateState(
+            #     matriz=actual_state_clean_CF,
+            #     voltaje=fig_voltage,
+            #     filename=str(rutas["figures_path"]) + f"/State_Clean_{num_simulation}_{fig_voltage}_sp_set.png",
+            #     device_size=params.device_size,
+            # )
+
             filamentos = CurrentSolver.Clasificar_CF(CF_graph, params.x_size, params.y_size, CF_ranges)
             exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(CF_ranges))
             cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf)
@@ -1147,16 +1151,10 @@ def SP_set(
                 matriz_muros=matriz_temperaturas_fijas,
             )
 
-            temperatura_anterior = temperatura
+            temperatura_anterior = temperatura[:, 1:-1]
 
-            # # Obtengo la matriz de temperatura
-            # temperatura = Temperature.solve_thermal_state(
-            #     types_map=materials_map,
-            #     Q_map=Q_source_map,
-            #     thermal_props=sim_ctes.propiedades_termicas,
-            #     atom_size=params.atom_size,
-            #     T_ambient=sim_ctes.Temperatura_electrodo,
-            # )
+            # print(f"Las dimensiones de la matriz de temperatura calculada son: {temperatura_anterior.shape}")
+
             if k % num_pasos_guardar_estado == 0:
                 print(
                     f"Representando para el paso {k} con voltaje {fig_voltage} V las filas intermedias son {filas_intermedias}\n"
@@ -1199,7 +1197,7 @@ def SP_set(
                 )
                 # Llamas a la función metiendo la matriz y el string entre corchetes []
                 distancias, perfiles = Temperature.extraer_perfiles_temperatura(
-                    lista_matrices=[temperatura], etiquetas=[f"{fig_voltage}"], columna_x=50, atom_size=0.25
+                    lista_matrices=[temperatura], etiquetas=[f"{fig_voltage}"], columna_x=21, atom_size=0.25
                 )
 
                 # 2. Se lo pasamos directamente a la función de dibujo
@@ -1248,7 +1246,7 @@ def SP_set(
         # Guardo los datos de la simulación
         data_sp_set[k] = np.array([simulation_time + tiempo_pp_set, voltage, current])
 
-        if k % 250 == 0:
+        if k % num_pasos_guardar_estado == 0:
             np.save(rutas["figures_path"] / f"temperatura_{k}_sp_set.npy", temperatura)
             np.save(rutas["figures_path"] / f"actual_state_{k}_sp_set.npy", actual_state)
 
