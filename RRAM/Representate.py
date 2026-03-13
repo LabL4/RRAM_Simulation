@@ -288,7 +288,7 @@ def RepresentateState(
     # Guardar archivos
     if filename:
         if guardar_png:
-            plt.savefig(filename, bbox_inches="tight", dpi=150)
+            plt.savefig(filename, bbox_inches="tight", dpi=300)
 
         # ruta_pdf = os.path.splitext(filename)[0] + ".pdf"
         # plt.savefig(ruta_pdf, bbox_inches="tight")
@@ -399,7 +399,7 @@ def RepresentateTwoStates(
     # plt.savefig(ruta_pdf, bbox_inches="tight")
 
     ruta_pdf = os.path.splitext(cadena)[0] + ".png"
-    plt.savefig(ruta_pdf, bbox_inches="tight", dpi=150)
+    plt.savefig(ruta_pdf, bbox_inches="tight", dpi=300)
 
     # Mostrar gráfico
     plt.close(fig)
@@ -523,14 +523,14 @@ def plot_IV(
     )
 
     # Guardar figura
-    fig.savefig(figures_path + f"/I-V_{num_simulation + 1}.png", bbox_inches="tight", dpi=150)
+    fig.savefig(figures_path + f"/I-V_{num_simulation + 1}.png", bbox_inches="tight", dpi=300)
 
     # # Guardar figura
-    # fig.savefig(figures_path + f"/I-V_{num_simulation + 1}.pdf", bbox_inches="tight", dpi=150)
+    # fig.savefig(figures_path + f"/I-V_{num_simulation + 1}.pdf", bbox_inches="tight", dpi=300)
     # plt.close(fig)  # Cierra para liberar memoria
 
     # Guardar figura
-    # fig.savefig(figures_path + f"/I-V_{num_simulation + 1}.svg", bbox_inches="tight", dpi=150)
+    # fig.savefig(figures_path + f"/I-V_{num_simulation + 1}.svg", bbox_inches="tight", dpi=300)
     # plt.close(fig)  # Cierra para liberar memoria
 
 
@@ -692,14 +692,14 @@ def plot_IV_marcado(
     fig.savefig(
         figures_path + f"/I-V_marcado_{num_simulation + 1}.png",
         bbox_inches="tight",
-        dpi=150,
+        dpi=300,
     )
 
     # # Guardar figura
     # fig.savefig(
     #     figures_path + f"/I-V_marcado_{num_simulation + 1}.pdf",
     #     bbox_inches="tight",
-    #     dpi=150,
+    #     dpi=300,
     # )
     # plt.close(fig)  # Cierra para liberar memoria
 
@@ -707,7 +707,7 @@ def plot_IV_marcado(
     # fig.savefig(
     #     figures_path + f"/I-V_marcado_{num_simulation + 1}.svg",
     #     bbox_inches="tight",
-    #     dpi=150,
+    #     dpi=300,
     # )
     plt.close(fig)  # Cierra para liberar memoria
 
@@ -789,7 +789,7 @@ def plot_thermal_state(T_map, types_map, voltage, num_levels=10, device_size: fl
     if save_path:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         # bbox_inches='tight' es crucial para que no recorte la leyenda exterior
-        plt.savefig(save_path, dpi=150, bbox_inches="tight")
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
 
     plt.close(fig)  # Cierra para liberar memoria
 
@@ -837,7 +837,7 @@ def plot_thermal_state(T_map, types_map, voltage, num_levels=10, device_size: fl
 #     # 7. Guardar si se especifica la ruta
 #     if save_path:
 #         os.makedirs(os.path.dirname(save_path), exist_ok=True)
-#         plt.savefig(save_path, dpi=150, bbox_inches="tight")
+#         plt.savefig(save_path, dpi=300, bbox_inches="tight")
 
 #     plt.close(fig)  # Cierra para liberar memoria
 
@@ -940,7 +940,7 @@ def RepresentateHeatmap(
 
     # Guardar archivos
     if filename:
-        plt.savefig(filename, bbox_inches="tight", dpi=150)
+        plt.savefig(filename, bbox_inches="tight", dpi=300)
 
         # ruta_pdf = os.path.splitext(filename)[0] + ".pdf"
         # plt.savefig(ruta_pdf, bbox_inches="tight")
@@ -997,7 +997,7 @@ def plot_centros_filamento(
     for idx, (ymin, ymax) in enumerate(rangos_CF):
         if idx < len(rangos_CF) - 1:
             ax.axhline(
-                y=(ymax + 0.5) * atom_size_nm,
+                y=(ymax + atom_size_nm / 2) * atom_size_nm,
                 color="gray",
                 linestyle=":",
                 alpha=0.8,
@@ -1011,7 +1011,7 @@ def plot_centros_filamento(
         if centro is not None:
             y_fisico = centro + 0.5
             ax.axhline(
-                y=y_fisico * atom_size_nm,
+                y=(y_fisico + atom_size_nm) / 2 * atom_size_nm,
                 color="#D32F2F",
                 linestyle="-",
                 alpha=0.9,
@@ -1030,7 +1030,7 @@ def plot_centros_filamento(
                 linestyle="-.",
                 alpha=0.9,
                 linewidth=2.5,
-                label=f"Muro {idx + 1} (Fila {fila_mid})",  # <-- ¡Mejora aquí!
+                label=f"Muro {idx + 1} (Fila {fila_mid})",
                 zorder=3,
             )
 
@@ -1062,7 +1062,146 @@ def plot_centros_filamento(
     if filename:
         os.makedirs(os.path.dirname(filename), exist_ok=True)
         # Es vital bbox_inches="tight" para que la leyenda exterior no se recorte al guardar
-        plt.savefig(filename, bbox_inches="tight", dpi=150)
+        plt.savefig(filename, bbox_inches="tight", dpi=300)
+
+    plt.close(fig)
+    return None
+
+
+import matplotlib.patches as patches
+import matplotlib.pyplot as plt
+import numpy as np
+import os
+
+
+def plot_centros_filamento_det(
+    matriz_state: np.ndarray,
+    rangos_CF: list,
+    centros_calculados: list,
+    filas_intermedias: list,
+    filename: str | None = None,
+    device_size: float = 10e-9,
+    atom_size: float = 0.25e-9,
+    electrode_width: float = 0.2,
+) -> None:
+    """
+    Genera un gráfico visualizando los centros de filamentos calculados y las
+    filas donde se colocarán los muros térmicos, envuelto por electrodos.
+    Muestra en la leyenda el índice y la fila exacta de cada centro y muro.
+    Incluye una malla visual estricta cada 0.25 nm (en los bordes de la celda).
+    """
+    # 1. Aplicar estilos y crear figura (Estándar RRAM)
+    setup_paper_plt(plt, latex=True, scaling=3)
+    fig, ax = plt.subplots(figsize=(12, 9))
+    config_ax_state(ax)
+
+    size_nm = device_size * 1e9
+    atom_size_nm = atom_size * 1e9
+
+    # 2. Dibujo de la matriz (zorder=2)
+    ax.imshow(matriz_state, cmap="Blues", origin="lower", aspect="equal", extent=[0, size_nm, 0, size_nm], zorder=2)
+
+    # ==========================================================
+    # 3. ELECTRODOS ENVOLVENTES
+    # ==========================================================
+    y_start = 0
+    electrode_height = size_nm
+
+    left_electrode = patches.Rectangle(
+        (-electrode_width, y_start), electrode_width, electrode_height, color="gray", zorder=1
+    )
+    right_electrode = patches.Rectangle((size_nm, y_start), electrode_width, electrode_height, color="gray", zorder=1)
+
+    ax.add_patch(left_electrode)
+    ax.add_patch(right_electrode)
+
+    # ==========================================================
+    # 3.5. CUADRÍCULA ESTRICTA CADA 0.25 NM
+    # ==========================================================
+    # Dibujamos líneas horizontales desde 0 hasta size_nm saltando exactamente el tamaño del átomo
+    for y_grid in np.arange(0, size_nm + atom_size_nm, atom_size_nm):
+        ax.axhline(
+            y=y_grid,
+            color="black",  # Color oscuro para contraste
+            linestyle="--",  # Línea discontinua
+            alpha=0.25,  # Transparencia baja para que no sature
+            linewidth=0.8,  # Línea fina
+            zorder=2.5,  # Encima de la matriz pero debajo de los centros
+        )
+
+    # ==========================================================
+    # 4. DIBUJO DE LÍNEAS CON LEYENDAS DINÁMICAS
+    # ==========================================================
+    # Límites de los rangos
+    for idx, (ymin, ymax) in enumerate(rangos_CF):
+        if idx < len(rangos_CF) - 1:
+            ax.axhline(
+                y=(ymax + 0.5) * atom_size_nm,
+                color="gray",
+                linestyle=":",
+                alpha=0.8,
+                linewidth=2,
+                label="Límite de Rango" if idx == 0 else "",
+                zorder=3,
+            )
+
+    # CENTROS calculados
+    for idx, centro in enumerate(centros_calculados):
+        if centro is not None:
+            y_fisico = centro
+            ax.axhline(
+                y=(y_fisico + 0.5) * atom_size_nm,
+                color="#D32F2F",
+                linestyle="-",
+                alpha=0.9,
+                linewidth=3,
+                label=f"Centro {idx + 1} (Fila {centro})",
+                zorder=3,
+            )
+
+    # Filas intermedias / muros
+    for idx, fila_mid in enumerate(filas_intermedias):
+        if fila_mid is not None:
+            y_mid_fisico = fila_mid
+            ax.axhline(
+                y=(y_mid_fisico + 0.5) * atom_size_nm,
+                color="#388E3C",
+                linestyle="-.",
+                alpha=0.9,
+                linewidth=2.5,
+                label=f"Muro {idx + 1} (Fila {fila_mid})",
+                zorder=3,
+            )
+
+    # ==========================================================
+    # 5. LÍMITES AJUSTADOS Y ESTÉTICA
+    # ==========================================================
+    ax.set_aspect("equal")
+
+    ax.set_xlim(-electrode_width, size_nm + electrode_width)
+    margen_y = 0.05
+    ax.set_ylim(-margen_y, size_nm + margen_y)
+
+    paso_ticks = 2 if size_nm <= 15 else (5 if size_nm <= 30 else 10)
+    ax.set_xticks(np.arange(0, size_nm + 1, paso_ticks))
+    ax.set_yticks(np.arange(0, size_nm + 1, paso_ticks))
+
+    ax.set_title("Centros de Filamento y Límites", pad=20)
+    ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
+    ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
+
+    # Leyenda fuera de la gráfica a la derecha
+    ax.legend(loc="upper left", bbox_to_anchor=(1.02, 1), framealpha=0.95)
+
+    plt.subplots_adjust(top=0.85)
+
+    # ==========================================================
+    # 6. GUARDADO Y CIERRE
+    # ==========================================================
+    if filename:
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        # Es vital bbox_inches="tight" para que la leyenda exterior no se recorte al guardar
+        plt.savefig(filename, bbox_inches="tight", dpi=300)
 
     plt.close(fig)
     return None
@@ -1158,7 +1297,7 @@ def plot_muro_termico(
     # ==========================================================
     if filename:
         os.makedirs(os.path.dirname(filename), exist_ok=True)
-        plt.savefig(filename, bbox_inches="tight", dpi=150)
+        plt.savefig(filename, bbox_inches="tight", dpi=300)
 
     plt.close(fig)
 
@@ -1260,7 +1399,7 @@ def plot_thermal_state_muro(
     if save_path:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         # bbox_inches='tight' es crucial para que no recorte la leyenda exterior
-        plt.savefig(save_path, dpi=150, bbox_inches="tight")
+        plt.savefig(save_path, dpi=300, bbox_inches="tight")
 
     plt.close(fig)  # Cierra para liberar memoria
 
@@ -1269,10 +1408,10 @@ def plot_perfil_temperatura(
     distancias: np.ndarray,
     perfiles: dict,
     step: int = 1,
-    title: str = "Vertical Temperature Profile Evolution x = 50",
+    title: str = "Vertical Temperature Profile Evolution x = 20",
     save_path: str | None = None,
     usar_latex: bool = True,
-    scaling: float = 2,
+    scaling: float = 3,
 ):
     """
     Dibuja múltiples perfiles de temperatura en una misma gráfica,

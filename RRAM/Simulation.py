@@ -832,7 +832,7 @@ def PP_set(
                         device_size=params.device_size,
                     )
 
-                    Representate.plot_centros_filamento(
+                    Representate.plot_centros_filamento_det(
                         matriz_state=actual_state,
                         rangos_CF=CF_ranges,
                         filas_intermedias=filas_intermedias,
