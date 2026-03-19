@@ -233,3 +233,92 @@ def simulation_IV(
     )
 
     return None
+
+
+def resumen_plots(
+    k,
+    fig_voltage,
+    filas_intermedias,
+    temperatura,
+    materials_map,
+    rutas,
+    num_simulation,
+    voltage,
+    params,
+    actual_state,
+    actual_state_clean_CF,
+    matriz_temperaturas_fijas,
+    centros_calculados,
+    mis_perfiles_extraidos,
+    CF_ranges,
+    etapa="pp_set",
+    columna_perfil=21,
+):
+    """
+    Genera y guarda todas las gráficas de estado, temperatura y muros térmicos
+    para un paso específico de la simulación.
+    """
+    from RRAM import Representate, Temperature
+    import numpy as np
+
+    print(f"Representando para el paso {k} con voltaje {fig_voltage} V las filas intermedias son {filas_intermedias}\n")
+
+    # 1. Mapa de temperatura y muros
+    Representate.plot_thermal_state_muro(
+        temperatura,
+        materials_map,
+        fig_voltage,
+        10,
+        save_path=rutas["figures_path"] / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_{etapa}.png",
+        device_size=params.device_size,
+        filas_intermedias=filas_intermedias,
+    )
+
+    # 2. Estados de la matriz
+    Representate.RepresentateState(
+        matriz=actual_state,
+        voltaje=fig_voltage,
+        filename=str(rutas["figures_path"]) + f"/State_{num_simulation}_{fig_voltage}_{etapa}.png",
+        device_size=params.device_size,
+    )
+
+    Representate.RepresentateState(
+        matriz=actual_state_clean_CF,
+        voltaje=fig_voltage,
+        filename=str(rutas["figures_path"]) + f"/State_Clean_{num_simulation}_{fig_voltage}_{etapa}.png",
+        device_size=params.device_size,
+    )
+
+    # 3. Preparación y plot del muro térmico
+    matriz_para_plot_muro = np.copy(matriz_temperaturas_fijas)
+    for centro, perfil_filamento in zip(centros_calculados, mis_perfiles_extraidos):
+        if centro is not None and perfil_filamento is not None:
+            matriz_para_plot_muro[centro, :] = perfil_filamento
+
+    Representate.plot_muro_termico(
+        matriz_muros=matriz_para_plot_muro,
+        matriz_molde=actual_state_clean_CF,
+        filename=rutas["figures_path"] / f"Muro_termico_{num_simulation}_{fig_voltage}_{etapa}.png",
+        device_size=params.device_size,
+    )
+
+    # 4. Centros de filamentos
+    Representate.plot_centros_filamento_det(
+        matriz_state=actual_state,
+        rangos_CF=CF_ranges,
+        filas_intermedias=filas_intermedias,
+        centros_calculados=centros_calculados,
+        filename=rutas["figures_path"] / f"Centros_filamentos_{num_simulation}_{fig_voltage}_{etapa}.png",
+        device_size=params.device_size,
+    )
+
+    # # 5. Perfil térmico
+    # distancias, perfiles = Temperature.extraer_perfiles_temperatura(
+    #     lista_matrices=[temperatura], etiquetas=[f"{fig_voltage}"], columna_x=columna_perfil, atom_size=params.atom_size
+    # )
+
+    # Representate.plot_perfil_temperatura(
+    #     distancias=distancias,
+    #     perfiles=perfiles,
+    #     save_path=rutas["figures_path"] / f"Perfil_termico_{num_simulation}_{fig_voltage}_{etapa}.png",
+    # )

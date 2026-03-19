@@ -275,6 +275,10 @@ def solve_thermal_state(
 
     cell_volume = atom_size * atom_size
 
+    # print(
+    #     f"La matriz con la temperatura de los muros térmicos es:\n{matriz_muros}\n"
+    # )  # Depuración: Imprime la matriz de muros
+
     for i in range(Ny):
         for j in range(Nx):
             n = i * Nx + j  # Índice lineal actual
@@ -472,7 +476,11 @@ def calcular_filas_intermedias(centros: list) -> tuple[list, list]:
 
 
 def calcular_perfiles_muro(
-    perfiles_filamentos: list, distancias_casillas: list, pendiente_temperatura: float, atom_size: float
+    perfiles_filamentos: list,
+    distancias_casillas: list,
+    pendiente_temperatura: float,
+    atom_size: float,
+    T_ambient: float,
 ) -> list:
     """
     Calcula el perfil de temperatura 1D para cada muro térmico basándose en
@@ -494,14 +502,8 @@ def calcular_perfiles_muro(
     # Recorremos la lista de distancias. El índice 'i' representa el espacio
     # INTERMEDIO entre el filamento 'i' (arriba) y el filamento 'i-1' (abajo).
     for i in range(len(distancias_casillas)):
-        # print(
-        #     f"Los perfiles de los filamentos son: {perfiles_filamentos} siendo {perfiles_filamentos[i]} (arriba) y {perfiles_filamentos[i - 1]} (abajo)."
-        # )
         casillas_arriba, casillas_abajo = distancias_casillas[i]
 
-        # print(
-        #     f"Las distancias en casillas para el muro {i} son: {casillas_arriba} (arriba) y {casillas_abajo} (abajo)."
-        # )
         # BLOQUE 3: Extracción de los perfiles de los filamentos origen
         # -----------------------------------------------------------------
         # El muro superior está influenciado por el filamento que tiene encima (i)
@@ -510,8 +512,8 @@ def calcular_perfiles_muro(
         # El muro inferior está influenciado por el filamento que tiene debajo (i+1)
         T_filamento_abajo = perfiles_filamentos[i - 1]
 
-        # print("El perfil de temperatura del filamento superior es:", T_filamento_arriba)
-        # print("El perfil de temperatura del filamento inferior es:", T_filamento_abajo)
+        # print("El perfil de temperatura del filamento superior en la funcion del muro es:", T_filamento_arriba[10:21])
+        # print("El perfil de temperatura del filamento inferior en la funcion del muro es:", T_filamento_abajo[10:21])
 
         # BLOQUE 4: Cálculo vectorizado de la temperatura
         # -----------------------------------------------------------------
@@ -524,15 +526,20 @@ def calcular_perfiles_muro(
         T_muro_arriba = T_filamento_arriba + pendiente_temperatura * (casillas_arriba * atom_size * 1e9)
         T_muro_abajo = T_filamento_abajo + pendiente_temperatura * (casillas_abajo * atom_size * 1e9)
 
-        # print("Temperatura calculada para el muro superior antes de limitar:", T_muro_arriba)
-        # print("Temperatura calculada para el muro inferior antes de limitar:", T_muro_abajo)
+        # Imprimir los primeros 10 números del perfil para depuración
+        # print("Temperatura calculada para el muro superior antes de limitar:", T_muro_arriba[10:21])
+        # print("Temperatura calculada para el muro inferior antes de limitar:", T_muro_abajo[10:21])
 
         # Si la temperatura calculada para el muro es mayor que la del filamento, la limitamos a la temperatura del filamento
         T_muro_arriba = np.minimum(T_muro_arriba, T_filamento_arriba)
         T_muro_abajo = np.minimum(T_muro_abajo, T_filamento_abajo)
 
-        # print("Temperatura calculada para el muro superior después de limitar:", T_muro_arriba)
-        # print("Temperatura calculada para el muro inferior después de limitar:", T_muro_abajo)
+        # Si la temperatura calculada para el muro es menor que la temperatura ambiente, la limitamos a la temperatura ambiente
+        T_muro_arriba = np.maximum(T_muro_arriba, T_ambient)
+        T_muro_abajo = np.maximum(T_muro_abajo, T_ambient)
+
+        # print("Temperatura calculada para el muro superior después de limitar:", T_muro_arriba[10:21])
+        # print("Temperatura calculada para el muro inferior después de limitar:", T_muro_abajo[10:21])
 
         # Guardamos el par de perfiles calculados para esta interfaz
         perfiles_muros.append((T_muro_arriba, T_muro_abajo))

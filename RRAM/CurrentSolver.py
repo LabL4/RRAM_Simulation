@@ -296,3 +296,62 @@ def Poole_Frenkel(
     I_poole_frenkel = I_0 * E_field * exponencial
 
     return I_poole_frenkel
+
+
+def limitar_grosor_filamentos(
+    matriz_state: np.ndarray,
+    matriz_solo_filamentos: np.ndarray,
+    centros_calculados: list,
+    casillas_mantener: int,
+    rangos_CF: list,
+    valor_oxido: int = 0,  # <-- Ahora el valor por defecto es 0 (el óxido en tu matriz)
+) -> tuple[np.ndarray, np.ndarray]:
+    """
+    Recorta el grosor de los filamentos eliminando las vacantes que se alejan
+    demasiado de su centro, respetando los límites físicos (rangos) de cada filamento.
+
+    Argumentos:
+    - matriz_state: Matriz cuadrada de la simulación (0=óxido, 1=vacantes).
+    - matriz_solo_filamentos: Matriz que SOLO contiene las vacantes que forman filamento.
+    - centros_calculados: Lista con la fila central de cada filamento.
+    - casillas_mantener: Cuántas filas por encima y por debajo del centro se conservan.
+    - rangos_CF: Lista de tuplas indicando el límite (ymin, ymax) de cada filamento.
+    - valor_oxido: Valor numérico para rellenar el hueco dejado (0 por defecto).
+
+    Retorna:
+    - (matriz_state_recortada, matriz_filamentos_recortada)
+    """
+    # 1. Copias de seguridad para no alterar las matrices originales
+    m_state_recortada = np.copy(matriz_state)
+    m_filamentos_recortada = np.copy(matriz_solo_filamentos)
+
+    # 2. Recorremos cada filamento con su centro y su rango (límites)
+    for centro, rango in zip(centros_calculados, rangos_CF):
+        # Si no hay filamento formado en este rango, pasamos al siguiente
+        if centro is None or rango is None:
+            continue
+
+        ymin, ymax = rango
+
+        # 3. Calculamos las fronteras permitidas para este filamento
+        limite_inferior = centro - casillas_mantener
+        limite_superior = centro + casillas_mantener
+
+        # 4. Escaneamos solo las filas que pertenecen al rango de este filamento
+        for y in range(ymin, ymax + 1):
+            # Si la fila está FUERA del grosor permitido (muy arriba o muy abajo)
+            if y < limite_inferior or y > limite_superior:
+                # Buscamos en la matriz de SOLO filamentos dónde están las vacantes (los '1')
+                cols_vacantes = np.where(m_filamentos_recortada[y, :] == 1)[0]
+
+                if len(cols_vacantes) > 0:
+                    # Imprimimos el número de vacantes que se van a eliminar
+                    # print(f"Eliminando {len(cols_vacantes)} vacantes en la fila {y} fuera del rango permitido.")
+
+                    # Eliminamos las vacantes de la matriz exclusiva de filamentos
+                    m_filamentos_recortada[y, cols_vacantes] = valor_oxido
+
+                    # Eliminamos ESAS MISMAS vacantes de la matriz de estado general
+                    m_state_recortada[y, cols_vacantes] = valor_oxido
+
+    return m_state_recortada, m_filamentos_recortada

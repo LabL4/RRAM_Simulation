@@ -18,6 +18,7 @@ MATERIAL_DEFAULTS = {
     "long_decaimiento_concentracion": 1e-9,
     "ohm_resistence_set": 150.0,
     "ohm_resistence_reset": 150.0,
+    "grosor_filamento": 1,
 }
 
 # ============================================================================
@@ -71,8 +72,8 @@ SIMULATION_DEFAULTS = {
 # PARÁMETROS SET / RESET
 # ============================================================================
 SET_RESET_DEFAULTS = {
-    "ocupacion_max_pp_set": 0.35,
-    "ocupacion_max_sp_set": 0.35,
+    "ocupacion_max_pp_set": 0.45,
+    "ocupacion_max_sp_set": 0.45,
     "factor_vecinos_pp_set": 1.0,
     "factor_libre_pp_set": 1.0,
     "factor_vecinos_sp_set": 1.0,
@@ -167,6 +168,7 @@ class ConfigManager:
             "long_decaimiento_concentracion",
             "ohm_resistence_set",
             "ohm_resistence_reset",
+            "grosor_filamento",
             "vibration_frequency",
             "gamma",
             "gamma_drift",

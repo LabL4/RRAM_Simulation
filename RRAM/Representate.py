@@ -7,7 +7,6 @@ from matplotlib.colors import ListedColormap
 from matplotlib import markers
 
 from matplotlib.colors import LinearSegmentedColormap
-from matplotlib.lines import Line2D
 
 # import pandas as pd
 import numpy as np
@@ -1066,12 +1065,6 @@ def plot_centros_filamento(
 
     plt.close(fig)
     return None
-
-
-import matplotlib.patches as patches
-import matplotlib.pyplot as plt
-import numpy as np
-import os
 
 
 def plot_centros_filamento_det(
