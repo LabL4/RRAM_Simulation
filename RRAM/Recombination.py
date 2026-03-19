@@ -1,9 +1,8 @@
-from RRAM import Constants as cte
-from .Constants import k_b_ev
-
 import numpy as np
 import math
 import sys
+
+k_b_ev = 8.617333262145e-5  # Boltzmann constant in eV/K
 
 
 def Init_OxygenState(espesor_dispositivo: float, atom_size: float):
@@ -26,187 +25,55 @@ def Init_OxygenState(espesor_dispositivo: float, atom_size: float):
     return InitialOxygenState
 
 
-def Generate_Oxygen(oxygen_state: np.ndarray, num_oxygen: int):
+def generate_oxygen(oxygen_state: np.ndarray, max_num_oxygen: int) -> np.ndarray:
     """
-    Generates random oxygen positions in the given oxygen state matrix.
-
-    Args:
-        oxigen_state (np.ndarray): The current oxygen state matrix.
-        num_oxigen (int): The number of oxygen to generate.
-
-    Returns:
-        np.ndarray: The updated oxygen state matrix with the generated oxygen positions.
+    Genera una cantidad aleatoria de oxígenos (hasta un máximo de 'max_num_oxygen')
+    en posiciones libres de la interfaz (columna x=0).
     """
+    if max_num_oxygen <= 0:
+        return oxygen_state
 
-    eje_y = oxygen_state.shape[1]
-    y = np.zeros(num_oxygen, dtype=int)
+    # Genera un número aleatorio entre 0 y el máximo que se indica en max_num_oxygen.
+    # Ej: Si max_num_oxygen es 3, puede generar 0, 1, 2 o 3 en este paso.
+    cantidad_real = np.random.randint(0, max_num_oxygen + 1)
 
-    for i in range(num_oxygen):
-        # Genero las coordenadas aleatorias para el eje y donde habrá un oxígeno
-        y[i] = np.random.randint(0, eje_y)
+    # (Nota: Si prefieres que simule un "lanzamiento de moneda" independiente
+    # por cada oxígeno con un 60% de probabilidad de éxito, podrías usar:
+    # cantidad_real = np.random.binomial(n=max_num_oxygen, p=0.6) )
 
-    # Itero sobre cada par coordenada para asignar el valor de 1 que representa que se generó un oxígeno en esa posición
-    for i in range(num_oxygen):
-        random_number = np.random.rand()
-        if oxygen_state[y[i], 0] == 0 and random_number < 0.35:
-            oxygen_state[y[i], 0] = 1
+    if cantidad_real == 0:
+        return oxygen_state
 
-    # Devuelvo la matriz con los oxígenos generados
+    # Buscamos qué posiciones (índices de fila) están libres en la columna 0
+    posiciones_libres = np.where(oxygen_state[:, 0] == 0)[0]
+
+    # Limitamos por si la interfaz estuviera casi llena y no cupieran todos
+    cantidad_final = min(cantidad_real, len(posiciones_libres))
+
+    if cantidad_final > 0:
+        # Elegimos aleatoriamente las posiciones SIN repetición (replace=False)
+        posiciones_elegidas = np.random.choice(posiciones_libres, size=cantidad_final, replace=False)
+
+        # Asignamos los oxígenos elegidos
+        oxygen_state[posiciones_elegidas, 0] = 1
+
     return oxygen_state
 
 
-def Move_OxygenIons(
-    paso_temp: float,
-    oxygen_state: np.ndarray,
-    temperature: float,
-    E_field: float,
-    grid_size: float,
-    **kwargs,
-):  # type: ignore
-    """
-    Move the oxygen ions in the simulation based on the given parameters.
-
-    Parameters:
-        - simu_time (float): The simulation time.
-        - oxygen_state (np.ndarray): The matrix representing the state of oxygen ions.
-        - temperature (float): The temperature of the system.
-        - E_field (float): The electric field strength.
-        - atom_size (float): The size of each atom.
-
-    Returns:
-    np.ndarray: The updated matrix representing the state of oxygen ions after the movement.
-    """
-
-    # Obtengo los valores de las constantes si las estoy pasando como argumentos
-    if kwargs:
-        # Obtengo el valor de las constantes que necesita la función
-        t_0 = float(kwargs.get("vibration_frequency"))  # type: ignore
-        gamma_drift = float(kwargs.get("drift_coefficient"))  # type: ignore
-        E_m = float(kwargs.get("migration_energy"))  # type: ignore
-        cte_red = float(kwargs.get("cte_red"))  # type: ignore
-    else:
-        t_0 = cte.t_0
-        gamma_drift = cte.gamma_drift
-        E_m = cte.E_m
-        cte_red = cte.cte_red
-
-    # Duplico la matriz de oxígeno para no modificar la original
-    oxygen_state_before = np.copy(oxygen_state)
-
-    # Obtengo la velocidad de los iones de oxígeno v = ((2 * a)/t0)*exp(−Em/kT) sinh((d * γ_drift * F)/2kT)
-    try:
-        # Obtengo la velocidad de los iones de oxígeno v = ((2 * a)/t0)*exp(−Em/kT) sinh((d * γ_drift * F)/2kT)
-        senoh = np.sinh((cte_red * E_field * gamma_drift) / (2 * k_b_ev * temperature))
-        exp_velocity = np.exp(-E_m / (k_b_ev * temperature))
-    except OverflowError as Overflow_exception:
-        print(
-            "\n Error en el cálculo de la velocidad de los iones de oxígeno, los valores empleados son:"
-        )
-        print(f"OverflowError: {Overflow_exception}")
-        print(f"cte_red: {cte_red}")
-        print(f"E_field: {E_field}")
-        print(f"gamma_drift: {gamma_drift}")
-        print(f"k_b_ev: {k_b_ev}")
-        print(f"temperature: {temperature}")
-        print(f"E_m: {E_m}")
-        sys.exit(1)  # Termina la ejecución del programa con un código de salida 1
-
-    # Esto es un arreglo temporal para dar cuenta que hay un tiempo hasta que los iones de oxígeno se muevan
-    # En la expresión original se multiplica por 2 lo he quitado para ver si sale algo mejor
-    abs_field = abs(E_field * 10e-9)
-    thresholds = [
-        (0.7, 5.2e-07),
-        (0.5, 3e-07),
-    ]
-    oxigen_velocity = 0
-    for limit, vel in thresholds:
-        if abs_field > limit:
-            oxigen_velocity = vel
-            break
-
-    # Calculo la cantidad de "casillas" que se moverá el ion de oxígeno
-    displacement = int(round((oxigen_velocity * paso_temp) / grid_size))
-    if displacement > 3:
-        displacement = 3
-
-    if displacement == 0:
-        pass  # print("No se mueve")
-    else:
-        # Recorro la matriz de oxígeno para mover los iones
-        for i in range(oxygen_state_before.shape[0]):  # Recorro las filas
-            for j in range(oxygen_state_before.shape[1]):
-                if oxygen_state_before[j, i] == 1:
-                    # Muevo el oxígeno si queda dentro de la matriz
-                    if i + displacement < oxygen_state_before.shape[1]:
-                        oxygen_state[j, i + displacement] = 1
-                        oxygen_state[j, i] = 0
-                    else:  # Si se sale de la matriz, lo elimino
-                        oxygen_state[j, i] = 0
-
-    return oxygen_state, oxigen_velocity, displacement
-
-
-def Recombine(
-    actual_state: np.ndarray,
-    oxygen_state: np.ndarray,
-    paso_temp: float,
-    velocidad: float,
-    temp: float,
-    **kwargs,
-) -> tuple[np.ndarray, np.ndarray, float]:
-    """
-    Recombines oxygen and actual states based on certain conditions.
-
-    Parameters:
-    oxygen_state (np.ndarray): The matrix representing the oxygen state.
-    actual_state (np.ndarray): The matrix representing the actual state.
-
-    Returns:
-    np.ndarray: The updated actual state after recombination.
-    """
-
-    # Duplico la matriz de oxígeno y configuraciones para no modificar la original
-    oxygen_state_before = np.copy(oxygen_state)
-    actual_state_before = np.copy(actual_state)
-
-    # Calculo la probabilidad de recombinación.
-    prob_recom = min(
-        Prob_Recombination(paso_temp, velocidad, temp, **kwargs), 1.0
-    )  # Para que no se pase de 1.0
-
-    # Recorro la matriz de oxígeno para saber en qué posiciones hay oxígeno
-    for i in range(oxygen_state_before.shape[0]):
-        for j in range(oxygen_state_before.shape[1]):
-            # Si hay oxígeno en la posición de la matriz de oxígeno y hay una vacante en la matriz de estado actual
-            if oxygen_state_before[i, j] == 1 and actual_state_before[i, j] == 1:
-                # Si hay un hueco, calculo la probabilidad de recombinación
-                random_number = np.random.rand()  # Genero un número aleatorio
-                if random_number < prob_recom:
-                    actual_state[i, j] = 0
-                    oxygen_state[i, j] = 0
-
-    return (actual_state, oxygen_state, prob_recom)
-
-
 def Prob_Recombination(
-    paso_temporal: float, velocidad: float, temp: float, **kwargs
-) -> float:
-    # Obtengo las constantes necesarias para el cálculo
-    if kwargs:
-        # Obtengo el valor de las constantes que necesita la función
-        t_0 = float(kwargs.get("vibration_frequency"))  # type: ignore
-        beta_0 = float(kwargs.get("recom_enchancement_factor"))  # type: ignore
-        E_r = float(kwargs.get("recombination_energy"))  # type: ignore
-        L_p = float(kwargs.get("decaimiento_concentracion"))  # type: ignore
-    else:
-        t_0 = cte.t_0
-        beta_0 = cte.beta_0
-        E_r = cte.E_r
-        L_p = cte.L_p
+    paso_temporal: float,
+    velocidad: float | np.ndarray,
+    temp: float | np.ndarray,
+    vibration_frequency: float,
+    recom_enchancement_factor: float,
+    recombination_energy: float,
+    long_decaimiento_concentracion: float,
+) -> float | np.ndarray:
 
-    # Calculo la probabilidad de recombinación en equilibrio
-    prob_in_equilibrio = (paso_temporal * t_0) * (math.exp(-E_r / (k_b_ev * temp)))
-    exp_beta = math.exp(-(paso_temporal * velocidad) / L_p) * beta_0
+    # IMPORTANTE: Usamos np.exp en lugar de math.exp para que pueda manejar tanto floats como arrays (mapas de calor) sin problemas de tipo de variable.
+    prob_in_equilibrio = (paso_temporal * vibration_frequency) * np.exp(-recombination_energy / (k_b_ev * temp))
+
+    exp_beta = np.exp(-(paso_temporal * velocidad) / long_decaimiento_concentracion) * recom_enchancement_factor
     prob_recom = prob_in_equilibrio * exp_beta
 
     return prob_recom
@@ -216,211 +83,161 @@ def Recombine_opt(
     vacancy_state: np.ndarray,
     oxygen_state: np.ndarray,
     paso_temp: float,
-    velocidad: float,
-    temp: float,
-    **kwargs,
+    velocidad: np.ndarray | float,
+    temperatura: np.ndarray | float,
+    vibration_frequency: float,
+    recom_enchancement_factor: float,
+    recombination_energy: float,
+    long_decaimiento_concentracion: float,
 ) -> tuple[np.ndarray, np.ndarray]:
-    """
-    Función optimizada para recombinar oxígeno con vacantes en la simulación,
-    mediante operaciones vectorizadas que eliminan bucles explícitos.
-
-    Args:
-        actual_state (np.ndarray): Matriz de estado actual con vacantes (1).
-        oxygen_state (np.ndarray): Matriz de iones oxígeno (1 donde hay oxígeno).
-        paso_temp (float): Paso temporal de simulación.
-        velocidad (float): Velocidad promedio de movimiento de iones de oxígeno.
-        temp (float): Temperatura actual.
-        **kwargs: Constantes físicas necesarias para cálculo.
-
-    Returns:
-        Tuple conteniendo:
-        - actual_state actualizado (np.ndarray).
-        - oxygen_state actualizado (np.ndarray).
-        - probabilidad de recombinación calculada (float).
-    """
 
     state_updated = np.copy(vacancy_state)
     oxygen_updated = np.copy(oxygen_state)
 
-    # Posiciones donde hay oxígeno y una vacante
-    mask_recomb = (oxygen_state == 1) & (vacancy_state == 1)
+    # 1. Buscar las coordenadas exactas donde coinciden un ion y una vacante
+    active_indices = np.where((oxygen_state == 1) & (vacancy_state == 1))
 
-    # Matriz de números aleatorios del mismo tamaño que la máscara
-    random_values = np.random.rand(*oxygen_state.shape)
+    # Guardamos cuántas coincidencias hubo
+    num_coincidencias = len(active_indices[0])
 
-    # Calculo la probabilidad de recombinación.
-    prob_recom = min(Prob_Recombination(paso_temp, velocidad, temp, **kwargs), 1.0)
+    # Si no hay coincidencias, salimos
+    if num_coincidencias == 0:
+        return state_updated, oxygen_updated
 
-    recombination_mask = mask_recomb & (random_values < prob_recom)
+    # =========================================================================
+    # 2. GESTIÓN INTELIGENTE DE MATRICES (Extraer solo los datos útiles)
+    # =========================================================================
 
-    state_updated[recombination_mask] = 0
-    oxygen_updated[recombination_mask] = 0
+    # Filtrar TEMPERATURAS
+    if isinstance(temperatura, np.ndarray):
+        active_temps = temperatura[active_indices]
+    else:
+        active_temps = temperatura
 
-    return (state_updated, oxygen_updated)
+    # Filtrar VELOCIDADES (¡La solución al problema!)
+    if isinstance(velocidad, np.ndarray):
+        active_vels = velocidad[active_indices]
+    else:
+        active_vels = velocidad
+
+    # =========================================================================
+    # 3. Calcular probabilidades
+    # =========================================================================
+    active_probs = Prob_Recombination(
+        paso_temporal=paso_temp,
+        velocidad=active_vels,
+        temp=active_temps,
+        vibration_frequency=vibration_frequency,
+        recom_enchancement_factor=recom_enchancement_factor,
+        recombination_energy=recombination_energy,
+        long_decaimiento_concentracion=long_decaimiento_concentracion,
+    )
+
+    # Saturamos a 1.0 por seguridad usando la versión de NumPy
+    active_probs = np.minimum(active_probs, 1.0)
+
+    # 4. Tirar los dados
+    random_values = np.random.rand(num_coincidencias)
+
+    # 5. Ver cuáles han tenido éxito
+    success_mask_1d = random_values < active_probs
+
+    # 6. Reconstruir las coordenadas 2D de los que tuvieron éxito
+    success_indices = (active_indices[0][success_mask_1d], active_indices[1][success_mask_1d])
+
+    # 7. Actualizar el estado físico rompiendo el filamento
+    state_updated[success_indices] = 0
+    oxygen_updated[success_indices] = 0
+
+    return state_updated, oxygen_updated
 
 
-def update_oxygen_state(
+def move_oxygen_ions(
     paso_temp: float,
     oxygen_state: np.ndarray,
-    temperature: float,
+    temperature: np.ndarray | float,
     E_field: float,
     grid_size: float,
-    **kwargs,
-):  # type: ignore
+    vibration_frequency: float,
+    gamma_drift: float,
+    migration_energy: float,
+    cte_red: float,
+) -> tuple[np.ndarray, np.ndarray | float]:
     """
-    Move the oxygen ions in the simulation based on the given parameters.
-    Parameters:
-        - simu_time (float): The simulation time.
-        - oxygen_state (np.ndarray): The matrix representing the state of oxygen ions.
-        - temperature (float): The temperature of the system.
-        - E_field (float): The electric field strength.
-        - atom_size (float): The size of each atom.
+    Mueve los iones de oxígeno en la simulación calculando su velocidad de deriva (drift).
+    Soporta tanto un valor constante de temperatura (escalar) como mapas de calor (matriz 2D).
+
     Returns:
-    np.ndarray: The updated matrix representing the state of oxygen ions after the movement.
+        tuple: (Nueva matriz de estado de oxígenos, velocidad calculada)
     """
 
-    # Obtengo los valores de las constantes si las estoy pasando como argumentos
-    if kwargs:
-        # Obtengo el valor de las constantes que necesita la función
-        t_0 = float(kwargs.get("vibration_frequency"))  # type: ignore
-        gamma_drift = float(kwargs.get("drift_coefficient"))  # type: ignore
-        E_m = float(kwargs.get("migration_energy"))  # type: ignore
-        cte_red = float(kwargs.get("cte_red"))  # type: ignore
-    else:
-        t_0 = cte.t_0
-        gamma_drift = cte.gamma_drift
-        E_m = cte.E_m
-        cte_red = cte.cte_red
+    # =========================================================================
+    # 1. CÁLCULO FÍSICO DE LA VELOCIDAD (Cinemática)
+    # =========================================================================
+    try:
+        senoh = np.sinh((cte_red * E_field * gamma_drift) / (2 * k_b_ev * temperature))
+        exp_velocity = np.exp(-migration_energy / (k_b_ev * temperature))
+        oxygen_velocity = 2 * cte_red * vibration_frequency * (senoh * exp_velocity)
 
-    # Esto es un arreglo temporal para dar cuenta que hay un tiempo hasta que los iones de oxígeno se muevan. En la expresión original se multiplica por 2 lo he quitado para ver si sale algo mejor
-    # Calcular velocidad de iones con manejo robusto usando numpy
-    # try:
-    #     senoh = np.sinh(
-    #         (cte_red * E_field * gamma_drift) / (2 * 8.617333262145e-5 * temperature)
-    #     )
-    #     exp_velocity = np.exp(-E_m / (8.617333262145e-5 * temperature))
-    # except Exception as e:
-    #     print(f"Error en cálculo de velocidad de iones: {e}")
-    #     sys.exit(1)
+    except OverflowError as Overflow_exception:
+        print("\n Error en el cálculo de la velocidad de los iones de oxígeno, los valores empleados son:")
+        print(f"OverflowError: {Overflow_exception}")
+        print(f"cte_red: {cte_red}, E_field: {E_field}, gamma_drift: {gamma_drift}")
+        print(f"k_b_ev: {k_b_ev}, temperature: {temperature}, E_m: {migration_energy}")
+        sys.exit(1)
 
-    # E_field_abs = abs(E_field * 10e-9)
-    # velocity_map = [
-    #     (0.7, 5.1e-07),
-    #     (0.5, 2.6e-07),
-    # ]
-
-    # oxigen_velocity = 0
-    # for threshold, velocity in velocity_map:
-    #     if E_field_abs > threshold:
-    #         oxigen_velocity = velocity
-    #         break
-
+    # print("Velocidad de los iones de oxígeno: ", oxygen_velocity)
     # Esto es un arreglo temporal para dar cuenta que hay un tiempo hasta que los iones de oxígeno se muevan
-    if abs(E_field * (10e-9)) > 0.5:
-        # En la expresión original se multiplica por 2 lo he quitado para ver si sale algo mejor
-        oxigen_velocity = 3e-07  # 2 * t_0 * cte_red * (senoh * exp_velocity)
-    elif abs(E_field * (10e-9)) > 0.7:
-        oxigen_velocity = 5.2e-07  # 2 * t_0 * cte_red * (senoh * exp_velocity)
+    valor_prueba = abs(E_field * (10e-9))
+    if valor_prueba > 0.7:
+        oxygen_velocity = 5.2e-07
+    elif valor_prueba > 0.5:
+        oxygen_velocity = 3e-07
     else:
-        oxigen_velocity = (
-            0  # para que no se mueva hasta q se alcance un potencial concreto
-        )
+        oxygen_velocity = 0
 
-    # Calculo la cantidad de "casillas" que se moverá el ion de oxígeno
-    displacement = int(round((oxigen_velocity * paso_temp) / grid_size))
+    # =========================================================================
+    # 2. CÁLCULO DEL DESPLAZAMIENTO (Cuántas "casillas" se mueve el ión)
+    # =========================================================================
+    # Convierte el resultado a un array NumPy de tipo entero.
+    # Si oxigen_velocity es float, displacement será un array de 0 dimensiones.
+    # Si oxigen_velocity es matriz, displacement será una matriz (2D).
+    displacement = np.array(np.round((oxygen_velocity * paso_temp) / grid_size), dtype=int)
 
-    # Generar nueva matriz vacía para estado actualizado
+    # Creamos la nueva matriz vacía (el "nuevo lienzo")
     oxygen_state_new = np.zeros_like(oxygen_state)
 
-    if displacement > 0:
-        oxygen_state_new[:, displacement:] = oxygen_state[:, :-displacement]
-    else:
-        # Sin desplazamiento, copiar directamente
-        oxygen_state_new = oxygen_state.copy()
+    # =========================================================================
+    # 3. EXTRACCIÓN Y MOVIMIENTO INDEPENDIENTE SI LO HUBIESE
+    # =========================================================================
+    # rows y cols guardan las coordenadas exactas de cada ión existente (los 1s)
+    rows, cols = np.where(oxygen_state == 1)
 
-    return oxygen_state_new, oxigen_velocity
+    # Solo procesamos si realmente hay algún ión en la red
+    if len(rows) > 0:
+        # Comprobación de dimensiones
+        if displacement.ndim > 0:
+            # Si tiene dimensiones (es matriz/mapa), extraemos el desplazamiento local
+            shifts = displacement[rows, cols]
+        else:
+            # Si tiene 0 dimensiones (es un escalar), todos se mueven lo mismo
+            shifts = displacement
 
+        # Calculamos sus nuevas posiciones sumando el desplazamiento a la columna actual
+        new_cols = cols + shifts
 
-def update_oxygen_state_old(
-    paso_temp: float,
-    oxygen_state: np.ndarray,
-    temperature: float,
-    E_field: float,
-    grid_size: float,
-    **kwargs,
-):  # type: ignore
-    """
-    Move the oxygen ions in the simulation based on the given parameters.
-    Parameters:
-        - simu_time (float): The simulation time.
-        - oxygen_state (np.ndarray): The matrix representing the state of oxygen ions.
-        - temperature (float): The temperature of the system.
-        - E_field (float): The electric field strength.
-        - atom_size (float): The size of each atom.
-    Returns:
-    np.ndarray: The updated matrix representing the state of oxygen ions after the movement. returns oxygen_state_new, oxigen_velocity
+        # =========================================================================
+        # 4. FILTRADO DE LÍMITES DE FRONTERA
+        # =========================================================================
+        # Comprobamos que el ión no se haya salido del dispositivo (ni por izquierda ni por derecha)
+        valid_mask = (new_cols >= 0) & (new_cols < oxygen_state.shape[1])
 
-    """
+        # Nos quedamos solo con las coordenadas válidas de los iones que siguen dentro
+        valid_rows = rows[valid_mask]
+        valid_new_cols = new_cols[valid_mask]
 
-    # Obtengo los valores de las constantes si las estoy pasando como argumentos
-    if kwargs:
-        # Obtengo el valor de las constantes que necesita la función
-        t_0 = float(kwargs.get("vibration_frequency"))  # type: ignore
-        gamma_drift = float(kwargs.get("drift_coefficient"))  # type: ignore
-        E_m = float(kwargs.get("migration_energy"))  # type: ignore
-        cte_red = float(kwargs.get("cte_red"))  # type: ignore
-    else:
-        t_0 = cte.t_0
-        gamma_drift = cte.gamma_drift
-        E_m = cte.E_m
-        cte_red = cte.cte_red
+        # Pintamos los iones en sus nuevas posiciones en la matriz vacía
+        # (Si dos iones acaban en la misma coordenada, NumPy lo gestiona sin errores)
+        oxygen_state_new[valid_rows, valid_new_cols] = 1
 
-    # Esto es un arreglo temporal para dar cuenta que hay un tiempo hasta que los iones de oxígeno se muevan. En la expresión original se multiplica por 2 lo he quitado para ver si sale algo mejor
-    # Calcular velocidad de iones con manejo robusto usando numpy
-    # try:
-    #     senoh = np.sinh(
-    #         (cte_red * E_field * gamma_drift) / (2 * 8.617333262145e-5 * temperature)
-    #     )
-    #     exp_velocity = np.exp(-E_m / (8.617333262145e-5 * temperature))
-    # except Exception as e:
-    #     print(f"Error en cálculo de velocidad de iones: {e}")
-    #     sys.exit(1)
-
-    # E_field_abs = abs(E_field * 10e-9)
-    # velocity_map = [
-    #     (0.7, 5.1e-07),
-    #     (0.5, 2.6e-07),
-    # ]
-
-    # oxigen_velocity = 0
-    # for threshold, velocity in velocity_map:
-    #     if E_field_abs > threshold:
-    #         oxigen_velocity = velocity
-    #         break
-
-    # Esto es un arreglo temporal para dar cuenta que hay un tiempo hasta que los iones de oxígeno se muevan
-    if abs(E_field * (5e-9)) > 0.5:
-        # En la expresión original se multiplica por 2 lo he quitado para ver si sale algo mejor
-        oxigen_velocity = 1.3e-07  # 3e-07  # 2 * t_0 * cte_red * (senoh * exp_velocity)
-    elif abs(E_field * (5e-9)) > 0.7:
-        oxigen_velocity = (
-            2.5e-07  # 5.2e-07  # 2 * t_0 * cte_red * (senoh * exp_velocity)
-        )
-    else:
-        oxigen_velocity = (
-            0  # para que no se mueva hasta q se alcance un potencial concreto
-        )
-
-    # Calculo la cantidad de "casillas" que se moverá el ion de oxígeno
-    displacement = int(round((oxigen_velocity * paso_temp) / grid_size))
-
-    # Generar nueva matriz vacía para estado actualizado
-    oxygen_state_new = np.zeros_like(oxygen_state)
-
-    if displacement > 0:
-        oxygen_state_new[:, displacement:] = oxygen_state[:, :-displacement]
-    else:
-        # Sin desplazamiento, copiar directamente
-        oxygen_state_new = oxygen_state.copy()
-
-    return oxygen_state_new, oxigen_velocity
+    return oxygen_state_new, oxygen_velocity

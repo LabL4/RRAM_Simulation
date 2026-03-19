@@ -1,5 +1,5 @@
-from typing import List, Dict
 from . import Representate, utils
+from typing import List, Dict
 from pathlib import Path
 
 import numpy as np
@@ -52,7 +52,7 @@ def crear_rutas_simulacion(num_simulation: int, state: str) -> dict:
 
 
 def cargar_y_representar_estado(
-    pkl_path: Path, figures_path: Path, voltage: float, plot_state: bool = True
+    pkl_path: Path, figures_path: Path, voltage: float, plot_state: bool = True, device_size: float = 10e-9
 ) -> np.ndarray:
     """
     Carga el estado de configuración desde archivo pkl y genera una imagen de ese estado.
@@ -69,7 +69,7 @@ def cargar_y_representar_estado(
         actual_state = pickle.load(f)
 
     if plot_state:
-        Representate.RepresentateState(actual_state, voltage, str(figures_path))
+        Representate.RepresentateState(actual_state, voltage, str(figures_path), device_size=device_size)
 
     return actual_state
 
@@ -179,18 +179,10 @@ def simulation_IV(
             data[key] = np.load(simulation_path / name)
 
     # Extraer y concatenar columnas de interés
-    i_set = np.concatenate(
-        [data["pp_set"]["datos"][:, 2], data["sp_set"]["datos"][:, 2]]
-    )
-    v_set = np.concatenate(
-        [data["pp_set"]["datos"][:, 1], data["sp_set"]["datos"][:, 1]]
-    )
-    v_reset = np.concatenate(
-        [data["pp_reset"]["datos"][:, 1], data["sp_reset"]["datos"][:, 1]]
-    )
-    i_reset = np.concatenate(
-        [data["pp_reset"]["datos"][:, 2], data["sp_reset"]["datos"][:, 2]]
-    )
+    i_set = np.concatenate([data["pp_set"]["datos"][:, 2], data["sp_set"]["datos"][:, 2]])
+    v_set = np.concatenate([data["pp_set"]["datos"][:, 1], data["sp_set"]["datos"][:, 1]])
+    v_reset = np.concatenate([data["pp_reset"]["datos"][:, 1], data["sp_reset"]["datos"][:, 1]])
+    i_reset = np.concatenate([data["pp_reset"]["datos"][:, 2], data["sp_reset"]["datos"][:, 2]])
 
     # Diccionario de puntos que quieres ubicar
     puntos_x_set = {"a": 1e-6, "b": voltaje_percolacion, "c": 1.1}

@@ -1,13 +1,9 @@
 from RRAM import Simulation, utils
-from typing import final
 from pathlib import Path
-from turtle import back
-
 
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib
-import shutil
 import sys
 
 matplotlib.use("Agg")
@@ -47,7 +43,7 @@ if num_filamentos == 2:
 elif num_filamentos == 4:
     filamentos_ranges = [(0, 9), (10, 19), (20, 29), (30, 39)]
 elif num_filamentos == 1:
-    filamentos_ranges = [(0, 39)]
+    filamentos_ranges = [(0, 99)]
 
 CF_creado = np.full(len(filamentos_ranges), False, dtype=bool)
 
