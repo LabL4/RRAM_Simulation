@@ -58,9 +58,9 @@ THERMAL_DEFAULTS = {
 # PARÁMETROS GEOMÉTRICOS Y DE SIMULACIÓN
 # ============================================================================
 SIMULATION_DEFAULTS = {
-    "device_size": 10e-9,
+    "device_size": 25e-9,
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
-    "num_trampas": 100,
+    "num_trampas": 400,
     "total_simulation_time": 10.0,
     "num_pasos": 10000,
     "voltaje_final": 1.1,
@@ -74,10 +74,10 @@ SIMULATION_DEFAULTS = {
 SET_RESET_DEFAULTS = {
     "ocupacion_max_pp_set": 0.45,
     "ocupacion_max_sp_set": 0.45,
-    "factor_vecinos_pp_set": 1.0,
+    "factor_vecinos_pp_set": 1.5,
     "factor_libre_pp_set": 1.0,
-    "factor_vecinos_sp_set": 1.0,
-    "factor_libre_sp_set": 0.9,
+    "factor_vecinos_sp_set": 1.5,
+    "factor_libre_sp_set": 1.0,
     "lim_voltage_percolacion": 1.2,
     "compliance_voltage": 0.6,
     "voltaje_gen_oxigeno_pp_1": 0.45,

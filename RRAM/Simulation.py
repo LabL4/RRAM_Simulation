@@ -494,7 +494,7 @@ def PP_set(
 
     sistema_percola = False
     total_vacantes_pp_set = False
-    num_pasos_guardar_estado = 1000
+    num_pasos_guardar_estado = 250
     voltaje_percolacion = params.voltaje_final_set
     # AL inicio como la corriente es de tipo poole frenkel, la resitencia ohmica se considera nula
     resistencia = 0.0
@@ -638,12 +638,13 @@ def PP_set(
                 if len(CF_ranges) == 1:
                     if filamentos_actuales == 1:
                         print("Todos los filamentos creados.")
-                        sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 5)
-                        sim_ctes = sim_ctes.update_generation_energy(1.75)
+                        sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 3)
+                        sim_ctes = sim_ctes.update_generation_energy(1.25)
                         print(f"El nuevo valor de gamma es: {sim_ctes.gamma}")
                         print("El nuevo valor de la energía de generación es:", sim_ctes.generation_energy, "\n")
                         all_CFs_created = True
                         print("Todos los filamentos esperados se han creado:", all_CFs_created, "\n")
+                        centros_calculados = Temperature.obtener_centro_CF(actual_state_clean_CF, cf_ranges=CF_ranges)
 
                 # 2. Caso para dos filamentos
                 elif len(CF_ranges) == 2:
@@ -755,24 +756,24 @@ def PP_set(
                 # 5. CÁLCULO DE LOS PERFILES PARA LOS MUROS Y COLOCACIÓN
                 # =====================================================================
 
-                perfiles_muros_calculados = Temperature.calcular_perfiles_muro(
-                    perfiles_filamentos=mis_perfiles_extraidos,
-                    distancias_casillas=dist_casillas,
-                    pendiente_temperatura=pendiente_temperatura,
-                    atom_size=params.atom_size,
-                    T_ambient=params.init_temp,
-                )
+                # perfiles_muros_calculados = Temperature.calcular_perfiles_muro(
+                #     perfiles_filamentos=mis_perfiles_extraidos,
+                #     distancias_casillas=dist_casillas,
+                #     pendiente_temperatura=pendiente_temperatura,
+                #     atom_size=params.atom_size,
+                #     T_ambient=params.init_temp,
+                # )
 
-                matriz_temperaturas_fijas = Temperature.colocar_muro_termico(
-                    matriz_molde=actual_state_clean_CF,
-                    filas_intermedias=filas_intermedias,
-                    perfiles_muros_calculados=perfiles_muros_calculados,
-                )
+                # matriz_temperaturas_fijas = Temperature.colocar_muro_termico(
+                #     matriz_molde=actual_state_clean_CF,
+                #     filas_intermedias=filas_intermedias,
+                #     perfiles_muros_calculados=perfiles_muros_calculados,
+                # )
 
                 # Añadimos columnas de ceros (donde no hay muro) en las posiciones de los electrodos
-                Ny = matriz_temperaturas_fijas.shape[0]
-                columna_ceros = np.zeros((Ny, 1))
-                matriz_temperaturas_fijas_final = np.hstack([columna_ceros, matriz_temperaturas_fijas, columna_ceros])
+                # Ny = matriz_temperaturas_fijas.shape[0]
+                # columna_ceros = np.zeros((Ny, 1))
+                # matriz_temperaturas_fijas_final = np.hstack([columna_ceros, matriz_temperaturas_fijas, columna_ceros])
 
                 # print("\nMatriz de temperaturas fijas para los muros termicos:\n", matriz_temperaturas_fijas_final)
 
@@ -782,7 +783,7 @@ def PP_set(
                     thermal_props=sim_ctes.propiedades_termicas,
                     atom_size=params.atom_size,
                     T_ambient=params.init_temp,
-                    matriz_muros=matriz_temperaturas_fijas_final,
+                    # matriz_muros=matriz_temperaturas_fijas_final,
                 )
 
                 # Actualizo la temperatura anterior para el siguiente paso, NO guardo las columnas primera y ultima ya q corresponden a los electrodos
@@ -808,7 +809,7 @@ def PP_set(
                     utils.resumen_plots(
                         k=k,
                         fig_voltage=fig_voltage,
-                        filas_intermedias=filas_intermedias,
+                        filas_intermedias= None, #filas_intermedias,
                         temperatura=temperatura,
                         materials_map=materials_map,
                         rutas=rutas,
@@ -817,7 +818,7 @@ def PP_set(
                         params=params,
                         actual_state=actual_state,
                         actual_state_clean_CF=cf_clean_matrix,
-                        matriz_temperaturas_fijas=matriz_temperaturas_fijas,
+                        matriz_temperaturas_fijas=None,  # matriz_temperaturas_fijas_final,
                         centros_calculados=centros_calculados,
                         mis_perfiles_extraidos=mis_perfiles_extraidos,
                         CF_ranges=CF_ranges,
@@ -1016,7 +1017,7 @@ def SP_set(
     compliance_voltage = 2
     total_vacantes_sp_set = False
     num_columnas = 3  # Tiempo, Voltaje, Intensidad
-    num_pasos_guardar_estado = 1000
+    num_pasos_guardar_estado = 250
     rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="set")
 
     # print("El valor de las rutas para guardar la simulación es:", rutas, "\n")
@@ -1344,7 +1345,7 @@ def PP_reset(
     final_state_sp_set: dict,
     num_simulation: int,
     CF_ranges: List[tuple],
-    num_pasos_guardar_estado: int = 2000,  # Antes era cada 2000
+    num_pasos_guardar_estado: int = 250,  # Antes era cada 2000
 ):
     """
     Simulates the reset process of a resistive switching device, updating the system's state and tracking the evolution of various parameters over time.
@@ -1606,7 +1607,7 @@ def SP_reset(
     final_state_pp_reset: dict,
     num_simulation: int,
     CF_ranges: List[tuple],
-    num_pasos_guardar_estado: int = 2000,
+    num_pasos_guardar_estado: int = 250,
 ):
     params = final_state_pp_reset["params"]
     sim_ctes = final_state_pp_reset["sim_ctes"]
