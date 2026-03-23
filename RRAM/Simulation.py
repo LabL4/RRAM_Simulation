@@ -101,6 +101,7 @@ class SimulationConstants:
     long_decaimiento_concentracion: float
     ohm_resistence_set: float
     ohm_resistence_reset: float
+    num_filamentos: int
     grosor_filamento: int
     gamma: float
     gamma_drift: float

@@ -18,6 +18,7 @@ MATERIAL_DEFAULTS = {
     "long_decaimiento_concentracion": 1e-9,
     "ohm_resistence_set": 150.0,
     "ohm_resistence_reset": 150.0,
+    "num_filamentos": 2,
     "grosor_filamento": 1,
 }
 
@@ -168,6 +169,7 @@ class ConfigManager:
             "long_decaimiento_concentracion",
             "ohm_resistence_set",
             "ohm_resistence_reset",
+            "num_filamentos",
             "grosor_filamento",
             "vibration_frequency",
             "gamma",
