@@ -37,13 +37,19 @@ print("\n----------------------------------------------------------------------\
 print(ctes)
 
 # Crear una lista para rastrear si se ha creado el CF para cada rango de filamentos
+eje_x = params.x_size
+eje_y = params.y_size
+num_filamentos = ctes.num_filamentos
 
-if num_filamentos == 2:
-    filamentos_ranges = [(0, 19), (20, 39)]  # Se incluye el ultimo valor
-elif num_filamentos == 4:
-    filamentos_ranges = [(0, 9), (10, 19), (20, 29), (30, 39)]
-elif num_filamentos == 1:
-    filamentos_ranges = [(0, 99)]
+filamentos_ranges, _ = utils.generar_configuracion_filamentos(
+    eje_x=eje_x,
+    eje_y=eje_y,
+    num_filamentos=num_filamentos,
+)
+
+print(
+    f"\nSimulación {sim_parmtrs[num_simulation]['num_trampas']} trampas, {num_filamentos} filamentos. El rango de cada filamento es: {filamentos_ranges}\n"
+)
 
 CF_creado = np.full(len(filamentos_ranges), False, dtype=bool)
 

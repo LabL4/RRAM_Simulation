@@ -7,6 +7,48 @@ import pickle
 import csv
 
 
+def generar_configuracion_filamentos(eje_x, eje_y, num_filamentos, peso_central=70):
+    """
+    Calcula los rangos de cada filamento y define las regiones de peso iniciales.
+
+    Argumentos:
+        eje_x (int): Número de celdas en el eje X (filas).
+        eje_y (int): Número de celdas en el eje Y (columnas).
+        num_filamentos (int): Número de filamentos a distribuir.
+        peso_central (int): Probabilidad asignada a la zona central (por defecto 70).
+
+    Retorna:
+        tuple: (filamentos_ranges, regiones_pesos)
+    """
+    filamentos_ranges = []
+    regiones_pesos = []
+
+    # Calculamos el ancho de cada zona dividiendo el espacio total entre el número de filamentos
+    ancho_zona = eje_x // num_filamentos
+
+    for n in range(num_filamentos):
+        # 1. Calcular el rango (zona) de este filamento
+        inicio_rango = n * ancho_zona
+        # El último filamento se extiende hasta el final para cubrir el resto por división entera
+        fin_rango = (n + 1) * ancho_zona - 1 if n < num_filamentos - 1 else eje_x - 1
+        filamentos_ranges.append((inicio_rango, fin_rango))
+
+        # 2. Identificar la fila central de dicha zona
+        fila_central = (inicio_rango + fin_rango) // 2
+
+        # 3. Definir la región de alta probabilidad (Fila central + 2 arriba + 2 abajo)
+        # x_start: fila_central - 2
+        # x_end: fila_central + 3 (se usa +3 porque en el slicing el límite superior es exclusivo)
+        x_start = max(0, fila_central - 2)
+        x_end = min(eje_x, fila_central + 3)
+
+        # La región cubre todo el ancho del dispositivo (de 0 a eje_y)
+        region = (x_start, x_end, 0, eje_y)
+        regiones_pesos.append((region, peso_central))
+
+    return filamentos_ranges, regiones_pesos
+
+
 def obtener_puntos_en_curva(v_array, i_array, puntos_x):
     """
     Devuelve un diccionario con las coordenadas (x, y) de los puntos
