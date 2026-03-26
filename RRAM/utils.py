@@ -94,7 +94,7 @@ def crear_rutas_simulacion(num_simulation: int, state: str) -> dict:
 
 
 def cargar_y_representar_estado(
-    pkl_path: Path, figures_path: Path, voltage: float, plot_state: bool = True, device_size: float = 10e-9
+    data_path: Path, figures_path: Path, voltage: float, plot_state: bool = False, device_size: float = 10e-9
 ) -> np.ndarray:
     """
     Carga el estado de configuración desde archivo pkl y genera una imagen de ese estado.
@@ -107,8 +107,11 @@ def cargar_y_representar_estado(
     Returns:
         np.ndarray: Matriz con el estado inicial cargado.
     """
-    with open(f"{pkl_path}.pkl", "rb") as f:
-        actual_state = pickle.load(f)
+
+    # Cargamos directamente el archivo .npz y extraemos la matriz 'actual_state'
+    datos = np.load(f"{data_path}.npz")
+    actual_state = datos["actual_state"]
+    datos.close()  # Siempre es buena práctica cerrar el archivo
 
     if plot_state:
         Representate.RepresentateState(actual_state, voltage, str(figures_path), device_size=device_size)
@@ -122,8 +125,8 @@ def guardar_datos(
     datos_save: np.ndarray,
     header_files: str,
     save_path_data: Path,
-    save_path_pkl: Path,
     save_path_figures: Path,
+    plot_state: bool = False,
 ) -> None:
     """
     Saves simulation data, configuration state, and generates a representation of the final state.
@@ -139,16 +142,12 @@ def guardar_datos(
         None
     """
 
-    # Cuando acaba la simulacion guardo el estado final de configuracion
-    with open(str(save_path_pkl), "wb") as f:
-        pickle.dump(config_state, f)
-
-    np.savez(
-        save_path_data.with_suffix(".npz"),
-        datos=datos_save,
-        header=np.array([header_files]),
+    # Guardamos estado, datos y cabeceras de forma consolidada y comprimida
+    np.savez_compressed(
+        save_path_data.with_suffix(".npz"), actual_state=config_state, datos=datos_save, header=np.array([header_files])
     )
-    Representate.RepresentateState(config_state, voltaje_final, str(save_path_figures))
+    if plot_state:
+        Representate.RepresentateState(config_state, voltaje_final, str(save_path_figures))
 
     return None
 
@@ -158,6 +157,7 @@ def guardar_representar_estado(
     config_state: np.ndarray,
     save_path_pkl: Path,
     save_path_figures: Path,
+    plot_state: bool = False,
 ) -> None:
     """
     Saves simulation data, configuration state, and generates a representation of the final state.
@@ -170,13 +170,36 @@ def guardar_representar_estado(
         None
     """
 
-    # Cuando acaba la simulacion guardo el estado final de configuracion
-    with open(str(save_path_pkl), "wb") as f:
-        pickle.dump(config_state, f)
+    # Usamos .with_suffix(".npz") por seguridad y guardamos la matriz
+    ruta_npz = Path(save_path_pkl).with_suffix(".npz")
+    np.savez_compressed(ruta_npz, actual_state=config_state)
 
-    Representate.RepresentateState(config_state, voltaje, str(save_path_figures))
+    if plot_state:
+        Representate.RepresentateState(config_state, voltaje, str(save_path_figures))
 
     return None
+
+
+def guardar_estado_intermedio(ruta_destino: Path, etapa: str, num_simulation: int, k: int, **matrices) -> None:
+    """
+    Guarda todas las matrices relevantes de un paso de simulación en un único archivo .npz comprimido.
+    Garantiza que todas las claves pasadas existan en el archivo final.
+    """
+
+    # 1. Reemplazamos los valores None por un array vacío de NumPy.
+    # Esto es mejor que guardar 'None' a secas, porque NumPy prefiere trabajar con arrays.
+    matrices_seguras = {}
+    for nombre, matriz in matrices.items():
+        if matriz is None:
+            matrices_seguras[nombre] = np.array([])  # Array vacío indicando que no hay datos
+        else:
+            matrices_seguras[nombre] = matriz
+
+    # 2. Construimos el nombre del archivo estandarizado
+    nombre_archivo = ruta_destino / f"Estado_{etapa}_sim_{num_simulation}_paso_{k}.npz"
+
+    # 3. Guardamos de forma comprimida asegurando que todas las claves se escriben
+    np.savez_compressed(nombre_archivo, **matrices_seguras)
 
 
 def read_csv_to_dic(cvs_path: str) -> List[Dict[str, str]]:
