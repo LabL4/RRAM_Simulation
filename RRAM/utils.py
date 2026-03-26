@@ -1,7 +1,7 @@
 from . import Representate, utils
 from typing import List, Dict
+from typing import Optional
 from pathlib import Path
-
 import numpy as np
 import pickle
 import csv
@@ -119,37 +119,71 @@ def cargar_y_representar_estado(
     return actual_state
 
 
-def guardar_datos(
-    voltaje_final: float,
-    config_state: np.ndarray,
-    datos_save: np.ndarray,
-    header_files: str,
-    save_path_data: Path,
-    save_path_figures: Path,
-    plot_state: bool = False,
-) -> None:
+# def guardar_datos(
+#     voltaje_final: float,
+#     config_state: np.ndarray,
+#     datos_save: np.ndarray,
+#     header_files: str,
+#     save_path_data: Path,
+#     save_path_figures: Path,
+#     plot_state: bool = False,
+# ) -> None:
+#     """
+#     Saves simulation data, configuration state, and generates a representation of the final state.
+#     Args:
+#         voltaje_final_set (float): The final voltage value used in the simulation.
+#         config_state (np.ndarray): The final configuration state of the simulation.
+#         datos_save (np.ndarray): The data to be saved as a CSV file.
+#         header_files (str): The header string for the CSV file.
+#         save_path_data (Path): The file path where the configuration state will be saved as a binary file.
+#         save_path_pkl (Path): The file path where the simulation data will be saved as a CSV file.
+#         save_path_figures (Path): The directory path where the final state representation will be saved.
+#     Returns:
+#         None
+#     """
+
+#     # Guardamos estado, datos y cabeceras de forma consolidada y comprimida
+#     np.savez_compressed(
+#         save_path_data.with_suffix(".npz"), actual_state=config_state, datos=datos_save, header=np.array([header_files])
+#     )
+
+#     if plot_state:
+#         Representate.RepresentateState(config_state, voltaje_final, str(save_path_figures))
+
+#     return None
+
+
+def guardar_datos(save_path_data: Path, headers: Optional[dict] = None, **vectores) -> None:
     """
-    Saves simulation data, configuration state, and generates a representation of the final state.
+    Guarda múltiples vectores, matrices o datos escalares en un archivo .npz comprimido.
+    Asocia dinámicamente encabezados a los datos si se proporcionan.
+
     Args:
-        voltaje_final_set (float): The final voltage value used in the simulation.
-        config_state (np.ndarray): The final configuration state of the simulation.
-        datos_save (np.ndarray): The data to be saved as a CSV file.
-        header_files (str): The header string for the CSV file.
-        save_path_data (Path): The file path where the configuration state will be saved as a binary file.
-        save_path_pkl (Path): The file path where the simulation data will be saved as a CSV file.
-        save_path_figures (Path): The directory path where the final state representation will be saved.
-    Returns:
-        None
+        ruta_destino (Path): Ruta del archivo donde se guardarán los datos.
+        headers (dict, opcional): Diccionario con los encabezados. Las claves deben
+                                  coincidir con los nombres dados en **vectores.
+        **vectores: Datos a guardar pasados como argumentos con nombre (ej: datos_iv=matriz).
     """
+    if headers is None:
+        headers = {}
 
-    # Guardamos estado, datos y cabeceras de forma consolidada y comprimida
-    np.savez_compressed(
-        save_path_data.with_suffix(".npz"), actual_state=config_state, datos=datos_save, header=np.array([header_files])
-    )
-    if plot_state:
-        Representate.RepresentateState(config_state, voltaje_final, str(save_path_figures))
+    datos_seguros = {}
 
-    return None
+    for nombre, vector in vectores.items():
+        if vector is not None:
+            datos_seguros[nombre] = vector
+
+            # Si el usuario ha proporcionado un encabezado para este vector específico,
+            # lo guardamos en el .npz añadiendo el prefijo 'header_' al nombre original.
+            if nombre in headers:
+                # Lo convertimos a array de NumPy de 1 elemento para guardarlo de forma nativa
+                datos_seguros[f"header_{nombre}"] = np.array([headers[nombre]])
+        else:
+            # Si se pasa un None, guardamos un array vacío para mantener la estructura de claves
+            datos_seguros[nombre] = np.array([])
+
+    # Guardamos todo el paquete de forma consolidada y comprimida
+    np.savez_compressed(save_path_data.with_suffix(".npz"), **datos_seguros)
 
 
 def guardar_representar_estado(
@@ -323,8 +357,6 @@ def resumen_plots(
     Genera y guarda todas las gráficas de estado, temperatura y muros térmicos
     para un paso específico de la simulación.
     """
-    from RRAM import Representate, Temperature
-    import numpy as np
 
     print(f"Representando para el paso {k} con voltaje {fig_voltage} V las filas intermedias son {filas_intermedias}\n")
 
@@ -376,14 +408,3 @@ def resumen_plots(
         filename=rutas["figures_path"] / f"Centros_filamentos_{num_simulation}_{fig_voltage}_{etapa}.png",
         device_size=params.device_size,
     )
-
-    # # 5. Perfil térmico
-    # distancias, perfiles = Temperature.extraer_perfiles_temperatura(
-    #     lista_matrices=[temperatura], etiquetas=[f"{fig_voltage}"], columna_x=columna_perfil, atom_size=params.atom_size
-    # )
-
-    # Representate.plot_perfil_temperatura(
-    #     distancias=distancias,
-    #     perfiles=perfiles,
-    #     save_path=rutas["figures_path"] / f"Perfil_termico_{num_simulation}_{fig_voltage}_{etapa}.png",
-    # )

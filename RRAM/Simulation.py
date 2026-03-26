@@ -21,11 +21,9 @@ from typing import get_type_hints
 from dataclasses import fields
 from typing import List, Dict
 from functools import wraps
-import pickleimport pickle
 from pathlib import Path
-import timeimport time
-import pandas as pd
 import numpy as np
+import time
 
 
 def medir_tiempo(func):
@@ -499,7 +497,7 @@ def PP_set(
 
     sistema_percola = False
     total_vacantes_pp_set = False
-    num_pasos_guardar_estado = 1000
+    num_pasos_guardar_estado = 250
     voltaje_percolacion = params.voltaje_final_set
     # AL inicio como la corriente es de tipo poole frenkel, la resitencia ohmica se considera nula
     resistencia = 0.0
@@ -526,12 +524,16 @@ def PP_set(
     print("El paso de potencial para la parte de set es:", params.paso_potencial_set, "\n")
 
     num_columnas = 3  # Tiempo, Voltaje, Intensidad
-    
+
     # Defino la matriz para almacenar los datos
     data_pp_set = np.zeros((params.num_pasos, num_columnas), dtype=np.float64)
-    resistencia_vector = np.zeros(params.num_pasos, dtype=np.float64)
+    resistencia_vector = np.zeros((params.num_pasos, num_columnas), dtype=np.float64)
     num_vacantes_total = np.zeros((params.num_pasos, num_columnas), dtype=np.float64)
-    # config_matrix_pp_set = np.zeros((int((params.num_pasos / params.paso_guardar)), params.x_size, params.y_size))
+
+    # Inicializamos las matrices variables a None para que existan desde el principio
+    cf_clean_matrix = None
+    probabilidad_matrix = None
+    matriz_para_plot_muro = None
 
     print("El valor de gamma es:", sim_ctes.gamma, "\n")
 
@@ -540,7 +542,6 @@ def PP_set(
 
     for k in range(0, params.num_pasos + 1):
         total_vacantes = np.sum(actual_state)
-        fig_voltage = round(vector_ddp[k], 5)
 
         if total_vacantes > int(params.num_max_vacantes):
             # Si se llena el 90 del espacio de la matriz salto a otra simulación. Ponerlo aqui puede dar el problema de que nada mas empezar esté lleno y de error, pero eso NO debe pasar asi q no me preocupa.
@@ -603,13 +604,6 @@ def PP_set(
                 if voltaje_percolacion >= sim_ctes.lim_voltage_percolacion:
                     # Si el voltaje de percolación es demasiado alto no va a coincidir con los datos experimentales, y no merece la pena seguir con la simulación
                     raise exceptions.HighPercolationVoltageException(voltage_percola=voltaje_percolacion)
-
-                Representate.RepresentateState(
-                    actual_state,
-                    round(voltaje_percolacion, 5),
-                    str(rutas["figures_path"]) + f"/Percola_state_{num_simulation}.png",
-                    device_size=params.device_size,
-                )
 
                 # Verificar si temperatura es un float y convertirlo a matriz
                 if isinstance(temperatura, (float, int)):
@@ -733,13 +727,7 @@ def PP_set(
                     factor_generar_calor=sim_ctes.factor_generar_calor,
                 )
 
-                # Preparo el muro térmico, obtengo los centros de los CF esto solo se calcula una vez al inicio
-                # centros_calculados = Temperature.obtener_centro_CF(actual_state_clean_CF, cf_ranges=CF_ranges)
-                # filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(centros_calculados)
-
-                # 4. LLAMAMOS A LA FUNCIÓN DE EXTRACCIÓN
                 # Compruebo si temperatura es un float, si es así se lanza una excepción porque no se puede extraer el perfil, si no es así se asume que es una matriz y se lanza la función de extracción
-
                 if isinstance(temperatura_anterior, (float, int)):
                     raise ValueError(
                         "La temperatura no se ha calculado como matriz, no se pueden extraer los perfiles de los filamentos. Se esperaba una matriz de temperaturas, pero se ha recibido un valor escalar."
@@ -841,13 +829,15 @@ def PP_set(
 
         # Guardo los datos de la simulación
         data_pp_set[k] = np.array([simulation_time, voltage, current])
+
         if locals().get("resistencia") is not None:
-            resistencia_vector[k] = resistencia
-            
-        num_vacantes_total[k] = np.array([simulation_time, voltage, total_vacantes])
+            resistencia_vector[k] = np.array([k, voltage, resistencia])
+        else:
+            resistencia_vector[k] = np.array([k, voltage, 0])
+
+        num_vacantes_total[k] = np.array([k, voltage, total_vacantes])
 
         if k % num_pasos_guardar_estado == 0:
-            
             # Si se ha creado la matriz de temperaturas fijas es porque se ha creado el muro y entonces tiene sentido guardarlo.
             if locals().get("matriz_temperaturas_fijas") is not None:
                 matriz_para_plot_muro = np.copy(matriz_temperaturas_fijas)
@@ -862,25 +852,19 @@ def PP_set(
                 num_simulation=num_simulation,
                 k=k,
                 actual_state=actual_state,
-                cf_clean_matrix=locals().get("cf_clean_matrix"),  # Si no existe, devuelve None
+                cf_clean_matrix=locals().get("cf_clean_matrix"),
                 temperatura=locals().get("temperatura"),
                 probabilidad_matrix=locals().get("probabilidad_matrix"),
-                matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),  # Si no existe, devuelve None
+                matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
             )
-
-    # Se decarta la simulación si no se ha llegado a la resistencia mínima necesaria para la segunda parte del set, ya que no va a coincidir con los datos experimentales.
-    # if not (35 <= resistencia <= 55):
-    #     # No se ha llegado a la resistencia necesaria para la segunda parte del set, directamelo lo descarto
-    #     raise exceptions.LowResistanceException(valor_resistencia=resistencia)
 
     # Muestro el valor de temperatura más alto alcanzado en la simulación
     print(f"\nLa temperatura máxima alcanzada en la simulación ha sido de: {round(np.max(temperatura), 4)} K\n")
 
+    # SI no se fomran los flamentos esperados se decarta la simulación
     if filamentos_actuales < len(CF_ranges):
         raise exceptions.FilamentosNoFormadosException(
             simulation_path=rutas["simulation_path"],
-            figures_path=rutas["figures_path"],
-            voltage=voltage,
             num_simulation=num_simulation,
             actual_state=actual_state,
             CF_formados=filamentos_actuales,
@@ -888,19 +872,29 @@ def PP_set(
         )
 
     # Guardo los datos de la simulación
-    save_path_data = rutas["simulation_path"] / f"Data_pp_set_{num_simulation}.txt"
-    save_path_figures = rutas["figures_path"] / f"Final_state_pp_set_{num_simulation}.png"
+    save_path_data = rutas["simulation_path"] / f"ALL_data_pp_set_{num_simulation}"
 
-    np.save(rutas["simulation_path"] / f"num_vacantes_total_{num_simulation}_pp_set.npy", num_vacantes_total)
+    data_encabezados = {
+        "datos_simulacion": "Tiempo [s],Voltaje [V],Intensidad [A]",
+        "vacantes": "paso, Voltaje [V], Total Vacantes",  # Correcto, porque solo hay 1 columna
+        "resistencia": "paso, Voltaje [V], Resistencia [Ohm]",  # Correcto, porque solo hay 1 columna
+    }
 
+    # Guardo los datos de la simulacion
     utils.guardar_datos(
-        voltaje_final=params.voltaje_final_set,
-        config_state=actual_state,
-        datos_save=data_pp_set,
-        header_files="Tiempo simulacion [s],Voltaje [V],Intensidad [A]",
         save_path_data=save_path_data,
-        save_path_figures=save_path_figures,
+        headers=data_encabezados,
+        datos_sim=data_pp_set,
+        vacantes=num_vacantes_total,
+        resistencia=resistencia_vector,
     )
+
+    np.save(rutas["simulation_path"] / f"Final_state_{num_simulation}_pp_set.npz", actual_state)
+
+    # Se decarta la simulación si no se ha llegado a la resistencia mínima necesaria para la segunda parte del set, ya que no va a coincidir con los datos experimentales.
+    # if not (35 <= resistencia <= 55):
+    #     # No se ha llegado a la resistencia necesaria para la segunda parte del set, directamelo lo descarto
+    #     raise exceptions.LowResistanceException(valor_resistencia=resistencia)
 
     # Guardo todas las variables del estado final del PP set para usarlas en el PS set
     final_state_pp_set = {
@@ -919,8 +913,6 @@ def PP_set(
         "intensidad_final": current,
         "centros_calculados": centros_calculados,
     }
-    with open(rutas["simulation_path"] / f"Num_vacantes_{num_simulation}_pp_set.pkl", "wb") as f:
-        pickle.dump(actual_state, f)
 
     return final_state_pp_set
 
@@ -994,26 +986,20 @@ def SP_set(
     num_pasos_guardar_estado = 250
     rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="set")
 
-    # print("El valor de las rutas para guardar la simulación es:", rutas, "\n")
-
     temperatura_anterior = final_state_pp_set["Temperatura_final"]
+
     # Elimino las columnas 0 y ultima de la matriz de temperatura porque corresponden a los electrodos
     temperatura_anterior = final_state_pp_set["Temperatura_final"][:, 1:-1]
-    # Imprimo las dimensiones de la matriz de temperatura para comprobar que es correcta
-    # print("Las dimensiones de la matriz de temperatura son:", temperatura_anterior.shape)
 
     pendiente_temperatura = sim_ctes.pendiente_temperatura
 
-    vector_ddp = np.arange(voltaje_max_set, 0.000, -params.paso_potencial_set)
     print("El paso de potencial para sp set es:", params.paso_potencial_set, "\n")
+    vector_ddp = np.arange(voltaje_max_set, 0.000, -params.paso_potencial_set)
 
     E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
 
     # Defino la matriz para almacenar los datos
     data_sp_set = np.zeros((k_max, num_columnas), dtype=np.float64)
-
-    # nueva_gamma = sim_ctes.gamma / sim_ctes.factor_generacion
-    # sim_ctes = sim_ctes.update_gamma(nueva_gamma)
 
     filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(centros_calculados)
 
@@ -1024,7 +1010,7 @@ def SP_set(
     actual_state_clean_CF, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
     filamentos = CurrentSolver.Clasificar_CF(CF_graph, params.x_size, params.y_size, CF_ranges)
     exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(CF_ranges))
-    
+
     # cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf)
     # _, cf_clean_matrix = CurrentSolver.limitar_grosor_filamentos(
     #     actual_state,
@@ -1104,28 +1090,11 @@ def SP_set(
             #         f"\nSe han eliminado {total_vacantes - vacantes_finales} vacantes para limitar el grosor de los filamentos.\n"
             #     )
 
-            #     Representate.RepresentateState(
-            #         matriz=before_clean_matrix,
-            #         voltaje=fig_voltage,
-            #         filename=str(rutas["figures_path"])
-            #         + f"/State_Clean_ANTES_{num_simulation}_{fig_voltage}_sp_set.png",
-            #         device_size=params.device_size,
-            #     )
-
-            #     Representate.RepresentateState(
-            #         matriz=actual_state,
-            #         voltaje=fig_voltage,
-            #         filename=str(rutas["figures_path"])
-            #         + f"/State_Clean_DESPUES_{num_simulation}_{fig_voltage}_sp_set.png",
-            #         device_size=params.device_size,
-            #     )
-
             # Si ha percolado uso la corriente de Ohm
             try:
-                if voltage <= compliance_voltage:
-                    current, resistencia = CurrentSolver.OmhCurrent(
-                        voltage, cf_clean_matrix, ohm_resistence=sim_ctes.ohm_resistence_set
-                    )
+                current, _ = CurrentSolver.OmhCurrent(
+                    voltage, cf_clean_matrix, ohm_resistence=sim_ctes.ohm_resistence_set
+                )
             except ZeroDivisionError:
                 raise exceptions.NullResistanceException(
                     simulation_path=rutas["simulation_path"],
@@ -1146,10 +1115,6 @@ def SP_set(
                 factor_generar_calor=sim_ctes.factor_generar_calor,
             )
 
-            # Preparo el muro térmico, obtengo los centros de los CF
-            # centros_calculados = Temperature.obtener_centro_CF(actual_state_clean_CF, cf_ranges=CF_ranges)
-            # filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(centros_calculados)
-
             # 4. LLAMAMOS A LA FUNCIÓN DE EXTRACCIÓN
             # Compruebo si temperatura es un float, si es así se lanza una excepción porque no se puede extraer el perfil, si no es así se asume que es una matriz y se lanza la función de extracción
             if isinstance(temperatura_anterior, (float, int)):
@@ -1169,8 +1134,6 @@ def SP_set(
                 atom_size=params.atom_size,
                 T_ambient=params.init_temp,
             )
-            # print("\nPerfiles calculados para los muros térmicos:\n", perfiles_muros_calculados)
-
             matriz_temperaturas_fijas = Temperature.colocar_muro_termico(
                 matriz_molde=actual_state_clean_CF,
                 filas_intermedias=filas_intermedias,
@@ -1180,8 +1143,6 @@ def SP_set(
             Ny = matriz_temperaturas_fijas.shape[0]
             columna_ceros = np.zeros((Ny, 1))
             matriz_temperaturas_fijas_final = np.hstack([columna_ceros, matriz_temperaturas_fijas, columna_ceros])
-
-            # print("\nMatriz de temperaturas fijas para los muros termicos:\n", matriz_temperaturas_fijas_final)
 
             temperatura = Temperature.solve_thermal_state(
                 types_map=materials_map,
@@ -1205,14 +1166,13 @@ def SP_set(
                 # Guardo las variables del estado
                 utils.guardar_estado_intermedio(
                     ruta_destino=rutas["data_simulation_path"],
-                    etapa="pp_set",
+                    etapa="sp_set",
                     num_simulation=num_simulation,
                     k=k,
                     actual_state=actual_state,
                     cf_clean_matrix=locals().get("cf_clean_matrix"),  # Si no existe, devuelve None
                     temperatura=locals().get("temperatura"),
-                    matriz_para_plot_muro=locals().get("matriz_para_plot_muro"
-                    )
+                    matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
                 )
 
         else:
@@ -1257,16 +1217,14 @@ def SP_set(
     tiempo_sp_set = simulation_time + tiempo_pp_set
 
     # Guardo los datos de la simulación
-    save_path_data = rutas["simulation_path"] / f"Data_sp_set_{num_simulation}.txt"
-    save_path_figures = rutas["figures_path"] / f"Final_state_sp_set_{num_simulation}.png"
+    save_path_data = rutas["simulation_path"] / f"Data_sp_set_{num_simulation}"
+    data_encabezados = {"datos_simulacion": "Tiempo [s],Voltaje [V],Intensidad [A]"}
 
+    # Guardo los datos de la simulacion
     utils.guardar_datos(
-        voltaje_final=params.voltaje_final_set,
-        config_state=actual_state,
-        datos_save=data_sp_set,
-        header_files="Tiempo simulacion [s],Voltaje [V],Intensidad [A]",
         save_path_data=save_path_data,
-        save_path_figures=save_path_figures,
+        headers=data_encabezados,
+        datos_sim=data_sp_set,
     )
 
     # Guardo todas las variables del estado final del SP set para usarlas en el PP reset
@@ -1279,7 +1237,7 @@ def SP_set(
         "percola": sistema_percola,
     }
 
-    np.savez_compressed(rutas["simulation_path"] / f"final_state_pp_set_{num_simulation}.npz", actual_state=actual_state)
+    np.save(rutas["simulation_path"] / f"final_state_pp_set_{num_simulation}.npz", actual_state)
 
     print("\nSimulación del set finalizada correctamente.\n")
 
@@ -1481,13 +1439,13 @@ def PP_reset(
         if k % num_pasos_guardar_estado == 0:
             # matriz_para_plot_muro = np.copy(matriz_temperaturas_fijas)
             # for centro, perfil_filamento in zip(centros_calculados, mis_perfiles_extraidos):
-                # if centro is not None and perfil_filamento is not None:
-                    # matriz_para_plot_muro[centro, :] = perfil_filamento
+            # if centro is not None and perfil_filamento is not None:
+            # matriz_para_plot_muro[centro, :] = perfil_filamento
 
             # Guardo las variables del estado
             utils.guardar_estado_intermedio(
                 ruta_destino=rutas["data_simulation_path"],
-                etapa="pp_set",
+                etapa="pp_reset",
                 num_simulation=num_simulation,
                 k=k,
                 actual_state=actual_state,
@@ -1496,18 +1454,20 @@ def PP_reset(
             )
 
     # Guardo los datos de la simulación
-    save_path_pkl = rutas["data_simulation_path"] / f"Data_pp_reset_{num_simulation}.pkl"
-    save_path_data = rutas["simulation_path"] / f"Data_pp_reset_{num_simulation}.txt"
-    save_path_figures = rutas["figures_path"] / f"Final_state_pp_reset_{num_simulation}.png"
+    save_path_data = rutas["simulation_path"] / f"Data_pp_reset_{num_simulation}"
 
+    data_encabezados = {
+        "datos_simulacion": "Tiempo [s],Voltaje [V],Intensidad [A]",
+    }
+
+    # Guardo los datos de la simulacion
     utils.guardar_datos(
-        voltaje_final=voltage,
-        config_state=actual_state,
-        datos_save=data_pp_reset,
-        header_files="Tiempo simulacion [s],Voltaje [V],Intensidad [A]",
         save_path_data=save_path_data,
-        save_path_figures=save_path_figures,
+        headers=data_encabezados,
+        datos_sim=data_pp_reset,
     )
+
+    np.save(rutas["simulation_path"] / f"final_state_pp_reset_{num_simulation}.npz", actual_state)
 
     # Guardo todas las variables del estado final del PP set para usarlas en el PS set
     final_state_pp_reset = {
@@ -1525,8 +1485,6 @@ def PP_reset(
         "roturas_dict": roturas_dict,
         "temperatura_final": temperatura,
     }
-    
-    np.savez_compressed(rutas["simulation_path"] / f"final_state_pp_reset_{num_simulation}.npz", actual_state=actual_state)
 
     return final_state_pp_reset
 
@@ -1535,7 +1493,7 @@ def SP_reset(
     final_state_pp_reset: dict,
     num_simulation: int,
     CF_ranges: List[tuple],
-    num_pasos_guardar_estado: int = 2000,
+    num_pasos_guardar_estado: int = 250,
 ):
     params = final_state_pp_reset["params"]
     sim_ctes = final_state_pp_reset["sim_ctes"]
@@ -1598,7 +1556,7 @@ def SP_reset(
         if any(~CF_destruido):  # mientras haya alguno sin romper
             procesar_filamentos_destruidos(
                 imagen_path=rutas["figures_path"],
-                pkl_path=rutas["data_simulation_path"],
+                data_save_path=rutas["data_simulation_path"],
                 existentes=exist_cf,
                 CF_destruido=CF_destruido,
                 voltage=voltage,
@@ -1691,31 +1649,16 @@ def SP_reset(
         tiempo_total = simulation_time + tiempo_pp_reset
         data_sp_reset[k] = np.array([tiempo_total, voltage, current])
 
-        fig_voltage = round(vector_ddp[k], 4)
-        # if k % num_pasos_guardar_estado == 0:
-        #     np.save(rutas["figures_path"] / f"temperatura_{k}_sp_reset.npy", temperatura)
-
-        # Represento el estado cada 3000 pasos
+        # Represento el estado cada x pasos
         if k % num_pasos_guardar_estado == 0:
-            fig_voltage = round(vector_ddp[k], 3)
-            utils.guardar_representar_estado(
-                voltaje=fig_voltage,
-                config_state=actual_state,
-                save_path_pkl=rutas["data_simulation_path"] / f"sp_reset_state_V={fig_voltage}_{num_simulation}.pkl",
-                save_path_figures=rutas["figures_path"] / f"sp_reset_state_V={fig_voltage}_{num_simulation}.png",
-            )
-
-            # Representate.RepresentateTwoStates(
-            #     matriz1=actual_state,
-            #     matriz2=oxygen_state,
-            #     voltage=fig_voltage,
-            #     filename=str(rutas["figures_path"] / f"sp_reset_full_state_V={fig_voltage}_{num_simulation}.png"),
-            # )
-
-            print(
-                "Representando el estado de la simulación en el voltaje: ",
-                fig_voltage,
-                " (V)",
+            utils.guardar_estado_intermedio(
+                ruta_destino=rutas["data_simulation_path"],
+                etapa="sp_reset",
+                num_simulation=num_simulation,
+                k=k,
+                actual_state=actual_state,
+                cf_clean_matrix=locals().get("cf_clean_matrix"),  # Si no existe, devuelve None
+                temperatura=locals().get("temperatura"),
             )
 
     # Guardo los datos de la simulación
@@ -1733,15 +1676,7 @@ def SP_reset(
         save_path_figures=save_path_figures,
     )
 
-    with open(rutas["simulation_path"] / f"final_state_sp_reset_{num_simulation}.pkl", "wb") as f:
-        pickle.dump(actual_state, f)
-
-    Representate.RepresentateState(
-        actual_state,
-        round(voltage, 5),
-        str(rutas["figures_path"]) + f"/final_state_sp_reset_{num_simulation}.png",
-        device_size=params.device_size,
-    )
+    np.save(rutas["simulation_path"] / f"final_state_sp_reset_{num_simulation}.npz", actual_state)
 
     print(f"\nSimulación {num_simulation} finalizada correctamente.\n")
 

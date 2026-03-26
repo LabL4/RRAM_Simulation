@@ -1,6 +1,7 @@
 # Excepciones personalizadas para el módulo RRAM
 
 from RRAM import Representate
+import numpy as np
 import pickle
 
 
@@ -26,9 +27,13 @@ class MaxVacantesException(Exception):
 
 # Excepción para cuando el voltaje de percolación es demasiado alto
 class HighPercolationVoltageException(Exception):
-    def __init__(self, voltage_percola=None):
+    def __init__(self, voltage_percola=None, data_path=None, actual_state=None):
         if voltage_percola is not None:
             message = f"El voltaje de percolación es demasiado alto.\nEl voltaje de percolación es: {voltage_percola}"
+
+            # Guardo el estado de la simulación empleando npz si no data path y actual state none
+            if data_path and actual_state is not None:
+                np.save(data_path, actual_state)
         else:
             message = "El voltaje de percolación es demasiado alto"
         self.message = message
@@ -87,27 +92,19 @@ class FilamentosNoFormadosException(Exception):
     def __init__(
         self,
         simulation_path,
-        figures_path,
-        voltage,
         num_simulation,
         actual_state,
         CF_formados,
         CF_esperados,
     ):
-        self.filename = str(simulation_path) + f"/state_not_all_CF_formed.pkl"
-        self.voltage = voltage
+        self.filename = str(simulation_path) + f"/simulation_{num_simulation}_not_all_CF_formed.npz"
         self.simulation_path = simulation_path
         self.num_simulation = num_simulation + 1
         self.actual_state = actual_state
-        self.figures_path = str(figures_path) + f"/state_not_all_CF_formed_{self.num_simulation}.png"
-
-        print(f"Se esperaba que se formaran {CF_esperados} y se han formado {CF_formados}.")
 
         # Generar representación visual
-        Representate.RepresentateState(self.actual_state, round(self.voltage, 3), self.figures_path)
 
         # Guardar estado
-        with open(self.filename, "wb") as f:
-            pickle.dump({"actual_state": self.actual_state}, f)
+        np.save(self.filename, self.actual_state)
 
-        super().__init__(f"Se esperaba que se formaran {CF_esperados} y se han formado {CF_formados}.")
+        super().__init__(f"Se esperaba que se formaran {CF_esperados} CF, y se han formado {CF_formados} CF.")
