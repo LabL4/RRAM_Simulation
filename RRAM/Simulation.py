@@ -708,7 +708,6 @@ def PP_set(
             except ZeroDivisionError:
                 raise exceptions.NullResistanceException(
                     simulation_path=rutas["simulation_path"],
-                    figures_path=rutas["figures_path"],
                     voltage=voltage,
                     num_simulation=num_simulation,
                     actual_state=actual_state,
@@ -1098,7 +1097,6 @@ def SP_set(
             except ZeroDivisionError:
                 raise exceptions.NullResistanceException(
                     simulation_path=rutas["simulation_path"],
-                    figures_path=rutas["figures_path"],
                     voltage=voltage,
                     num_simulation=num_simulation,
                     actual_state=actual_state,
@@ -1372,7 +1370,6 @@ def PP_reset(
             except ZeroDivisionError:
                 raise exceptions.NullResistanceException(
                     simulation_path=rutas["simulation_path"],
-                    figures_path=rutas["figures_path"],
                     voltage=voltage,
                     num_simulation=num_simulation,
                     actual_state=actual_state,
@@ -1582,7 +1579,6 @@ def SP_reset(
             except ZeroDivisionError:
                 raise exceptions.NullResistanceException(
                     simulation_path=rutas["simulation_path"],
-                    figures_path=rutas["figures_path"],
                     voltage=voltage,
                     num_simulation=num_simulation,
                     actual_state=actual_state,

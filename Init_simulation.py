@@ -1,5 +1,4 @@
 import pandas as pd
-import pickle
 import math
 import sys
 import os
@@ -107,12 +106,8 @@ for i, row in df_params.iterrows():
     # ]
 
     init_state = gn.initial_state_priv(eje_x, eje_y, num_trampas, regiones_pesos)
-    # oxygen_state = Recombination.Init_OxygenState(row["device_size"], row["atom_size"])
 
-    with open(f"{carpeta}/init_state_{i}.pkl", "wb") as f:
-        pickle.dump(init_state, f)
-
-    # with open(f"{carpeta}/oxygen_state_{i}.pkl", "wb") as f:
-    #     pickle.dump(oxygen_state, f)
+    # Guardamos como npz usando la clave 'actual_state' que utils.py va a buscar
+    np.savez_compressed(f"{carpeta}/init_state_{i}.npz", actual_state=init_state)
 
 print("Estados iniciales generados correctamente.")

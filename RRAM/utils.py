@@ -94,7 +94,7 @@ def crear_rutas_simulacion(num_simulation: int, state: str) -> dict:
 
 
 def cargar_y_representar_estado(
-    data_path: Path, figures_path: Path, voltage: float, plot_state: bool = False, device_size: float = 10e-9
+    load_data_path: Path, figures_path: Path, voltage: float, plot_state: bool = False, device_size: float = 10e-9
 ) -> np.ndarray:
     """
     Carga el estado de configuración desde archivo pkl y genera una imagen de ese estado.
@@ -109,7 +109,7 @@ def cargar_y_representar_estado(
     """
 
     # Cargamos directamente el archivo .npz y extraemos la matriz 'actual_state'
-    datos = np.load(f"{data_path}.npz")
+    datos = np.load(f"{load_data_path}.npz")
     actual_state = datos["actual_state"]
     datos.close()  # Siempre es buena práctica cerrar el archivo
 
@@ -189,7 +189,7 @@ def guardar_datos(save_path_data: Path, headers: Optional[dict] = None, **vector
 def guardar_representar_estado(
     voltaje: float,
     config_state: np.ndarray,
-    save_path_pkl: Path,
+    save_data_path: Path,
     save_path_figures: Path,
     plot_state: bool = False,
 ) -> None:
@@ -205,7 +205,7 @@ def guardar_representar_estado(
     """
 
     # Usamos .with_suffix(".npz") por seguridad y guardamos la matriz
-    ruta_npz = Path(save_path_pkl).with_suffix(".npz")
+    ruta_npz = Path(save_data_path).with_suffix(".npz")
     np.savez_compressed(ruta_npz, actual_state=config_state)
 
     if plot_state:
