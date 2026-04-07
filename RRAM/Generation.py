@@ -186,3 +186,85 @@ def get_generation_probabilities_matrix(
     prob_final = np.minimum(prob_final, 1.0)
 
     return prob_final
+
+
+def get_generation_probabilities_matrix_CF(
+    state: np.ndarray,
+    paso_temporal: float,
+    Electric_field: np.ndarray | float,
+    temperatura: np.ndarray | float,
+    factor_vecinos: float,
+    factor_sin_vecinos: float,
+    vibration_frequency: float,
+    generation_energy: float,
+    cte_red: float,
+    gamma: float,
+    neighbor_mode: str = "both",
+    cf_matrix: np.ndarray | None = None,
+) -> np.ndarray:
+    """
+    Calcula el mapa de probabilidades locales (0 a 1) para generar nuevas vacantes en la red.
+    Si se proporciona 'cf_matrix', solo se considerarán como vecinos válidos las vacantes
+    que pertenezcan al filamento. Si no, se considerará cualquier vacante del 'state'.
+    """
+
+    # 1. Máscara de posiciones libres (siempre miramos 'state' para saber dónde se puede generar)
+    free_mask = state == 0
+    vecino_mask = np.zeros_like(state, dtype=bool)
+
+    # Determinar la matriz de referencia para los vecinos
+    # Si nos pasan la matriz de filamentos y no está vacía, buscamos vecinos en ella.
+    if cf_matrix is not None and cf_matrix.size > 0:
+        referencia_vecinos = cf_matrix == 1
+    else:
+        # Si no hay filamento aún, cualquier vacante es un vecino válido
+        referencia_vecinos = state == 1
+
+    # 3. Lógica de Vecinos (ahora usando 'referencia_vecinos' en lugar de 'state')
+    if neighbor_mode in ["horizontal", "both"]:
+        left_neighbor = np.zeros_like(state, dtype=bool)
+        left_neighbor[:, 1:] = referencia_vecinos[:, :-1]
+
+        right_neighbor = np.zeros_like(state, dtype=bool)
+        right_neighbor[:, :-1] = referencia_vecinos[:, 1:]
+
+        vecino_mask |= left_neighbor | right_neighbor
+
+    if neighbor_mode in ["vertical", "both"]:
+        up_neighbor = np.zeros_like(state, dtype=bool)
+        up_neighbor[1:, :] = referencia_vecinos[:-1, :]
+
+        down_neighbor = np.zeros_like(state, dtype=bool)
+        down_neighbor[:-1, :] = referencia_vecinos[1:, :]
+
+        vecino_mask |= up_neighbor | down_neighbor
+
+    free_with_vecino = free_mask & vecino_mask
+    free_without_vecino = free_mask & (~vecino_mask)
+
+    # Probabilidad base
+    prob_base_raw = calcular_probabilidad_generacion(
+        time_stp=paso_temporal,
+        electric_field=Electric_field,
+        temp=temperatura,
+        vibration_frequency=vibration_frequency,
+        generation_energy=generation_energy,
+        cte_red=cte_red,
+        gamma=gamma,
+    )
+
+    # Si la calculadora devolvió un escalar (float), lo expandimos a una matriz
+    if not isinstance(prob_base_raw, np.ndarray) or prob_base_raw.ndim == 0:
+        prob_base_matrix = np.full(state.shape, prob_base_raw)
+    else:
+        prob_base_matrix = prob_base_raw
+
+    # Aplicar factores condicionales
+    prob_final = np.zeros_like(prob_base_matrix)
+    prob_final[free_with_vecino] = prob_base_matrix[free_with_vecino] * factor_vecinos
+    prob_final[free_without_vecino] = prob_base_matrix[free_without_vecino] * factor_sin_vecinos
+
+    # Saturamos a 1.0 por seguridad
+    prob_final = np.minimum(prob_final, 1.0)
+
+    return prob_final

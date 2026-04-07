@@ -40,7 +40,8 @@ def medir_tiempo(func):
 
 @dataclass
 class SimulationParameters:
-    device_size: float
+    device_size_x: float
+    device_size_y: float
     atom_size: float
     num_trampas: int
     total_simulation_time: float
@@ -57,8 +58,8 @@ class SimulationParameters:
     paso_potencial_reset: float = field(init=False)
 
     def __post_init__(self):
-        self.x_size = int(np.ceil(self.device_size / self.atom_size))  # Número de "casillas" en la dimensión x
-        self.y_size = int(np.ceil(self.device_size / self.atom_size))  # Número de "casillas" en la dimensión y
+        self.x_size = int(np.ceil(self.device_size_x / self.atom_size))  # Número de "casillas" en la dimensión x
+        self.y_size = int(np.ceil(self.device_size_y / self.atom_size))  # Número de "casillas" en la dimensión y
         self.num_max_vacantes = int(0.95 * (self.x_size * self.x_size))  # 95% de la matriz puede llenarse de vacantes
         self.paso_temporal = self.total_simulation_time / self.num_pasos  # Paso temporal en segundos
         self.paso_potencial_set = self.voltaje_final_set / self.num_pasos  # Paso de voltaje para la parte de set
@@ -320,6 +321,7 @@ def update_state_generation(
     factor_sin_vecinos: float,
     max_vacantes_permitidas: int,  # <-- NUEVO PARÁMETRO
     neighbor_mode: str = "both",
+    CF_clean_matrix: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Orquesta el proceso de generación de vacantes asegurando que no se supere
@@ -340,8 +342,23 @@ def update_state_generation(
     else:
         temp_matrix = temperatura
 
+    # # 3. Cálculo de la matriz de probabilidades
+    # prob_final = Generation.get_generation_probabilities_matrix(
+    #     state=state,
+    #     paso_temporal=params.paso_temporal,
+    #     Electric_field=E_field_matrix,
+    #     temperatura=temp_matrix,
+    #     factor_vecinos=factor_vecinos,
+    #     factor_sin_vecinos=factor_sin_vecinos,
+    #     vibration_frequency=sim_ctes.vibration_frequency,
+    #     generation_energy=sim_ctes.generation_energy,
+    #     cte_red=sim_ctes.cte_red,
+    #     gamma=sim_ctes.gamma,
+    #     neighbor_mode=neighbor_mode,
+    # )
+
     # 3. Cálculo de la matriz de probabilidades
-    prob_final = Generation.get_generation_probabilities_matrix(
+    prob_final = Generation.get_generation_probabilities_matrix_CF(
         state=state,
         paso_temporal=params.paso_temporal,
         Electric_field=E_field_matrix,
@@ -353,6 +370,7 @@ def update_state_generation(
         cte_red=sim_ctes.cte_red,
         gamma=sim_ctes.gamma,
         neighbor_mode=neighbor_mode,
+        cf_matrix=CF_clean_matrix,
     )
 
     # 4. Evaluación de la estocástica (cuáles "intentan" generarse)
@@ -498,6 +516,7 @@ def PP_set(
     sistema_percola = False
     total_vacantes_pp_set = False
     num_pasos_guardar_estado = 250
+    cf_clean_matrix = None
     voltaje_percolacion = params.voltaje_final_set
     # AL inicio como la corriente es de tipo poole frenkel, la resitencia ohmica se considera nula
     resistencia = 0.0
@@ -649,8 +668,8 @@ def PP_set(
                     if filamentos_actuales == 1:
                         # Se acaba de formar el PRIMERO
                         print("Se ha formado el primer filamento de dos.")
-                        sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 2)
-                        # sim_ctes = sim_ctes.update_generation_energy(1.75)
+                        sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 4)
+                        sim_ctes = sim_ctes.update_generation_energy(sim_ctes.generation_energy + 0.1)
                         print(f"El nuevo valor de gamma es: {sim_ctes.gamma}")
                         print("El nuevo valor de la energía de generación es:", sim_ctes.generation_energy, "\n")
                         # obtengo los centros de los CF
@@ -661,10 +680,11 @@ def PP_set(
                         # Se acaba de formar el SEGUNDO
                         print("Se ha formado el segundo filamento de dos.")
                         sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 2)
-                        # sim_ctes = sim_ctes.update_generation_energy(2)
+                        sim_ctes = sim_ctes.update_generation_energy(sim_ctes.generation_energy + 0.25)
                         print(f"El nuevo valor de gamma es: {sim_ctes.gamma}")
                         print("El nuevo valor de la energía de generación es:", sim_ctes.generation_energy, "\n")
                         all_CFs_created = True
+
                         # obtengo los centros de los CF
                         centros_calculados = Temperature.obtener_centro_CF(actual_state_clean_CF, cf_ranges=CF_ranges)
                         filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(centros_calculados)
@@ -765,8 +785,6 @@ def PP_set(
                 columna_ceros = np.zeros((Ny, 1))
                 matriz_temperaturas_fijas_final = np.hstack([columna_ceros, matriz_temperaturas_fijas, columna_ceros])
 
-                # print("\nMatriz de temperaturas fijas para los muros termicos:\n", matriz_temperaturas_fijas_final)
-
                 temperatura = Temperature.solve_thermal_state(
                     types_map=materials_map,
                     Q_map=Q_source_map,
@@ -808,17 +826,30 @@ def PP_set(
                 ) * (params.device_size)
 
         if total_vacantes < max_vancantes_pp_set:
-            # Actualizo el estado del sistema
-            actual_state, probabilidad_matrix = update_state_generation(
-                actual_state,
-                params,
-                sim_ctes,
-                E_field_vector,
-                temperatura,
-                sim_ctes.factor_vecinos_pp_set,
-                sim_ctes.factor_libre_pp_set,
-                max_vancantes_pp_set,
-            )
+            if all_CFs_created:
+                # Actualizo el estado del sistema
+                actual_state, probabilidad_matrix = update_state_generation(
+                    actual_state,
+                    params,
+                    sim_ctes,
+                    E_field_vector,
+                    temperatura,
+                    sim_ctes.factor_vecinos_pp_set,
+                    sim_ctes.factor_libre_pp_set,
+                    max_vancantes_pp_set,
+                )
+            else:
+                actual_state, probabilidad_matrix = update_state_generation(
+                    actual_state,
+                    params,
+                    sim_ctes,
+                    E_field_vector,
+                    temperatura,
+                    sim_ctes.factor_vecinos_pp_set,
+                    sim_ctes.factor_libre_pp_set,
+                    max_vancantes_pp_set,
+                    CF_clean_matrix=cf_clean_matrix,
+                )
 
         elif not total_vacantes_pp_set:
             print(

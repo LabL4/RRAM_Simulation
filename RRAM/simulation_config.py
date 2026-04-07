@@ -59,9 +59,10 @@ THERMAL_DEFAULTS = {
 # PARÁMETROS GEOMÉTRICOS Y DE SIMULACIÓN
 # ============================================================================
 SIMULATION_DEFAULTS = {
-    "device_size": 10e-9,
+    "device_size_x": 10e-9,  # Ancho entre electrodos, debe corresponder a los dispositivos medidos
+    "device_size_y": 12.5e-9,
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
-    "num_trampas": 100,
+    "num_trampas": 250,
     "total_simulation_time": 10.0,
     "num_pasos": 10000,
     "voltaje_final": 1.1,
@@ -73,12 +74,12 @@ SIMULATION_DEFAULTS = {
 # PARÁMETROS SET / RESET
 # ============================================================================
 SET_RESET_DEFAULTS = {
-    "ocupacion_max_pp_set": 0.45,
-    "ocupacion_max_sp_set": 0.45,
+    "ocupacion_max_pp_set": 0.5,
+    "ocupacion_max_sp_set": 0.5,
     "factor_vecinos_pp_set": 1.5,
     "factor_libre_pp_set": 1.0,
-    "factor_vecinos_sp_set": 1.0,
-    "factor_libre_sp_set": 0.9,
+    "factor_vecinos_sp_set": 1.5,
+    "factor_libre_sp_set": 1.0,
     "lim_voltage_percolacion": 1.2,
     "compliance_voltage": 0.6,
     "voltaje_gen_oxigeno_pp_1": 0.45,
@@ -145,7 +146,8 @@ class ConfigManager:
         # === LIMPIEZA: SOLO EXPORTAMOS LOS INPUTS ===
         # Quitamos x_size, y_size, etc. porque se calcularán solos al cargar.
         cols_params = [
-            "device_size",
+            "device_size_x",
+            "device_size_y",
             "atom_size",
             "num_trampas",
             "total_simulation_time",

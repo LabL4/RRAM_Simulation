@@ -1,4 +1,5 @@
 from . import Representate, utils
+from os import device_encoding
 from typing import List, Dict
 from typing import Optional
 from pathlib import Path
@@ -347,6 +348,7 @@ def resumen_plots(
     actual_state,
     actual_state_clean_CF,
     matriz_temperaturas_fijas,
+    matriz_probabilidades,
     centros_calculados,
     mis_perfiles_extraidos,
     CF_ranges,
@@ -408,3 +410,22 @@ def resumen_plots(
         filename=rutas["figures_path"] / f"Centros_filamentos_{num_simulation}_{fig_voltage}_{etapa}.png",
         device_size=params.device_size,
     )
+
+    # 5. Matriz de probabilidades
+    Representate.RepresentateHeatmap(
+        matriz=matriz_probabilidades,
+        voltaje=fig_voltage,
+        filename=rutas["figures_path"] / f"Matriz_probabilidades_{num_simulation}_{fig_voltage}_{etapa}.png",
+        device_size=params.device_size,
+    )
+
+    # # 6. Perfil térmico
+    # distancias, perfiles = Temperature.extraer_perfiles_temperatura(
+    #     lista_matrices=[temperatura], etiquetas=[f"{fig_voltage}"], columna_x=columna_perfil, atom_size=params.atom_size
+    # )
+
+    # Representate.plot_perfil_temperatura(
+    #     distancias=distancias,
+    #     perfiles=perfiles,
+    #     save_path=rutas["figures_path"] / f"Perfil_termico_{num_simulation}_{fig_voltage}_{etapa}.png",
+    # )
