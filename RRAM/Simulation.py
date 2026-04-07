@@ -412,6 +412,188 @@ def update_state_recombinate(
     return actual_state_update, oxygen_state_update
 
 
+def _inicializar_pp_set(
+    num_simulation: int,
+    params: SimulationParameters,
+) -> tuple:
+    """Crea directorios, carga el estado inicial y prepara los arrays de datos."""
+    rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="set")
+    rutas["simulation_path"].mkdir(parents=True, exist_ok=True)
+    rutas["figures_path"].mkdir(parents=True, exist_ok=True)
+    rutas["data_simulation_path"].mkdir(parents=True, exist_ok=True)
+
+    actual_state = utils.cargar_y_representar_estado(
+        Path.cwd() / f"Init_data/init_state_{num_simulation - 1}",
+        rutas["figures_path"] / f"Initial_state_{num_simulation}.png",
+        params.initial_voltaje,
+    )
+
+    vector_ddp = np.arange(
+        0.000, params.voltaje_final_reset + params.paso_potencial, params.paso_potencial
+    )
+    E_field_vector = np.zeros(actual_state.shape[0], dtype=np.float64)
+    data_pp_set = np.zeros((params.num_pasos, 3), dtype=np.float64)
+
+    return rutas, actual_state, vector_ddp, E_field_vector, data_pp_set
+
+
+def _calcular_campo_electrico(
+    voltage: float,
+    actual_state: np.ndarray,
+    params: SimulationParameters,
+    params_dict: dict,
+) -> np.ndarray:
+    """Calcula el vector de campo eléctrico por capa."""
+    E_field_vector = np.zeros(actual_state.shape[0], dtype=np.float64)
+    for i in range(params.x_size):
+        E_field_vector[i] = ElectricField.GapElectricField(
+            voltage, i, actual_state, **params_dict
+        )
+    return E_field_vector
+
+
+def _manejar_percolacion(
+    voltage: float,
+    actual_state: np.ndarray,
+    sim_ctes: SimulationConstants,
+    sim_ctes_dict: dict,
+    CF_ranges: List[tuple],
+    CF_creado: np.ndarray,
+    voltage_CF_creado: np.ndarray,
+    sistema_percola: bool,
+    rutas: dict,
+    num_simulation: int,
+    indice_gamma: int,
+    params: SimulationParameters,
+) -> tuple:
+    """
+    Gestiona la corriente y los eventos cuando el sistema ha percolado (rama Ohm).
+
+    Retorna:
+        (current, CF_creado, voltage_CF_creado, sim_ctes, sim_ctes_dict,
+         indice_gamma, voltaje_percolacion)
+        voltaje_percolacion es None si ya se había detectado percolación antes.
+    """
+    voltaje_percolacion = None
+
+    if not sistema_percola:
+        voltaje_percolacion = voltage
+        print(
+            "\nEl sistema ha percolado en el voltaje:",
+            round(voltaje_percolacion, 4),
+            " con una ocupación del:",
+            round((np.sum(actual_state) / params.num_max_vacantes), 4) * 100,
+            "%\n",
+        )
+
+        if voltaje_percolacion >= 0.75:
+            raise exceptions.HighPercolationVoltageException(
+                voltage_percola=voltaje_percolacion
+            )
+
+        Representate.RepresentateState(
+            actual_state,
+            round(voltaje_percolacion, 3),
+            str(rutas["figures_path"]) + f"/Percola_state_{num_simulation}.png",
+        )
+
+    _, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
+    filamentos = CurrentSolver.Clasificar_CF(
+        CF_graph, params.x_size, params.y_size, CF_ranges
+    )
+    exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(CF_ranges))
+
+    if any(~CF_creado):
+        procesar_filamentos_creados(
+            imagen_path=rutas["figures_path"],
+            pkl_path=rutas["data_simulation_path"],
+            existentes=exist_cf,
+            CF_creado=CF_creado,
+            voltage=voltage,
+            voltage_CF_creado=voltage_CF_creado,
+            actual_state=actual_state,
+            num_simulation=num_simulation,
+        )
+
+    if sum(CF_creado) == indice_gamma:
+        nueva_gamma = sim_ctes.gamma - (2.5 if len(CF_ranges) == 2 else 1)
+        sim_ctes = sim_ctes.update_gamma(nueva_gamma)
+        sim_ctes_dict = asdict(sim_ctes)
+        indice_gamma += 1
+        print("El nuevo valor de gamma es:", sim_ctes_dict["gamma"], "\n")
+
+    cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(
+        CF_graph, CF_ranges, exist_cf
+    )
+
+    try:
+        current, _ = CurrentSolver.OmhCurrent(voltage, cf_clean_matrix, **sim_ctes_dict)
+    except ZeroDivisionError:
+        raise exceptions.NullResistanceException(
+            simulation_path=rutas["simulation_path"],
+            figures_path=rutas["figures_path"],
+            voltage=voltage,
+            num_simulation=num_simulation,
+            actual_state=actual_state,
+        )
+
+    return current, CF_creado, voltage_CF_creado, sim_ctes, sim_ctes_dict, indice_gamma, voltaje_percolacion
+
+
+def _guardar_resultados_pp_set(
+    rutas: dict,
+    params: SimulationParameters,
+    data_pp_set: np.ndarray,
+    actual_state: np.ndarray,
+    voltage: float,
+    num_simulation: int,
+    sim_ctes: SimulationConstants,
+    temperatura: float,
+    sistema_percola: bool,
+    k: int,
+    simulation_time: float,
+    voltaje_max_set: float,
+    voltaje_percolacion: float,
+) -> dict:
+    """Persiste datos de la simulación (txt, pkl) y genera la figura del estado final."""
+    save_path_pkl = rutas["data_simulation_path"] / f"Data_pp_set_{num_simulation}.pkl"
+    save_path_data = rutas["simulation_path"] / f"Data_pp_set_{num_simulation}.txt"
+    save_path_figures = rutas["figures_path"] / f"Final_state_pp_set_{num_simulation}.png"
+
+    utils.guardar_datos(
+        voltaje_final=params.voltaje_final_set,
+        config_state=actual_state,
+        datos_save=data_pp_set,
+        header_files="Tiempo simulacion [s],Voltaje [V],Intensidad [A]",
+        save_path_data=save_path_data,
+        save_path_pkl=save_path_pkl,
+        save_path_figures=save_path_figures,
+    )
+
+    with open(
+        rutas["simulation_path"] / f"final_state_pp_set_{num_simulation}.pkl", "wb"
+    ) as f:
+        pickle.dump(actual_state, f)
+
+    Representate.RepresentateState(
+        actual_state,
+        round(voltage, 3),
+        str(rutas["figures_path"]) + f"/final_state_pp_set_{num_simulation}.png",
+    )
+
+    return {
+        "actual_state": actual_state,
+        "sistema_percola": sistema_percola,
+        "k_maxima": k,
+        "sim_ctes": sim_ctes,
+        "params": params,
+        "Temperatura_final": temperatura,
+        "voltaje_max_set": voltaje_max_set,
+        "voltaje_percolacion": voltaje_percolacion,
+        "tiempo_pp_set": simulation_time,
+    }
+
+
 def PP_set(
     num_simulation: int,
     params: SimulationParameters,
@@ -447,257 +629,91 @@ def PP_set(
         None
     """
 
-    # Declaro todas las variables que voy a usar exclusivamente en la primera parte (PP) del set.
-    rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="set")
-
-    rutas["simulation_path"].mkdir(parents=True, exist_ok=True)
-    rutas["figures_path"].mkdir(parents=True, exist_ok=True)
-    rutas["data_simulation_path"].mkdir(parents=True, exist_ok=True)
-
-    # Cargo y represento el estado inicial de configuración
-    actual_state = utils.cargar_y_representar_estado(
-        Path.cwd() / f"Init_data/init_state_{num_simulation - 1}",
-        rutas["figures_path"] / f"Initial_state_{num_simulation}.png",
-        params.initial_voltaje,
-    )
-
-    sistema_percola = False
-    total_vacantes_pp_set = False
-
-    ocupacion_max_pp_set = 0.38  # Antes habia un 35 y l resultado era aceptable
-    factor_vecinos = 1.1  # Factor de aumento de la probabilidad si tiene vecino
-    factor_libre = 0.9  # Factor de disminución de la probabilidad si no tiene vecino
-    lim_voltage_percolacion = 0.75  # Si el voltaje de percolación es mayor que este valor la simulación no vale la pena seguirla
+    ocupacion_max_pp_set = 0.38
+    factor_vecinos = 1.1
+    factor_libre = 0.9
     temperatura = params.T_0
     current = 0.0
+    sistema_percola = False
+    total_vacantes_pp_set = False
+    voltaje_percolacion = None
+    voltaje_max_set = None
+    indice_gamma = 1
 
-    max_vancantes_pp_set = int(ocupacion_max_pp_set * params.num_max_vacantes)
-    voltage_CF_creado = np.full(len(CF_ranges), 0.0)
-
-    # Inicializo vectores donde almaceno datos
-    E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
-    vector_ddp = np.arange(
-        0.000, params.voltaje_final_reset + params.paso_potencial, params.paso_potencial
+    rutas, actual_state, vector_ddp, E_field_vector, data_pp_set = _inicializar_pp_set(
+        num_simulation, params
     )
 
-    num_columnas = 3  # Tiempo, Voltaje, Intensidad
-    # Defino la matriz para almacenar los datos
-    data_pp_set = np.zeros((params.num_pasos, num_columnas), dtype=np.float64)
-    # config_matrix_pp_set = np.zeros((int((params.num_pasos / params.paso_guardar)), params.x_size, params.y_size))
+    max_vacantes_pp_set = int(ocupacion_max_pp_set * params.num_max_vacantes)
+    voltage_CF_creado = np.full(len(CF_ranges), 0.0)
 
     params_dict = asdict(params)
     sim_ctes_dict = asdict(sim_ctes)
 
     print("El valor de gamma es:", sim_ctes_dict["gamma"], "\n")
-
-    indice_gamma = 1
-
     print(f"Simulacion {num_simulation} - Primera parte del set\n")
 
     for k in range(0, params.num_pasos + 1):
         total_vacantes = np.sum(actual_state)
 
         if total_vacantes > int(params.num_max_vacantes):
-            # Si se llena el 90 del espacio de la matriz salto a otra simulación. Ponerlo aqui puede dar el problema de que nada mas empezar esté lleno y de error, pero eso NO debe pasar asi q no me preocupa.
             raise exceptions.MaxVacantesException(k=k - 1, voltage=vector_ddp[k - 1])
-        else:
-            # Verifica si el sistema ha percolado
-            if (k == params.num_pasos - 1) and (not sistema_percola):
-                raise exceptions.NoPercolationException()
 
-        # Actualizo el tiempo de simulación y el voltaje
+        if (k == params.num_pasos - 1) and not sistema_percola:
+            raise exceptions.NoPercolationException()
+
         simulation_time = params.paso_temporal * k
         voltage = vector_ddp[k]
 
-        # Genero el vector campo eléctrico
-        for i in range(0, params.x_size):
-            E_field_vector[i] = ElectricField.GapElectricField(
-                voltage, i, actual_state, **params_dict
-            )
+        E_field_vector = _calcular_campo_electrico(voltage, actual_state, params, params_dict)
 
-        # Verifica si el sistema ha percolado
         if voltage >= params.voltaje_final_set:
             if not sistema_percola:
                 raise exceptions.NoPercolationException()
 
-            voltaje_max_set = vector_ddp[k]
-            tiempo_pp_set = params.paso_temporal * (
-                k - 1
-            )  # Le quitamos un paso porque se ha superado el voltaje de ruptura
-
-            print(
-                "Voltaje final set",
-                voltaje_max_set,
-                "en el tiempo",
-                tiempo_pp_set,
-                "\n",
-            )
-            # Elimino las filas sobrantes del array de datos y las lleno de nans para eliminarlas luego
-            data_pp_set[k - 1 :] = np.nan  # Añadir valores nulos a partir de la fila k
-            data_pp_set = data_pp_set[
-                ~np.isnan(data_pp_set).any(axis=1)
-            ]  # Eliminar filas con valores nulos
+            voltaje_max_set = voltage
+            print("Voltaje final set", voltaje_max_set, "en el tiempo", params.paso_temporal * (k - 1), "\n")
+            data_pp_set[k - 1:] = np.nan
+            data_pp_set = data_pp_set[~np.isnan(data_pp_set).any(axis=1)]
             break
 
-        # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
-            # Si es la primera vez que percola, siste_percola será falso y entra aquí
-            if sistema_percola is False:
-                voltaje_percolacion = voltage  # Guardo el voltaje de percolación
-                print(
-                    "\nEl sistema ha percolado en la iteración:",
-                    k,
-                    " que corresponde con el voltaje:",
-                    round(voltaje_percolacion, 4),
-                    " con una ocupación del:",
-                    round((np.sum(actual_state) / (params.num_max_vacantes)), 4) * 100,
-                    "%\n",
-                )
-
-                if voltaje_percolacion >= lim_voltage_percolacion:
-                    # Si el voltaje de percolación es demasiado alto no va a coincidir con los datos experimentales, y no merece la pena seguir con la simulación
-                    raise exceptions.HighPercolationVoltageException(
-                        voltage_percola=voltaje_percolacion
-                    )
-
-                Representate.RepresentateState(
-                    actual_state,
-                    round(voltaje_percolacion, 3),
-                    str(rutas["figures_path"]) + f"/Percola_state_{num_simulation}.png",
-                )
-
-                # nueva_gamma = sim_ctes.gamma - 1  # / sim_ctes.factor_generacion
-                # sim_ctes = sim_ctes.update_gamma(nueva_gamma)
-                # sim_ctes_dict = asdict(sim_ctes)
-
-                # indice_gamma = indice_gamma + 1
-
-                # print("El nuevo valor de gamma es:", sim_ctes_dict["gamma"], "\n")
-
+            (
+                current, CF_creado, voltage_CF_creado,
+                sim_ctes, sim_ctes_dict, indice_gamma, vp,
+            ) = _manejar_percolacion(
+                voltage, actual_state, sim_ctes, sim_ctes_dict,
+                CF_ranges, CF_creado, voltage_CF_creado,
+                sistema_percola, rutas, num_simulation, indice_gamma, params,
+            )
+            if vp is not None:
+                voltaje_percolacion = vp
             sistema_percola = True
-
-            _, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
-            filamentos = CurrentSolver.Clasificar_CF(
-                CF_graph, params.x_size, params.y_size, CF_ranges
-            )
-            exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(CF_ranges))
-
-            # Compruebo si hay filamentos nuevos
-            if any(~CF_creado):
-                procesar_filamentos_creados(
-                    imagen_path=rutas["figures_path"],
-                    pkl_path=rutas["data_simulation_path"],
-                    existentes=exist_cf,
-                    CF_creado=CF_creado,
-                    voltage=voltage,
-                    voltage_CF_creado=voltage_CF_creado,
-                    actual_state=actual_state,
-                    num_simulation=num_simulation,
-                )
-
-            if sum(CF_creado) == indice_gamma:
-                if len(CF_ranges) == 2:
-                    nueva_gamma = sim_ctes.gamma - 2.5
-                else:
-                    nueva_gamma = sim_ctes.gamma - 1
-
-                sim_ctes = sim_ctes.update_gamma(nueva_gamma)
-                sim_ctes_dict = asdict(sim_ctes)
-                indice_gamma = indice_gamma + 1
-                print("El nuevo valor de gamma es:", sim_ctes_dict["gamma"], "\n")
-
-            cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(
-                CF_graph, CF_ranges, exist_cf
-            )
-
-            # Si ha percolado uso la corriente de Ohm
-            try:
-                current, _ = CurrentSolver.OmhCurrent(
-                    voltage, cf_clean_matrix, **sim_ctes_dict
-                )
-            except ZeroDivisionError:
-                raise exceptions.NullResistanceException(
-                    simulation_path=rutas["simulation_path"],
-                    figures_path=rutas["figures_path"],
-                    voltage=voltage,
-                    num_simulation=num_simulation,
-                    actual_state=actual_state,
-                )
-
         else:
             sistema_percola = False
-
             mean_field = np.mean(E_field_vector).item()
-            # Si no ha percolado uso la corriente de Poole-Frenkel
-            current = CurrentSolver.Poole_Frenkel(
-                temperatura, mean_field, **sim_ctes_dict
-            ) * (params.device_size)
+            current = CurrentSolver.Poole_Frenkel(temperatura, mean_field, **sim_ctes_dict) * params.device_size
 
-        # Obtengo los valores del campo eléctrico y la temperatura
         temperatura = Temperature.Temperature_Joule(
             voltage, current, sistema_percola, params.T_0, **sim_ctes_dict
         )
-        if total_vacantes < max_vancantes_pp_set:
-            # Actualizo el estado del sistema
+
+        if total_vacantes < max_vacantes_pp_set:
             actual_state = update_state_generate(
-                actual_state,
-                params,
-                sim_ctes_dict,
-                E_field_vector,
-                temperatura,
-                factor_vecinos,
-                factor_libre,
+                actual_state, params, sim_ctes_dict, E_field_vector,
+                temperatura, factor_vecinos, factor_libre,
             )
         elif not total_vacantes_pp_set:
-            print(
-                f"\nSe ha alcanzado la ocupación máxima del {ocupacion_max_pp_set * 100}% en la primera parte del set en el paso {k}.\n"
-            )
+            print(f"\nSe ha alcanzado la ocupación máxima del {ocupacion_max_pp_set * 100}% en el paso {k}.\n")
             total_vacantes_pp_set = True
 
-        # Guardo los datos de la simulación
         data_pp_set[k] = np.array([simulation_time, voltage, current])
 
-    # Guardo los datos de la simulación
-    save_path_pkl = rutas["data_simulation_path"] / f"Data_pp_set_{num_simulation}.pkl"
-    save_path_data = rutas["simulation_path"] / f"Data_pp_set_{num_simulation}.txt"
-    save_path_figures = (
-        rutas["figures_path"] / f"Final_state_pp_set_{num_simulation}.png"
+    return _guardar_resultados_pp_set(
+        rutas, params, data_pp_set, actual_state, voltage,
+        num_simulation, sim_ctes, temperatura, sistema_percola,
+        k, simulation_time, voltaje_max_set, voltaje_percolacion,
     )
-
-    utils.guardar_datos(
-        voltaje_final=params.voltaje_final_set,
-        config_state=actual_state,
-        datos_save=data_pp_set,
-        header_files="Tiempo simulacion [s],Voltaje [V],Intensidad [A]",
-        save_path_data=save_path_data,
-        save_path_pkl=save_path_pkl,
-        save_path_figures=save_path_figures,
-    )
-
-    # Guardo todas las variables del estado final del PP set para usarlas en el PS set
-    final_state_pp_set = {
-        "actual_state": actual_state,
-        "sistema_percola": sistema_percola,
-        "k_maxima": k,
-        "sim_ctes": sim_ctes,
-        "params": params,
-        "Temperatura_final": temperatura,
-        "voltaje_max_set": voltaje_max_set,
-        "voltaje_percolacion": voltaje_percolacion,
-        "tiempo_pp_set": simulation_time,
-    }
-    with open(
-        rutas["simulation_path"] / f"final_state_pp_set_{num_simulation}.pkl", "wb"
-    ) as f:
-        pickle.dump(actual_state, f)
-
-    Representate.RepresentateState(
-        actual_state,
-        round(voltage, 3),
-        str(rutas["figures_path"]) + f"/final_state_pp_set_{num_simulation}.png",
-    )
-
-    return final_state_pp_set
 
 
 def SP_set(
