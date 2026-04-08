@@ -79,8 +79,8 @@ print(f"Construyendo estados iniciales para {num_simulations} simulaciones...")
 
 for i, row in df_params.iterrows():
     # Calculamos el tamaño de la matriz a partir de los parámetros físicos
-    eje_x = int(math.ceil(row["device_size"] / row["atom_size"]))
-    eje_y = int(math.ceil(row["device_size"] / row["atom_size"]))
+    eje_x = int(math.ceil(row["device_size_x"] / row["atom_size"]))
+    eje_y = int(math.ceil(row["device_size_y"] / row["atom_size"]))
     num_trampas = int(row["num_trampas"])
 
     f_ranges, regiones_pesos = generar_configuracion_filamentos(eje_x, eje_y, num_filamentos=2)

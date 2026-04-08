@@ -369,7 +369,7 @@ def resumen_plots(
         fig_voltage,
         10,
         save_path=rutas["figures_path"] / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_{etapa}.png",
-        device_size=params.device_size,
+        device_size=params.device_size_y,
         filas_intermedias=filas_intermedias,
     )
 
@@ -378,14 +378,14 @@ def resumen_plots(
         matriz=actual_state,
         voltaje=fig_voltage,
         filename=str(rutas["figures_path"]) + f"/State_{num_simulation}_{fig_voltage}_{etapa}.png",
-        device_size=params.device_size,
+        device_size=params.device_size_y,
     )
 
     Representate.RepresentateState(
         matriz=actual_state_clean_CF,
         voltaje=fig_voltage,
         filename=str(rutas["figures_path"]) + f"/State_Clean_{num_simulation}_{fig_voltage}_{etapa}.png",
-        device_size=params.device_size,
+        device_size=params.device_size_y,
     )
 
     # 3. Preparación y plot del muro térmico
@@ -398,7 +398,7 @@ def resumen_plots(
         matriz_muros=matriz_para_plot_muro,
         matriz_molde=actual_state_clean_CF,
         filename=rutas["figures_path"] / f"Muro_termico_{num_simulation}_{fig_voltage}_{etapa}.png",
-        device_size=params.device_size,
+        device_size=params.device_size_y,
     )
 
     # 4. Centros de filamentos
@@ -408,7 +408,7 @@ def resumen_plots(
         filas_intermedias=filas_intermedias,
         centros_calculados=centros_calculados,
         filename=rutas["figures_path"] / f"Centros_filamentos_{num_simulation}_{fig_voltage}_{etapa}.png",
-        device_size=params.device_size,
+        device_size=params.device_size_y,
     )
 
     # 5. Matriz de probabilidades
@@ -416,7 +416,7 @@ def resumen_plots(
         matriz=matriz_probabilidades,
         voltaje=fig_voltage,
         filename=rutas["figures_path"] / f"Matriz_probabilidades_{num_simulation}_{fig_voltage}_{etapa}.png",
-        device_size=params.device_size,
+        device_size=params.device_size_y,
     )
 
     # # 6. Perfil térmico
