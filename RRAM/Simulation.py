@@ -1189,7 +1189,7 @@ def SP_set(
             temperatura_anterior = temperatura[:, 1:-1]
 
             if k % num_pasos_guardar_estado == 0:
-                if locals().get("matriz_temperaturas_fijas"):
+                if locals().get("matriz_temperaturas_fijas") is not None:
                     matriz_para_plot_muro = np.copy(matriz_temperaturas_fijas)
                     for centro, perfil_filamento in zip(centros_calculados, mis_perfiles_extraidos):
                         if centro is not None and perfil_filamento is not None:
