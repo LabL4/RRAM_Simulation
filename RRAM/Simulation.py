@@ -244,7 +244,8 @@ def procesar_filamentos_creados(
         if plot_filamento:
             nombre_img = imagen_path / f"Filamento_{i + 1}_creado_set_{num_simulation}.png"
             Representate.RepresentateState(
-                actual_state, round(voltage, 5), str(nombre_img), device_size=params.device_size_y
+                actual_state, round(voltage, 5), str(nombre_img),
+                device_size_x=params.device_size_x, device_size_y=params.device_size_y,
             )
 
         # Guardar estado actual en archivo pkl
@@ -302,7 +303,8 @@ def procesar_filamentos_destruidos(
         if plot_filamento:
             nombre_img = imagen_path / f"Filamento_{i + 1}_roto_reset_{num_simulation}.png"
             Representate.RepresentateState(
-                actual_state, round(voltage, 5), str(nombre_img), device_size=params.device_size_y
+                actual_state, round(voltage, 5), str(nombre_img),
+                device_size_x=params.device_size_x, device_size_y=params.device_size_y,
             )
 
         data_name = data_save_path / f"filamento_{i + 1}_roto_reset_{num_simulation}.npz"
@@ -510,7 +512,8 @@ def PP_set(
         Path.cwd() / f"Init_data/init_state_{num_simulation - 1}",
         rutas["figures_path"] / f"Initial_state_{num_simulation}.png",
         0.0,
-        device_size=params.device_size_y,
+        device_size_x=params.device_size_x,
+        device_size_y=params.device_size_y,
     )
 
     sistema_percola = False
@@ -631,7 +634,7 @@ def PP_set(
             sistema_percola = True
 
             actual_state_clean_CF, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
-            filamentos = CurrentSolver.Clasificar_CF(CF_graph, params.x_size, params.y_size, CF_ranges)
+            filamentos = CurrentSolver.Clasificar_CF(CF_graph, params.y_size, CF_ranges)
             exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(CF_ranges))
 
             # Compruebo si hay filamentos nuevos
@@ -707,7 +710,7 @@ def PP_set(
                 # Actualizamos el historial para que no vuelva a entrar en iteraciones futuras
                 filamentos_previos = filamentos_actuales
 
-            cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf)
+            cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf, H=params.x_size, W=params.y_size)
 
             # Limito el grosor de los filamentos a un máximo de 3 celdas
             _, new_cf_clean_matrix = CurrentSolver.limitar_grosor_filamentos(
@@ -1038,7 +1041,7 @@ def SP_set(
     print("La distancia entre casillas es:", dist_casillas, "\n")
 
     actual_state_clean_CF, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
-    filamentos = CurrentSolver.Clasificar_CF(CF_graph, params.x_size, params.y_size, CF_ranges)
+    filamentos = CurrentSolver.Clasificar_CF(CF_graph, params.y_size, CF_ranges)
     exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(CF_ranges))
 
     # cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf)
@@ -1368,7 +1371,7 @@ def PP_reset(
         _, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
 
         max_x, max_y = actual_state.shape
-        filamentos = CurrentSolver.Clasificar_CF(CF_graph, max_x, max_y, CF_ranges)
+        filamentos = CurrentSolver.Clasificar_CF(CF_graph, max_y, CF_ranges)
         exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(CF_ranges))
 
         if any(~CF_destruido):  # mientras haya alguno sin romper
@@ -1389,7 +1392,7 @@ def PP_reset(
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
             # Obtengo los caminos de percolación
-            cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf)
+            cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf, H=params.x_size, W=params.y_size)
             percola = True
 
             # Si ha percolado uso la corriente de Ohm
@@ -1576,7 +1579,7 @@ def SP_reset(
         actual_state_clean_CF, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
 
         max_x, max_y = actual_state.shape
-        filamentos = CurrentSolver.Clasificar_CF(CF_graph, max_x, max_y, CF_ranges)
+        filamentos = CurrentSolver.Clasificar_CF(CF_graph, max_y, CF_ranges)
         exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(CF_ranges))
 
         anterior_voltage_CF = voltage_CF_destruido.copy()
@@ -1599,7 +1602,7 @@ def SP_reset(
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
             # Obtengo los caminos de percolación
-            cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf)
+            cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf, H=params.x_size, W=params.y_size)
             percola = True
 
             # Si ha percolado uso la corriente de Ohm

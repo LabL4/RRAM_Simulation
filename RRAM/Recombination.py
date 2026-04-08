@@ -5,20 +5,21 @@ import sys
 k_b_ev = 8.617333262145e-5  # Boltzmann constant in eV/K
 
 
-def Init_OxygenState(espesor_dispositivo: float, atom_size: float):
+def Init_OxygenState(device_size_x: float, device_size_y: float, atom_size: float):
     """
     Initializes the state of oxygen atoms in a device.
 
     Parameters:
-    - espesor_dispositivo (float): The thickness of the device.
+    - device_size_x (float): Physical size of the device in the X direction (lateral, rows).
+    - device_size_y (float): Physical size of the device in the Y direction (between electrodes, columns).
     - atom_size (float): The size of each atom, is equal to the mesh size of the simulation.
 
     Returns:
     - InitialOxigenState (numpy.ndarray): The initial state of oxygen atoms in the device.
     """
 
-    eje_x = round(espesor_dispositivo / atom_size)
-    eje_y = round(espesor_dispositivo / atom_size)
+    eje_x = int(np.ceil(device_size_x / atom_size))
+    eje_y = int(np.ceil(device_size_y / atom_size))
 
     InitialOxygenState = np.zeros((eje_x, eje_y), dtype=int)
 
