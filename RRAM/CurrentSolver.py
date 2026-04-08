@@ -79,20 +79,19 @@ def Clean_state_matrix(
 
 def Clasificar_CF(
     G: nx.Graph,
-    x_max: int,
-    y_max: int,
+    num_columnas: int,
     filamentos_ranges: list[tuple[int, int]],
 ) -> dict:
     """
     Classifies starting nodes of a graph into filaments and determines if they percolate.
-    This function takes a graph `G` and classifies its starting nodes (nodes with y-coordinate 0)
-    into filaments based on their x-coordinate ranges. It also checks if there is a path from each
-    starting node to any of the ending nodes (nodes with y-coordinate `x_max - 1`).
+    This function takes a graph `G` and classifies its starting nodes (nodes with column 0)
+    into filaments based on their row ranges. It also checks if there is a path from each
+    starting node to any of the ending nodes (nodes at the last column, num_columnas - 1).
     Args:
-        G (nx.Graph): The graph representing the system.
-        x_max (int): The maximum x-coordinate value in the graph.
-        y_max (int): The maximum y-coordinate value in the graph (not used in this function).
-        filamentos_ranges (list[tuple[int, int]]): A list of tuples representing the x-coordinate
+        G (nx.Graph): The graph representing the system. Nodes are (row, col) tuples.
+        num_columnas (int): Number of columns in the grid (y_size = device_size_y / atom_size).
+            The last electrode is at column num_columnas - 1.
+        filamentos_ranges (list[tuple[int, int]]): A list of tuples representing the row
             ranges for each filament. Each tuple is of the form (fila_min, fila_max).
     Returns:
         dict: A dictionary where each key is a starting node, and the value is another dictionary
@@ -103,10 +102,8 @@ def Clasificar_CF(
         ValueError: If a starting node cannot be assigned to any filament based on the provided ranges.
     Example:
         >>> G = nx.grid_2d_graph(5, 5)
-        >>> x_max = 5
-        >>> y_max = 5
         >>> filamentos_ranges = [(0, 2), (3, 4)]
-        >>> Clasificar_CF(G, x_max, y_max, filamentos_ranges)
+        >>> Clasificar_CF(G, 5, filamentos_ranges)
         {
             (0, 0): {"filamento": 1, "percola": True},
             (1, 0): {"filamento": 1, "percola": True},
@@ -114,9 +111,9 @@ def Clasificar_CF(
         }
     """
 
-    # Nodos de origen y destino
+    # Nodos de origen (columna 0, electrodo izquierdo) y destino (última columna, electrodo derecho)
     nodos_inicio = [n for n in G.nodes() if n[1] == 0]
-    nodos_fin = [n for n in G.nodes() if n[1] == x_max - 1]
+    nodos_fin = [n for n in G.nodes() if n[1] == num_columnas - 1]
 
     # Clasificación de nodos de inicio en filamentos
     nodos_inicio_clasificados = {}
@@ -163,33 +160,35 @@ def Existe_filamentos(resultados, num_filamentos) -> list[bool]:
     return Percola_list_bool
 
 
-def Eliminar_filamentos_incompletos(grid_limpio, filamentos_ranges, percola_bools, W=None):
+def Eliminar_filamentos_incompletos(grid_limpio, filamentos_ranges, percola_bools, H=None, W=None):
     """
     Elimina los nodos y aristas de los rangos donde el filamento no se ha formado (no percola).
 
     Args:
-        G : nx.Graph
+        grid_limpio : nx.Graph
             Grafo original copiado, tamaño completo.
         filamentos_ranges : list of tuples
             Lista de rangos de fila [(fila_min, fila_max), ...] para cada filamento.
         percola_bools : list of bool
             Lista booleana que indica si cada filamento percola.
-        W : int representa el ancho del espacio de configuración (número de columnas).
+        H : int, opcional
+            Número de filas del espacio de simulación (x_size). Se calcula del grafo si no se pasa.
+        W : int, opcional
+            Número de columnas del espacio de simulación (y_size). Se calcula del grafo si no se pasa.
 
     Returns:
-        G_limpio : nx.Graph
-            Grafo con los nodos (y sus aristas) solo de los filamentos completos.
+        CF_matrix : np.ndarray de forma (H, W)
+            Matriz con 1 solo en los filamentos que han percolado.
     """
-    # Si no se pasa W, lo calcula automáticamente del tamaño real de la matriz
-
-    # Si no se pasa W, calcularlo del grafo
-    if W is None:
+    if H is None or W is None:
         nodos = list(grid_limpio.nodes())
         if nodos:
-            max_dim = max(max(n[0], n[1]) for n in nodos)
-            W = max_dim + 1
+            if H is None:
+                H = max(n[0] for n in nodos) + 1
+            if W is None:
+                W = max(n[1] for n in nodos) + 1
         else:
-            raise ValueError("El grafo está vacío y no se proporcionó la dimensión W")
+            raise ValueError("El grafo está vacío y no se proporcionaron las dimensiones H y W")
 
     G_limpio = grid_limpio.copy()
 
@@ -200,13 +199,11 @@ def Eliminar_filamentos_incompletos(grid_limpio, filamentos_ranges, percola_bool
             G_limpio.remove_nodes_from(nodos_a_borrar)
 
     # Crear matriz vacía de ceros para la matriz resistencia
-    CF_matrix = np.zeros((W, W), dtype=int)
+    CF_matrix = np.zeros((H, W), dtype=int)
 
     # Poner 1 en las posiciones de los nodos que siguen en G
     for i, j in G_limpio.nodes():
         CF_matrix[i, j] = 1
-
-    # rp.RepresentateState(CF_matrix, 0.00, os.getcwd() + "/Matriz_resistencia.pdf")
 
     return CF_matrix
 
@@ -227,7 +224,7 @@ def calcular_resistencia(CF_matrix, ohm_resistence):
     total_resistance = 0.0
     Ny, Nx = CF_matrix.shape
     for j in range(1, Nx - 1):
-        fil_indices = np.where(CF_matrix == 1)[0]
+        fil_indices = np.where(CF_matrix[:, j] == 1)[0]
         N_total_columna = len(fil_indices)
 
         if N_total_columna == 0:

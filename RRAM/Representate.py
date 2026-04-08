@@ -211,12 +211,16 @@ def RepresentateState(
     filename: str | None = None,
     color=(0.0000, 0.0000, 0.5451),
     guardar_png: bool = True,
-    device_size: float = 10e-9,
+    device_size_x: float = 10e-9,
+    device_size_y: float = 10e-9,
 ) -> None:
     """
     Representa el estado de una matriz de RRAM.
     Optimizado para publicación: electrodos ajustables, cero absoluto en la base,
     y colores estables independientemente de la ocupación de la matriz.
+
+    El eje X del plot corresponde a la dirección Y física (entre electrodos, device_size_y).
+    El eje Y del plot corresponde a la dirección X física (lateral, device_size_x).
     """
 
     # El blanco SIEMPRE será el valor 0, y tu color SIEMPRE será el valor 1.
@@ -227,7 +231,8 @@ def RepresentateState(
     setup_paper_plt(plt, latex=True, scaling=3)
     config_ax_state(ax)
 
-    size_nm = device_size * 1e9  # Convertir a nm ya que siempre se representa en nm
+    size_nm_x = device_size_x * 1e9  # Dirección lateral (filas) → eje Y del plot
+    size_nm_y = device_size_y * 1e9  # Dirección entre electrodos (columnas) → eje X del plot
 
     # 1. MATRIZ
     ax.imshow(
@@ -235,42 +240,41 @@ def RepresentateState(
         cmap=cmap,
         vmin=0,
         vmax=1,
-        extent=[0, size_nm, 0, size_nm],
+        extent=[0, size_nm_y, 0, size_nm_x],
         origin="lower",
         interpolation="nearest",
-        aspect="equal",
+        aspect="auto",
         zorder=2,
     )
 
     # 2. ELECTRODOS
     electrode_width = 0.2
     y_start = 0
-    electrode_height = size_nm
+    electrode_height = size_nm_x
 
     left_electrode = patches.Rectangle(
         (-electrode_width, y_start), electrode_width, electrode_height, color="gray", zorder=1
     )
 
-    right_electrode = patches.Rectangle((size_nm, y_start), electrode_width, electrode_height, color="gray", zorder=1)
+    right_electrode = patches.Rectangle((size_nm_y, y_start), electrode_width, electrode_height, color="gray", zorder=1)
 
     ax.add_patch(left_electrode)
     ax.add_patch(right_electrode)
 
     # Ajustar formato visual
-    ax.set_aspect("equal")
+    ax.set_aspect("auto")
 
     # 3. LÍMITES AJUSTADOS
-    ax.set_xlim(-electrode_width, size_nm + electrode_width)
+    ax.set_xlim(-electrode_width, size_nm_y + electrode_width)
 
-    # MEJORA 2: Un margen vertical invisible (0.05) para que el marco negro del gráfico
-    # no "pise" ni ampute los píxeles de las vacantes en los extremos.
     margen_y = 0.05
-    ax.set_ylim(-margen_y, size_nm + margen_y)
+    ax.set_ylim(-margen_y, size_nm_x + margen_y)
 
     # 4. MARCAS AUTOMÁTICAS
-    paso_ticks = 2 if size_nm <= 15 else (5 if size_nm <= 30 else 10)
-    ax.set_xticks(np.arange(0, size_nm + 1, paso_ticks))
-    ax.set_yticks(np.arange(0, size_nm + 1, paso_ticks))
+    paso_ticks_x = 2 if size_nm_y <= 15 else (5 if size_nm_y <= 30 else 10)
+    paso_ticks_y = 2 if size_nm_x <= 15 else (5 if size_nm_x <= 30 else 10)
+    ax.set_xticks(np.arange(0, size_nm_y + 1, paso_ticks_x))
+    ax.set_yticks(np.arange(0, size_nm_x + 1, paso_ticks_y))
 
     # Configurar etiquetas y título
     ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
@@ -303,7 +307,8 @@ def RepresentateTwoStates(
     voltage: float,
     filename: str = None,  # type: ignore
     guardar_png: bool = False,
-    device_size: float = 10e-9,
+    device_size_x: float = 10e-9,
+    device_size_y: float = 10e-9,
 ) -> None:
     """
     Representa el estado de dos matrices con un estilo gráfico personalizado en el mismo plot.
@@ -311,9 +316,10 @@ def RepresentateTwoStates(
     Parámetros:
     - matriz1 (np.ndarray): Primera matriz a representar (color rojo).
     - matriz2 (np.ndarray): Segunda matriz a representar (color azul).
-    - k (int): Factor para calcular el voltaje.
-    - paso_voltaje (float): Paso de voltaje.
+    - voltage (float): Voltaje aplicado.
     - filename (str, opcional): Nombre del archivo para guardar la gráfica.
+    - device_size_x (float): Tamaño físico en X (lateral, filas) en metros.
+    - device_size_y (float): Tamaño físico en Y (entre electrodos, columnas) en metros.
 
     Retorna:
     - None
@@ -323,11 +329,12 @@ def RepresentateTwoStates(
     fig, ax = plt.subplots(figsize=(12, 9))  # Tamaño de la figura ajustado
     config_ax_state(ax)
 
-    size_nm = device_size * 1e9  # Convertir a nm ya que siempre se representa en nm
+    size_nm_x = device_size_x * 1e9  # Dirección lateral (filas) → eje Y del plot
+    size_nm_y = device_size_y * 1e9  # Dirección entre electrodos (columnas) → eje X del plot
 
     nrows, ncols = matriz1.shape
-    x = np.linspace(0, size_nm, ncols)  # Escala real de 10 nm en eje X
-    y = np.linspace(0, size_nm, nrows)  # Escala real de 10 nm en eje Y
+    x = np.linspace(0, size_nm_y, ncols)
+    y = np.linspace(0, size_nm_x, nrows)
 
     # Crear mapas de colores para cada matriz
     cmap1 = LinearSegmentedColormap.from_list("cmap1", [(1, 1, 1), (0.9647, 0.1725, 0.3059)], N=2)  # Rojo
@@ -356,35 +363,36 @@ def RepresentateTwoStates(
         alpha=0.5,  # Transparencia para superposición
     )
 
-    # Configuración de electrodos con mayor altura
-    electrode_width = 0.2  # Se mantiene el ancho en X
-    electrode_height = size_nm  # Se extienden en Y (de -1 a 11)
-    electrode_color = "gray"  # Color de los electrodos
+    # Configuración de electrodos
+    electrode_width = 0.2
+    electrode_height = size_nm_x
+    electrode_color = "gray"
 
     left_electrode = patches.Rectangle((-0.3, -0.5), electrode_width, electrode_height + 1, color=electrode_color)
 
     right_electrode = patches.Rectangle(
-        (device_size, -0.5), electrode_width, electrode_height + 1, color=electrode_color
+        (size_nm_y, -0.5), electrode_width, electrode_height + 1, color=electrode_color
     )
 
     ax.add_patch(left_electrode)
     ax.add_patch(right_electrode)
-    # Aplicar configuración de ejes
 
     # Configurar etiquetas y título
-    ax.set_xticks(np.arange(0, 26, 2))  # Ticks cada 2 nm en X
-    ax.set_yticks(np.arange(0, 26, 2))  # Ticks cada 2 nm en Y
+    paso_ticks_x = 2 if size_nm_y <= 15 else (5 if size_nm_y <= 30 else 10)
+    paso_ticks_y = 2 if size_nm_x <= 15 else (5 if size_nm_x <= 30 else 10)
+    ax.set_xticks(np.arange(0, size_nm_y + 1, paso_ticks_x))
+    ax.set_yticks(np.arange(0, size_nm_x + 1, paso_ticks_y))
     ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
     ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
     ax.set_title(rf"V = {voltage} (V)", pad=20)
 
     # Ajustar formato visual
-    ax.set_aspect("equal")
+    ax.set_aspect("auto")
     ax.invert_yaxis()
 
     # Ajustar límites del eje X y Y para que los electrodos sean visibles
-    ax.set_xlim(-0.3, device_size + 0.3)
-    ax.set_ylim(-0, device_size)
+    ax.set_xlim(-0.3, size_nm_y + 0.3)
+    ax.set_ylim(-0, size_nm_x)
 
     # Aumentar margen superior para más espacio en el título
     plt.subplots_adjust(top=0.85)
@@ -711,16 +719,17 @@ def plot_IV_marcado(
     plt.close(fig)  # Cierra para liberar memoria
 
 
-def plot_thermal_state(T_map, types_map, voltage, num_levels=10, device_size: float = 10e-9, save_path=None):
+def plot_thermal_state(T_map, types_map, voltage, num_levels=10, device_size_x: float = 10e-9, device_size_y: float = 10e-9, save_path=None):
     """
     Visualiza el mapa de temperatura con superposición de materiales e isotermas alineadas.
 
     Argumentos:
     - T_map: Matriz de temperaturas (resultado del solver).
     - types_map: Matriz de materiales (ID 1: Filamento, ID 3: Electrodo).
-    - title: Título del gráfico.
     - num_levels: Cantidad de líneas de contorno para las isotermas.
-    - save_path: (Opcional) Ruta completa con nombre de archivo para guardar la imagen (ej: 'img/termico.png').
+    - device_size_x: Tamaño físico en X (lateral, filas) en metros.
+    - device_size_y: Tamaño físico en Y (entre electrodos, columnas) en metros.
+    - save_path: (Opcional) Ruta completa con nombre de archivo para guardar la imagen.
     """
 
     # 2. Aplicar los estilos globales ANTES de crear la figura
@@ -734,11 +743,12 @@ def plot_thermal_state(T_map, types_map, voltage, num_levels=10, device_size: fl
 
     # 1. Configuración de dimensiones y límites (Alineación perfecta)
     Ny, Nx = T_map.shape
-    size_nm = device_size * 1e9  # Convertir a nm
-    extent = [0, size_nm, 0, size_nm]
+    size_nm_x = device_size_x * 1e9  # Dirección lateral (filas) → eje Y del plot
+    size_nm_y = device_size_y * 1e9  # Dirección entre electrodos (columnas) → eje X del plot
+    extent = [0, size_nm_y, 0, size_nm_x]
 
     # 5. Capa base: Temperatura
-    im = ax.imshow(T_map, cmap="coolwarm", origin="lower", extent=extent, aspect="equal")
+    im = ax.imshow(T_map, cmap="coolwarm", origin="lower", extent=extent, aspect="auto")
     cbar = fig.colorbar(im, ax=ax, fraction=0.05, pad=0.04)
     cbar.set_label("Temperatura (K)")
 
@@ -746,7 +756,7 @@ def plot_thermal_state(T_map, types_map, voltage, num_levels=10, device_size: fl
     overlay = np.zeros((Ny, Nx, 4))
     overlay[types_map == 3] = [0.2, 0.2, 0.2, 0.8]  # Electrodos: Gris oscuro
     overlay[types_map == 1] = [0.5, 0.5, 0.5, 0.4]  # Filamento: Gris claro
-    ax.imshow(overlay, origin="lower", extent=extent, aspect="equal")
+    ax.imshow(overlay, origin="lower", extent=extent, aspect="auto")
 
     # 7. Capa de Isotermas
     niveles = np.linspace(np.min(T_map), np.max(T_map), num_levels)
@@ -762,17 +772,18 @@ def plot_thermal_state(T_map, types_map, voltage, num_levels=10, device_size: fl
     # Eliminado el fontsize=7 para que herede la proporción del documento
     ax.clabel(contours, fontsize=18, inline=True, fmt="%d")
 
-    paso_ticks = 2 if size_nm <= 15 else (5 if size_nm <= 30 else 10)
-    ax.set_xticks(np.arange(0, size_nm + 1, paso_ticks))
-    ax.set_yticks(np.arange(0, size_nm + 1, paso_ticks))
+    paso_ticks_x = 2 if size_nm_y <= 15 else (5 if size_nm_y <= 30 else 10)
+    paso_ticks_y = 2 if size_nm_x <= 15 else (5 if size_nm_x <= 30 else 10)
+    ax.set_xticks(np.arange(0, size_nm_y + 1, paso_ticks_x))
+    ax.set_yticks(np.arange(0, size_nm_x + 1, paso_ticks_y))
 
     # 8. Estética y Leyenda
-    ax.set_title(f"$V_{{RRAM}}$ = {voltage} V", pad=25)  # Eliminado fontsize=14
+    ax.set_title(f"$V_{{RRAM}}$ = {voltage} V", pad=25)
     ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
     ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
 
     # Ajustar formato visual
-    ax.set_aspect("equal")
+    ax.set_aspect("auto")
     # ax.invert_yaxis()
 
     # patches = [
@@ -852,11 +863,15 @@ def RepresentateHeatmap(
     vmax: float | None = None,
     electrode_width: float = 0.2,
     cero_blanco: bool = True,
-    device_size: float = 10e-09,
+    device_size_x: float = 10e-09,
+    device_size_y: float = 10e-09,
 ) -> None:
     """
     Representa una matriz de valores continuos.
     Permite forzar que el valor 0 exacto se represente en color blanco.
+
+    El eje X del plot corresponde a la dirección Y física (entre electrodos, device_size_y).
+    El eje Y del plot corresponde a la dirección X física (lateral, device_size_x).
     """
     fig, ax = plt.subplots(figsize=(12, 9))
 
@@ -864,7 +879,8 @@ def RepresentateHeatmap(
     setup_paper_plt(plt, latex=True, scaling=3)
     config_ax_state(ax)
 
-    size_nm = device_size * 1e9  # Convertir a nm
+    size_nm_x = device_size_x * 1e9  # Dirección lateral (filas) → eje Y del plot
+    size_nm_y = device_size_y * 1e9  # Dirección entre electrodos (columnas) → eje X del plot
 
     # 1. GESTIÓN DEL COLOR Y MÁSCARA PARA EL CERO
     # Obtenemos una copia del mapa de colores para poder modificarlo de forma segura
@@ -888,38 +904,39 @@ def RepresentateHeatmap(
         cmap=cmap,
         vmin=val_min,
         vmax=val_max,
-        extent=[0, size_nm, 0, size_nm],
+        extent=[0, size_nm_y, 0, size_nm_x],
         origin="lower",
         interpolation="nearest",
-        aspect="equal",
+        aspect="auto",
         zorder=2,
     )
 
     # 3. ELECTRODOS
     y_start = 0
-    electrode_height = size_nm
+    electrode_height = size_nm_x
 
     left_electrode = patches.Rectangle(
         (-electrode_width, y_start), electrode_width, electrode_height, color="gray", zorder=1
     )
 
-    right_electrode = patches.Rectangle((size_nm, y_start), electrode_width, electrode_height, color="gray", zorder=1)
+    right_electrode = patches.Rectangle((size_nm_y, y_start), electrode_width, electrode_height, color="gray", zorder=1)
 
     ax.add_patch(left_electrode)
     ax.add_patch(right_electrode)
 
     # Ajustar formato visual
-    ax.set_aspect("equal")
+    ax.set_aspect("auto")
 
     # 4. LÍMITES AJUSTADOS
-    ax.set_xlim(-electrode_width, size_nm + electrode_width)
+    ax.set_xlim(-electrode_width, size_nm_y + electrode_width)
     margen_y = 0.05
-    ax.set_ylim(-margen_y, size_nm + margen_y)
+    ax.set_ylim(-margen_y, size_nm_x + margen_y)
 
     # Configurar marcas (ticks)
-    paso_ticks = 2 if size_nm <= 15 else (5 if size_nm <= 30 else 10)
-    ax.set_xticks(np.arange(0, size_nm + 1, paso_ticks))
-    ax.set_yticks(np.arange(0, size_nm + 1, paso_ticks))
+    paso_ticks_x = 2 if size_nm_y <= 15 else (5 if size_nm_y <= 30 else 10)
+    paso_ticks_y = 2 if size_nm_x <= 15 else (5 if size_nm_x <= 30 else 10)
+    ax.set_xticks(np.arange(0, size_nm_y + 1, paso_ticks_x))
+    ax.set_yticks(np.arange(0, size_nm_x + 1, paso_ticks_y))
 
     # Configurar etiquetas y título
     ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
@@ -955,7 +972,8 @@ def plot_centros_filamento(
     centros_calculados: list,
     filas_intermedias: list,
     filename: str | None = None,
-    device_size: float = 10e-9,
+    device_size_x: float = 10e-9,
+    device_size_y: float = 10e-9,
     atom_size: float = 0.25e-9,
     electrode_width: float = 0.2,
 ) -> None:
@@ -963,28 +981,32 @@ def plot_centros_filamento(
     Genera un gráfico visualizando los centros de filamentos calculados y las
     filas donde se colocarán los muros térmicos, envuelto por electrodos.
     Muestra en la leyenda el índice y la fila exacta de cada centro y muro.
+
+    El eje X del plot corresponde a la dirección Y física (entre electrodos, device_size_y).
+    El eje Y del plot corresponde a la dirección X física (lateral, device_size_x).
     """
     # 1. Aplicar estilos y crear figura (Estándar RRAM)
     setup_paper_plt(plt, latex=True, scaling=3)
     fig, ax = plt.subplots(figsize=(12, 9))
     config_ax_state(ax)
 
-    size_nm = device_size * 1e9
+    size_nm_x = device_size_x * 1e9  # Dirección lateral (filas) → eje Y del plot
+    size_nm_y = device_size_y * 1e9  # Dirección entre electrodos (columnas) → eje X del plot
     atom_size_nm = atom_size * 1e9
 
     # 2. Dibujo de la matriz (zorder=2)
-    ax.imshow(matriz_state, cmap="Blues", origin="lower", aspect="equal", extent=[0, size_nm, 0, size_nm], zorder=2)
+    ax.imshow(matriz_state, cmap="Blues", origin="lower", aspect="auto", extent=[0, size_nm_y, 0, size_nm_x], zorder=2)
 
     # ==========================================================
     # 3. ELECTRODOS ENVOLVENTES
     # ==========================================================
     y_start = 0
-    electrode_height = size_nm
+    electrode_height = size_nm_x
 
     left_electrode = patches.Rectangle(
         (-electrode_width, y_start), electrode_width, electrode_height, color="gray", zorder=1
     )
-    right_electrode = patches.Rectangle((size_nm, y_start), electrode_width, electrode_height, color="gray", zorder=1)
+    right_electrode = patches.Rectangle((size_nm_y, y_start), electrode_width, electrode_height, color="gray", zorder=1)
 
     ax.add_patch(left_electrode)
     ax.add_patch(right_electrode)
@@ -1015,7 +1037,7 @@ def plot_centros_filamento(
                 linestyle="-",
                 alpha=0.9,
                 linewidth=3,
-                label=f"Centro {idx + 1} (Fila {centro})",  # <-- ¡Mejora aquí!
+                label=f"Centro {idx + 1} (Fila {centro})",
                 zorder=3,
             )
 
@@ -1036,15 +1058,16 @@ def plot_centros_filamento(
     # ==========================================================
     # 5. LÍMITES AJUSTADOS Y ESTÉTICA
     # ==========================================================
-    ax.set_aspect("equal")
+    ax.set_aspect("auto")
 
-    ax.set_xlim(-electrode_width, size_nm + electrode_width)
+    ax.set_xlim(-electrode_width, size_nm_y + electrode_width)
     margen_y = 0.05
-    ax.set_ylim(-margen_y, size_nm + margen_y)
+    ax.set_ylim(-margen_y, size_nm_x + margen_y)
 
-    paso_ticks = 2 if size_nm <= 15 else (5 if size_nm <= 30 else 10)
-    ax.set_xticks(np.arange(0, size_nm + 1, paso_ticks))
-    ax.set_yticks(np.arange(0, size_nm + 1, paso_ticks))
+    paso_ticks_x = 2 if size_nm_y <= 15 else (5 if size_nm_y <= 30 else 10)
+    paso_ticks_y = 2 if size_nm_x <= 15 else (5 if size_nm_x <= 30 else 10)
+    ax.set_xticks(np.arange(0, size_nm_y + 1, paso_ticks_x))
+    ax.set_yticks(np.arange(0, size_nm_x + 1, paso_ticks_y))
 
     ax.set_title("Centros de Filamento y Límites", pad=20)
     ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
@@ -1073,7 +1096,8 @@ def plot_centros_filamento_det(
     centros_calculados: list,
     filas_intermedias: list,
     filename: str | None = None,
-    device_size: float = 10e-9,
+    device_size_x: float = 10e-9,
+    device_size_y: float = 10e-9,
     atom_size: float = 0.25e-9,
     electrode_width: float = 0.2,
 ) -> None:
@@ -1081,45 +1105,49 @@ def plot_centros_filamento_det(
     Genera un gráfico visualizando los centros de filamentos calculados y las
     filas donde se colocarán los muros térmicos, envuelto por electrodos.
     Muestra en la leyenda el índice y la fila exacta de cada centro y muro.
-    Incluye una malla visual estricta cada 0.25 nm (en los bordes de la celda).
+    Incluye una malla visual estricta cada atom_size nm.
+
+    El eje X del plot corresponde a la dirección Y física (entre electrodos, device_size_y).
+    El eje Y del plot corresponde a la dirección X física (lateral, device_size_x).
     """
     # 1. Aplicar estilos y crear figura (Estándar RRAM)
     setup_paper_plt(plt, latex=True, scaling=3)
     fig, ax = plt.subplots(figsize=(12, 9))
     config_ax_state(ax)
 
-    size_nm = device_size * 1e9
+    size_nm_x = device_size_x * 1e9  # Dirección lateral (filas) → eje Y del plot
+    size_nm_y = device_size_y * 1e9  # Dirección entre electrodos (columnas) → eje X del plot
     atom_size_nm = atom_size * 1e9
 
     # 2. Dibujo de la matriz (zorder=2)
-    ax.imshow(matriz_state, cmap="Blues", origin="lower", aspect="equal", extent=[0, size_nm, 0, size_nm], zorder=2)
+    ax.imshow(matriz_state, cmap="Blues", origin="lower", aspect="auto", extent=[0, size_nm_y, 0, size_nm_x], zorder=2)
 
     # ==========================================================
     # 3. ELECTRODOS ENVOLVENTES
     # ==========================================================
     y_start = 0
-    electrode_height = size_nm
+    electrode_height = size_nm_x
 
     left_electrode = patches.Rectangle(
         (-electrode_width, y_start), electrode_width, electrode_height, color="gray", zorder=1
     )
-    right_electrode = patches.Rectangle((size_nm, y_start), electrode_width, electrode_height, color="gray", zorder=1)
+    right_electrode = patches.Rectangle((size_nm_y, y_start), electrode_width, electrode_height, color="gray", zorder=1)
 
     ax.add_patch(left_electrode)
     ax.add_patch(right_electrode)
 
     # ==========================================================
-    # 3.5. CUADRÍCULA ESTRICTA CADA 0.25 NM
+    # 3.5. CUADRÍCULA ESTRICTA CADA atom_size NM
     # ==========================================================
-    # Dibujamos líneas horizontales desde 0 hasta size_nm saltando exactamente el tamaño del átomo
-    for y_grid in np.arange(0, size_nm + atom_size_nm, atom_size_nm):
+    # Líneas horizontales (dirección X, filas)
+    for y_grid in np.arange(0, size_nm_x + atom_size_nm, atom_size_nm):
         ax.axhline(
             y=y_grid,
-            color="black",  # Color oscuro para contraste
-            linestyle="--",  # Línea discontinua
-            alpha=0.25,  # Transparencia baja para que no sature
-            linewidth=0.8,  # Línea fina
-            zorder=2.5,  # Encima de la matriz pero debajo de los centros
+            color="black",
+            linestyle="--",
+            alpha=0.25,
+            linewidth=0.8,
+            zorder=2.5,
         )
 
     # ==========================================================
@@ -1169,15 +1197,16 @@ def plot_centros_filamento_det(
     # ==========================================================
     # 5. LÍMITES AJUSTADOS Y ESTÉTICA
     # ==========================================================
-    ax.set_aspect("equal")
+    ax.set_aspect("auto")
 
-    ax.set_xlim(-electrode_width, size_nm + electrode_width)
+    ax.set_xlim(-electrode_width, size_nm_y + electrode_width)
     margen_y = 0.05
-    ax.set_ylim(-margen_y, size_nm + margen_y)
+    ax.set_ylim(-margen_y, size_nm_x + margen_y)
 
-    paso_ticks = 2 if size_nm <= 15 else (5 if size_nm <= 30 else 10)
-    ax.set_xticks(np.arange(0, size_nm + 1, paso_ticks))
-    ax.set_yticks(np.arange(0, size_nm + 1, paso_ticks))
+    paso_ticks_x = 2 if size_nm_y <= 15 else (5 if size_nm_y <= 30 else 10)
+    paso_ticks_y = 2 if size_nm_x <= 15 else (5 if size_nm_x <= 30 else 10)
+    ax.set_xticks(np.arange(0, size_nm_y + 1, paso_ticks_x))
+    ax.set_yticks(np.arange(0, size_nm_x + 1, paso_ticks_y))
 
     ax.set_title("Centros de Filamento y Límites", pad=20)
     ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
@@ -1205,19 +1234,24 @@ def plot_muro_termico(
     matriz_molde: np.ndarray | None = None,
     titulo: str = "Thermal Walls Placement and Temperature",
     filename: str | None = None,
-    device_size: float = 10e-09,
+    device_size_x: float = 10e-09,
+    device_size_y: float = 10e-09,
     electrode_width: float = 0.2,
 ) -> None:
     """
     Dibuja el dispositivo en 2D. Muestra los filamentos de fondo (gris claro),
     la ubicación de los muros térmicos (colores) y los electrodos (gris oscuro).
+
+    El eje X del plot corresponde a la dirección Y física (entre electrodos, device_size_y).
+    El eje Y del plot corresponde a la dirección X física (lateral, device_size_x).
     """
     # 1. Aplicar estilos estándar
     setup_paper_plt(plt, latex=True, scaling=3)
     fig, ax = plt.subplots(figsize=(12, 9))
     config_ax_state(ax)
 
-    size_nm = device_size * 1e9
+    size_nm_x = device_size_x * 1e9  # Dirección lateral (filas) → eje Y del plot
+    size_nm_y = device_size_y * 1e9  # Dirección entre electrodos (columnas) → eje X del plot
 
     # ==========================================================
     # 2. CAPA DE FONDO: Matriz Molde (Filamentos)
@@ -1229,8 +1263,8 @@ def plot_muro_termico(
             cmap="Greys",
             origin="lower",
             alpha=0.25,
-            extent=[0, size_nm, 0, size_nm],
-            aspect="equal",
+            extent=[0, size_nm_y, 0, size_nm_x],
+            aspect="auto",
             zorder=2,
         )
 
@@ -1242,7 +1276,7 @@ def plot_muro_termico(
 
     # Dibujamos el muro con un colormap térmico (ej: plasma)
     im_muros = ax.imshow(
-        muros_visibles, cmap="plasma", origin="lower", extent=[0, size_nm, 0, size_nm], aspect="equal", zorder=3
+        muros_visibles, cmap="plasma", origin="lower", extent=[0, size_nm_y, 0, size_nm_x], aspect="auto", zorder=3
     )
 
     # Añadimos la barra de color vinculada solo a la temperatura del muro
@@ -1253,12 +1287,12 @@ def plot_muro_termico(
     # 4. ELECTRODOS (Estilo RepresentateState)
     # ==========================================================
     y_start = 0
-    electrode_height = size_nm
+    electrode_height = size_nm_x
 
     left_electrode = patches.Rectangle(
         (-electrode_width, y_start), electrode_width, electrode_height, color="gray", zorder=1
     )
-    right_electrode = patches.Rectangle((size_nm, y_start), electrode_width, electrode_height, color="gray", zorder=1)
+    right_electrode = patches.Rectangle((size_nm_y, y_start), electrode_width, electrode_height, color="gray", zorder=1)
 
     ax.add_patch(left_electrode)
     ax.add_patch(right_electrode)
@@ -1266,17 +1300,18 @@ def plot_muro_termico(
     # ==========================================================
     # 5. CONFIGURACIÓN DE EJES Y ESTÉTICA
     # ==========================================================
-    ax.set_aspect("equal")
+    ax.set_aspect("auto")
 
     # Ajustar límites para mostrar electrodos
-    ax.set_xlim(-electrode_width, size_nm + electrode_width)
+    ax.set_xlim(-electrode_width, size_nm_y + electrode_width)
     margen_y = 0.05
-    ax.set_ylim(-margen_y, size_nm + margen_y)
+    ax.set_ylim(-margen_y, size_nm_x + margen_y)
 
     # Ticks dinámicos
-    paso_ticks = 2 if size_nm <= 15 else (5 if size_nm <= 30 else 10)
-    ax.set_xticks(np.arange(0, size_nm + 1, paso_ticks))
-    ax.set_yticks(np.arange(0, size_nm + 1, paso_ticks))
+    paso_ticks_x = 2 if size_nm_y <= 15 else (5 if size_nm_y <= 30 else 10)
+    paso_ticks_y = 2 if size_nm_x <= 15 else (5 if size_nm_x <= 30 else 10)
+    ax.set_xticks(np.arange(0, size_nm_y + 1, paso_ticks_x))
+    ax.set_yticks(np.arange(0, size_nm_x + 1, paso_ticks_y))
 
     # Textos y Títulos
     ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
@@ -1302,14 +1337,18 @@ def plot_thermal_state_muro(
     types_map,
     voltage,
     num_levels=10,
-    device_size: float = 10e-9,
+    device_size_x: float = 10e-9,
+    device_size_y: float = 10e-9,
     save_path=None,
-    atom_size: float = 0.25e-9,  # <-- Añadido parámetro atom_size
-    filas_intermedias: list | None = None,  # <-- Añadido parámetro de muros
+    atom_size: float = 0.25e-9,
+    filas_intermedias: list | None = None,
 ):
     """
     Visualiza el mapa de temperatura con superposición de materiales e isotermas alineadas.
     Permite visualizar la ubicación de los muros térmicos si se proporcionan las filas.
+
+    El eje X del plot corresponde a la dirección Y física (entre electrodos, device_size_y).
+    El eje Y del plot corresponde a la dirección X física (lateral, device_size_x).
     """
 
     # 1. Aplicar los estilos globales ANTES de crear la figura
@@ -1323,12 +1362,13 @@ def plot_thermal_state_muro(
 
     # 4. Configuración de dimensiones y límites (Alineación perfecta)
     Ny, Nx = T_map.shape
-    size_nm = device_size * 1e9  # Convertir a nm
-    atom_size_nm = atom_size * 1e9  # Convertir la celda a nm
-    extent = [0, size_nm, 0, size_nm]
+    size_nm_x = device_size_x * 1e9  # Dirección lateral (filas) → eje Y del plot
+    size_nm_y = device_size_y * 1e9  # Dirección entre electrodos (columnas) → eje X del plot
+    atom_size_nm = atom_size * 1e9
+    extent = [0, size_nm_y, 0, size_nm_x]
 
     # 5. Capa base: Temperatura
-    im = ax.imshow(T_map, cmap="coolwarm", origin="lower", extent=extent, aspect="equal", zorder=1)
+    im = ax.imshow(T_map, cmap="coolwarm", origin="lower", extent=extent, aspect="auto", zorder=1)
     cbar = fig.colorbar(im, ax=ax, fraction=0.05, pad=0.04)
     cbar.set_label("Temperatura (K)")
 
@@ -1336,7 +1376,7 @@ def plot_thermal_state_muro(
     overlay = np.zeros((Ny, Nx, 4))
     overlay[types_map == 3] = [0.2, 0.2, 0.2, 0.8]  # Electrodos: Gris oscuro
     overlay[types_map == 1] = [0.5, 0.5, 0.5, 0.4]  # Filamento: Gris claro
-    ax.imshow(overlay, origin="lower", extent=extent, aspect="equal", zorder=2)
+    ax.imshow(overlay, origin="lower", extent=extent, aspect="auto", zorder=2)
 
     # 7. Capa de Isotermas
     niveles = np.linspace(np.min(T_map), np.max(T_map), num_levels)
@@ -1376,15 +1416,16 @@ def plot_thermal_state_muro(
     # ==========================================================
 
     # 9. Estética y marcas (Ticks)
-    paso_ticks = 2 if size_nm <= 15 else (5 if size_nm <= 30 else 10)
-    ax.set_xticks(np.arange(0, size_nm + 1, paso_ticks))
-    ax.set_yticks(np.arange(0, size_nm + 1, paso_ticks))
+    paso_ticks_x = 2 if size_nm_y <= 15 else (5 if size_nm_y <= 30 else 10)
+    paso_ticks_y = 2 if size_nm_x <= 15 else (5 if size_nm_x <= 30 else 10)
+    ax.set_xticks(np.arange(0, size_nm_y + 1, paso_ticks_x))
+    ax.set_yticks(np.arange(0, size_nm_x + 1, paso_ticks_y))
 
     ax.set_title(f"$V_{{RRAM}}$ = {voltage} V", pad=25)
     ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
     ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
 
-    ax.set_aspect("equal")
+    ax.set_aspect("auto")
 
     plt.tight_layout()
 
