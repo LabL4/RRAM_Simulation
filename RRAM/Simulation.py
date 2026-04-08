@@ -60,7 +60,7 @@ class SimulationParameters:
     def __post_init__(self):
         self.x_size = int(np.ceil(self.device_size_x / self.atom_size))  # Número de "casillas" en la dimensión x
         self.y_size = int(np.ceil(self.device_size_y / self.atom_size))  # Número de "casillas" en la dimensión y
-        self.num_max_vacantes = int(0.95 * (self.x_size * self.x_size))  # 95% de la matriz puede llenarse de vacantes
+        self.num_max_vacantes = int(0.95 * (self.x_size * self.y_size))  # 95% de la matriz puede llenarse de vacantes
         self.paso_temporal = self.total_simulation_time / self.num_pasos  # Paso temporal en segundos
         self.paso_potencial_set = self.voltaje_final_set / self.num_pasos  # Paso de voltaje para la parte de set
         self.paso_potencial_reset = self.voltaje_final_reset / self.num_pasos  # Paso de voltaje para la parte de reset
@@ -244,7 +244,7 @@ def procesar_filamentos_creados(
         if plot_filamento:
             nombre_img = imagen_path / f"Filamento_{i + 1}_creado_set_{num_simulation}.png"
             Representate.RepresentateState(
-                actual_state, round(voltage, 5), str(nombre_img), device_size=params.device_size
+                actual_state, round(voltage, 5), str(nombre_img), device_size=params.device_size_y
             )
 
         # Guardar estado actual en archivo pkl
@@ -302,7 +302,7 @@ def procesar_filamentos_destruidos(
         if plot_filamento:
             nombre_img = imagen_path / f"Filamento_{i + 1}_roto_reset_{num_simulation}.png"
             Representate.RepresentateState(
-                actual_state, round(voltage, 5), str(nombre_img), device_size=params.device_size
+                actual_state, round(voltage, 5), str(nombre_img), device_size=params.device_size_y
             )
 
         data_name = data_save_path / f"filamento_{i + 1}_roto_reset_{num_simulation}.npz"
@@ -510,7 +510,7 @@ def PP_set(
         Path.cwd() / f"Init_data/init_state_{num_simulation - 1}",
         rutas["figures_path"] / f"Initial_state_{num_simulation}.png",
         0.0,
-        device_size=params.device_size,
+        device_size=params.device_size_y,
     )
 
     sistema_percola = False
@@ -577,7 +577,7 @@ def PP_set(
         # Genero el vector campo eléctrico
         for i in range(0, params.x_size):
             E_field_vector[i] = ElectricField.GapElectricField(
-                voltage, i, actual_state, device_size=params.device_size, grid_size=params.atom_size
+                voltage, i, actual_state, device_size=params.device_size_y, grid_size=params.atom_size
             )
 
         # Verifica si el sistema ha percolado
@@ -814,7 +814,7 @@ def PP_set(
             )
             # print(f"El valor de la temperatura es {temperatura} K, se usa el modelo de temperatura de Joule\n")
 
-            # simple_field = ElectricField.SimpleElectricField(voltage, params.device_size)
+            # simple_field = ElectricField.SimpleElectricField(voltage, params.device_size_y)
             # Si no ha percolado uso la corriente de Poole-Frenkel
             if not total_vacantes_pp_set:
                 current = CurrentSolver.Poole_Frenkel(
@@ -823,7 +823,7 @@ def PP_set(
                     pb_metal_insul=sim_ctes.pb_metal_insul_set,
                     permitividad_relativa=sim_ctes.permitividad_relativa_set,
                     I_0=sim_ctes.I_0_set,
-                ) * (params.device_size)
+                ) * (params.device_size_y)
 
         if total_vacantes < max_vancantes_pp_set:
             if all_CFs_created:
@@ -1071,7 +1071,7 @@ def SP_set(
         # Genero el vector campo eléctrico
         for i in range(0, params.x_size):
             E_field_vector[i] = ElectricField.GapElectricField(
-                voltage, i, actual_state, device_size=params.device_size, grid_size=params.atom_size
+                voltage, i, actual_state, device_size=params.device_size_y, grid_size=params.atom_size
             )
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
@@ -1219,7 +1219,7 @@ def SP_set(
                     pb_metal_insul=sim_ctes.pb_metal_insul_set,
                     permitividad_relativa=sim_ctes.permitividad_relativa_set,
                     I_0=sim_ctes.I_0_set,
-                ) * (params.device_size)
+                ) * (params.device_size_y)
 
         if total_vacantes < max_vancantes_sp_set:
             # Actualizo el estado del sistema
@@ -1355,13 +1355,13 @@ def PP_reset(
         voltage = vector_ddp[k]
 
         # Obtengo los valores del campo eléctrico
-        E_field = abs(ElectricField.SimpleElectricField(voltage, params.device_size))
+        E_field = abs(ElectricField.SimpleElectricField(voltage, params.device_size_y))
 
         # Genero el vector campo eléctrico
         for i in range(0, actual_state.shape[0]):
             E_field_vector[i] = abs(
                 ElectricField.GapElectricField(
-                    voltage, i, actual_state, device_size=params.device_size, grid_size=params.atom_size
+                    voltage, i, actual_state, device_size=params.device_size_y, grid_size=params.atom_size
                 )
             )
 
@@ -1444,7 +1444,7 @@ def PP_reset(
                     permitividad_relativa=sim_ctes.permitividad_relativa_reset,
                     I_0=sim_ctes.I_0_reset,
                 )
-                * (params.device_size)
+                * (params.device_size_y)
             )
 
         # Actualizo el estado del sistema con la recombinación
@@ -1563,13 +1563,13 @@ def SP_reset(
         voltage = vector_ddp[k]
 
         # Obtengo los valores del campo eléctrico y la temperatura
-        E_field = abs(ElectricField.SimpleElectricField(voltage, params.device_size))
+        E_field = abs(ElectricField.SimpleElectricField(voltage, params.device_size_y))
 
         # Genero el vector campo eléctrico
         for i in range(0, actual_state.shape[0]):
             E_field_vector[i] = abs(
                 ElectricField.GapElectricField(
-                    voltage, i, actual_state, device_size=params.device_size, grid_size=params.atom_size
+                    voltage, i, actual_state, device_size=params.device_size_y, grid_size=params.atom_size
                 )
             )
 
@@ -1653,7 +1653,7 @@ def SP_reset(
                     permitividad_relativa=sim_ctes.permitividad_relativa_reset,
                     I_0=sim_ctes.I_0_reset,
                 )
-                * (params.device_size)
+                * (params.device_size_y)
             )
 
             temperatura = Temperature.Temperature_Joule(
