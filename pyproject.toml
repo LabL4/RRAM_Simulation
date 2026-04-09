@@ -1,4 +1,4 @@
 [tool.ruff]
-line-length = 88
+line-length = 120
 select = ["E225"]
 fix = true
