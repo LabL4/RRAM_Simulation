@@ -1,12 +1,13 @@
 # Excepciones personalizadas para el módulo RRAM
 
 from RRAM import Representate
-import numpy as np
 import pickle
 
 
 class NoPercolationException(Exception):
-    def __init__(self, message="El sistema no ha percolado al alcanzar el voltaje final"):
+    def __init__(
+        self, message="El sistema no ha percolado al alcanzar el voltaje final"
+    ):
         self.message = message
         super().__init__(self.message)
 
@@ -27,29 +28,14 @@ class MaxVacantesException(Exception):
 
 # Excepción para cuando el voltaje de percolación es demasiado alto
 class HighPercolationVoltageException(Exception):
-    def __init__(self, voltage_percola=None, data_path=None, actual_state=None):
+    def __init__(self, voltage_percola=None):
         if voltage_percola is not None:
-            message = f"El voltaje de percolación es demasiado alto.\nEl voltaje de percolación es: {voltage_percola}"
-
-            # Guardo el estado de la simulación empleando npz si no data path y actual state none
-            if data_path and actual_state is not None:
-                np.save(data_path, actual_state)
-        else:
-            message = "El voltaje de percolación es demasiado alto"
-        self.message = message
-        super().__init__(self.message)
-
-
-# Excepción para cuando la resistencia de la parte óhmica es baja y no se reproduce la seguna parte del set
-class LowResistanceException(Exception):
-    def __init__(self, valor_resistencia=None):
-        if valor_resistencia is not None:
             message = (
-                "La resistencia del sistema no reproduce la curva de la segunda parte del set\n"
-                f"El valor de la resistencia alcanzada es: {valor_resistencia}"
+                "El voltaje de percolación es demasiado alto.\n"
+                f"El voltaje de percolación es: {voltage_percola}"
             )
         else:
-            message = "La resistencia del sistema no reproduce la curva de la segunda parte del set"
+            message = "El voltaje de percolación es demasiado alto"
         self.message = message
         super().__init__(self.message)
 
@@ -61,43 +47,29 @@ class NullResistanceException(Exception):
     def __init__(
         self,
         simulation_path,
+        figures_path,
         voltage,
         num_simulation,
         actual_state,
     ):
-        self.filename = str(simulation_path) + f"/state_{voltage}_null_resistance.npz"
+        self.filename = str(simulation_path) + f"/state_{voltage}_null_resistance.pkl"
+        self.voltage = voltage
         self.simulation_path = simulation_path
         self.num_simulation = num_simulation + 1
         self.actual_state = actual_state
+        self.figures_path = (
+            str(figures_path) + f"/NULL_resistance_{self.num_simulation}.png"
+        )
 
         print("Null resistance matrix in ", self.filename)
 
+        # Generar representación visual
+        Representate.RepresentateState(
+            self.actual_state, round(self.voltage, 3), self.figures_path
+        )
+
         # Guardar estado
-        np.save(self.filename, self.actual_state)
+        with open(self.filename, "wb") as f:
+            pickle.dump({"actual_state": self.actual_state}, f)
 
         super().__init__("Se detectó una resistencia nula. La simulación se detendrá.")
-
-
-# Excepción para cuando no se han formado todos los filamentos conductores (CF)
-class FilamentosNoFormadosException(Exception):
-    """Excepción para manejar casos donde no se forman todos los filamentos esperados"""
-
-    def __init__(
-        self,
-        simulation_path,
-        num_simulation,
-        actual_state,
-        CF_formados,
-        CF_esperados,
-    ):
-        self.filename = str(simulation_path) + f"/simulation_{num_simulation}_not_all_CF_formed.npz"
-        self.simulation_path = simulation_path
-        self.num_simulation = num_simulation + 1
-        self.actual_state = actual_state
-
-        # Generar representación visual
-
-        # Guardar estado
-        np.save(self.filename, self.actual_state)
-
-        super().__init__(f"Se esperaba que se formaran {CF_esperados} CF, y se han formado {CF_formados} CF.")

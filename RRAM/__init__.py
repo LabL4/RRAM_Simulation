@@ -1,5 +1,3 @@
-from .simulation_config import *
-
 # __init__.py
 from .Plot_PostProcess import *
 from .ElectricField import *
