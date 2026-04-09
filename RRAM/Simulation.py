@@ -60,7 +60,7 @@ class SimulationParameters:
     def __post_init__(self):
         self.x_size = int(np.ceil(self.device_size_x / self.atom_size))  # Número de "casillas" en la dimensión x
         self.y_size = int(np.ceil(self.device_size_y / self.atom_size))  # Número de "casillas" en la dimensión y
-        self.num_max_vacantes = int(0.95 * (self.x_size * self.x_size))  # 95% de la matriz puede llenarse de vacantes
+        self.num_max_vacantes = int(0.95 * (self.x_size * self.y_size))  # 95% de la matriz puede llenarse de vacantes
         self.paso_temporal = self.total_simulation_time / self.num_pasos  # Paso temporal en segundos
         self.paso_potencial_set = self.voltaje_final_set / self.num_pasos  # Paso de voltaje para la parte de set
         self.paso_potencial_reset = self.voltaje_final_reset / self.num_pasos  # Paso de voltaje para la parte de reset
@@ -244,7 +244,11 @@ def procesar_filamentos_creados(
         if plot_filamento:
             nombre_img = imagen_path / f"Filamento_{i + 1}_creado_set_{num_simulation}.png"
             Representate.RepresentateState(
-                actual_state, round(voltage, 5), str(nombre_img), device_size=params.device_size
+                actual_state,
+                round(voltage, 5),
+                str(nombre_img),
+                device_size_x=params.device_size_x,
+                device_size_y=params.device_size_y,
             )
 
         # Guardar estado actual en archivo pkl
@@ -302,7 +306,11 @@ def procesar_filamentos_destruidos(
         if plot_filamento:
             nombre_img = imagen_path / f"Filamento_{i + 1}_roto_reset_{num_simulation}.png"
             Representate.RepresentateState(
-                actual_state, round(voltage, 5), str(nombre_img), device_size=params.device_size
+                actual_state,
+                round(voltage, 5),
+                str(nombre_img),
+                device_size_x=params.device_size_x,
+                device_size_y=params.device_size_y,
             )
 
         data_name = data_save_path / f"filamento_{i + 1}_roto_reset_{num_simulation}.npz"
@@ -337,8 +345,9 @@ def update_state_generation(
         E_field_matrix = E_field
 
     # 2. Ajuste de la matriz de Temperatura
+    # Si la temperatura tiene forma extendida (x_size+2, y_size) con filas de electrodos, las eliminamos
     if isinstance(temperatura, np.ndarray) and temperatura.shape != state.shape:
-        temp_matrix = temperatura[:, 1:-1]
+        temp_matrix = temperatura[1:-1, :]
     else:
         temp_matrix = temperatura
 
@@ -510,7 +519,8 @@ def PP_set(
         Path.cwd() / f"Init_data/init_state_{num_simulation - 1}",
         rutas["figures_path"] / f"Initial_state_{num_simulation}.png",
         0.0,
-        device_size=params.device_size,
+        device_size_x=params.device_size_x,
+        device_size_y=params.device_size_y,
     )
 
     sistema_percola = False
@@ -577,7 +587,7 @@ def PP_set(
         # Genero el vector campo eléctrico
         for i in range(0, params.x_size):
             E_field_vector[i] = ElectricField.GapElectricField(
-                voltage, i, actual_state, device_size=params.device_size, grid_size=params.atom_size
+                voltage, i, actual_state, device_size_x=params.device_size_x, grid_size=params.atom_size
             )
 
         # Verifica si el sistema ha percolado
@@ -780,10 +790,10 @@ def PP_set(
                     perfiles_muros_calculados=perfiles_muros_calculados,
                 )
 
-                # Añadimos columnas de ceros (donde no hay muro) en las posiciones de los electrodos
-                Ny = matriz_temperaturas_fijas.shape[0]
-                columna_ceros = np.zeros((Ny, 1))
-                matriz_temperaturas_fijas_final = np.hstack([columna_ceros, matriz_temperaturas_fijas, columna_ceros])
+                # Añadimos filas de ceros (donde no hay muro) en las posiciones de los electrodos (eje X)
+                Ny_size = matriz_temperaturas_fijas.shape[1]
+                fila_ceros = np.zeros((1, Ny_size))
+                matriz_temperaturas_fijas_final = np.vstack([fila_ceros, matriz_temperaturas_fijas, fila_ceros])
 
                 temperatura = Temperature.solve_thermal_state(
                     types_map=materials_map,
@@ -794,8 +804,8 @@ def PP_set(
                     matriz_muros=matriz_temperaturas_fijas_final,
                 )
 
-                # Actualizo la temperatura anterior para el siguiente paso, NO guardo las columnas primera y ultima ya q corresponden a los electrodos
-                temperatura_anterior = temperatura[:, 1:-1]
+                # Actualizo la temperatura anterior: elimino filas 0 y -1 (electrodos en eje X)
+                temperatura_anterior = temperatura[1:-1, :]
 
             else:
                 temperatura = Temperature.Temperature_Joule(
@@ -814,7 +824,7 @@ def PP_set(
             )
             # print(f"El valor de la temperatura es {temperatura} K, se usa el modelo de temperatura de Joule\n")
 
-            # simple_field = ElectricField.SimpleElectricField(voltage, params.device_size)
+            # simple_field = ElectricField.SimpleElectricField(voltage, params.device_size_x)
             # Si no ha percolado uso la corriente de Poole-Frenkel
             if not total_vacantes_pp_set:
                 current = CurrentSolver.Poole_Frenkel(
@@ -823,7 +833,7 @@ def PP_set(
                     pb_metal_insul=sim_ctes.pb_metal_insul_set,
                     permitividad_relativa=sim_ctes.permitividad_relativa_set,
                     I_0=sim_ctes.I_0_set,
-                ) * (params.device_size)
+                ) * (params.device_size_x)
 
         if total_vacantes < max_vancantes_pp_set:
             if all_CFs_created:
@@ -873,7 +883,7 @@ def PP_set(
                 matriz_para_plot_muro = np.copy(matriz_temperaturas_fijas)
                 for centro, perfil_filamento in zip(centros_calculados, mis_perfiles_extraidos):
                     if centro is not None and perfil_filamento is not None:
-                        matriz_para_plot_muro[centro, :] = perfil_filamento
+                        matriz_para_plot_muro[:, centro] = perfil_filamento
 
             # Guardo las variables del estado
             utils.guardar_estado_intermedio(
@@ -1018,8 +1028,8 @@ def SP_set(
 
     temperatura_anterior = final_state_pp_set["Temperatura_final"]
 
-    # Elimino las columnas 0 y ultima de la matriz de temperatura porque corresponden a los electrodos
-    temperatura_anterior = final_state_pp_set["Temperatura_final"][:, 1:-1]
+    # Elimino las filas 0 y última de la matriz de temperatura porque corresponden a los electrodos (eje X)
+    temperatura_anterior = final_state_pp_set["Temperatura_final"][1:-1, :]
 
     pendiente_temperatura = sim_ctes.pendiente_temperatura
 
@@ -1071,7 +1081,7 @@ def SP_set(
         # Genero el vector campo eléctrico
         for i in range(0, params.x_size):
             E_field_vector[i] = ElectricField.GapElectricField(
-                voltage, i, actual_state, device_size=params.device_size, grid_size=params.atom_size
+                voltage, i, actual_state, device_size_x=params.device_size_x, grid_size=params.atom_size
             )
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
@@ -1168,10 +1178,10 @@ def SP_set(
                 filas_intermedias=filas_intermedias,
                 perfiles_muros_calculados=perfiles_muros_calculados,
             )
-            # Añadimos columnas de ceros (donde no hay muro) en las posiciones de los electrodos
-            Ny = matriz_temperaturas_fijas.shape[0]
-            columna_ceros = np.zeros((Ny, 1))
-            matriz_temperaturas_fijas_final = np.hstack([columna_ceros, matriz_temperaturas_fijas, columna_ceros])
+            # Añadimos filas de ceros (donde no hay muro) en las posiciones de los electrodos (eje X)
+            Ny_size = matriz_temperaturas_fijas.shape[1]
+            fila_ceros = np.zeros((1, Ny_size))
+            matriz_temperaturas_fijas_final = np.vstack([fila_ceros, matriz_temperaturas_fijas, fila_ceros])
 
             temperatura = Temperature.solve_thermal_state(
                 types_map=materials_map,
@@ -1183,14 +1193,14 @@ def SP_set(
             )
 
             # Importante para que se actualice el perfil termico de los filamentos
-            temperatura_anterior = temperatura[:, 1:-1]
+            temperatura_anterior = temperatura[1:-1, :]
 
             if k % num_pasos_guardar_estado == 0:
                 if locals().get("matriz_temperaturas_fijas"):
                     matriz_para_plot_muro = np.copy(matriz_temperaturas_fijas)
                     for centro, perfil_filamento in zip(centros_calculados, mis_perfiles_extraidos):
                         if centro is not None and perfil_filamento is not None:
-                            matriz_para_plot_muro[centro, :] = perfil_filamento
+                            matriz_para_plot_muro[:, centro] = perfil_filamento
 
                 # Guardo las variables del estado
                 utils.guardar_estado_intermedio(
@@ -1219,7 +1229,7 @@ def SP_set(
                     pb_metal_insul=sim_ctes.pb_metal_insul_set,
                     permitividad_relativa=sim_ctes.permitividad_relativa_set,
                     I_0=sim_ctes.I_0_set,
-                ) * (params.device_size)
+                ) * (params.device_size_x)
 
         if total_vacantes < max_vancantes_sp_set:
             # Actualizo el estado del sistema
@@ -1355,13 +1365,13 @@ def PP_reset(
         voltage = vector_ddp[k]
 
         # Obtengo los valores del campo eléctrico
-        E_field = abs(ElectricField.SimpleElectricField(voltage, params.device_size))
+        E_field = abs(ElectricField.SimpleElectricField(voltage, params.device_size_x))
 
         # Genero el vector campo eléctrico
         for i in range(0, actual_state.shape[0]):
             E_field_vector[i] = abs(
                 ElectricField.GapElectricField(
-                    voltage, i, actual_state, device_size=params.device_size, grid_size=params.atom_size
+                    voltage, i, actual_state, device_size_x=params.device_size_x, grid_size=params.atom_size
                 )
             )
 
@@ -1444,7 +1454,7 @@ def PP_reset(
                     permitividad_relativa=sim_ctes.permitividad_relativa_reset,
                     I_0=sim_ctes.I_0_reset,
                 )
-                * (params.device_size)
+                * (params.device_size_x)
             )
 
         # Actualizo el estado del sistema con la recombinación
@@ -1563,13 +1573,13 @@ def SP_reset(
         voltage = vector_ddp[k]
 
         # Obtengo los valores del campo eléctrico y la temperatura
-        E_field = abs(ElectricField.SimpleElectricField(voltage, params.device_size))
+        E_field = abs(ElectricField.SimpleElectricField(voltage, params.device_size_x))
 
         # Genero el vector campo eléctrico
         for i in range(0, actual_state.shape[0]):
             E_field_vector[i] = abs(
                 ElectricField.GapElectricField(
-                    voltage, i, actual_state, device_size=params.device_size, grid_size=params.atom_size
+                    voltage, i, actual_state, device_size_x=params.device_size_x, grid_size=params.atom_size
                 )
             )
 
@@ -1653,7 +1663,7 @@ def SP_reset(
                     permitividad_relativa=sim_ctes.permitividad_relativa_reset,
                     I_0=sim_ctes.I_0_reset,
                 )
-                * (params.device_size)
+                * (params.device_size_x)
             )
 
             temperatura = Temperature.Temperature_Joule(

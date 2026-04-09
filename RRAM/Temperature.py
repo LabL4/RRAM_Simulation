@@ -64,32 +64,29 @@ def legacy_matriz_materiales(matriz_filamentos: np.ndarray) -> np.ndarray:
 
 def crear_matriz_materiales(matriz_filamentos):
     """
-    Versión corregida: Respeta los filamentos que toquen los bordes superior/inferior.
-    Solo aplica aislante (ID 2) donde antes había aire (ID 0).
+    Construye la matriz extendida de materiales con electrodos y bordes aislantes.
+
+    Convención de ejes:
+        shape[0] = eje X (filas) = distancia entre electrodos.
+        shape[1] = eje Y (columnas) = ancho transversal.
+
+    Los electrodos (ID 3) se añaden como FILAS en los extremos del eje X (Dirichlet).
+    El aislante (ID 2) se aplica en las COLUMNAS laterales del eje Y donde no hay filamento (Neumann).
+    Resultado: shape (x_size + 2, y_size).
     """
-    # 1. Copia de seguridad
     inner_map = matriz_filamentos.copy()
-    Ny, Nx = inner_map.shape
+    x_size, y_size = inner_map.shape  # filas = X, columnas = Y
 
-    # 2. Aplicar Condición de Aislante (Neumann) INTELIGENTE
-    # Solo sobrescribimos si NO hay filamento (es decir, si es 0)
-    # Fila Superior (0)
-    mask_aire_sup = inner_map[0, :] == 0
-    inner_map[0, mask_aire_sup] = 2
+    # Aplicar aislante (Neumann) en columnas laterales Y solo donde no hay filamento
+    mask_aire_izq = inner_map[:, 0] == 0
+    inner_map[mask_aire_izq, 0] = 2
 
-    # Fila Inferior (-1)
-    mask_aire_inf = inner_map[-1, :] == 0
-    inner_map[-1, mask_aire_inf] = 2
+    mask_aire_der = inner_map[:, -1] == 0
+    inner_map[mask_aire_der, -1] = 2
 
-    # Nota: Si en el borde hay un 1 (Filamento), se queda como 1.
-    # El solver aplicará automáticamente la condición adiabática (Neumann)
-    # en la frontera del dominio, independientemente del material.
-
-    # 3. Crear Electrodos Laterales (Dirichlet)
-    columna_electrodo = np.full((Ny, 1), 3, dtype=int)
-
-    # 4. Ensamblar
-    types_map = np.hstack([columna_electrodo, inner_map, columna_electrodo])
+    # Añadir electrodos como filas en los extremos del eje X (Dirichlet)
+    fila_electrodo = np.full((1, y_size), 3, dtype=int)
+    types_map = np.vstack([fila_electrodo, inner_map, fila_electrodo])  # (x_size+2, y_size)
 
     return types_map
 
@@ -98,45 +95,48 @@ def calculate_heat_source(
     types_map: np.ndarray, atom_size: float, I_total: float, R_cell: float, factor_generar_calor: float
 ) -> np.ndarray:
     """
-    Calcula el mapa de calor Q [W/m^3] usando aproximación resistiva por columnas.
-    Recibe la resistencia de celda y deduce la conductividad internamente para garantizar consistencia.
+    Calcula el mapa de calor Q [W/m^3] usando aproximación resistiva por filas X.
+
+    Convención de ejes:
+        shape[0] = eje X (filas) = dirección entre electrodos.
+        shape[1] = eje Y (columnas) = ancho transversal.
+
+    Para cada fila X interior, las celdas de filamento en dirección Y actúan como
+    resistencias en paralelo. La corriente circula a lo largo de X.
 
     Args:
-        types_map (np.ndarray): Matriz extendida con electrodos.
+        types_map (np.ndarray): Matriz extendida con electrodos (shape: x_size+2, y_size).
         atom_size (float): Tamaño de celda 'h' [m].
         I_total (float): Corriente total [A].
         R_cell (float): Resistencia óhmica de un nodo [Ohm].
+        factor_generar_calor (float): Factor de escala para la generación de calor.
     """
-    Ny, Nx = types_map.shape
-    Q_map_global = np.zeros((Ny, Nx))
+    x_size_ext, y_size = types_map.shape  # x_size_ext = x_size+2 (con electrodos), y_size = y_size
+    Q_map_global = np.zeros((x_size_ext, y_size))
 
-    # 1. Calculamos sigma localmente (Coste despreciable: 1 división)
-    # Garantizamos que sigma y R son coherentes siempre.
     sigma_material = 1.0 / (R_cell * atom_size)
 
-    # 2. Iteramos sobre columnas internas que es donde se encuentra el espacio de simulación real (quitando electrodos)
-    for j in range(1, Nx - 1):
-        column_data = types_map[:, j]
-        fil_indices = np.where(column_data == 1)[0]
-        N_total_columna = len(fil_indices)
+    # Iteramos sobre filas X internas (excluyendo electrodos en fila 0 y fila -1)
+    for i in range(1, x_size_ext - 1):
+        row_data = types_map[i, :]
+        fil_indices = np.where(row_data == 1)[0]  # índices Y (columnas) con filamento
+        N_total_fila = len(fil_indices)
 
-        if N_total_columna == 0:
+        if N_total_fila == 0:
             continue
 
-        # R equivalente de la columna (N resistencias en paralelo)
-        R_col = R_cell / N_total_columna
+        # R equivalente de la fila (N celdas Y en paralelo)
+        R_fila = R_cell / N_total_fila
 
-        # Caída de tensión local (Aproximación: I_total pasa por esta columna)
-        delta_V_local = I_total * R_col
+        # Caída de tensión local (I_total pasa por esta fila X)
+        delta_V_local = I_total * R_fila
 
         # Campo eléctrico local: E = V / h
         E_local = delta_V_local / atom_size
 
-        # Calor Joule: Q = sigma * E^2
+        # Calor Joule: Q = sigma * E^2, asignado a las celdas Y del filamento en esta fila X
         Q_val_local = sigma_material * (E_local**2)
-
-        # Factor de escala para convertir a W/m^3: Q_local [W/m^3] = sigma * (V/h)^2
-        Q_map_global[fil_indices, j] = Q_val_local * factor_generar_calor
+        Q_map_global[i, fil_indices] = Q_val_local * factor_generar_calor
 
     return Q_map_global
 
@@ -264,9 +264,21 @@ def solve_thermal_state(
 ) -> np.ndarray:
     """
     Ensambla y resuelve la ecuación del calor en estado estacionario (FVM).
+
+    Convención de ejes:
+        shape[0] = eje X (filas) = dirección entre electrodos. Electrodos en filas 0 y -1.
+        shape[1] = eje Y (columnas) = ancho transversal. Aislante adiabático en columnas 0 y -1.
+
+    Args:
+        types_map (np.ndarray): Matriz de materiales con electrodos (shape: x_size+2, y_size).
+        Q_map (np.ndarray): Mapa de calor Joule [W/m^3] (misma shape que types_map).
+        thermal_props (dict): {ID_material: {'k': conductividad}}.
+        atom_size (float): Tamaño de la celda [m].
+        T_ambient (float): Temperatura fija para condiciones Dirichlet [K].
+        matriz_muros (np.ndarray, optional): Mapa de muros térmicos (misma shape).
     """
-    Ny, Nx = types_map.shape
-    N = Ny * Nx  # Número total de incógnitas
+    x_size_ext, y_size = types_map.shape  # x_size_ext = x_size+2, y_size = y_size
+    N = x_size_ext * y_size
 
     data = []
     rows_idx = []
@@ -275,29 +287,21 @@ def solve_thermal_state(
 
     cell_volume = atom_size * atom_size
 
-    # print(
-    #     f"La matriz con la temperatura de los muros térmicos es:\n{matriz_muros}\n"
-    # )  # Depuración: Imprime la matriz de muros
+    for i in range(x_size_ext):      # i recorre eje X (filas)
+        for j in range(y_size):      # j recorre eje Y (columnas)
+            n = i * y_size + j       # índice lineal
 
-    for i in range(Ny):
-        for j in range(Nx):
-            n = i * Nx + j  # Índice lineal actual
-
-            # ==========================================================
-            # --- NUEVO: CONDICIÓN DIRICHLET POR MURO TÉRMICO ---
-            # Si nos han pasado la matriz de muros y esta celda tiene un valor > 0
-            # ==========================================================
+            # --- CONDICIÓN DIRICHLET POR MURO TÉRMICO ---
             if matriz_muros is not None and matriz_muros[i, j] > 0.0:
-                data.append(1.0)  # Coeficiente diagonal = 1
+                data.append(1.0)
                 rows_idx.append(n)
                 cols_idx.append(n)
-                b[n] = matriz_muros[i, j]  # Temperatura fijada al perfil del muro
-                continue  # Saltamos al siguiente píxel
-            # ==========================================================
+                b[n] = matriz_muros[i, j]
+                continue
 
             mat_id = types_map[i, j]
 
-            # --- CONDICIÓN DIRICHLET (Temperatura Fija - Electrodos) ---
+            # --- CONDICIÓN DIRICHLET (Electrodos, ID 3) ---
             if mat_id == 3:
                 data.append(1.0)
                 rows_idx.append(n)
@@ -305,34 +309,30 @@ def solve_thermal_state(
                 b[n] = T_ambient
                 continue
 
-            # --- CONDICIÓN NEUMANN / ECUACIÓN DEL CALOR ---
+            # --- ECUACIÓN DEL CALOR (Neumann en bordes Y, interior) ---
             k_center = thermal_props[mat_id]["k"]
             diag_sum = 0.0
 
             vecinos = []
             if i > 0:
-                vecinos.append(((i - 1, j), (i - 1) * Nx + j))  # Arriba
-            if i < Ny - 1:
-                vecinos.append(((i + 1, j), (i + 1) * Nx + j))  # Abajo
+                vecinos.append(((i - 1, j), (i - 1) * y_size + j))        # X anterior
+            if i < x_size_ext - 1:
+                vecinos.append(((i + 1, j), (i + 1) * y_size + j))        # X siguiente
             if j > 0:
-                vecinos.append(((i, j - 1), i * Nx + (j - 1)))  # Izquierda
-            if j < Nx - 1:
-                vecinos.append(((i, j + 1), i * Nx + (j + 1)))  # Derecha
+                vecinos.append(((i, j - 1), i * y_size + (j - 1)))        # Y anterior
+            if j < y_size - 1:
+                vecinos.append(((i, j + 1), i * y_size + (j + 1)))        # Y siguiente
 
             for (vec_i, vec_j), vec_n in vecinos:
                 mat_vec = types_map[vec_i, vec_j]
                 k_vec = thermal_props[mat_vec]["k"]
 
                 denom = k_center + k_vec
-                if denom == 0:
-                    k_eff = 0.0
-                else:
-                    k_eff = (2 * k_center * k_vec) / denom
+                k_eff = 0.0 if denom == 0 else (2 * k_center * k_vec) / denom
 
                 data.append(-k_eff)
                 rows_idx.append(n)
                 cols_idx.append(vec_n)
-
                 diag_sum += k_eff
 
             data.append(diag_sum)
@@ -341,87 +341,73 @@ def solve_thermal_state(
 
             b[n] = Q_map[i, j] * cell_volume
 
-    # --- RESOLUCIÓN DEL SISTEMA ---
     A_mat = coo_matrix((data, (rows_idx, cols_idx)), shape=(N, N))
-    A_csr = A_mat.tocsr()
-
-    T_vec = spsolve(A_csr, b)
-
-    T_final = T_vec.reshape((Ny, Nx))
-
-    # Aseguramos el tipo np.ndarray para satisfacer al linter (Pylance)
-    return np.asarray(T_final)
+    T_vec = spsolve(A_mat.tocsr(), b)
+    return np.asarray(T_vec.reshape((x_size_ext, y_size)))
 
 
 def obtener_centro_CF(types_map: np.ndarray, cf_ranges: list) -> list:
     """
-    Calcula los centros de los filamentos identificando bloques contiguos en cada columna,
-    y obteniendo la coordenada (fila) central que más se repite a lo largo de cada rango definido.
+    Calcula los centros en el eje Y (columnas) de cada filamento.
+
+    Convención de ejes:
+        shape[0] = eje X (filas) = dirección entre electrodos.
+        shape[1] = eje Y (columnas) = ancho transversal, donde se separan los filamentos.
+
+    Para cada fila X interior, identifica bloques contiguos de filamento en el eje Y
+    y calcula su centro. Devuelve el centro Y más repetido para cada rango definido en cf_ranges.
 
     Argumentos:
-    - types_map: Matriz 2D del sistema donde 1 indica filamento y 0 vacío.
-    - cf_ranges: (OBLIGATORIO) Lista de tuplas indicando el límite físico de cada filamento en el eje Y.
-                 Ejemplo para 1 filamento: [(0, 99)].
-                 Ejemplo para 2 filamentos: [(0, 49), (50, 99)].
+    - types_map: Matriz 2D con electrodos (shape: x_size+2, y_size). 1=filamento, 0=vacío, 3=electrodo.
+    - cf_ranges: Lista de tuplas con los rangos Y de cada filamento, ej: [(0, 49), (50, 99)].
 
     Retorna:
-    - Una lista con los centros (números enteros de fila). Devuelve un centro exacto por cada rango.
+    - Lista de centros Y (enteros) por filamento. None si el rango no tiene filamento.
     """
-    Ny, Nx = types_map.shape
+    x_size_ext, y_size = types_map.shape  # x_size_ext = x_size+2, y_size = y_size
     todos_los_centros = []
 
-    # Recorremos columnas (evitando electrodos 0 y Nx-1)
-    for j in range(1, Nx - 1):
-        column_data = types_map[:, j]
+    # Recorremos filas X internas (excluyendo electrodos en fila 0 y fila -1)
+    for i in range(1, x_size_ext - 1):
+        row_data = types_map[i, :]
 
-        # Encontramos los índices (filas) donde hay filamento en esta columna
-        fil_indices = np.where(column_data == 1)[0]
+        # Encontramos los índices Y (columnas) donde hay filamento en esta fila X
+        fil_indices = np.where(row_data == 1)[0]
 
         if len(fil_indices) == 0:
             continue
 
-        # --- 1. ALGORITMO DE AGRUPACIÓN (CLUSTERING) ---
+        # --- 1. CLUSTERING de índices Y contiguos ---
         clusters = []
         current_group = [fil_indices[0]]
 
-        for i in range(1, len(fil_indices)):
-            # Si el índice actual es consecutivo al anterior, pertenece al mismo bloque
-            if fil_indices[i] == fil_indices[i - 1] + 1:
-                current_group.append(fil_indices[i])
+        for k in range(1, len(fil_indices)):
+            if fil_indices[k] == fil_indices[k - 1] + 1:
+                current_group.append(fil_indices[k])
             else:
-                # Se rompió la continuidad: guardamos el bloque y empezamos uno nuevo
                 clusters.append(current_group)
-                current_group = [fil_indices[i]]
-        clusters.append(current_group)  # Guardar el último bloque
+                current_group = [fil_indices[k]]
+        clusters.append(current_group)
 
-        # --- 2. CÁLCULO DEL CENTRO LOCAL DE CADA CLUSTER ---
+        # --- 2. CENTRO Y de cada cluster ---
         for cluster in clusters:
-            # Calculamos la media aritmética de los índices (Ej: [18,19,20] -> 19.0)
             media = np.mean(cluster)
-
-            # Redondeamos al entero más cercano y forzamos a que sea tipo 'int'
             centro_entero = int(np.round(media))
-
-            # Guardamos el centro en la lista global del sistema
             todos_los_centros.append(centro_entero)
 
-    # Si la matriz estaba vacía o no había filamentos en el interior
     if not todos_los_centros:
         return [None] * len(cf_ranges)
 
-    # --- 3. OBTENER EL/LOS CENTROS MÁS REPETIDOS SEGÚN LOS RANGOS ---
+    # --- 3. CENTRO MÁS REPETIDO por rango Y ---
     centros_por_filamento = []
 
-    for fila_min, fila_max in cf_ranges:
-        # Filtramos solo los centros que caen estrictamente dentro de este filamento físico
-        centros_en_rango = [c for c in todos_los_centros if fila_min <= c <= fila_max]
+    for col_min, col_max in cf_ranges:
+        centros_en_rango = [c for c in todos_los_centros if col_min <= c <= col_max]
 
         if centros_en_rango:
-            # Obtenemos el que MAS se repite en esta región
             centro_ganador = Counter(centros_en_rango).most_common(1)[0][0]
             centros_por_filamento.append(centro_ganador)
         else:
-            # Si un rango no tiene filamento formado, devolvemos None
             centros_por_filamento.append(None)
 
     return centros_por_filamento
@@ -551,68 +537,79 @@ def colocar_muro_termico(
     matriz_molde: np.ndarray, filas_intermedias: list, perfiles_muros_calculados: list
 ) -> np.ndarray:
     """
-    Coloca los perfiles 1D de temperatura en las filas correspondientes de la matriz 2D.
+    Coloca los perfiles 1D de temperatura en las columnas Y intermedias de la matriz 2D.
+
+    Convención de ejes:
+        shape[0] = eje X (filas) = dirección entre electrodos.
+        shape[1] = eje Y (columnas) = ancho transversal.
+
+    Los muros térmicos se colocan en columnas Y (entre filamentos, en la dirección transversal).
+    Los perfiles asociados son vectores de temperatura a lo largo del eje X (longitud x_size).
+
+    Argumentos:
+    - matriz_molde: Matriz de referencia para la máscara (shape: x_size, y_size).
+    - filas_intermedias: Lista de índices Y (columnas) de las posiciones intermedias entre filamentos.
+    - perfiles_muros_calculados: Lista de tuplas (perfil_arriba, perfil_abajo), arrays 1D de longitud x_size.
     """
     matriz_muros = np.zeros_like(matriz_molde, dtype=float)
-    Ny, Nx = matriz_muros.shape
+    x_size, y_size = matriz_muros.shape
 
-    for i, fila_mid in enumerate(filas_intermedias):
-        if fila_mid is None:
+    for i, col_mid in enumerate(filas_intermedias):
+        if col_mid is None:
             continue
 
-        # Extraemos los perfiles 1D ya calculados por tu nueva función
         perfil_muro_arriba, perfil_muro_abajo = perfiles_muros_calculados[i]
 
-        # 1er Muro: Fila Intermedia
-        mask_vacio_arriba = matriz_molde[fila_mid, :] == 0
-        # Numpy asigna el valor del perfil SOLO en las columnas donde la máscara es True
-        matriz_muros[fila_mid, mask_vacio_arriba] = perfil_muro_arriba[mask_vacio_arriba]
+        # 1er Muro: columna Y intermedia
+        if 0 <= col_mid < y_size:
+            mask_vacio = matriz_molde[:, col_mid] == 0
+            matriz_muros[mask_vacio, col_mid] = perfil_muro_arriba[mask_vacio]
 
-        # 2do Muro: Una fila por debajo
-        fila_encima = fila_mid + 1
-        if 0 <= fila_encima < Ny:
-            mask_vacio_abajo = matriz_molde[fila_encima, :] == 0
-            matriz_muros[fila_encima, mask_vacio_abajo] = perfil_muro_abajo[mask_vacio_abajo]
+        # 2do Muro: columna Y siguiente
+        col_siguiente = col_mid + 1
+        if 0 <= col_siguiente < y_size:
+            mask_vacio_sig = matriz_molde[:, col_siguiente] == 0
+            matriz_muros[mask_vacio_sig, col_siguiente] = perfil_muro_abajo[mask_vacio_sig]
 
     return matriz_muros
 
 
 def extraer_perfiles_filamentos(matriz_temperaturas: np.ndarray, filas_centros: list) -> list:
     """
-    Extrae los perfiles de temperatura 1D (fila completa) de una matriz térmica 2D,
-    basándose en una lista de filas específicas (centros de los filamentos).
+    Extrae los perfiles de temperatura 1D a lo largo del eje X para cada filamento.
+
+    Convención de ejes:
+        shape[0] = eje X (filas) = dirección entre electrodos.
+        shape[1] = eje Y (columnas) = ancho transversal.
+
+    Para cada filamento, su 'centro' es un índice Y (columna). El perfil extraído
+    es el vector de temperatura a lo largo del eje X en esa columna Y fija:
+        perfil = matriz_temperaturas[:, centro_y]
 
     Argumentos:
-    - matriz_temperaturas: Matriz 2D con los resultados del solver térmico.
-    - filas_centros: Lista de enteros indicando las filas a extraer (Ej: [20, 80]).
+    - matriz_temperaturas: Matriz 2D con los resultados del solver térmico (shape: x_size+2, y_size).
+    - filas_centros: Lista de enteros Y (índices de columna) de los centros de cada filamento.
 
     Retorna:
-    - perfiles: Lista de arrays 1D correspondientes a la temperatura de cada filamento.
+    - perfiles: Lista de arrays 1D (longitud x_size+2) de temperatura por filamento.
     """
-
-    # BLOQUE 1: Preparación
     perfiles = []
-    Ny, Nx = matriz_temperaturas.shape
+    x_size_ext, y_size = matriz_temperaturas.shape
 
-    # BLOQUE 2: Iteración y Extracción
-    for fila in filas_centros:
-        # Caso A: El filamento no se formó (su centro es None)
-        if fila is None:
-            # Añadimos None a la lista para mantener la correspondencia de índices
+    for columna_y in filas_centros:
+        if columna_y is None:
             perfiles.append(None)
             print("Advertencia: Se detectó un filamento no formado (None). Perfil omitido.")
 
-        # Caso B: La fila es un índice válido dentro de la matriz
-        elif 0 <= fila < Ny:
-            # Extraemos la fila completa (todas las columnas de esa fila)
-            # Usamos .copy() para evitar modificar la matriz original accidentalmente
-            perfil_1d = matriz_temperaturas[fila, :].copy()
+        elif 0 <= columna_y < y_size:
+            # Perfil X completo en la columna Y del centro del filamento
+            perfil_1d = matriz_temperaturas[:, columna_y].copy()
             perfiles.append(perfil_1d)
 
-        # Caso C: Índice fuera de los límites de la matriz (Error de entrada)
         else:
             raise IndexError(
-                f"La fila solicitada ({fila}) está fuera de los límites de la matriz térmica (0 a {Ny - 1})."
+                f"La columna Y solicitada ({columna_y}) está fuera de los límites "
+                f"de la matriz térmica (0 a {y_size - 1})."
             )
 
     return perfiles

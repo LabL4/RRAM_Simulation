@@ -17,31 +17,28 @@ def SimpleElectricField(DDP: float, espesor: float) -> float:
 
 
 def GapElectricField(
-    potential: float, pos_y: int, actual_state: np.ndarray, device_size: float, grid_size: float
+    potential: float, pos_y: int, actual_state: np.ndarray, device_size_x: float, grid_size: float
 ) -> float:
     """
-    Calculate the No-normal electric field the device.
+    Calculate the non-uniform electric field in the device along the X axis (electrode direction).
     This function computes the electric field based on the potential difference,
-    the position in the y-axis, and the current state of the device. The size of
-    the device and the atomic size can be passed as keyword arguments; otherwise,
-    default values are used.
+    the row position (Y index), and the current state of the device. The physical
+    distance between electrodes (device_size_x) is used as the reference length.
 
     Parameters:
         - potential (float): The potential difference applied across the device.
-        - pos_y (int): The y-axis position to evaluate the gap.
-         -actual_state (np.array): The current state of the device, represented as a 2D array.
-
-    **kwargs:
-        - 'device_size' (float): The size of the device in meters. Default is 10e-9.
-        - 'atom_size' (float): The size of an atom in meters. Default is 0.25e-9.
+        - pos_y (int): The row index (Y position) for which to evaluate the gap along X.
+        - actual_state (np.ndarray): The current state of the device as a 2D array.
+        - device_size_x (float): The physical distance between electrodes (X axis) in meters.
+        - grid_size (float): The physical size of one cell (atom_size) in meters.
 
     Returns:
-        - float: The electric field across the gap in the device.
+        - float: The electric field across the remaining gap in the X direction.
     """
 
     gap = grid_size * (np.sum(actual_state[pos_y]))
-    L = device_size - gap
+    L = device_size_x - gap
     if L == 0:
-        return potential / device_size
+        return potential / device_size_x
     else:
         return potential / L

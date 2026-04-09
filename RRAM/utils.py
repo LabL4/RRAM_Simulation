@@ -95,27 +95,36 @@ def crear_rutas_simulacion(num_simulation: int, state: str) -> dict:
 
 
 def cargar_y_representar_estado(
-    load_data_path: Path, figures_path: Path, voltage: float, plot_state: bool = False, device_size: float = 10e-9
+    load_data_path: Path,
+    figures_path: Path,
+    voltage: float,
+    plot_state: bool = False,
+    device_size_x: float = 10e-9,
+    device_size_y: float = 10e-9,
 ) -> np.ndarray:
     """
     Carga el estado de configuración desde archivo pkl y genera una imagen de ese estado.
 
     Args:
-        pkl_path (Path): Ruta del pkl con el estado.
+        load_data_path (Path): Ruta base del .npz con el estado (sin extensión).
         figures_path (Path): Ruta donde se guardará la imagen generada, debe incluir el nombre del archivo CON extensión.
-        plot_state (bool): Indica si se debe generar la imagen del estado, por defecto es True.
+        voltage (float): Voltaje asociado al estado.
+        plot_state (bool): Indica si se debe generar la imagen del estado, por defecto es False.
+        device_size_x (float): Tamaño del dispositivo en el eje X (entre electrodos) en metros.
+        device_size_y (float): Tamaño del dispositivo en el eje Y (transversal) en metros.
 
     Returns:
         np.ndarray: Matriz con el estado inicial cargado.
     """
 
-    # Cargamos directamente el archivo .npz y extraemos la matriz 'actual_state'
     datos = np.load(f"{load_data_path}.npz")
     actual_state = datos["actual_state"]
-    datos.close()  # Siempre es buena práctica cerrar el archivo
+    datos.close()
 
     if plot_state:
-        Representate.RepresentateState(actual_state, voltage, str(figures_path), device_size=device_size)
+        Representate.RepresentateState(
+            actual_state, voltage, str(figures_path), device_size_x=device_size_x, device_size_y=device_size_y
+        )
 
     return actual_state
 
@@ -193,24 +202,29 @@ def guardar_representar_estado(
     save_data_path: Path,
     save_path_figures: Path,
     plot_state: bool = False,
+    device_size_x: float = 10e-9,
+    device_size_y: float = 10e-9,
 ) -> None:
     """
     Saves simulation data, configuration state, and generates a representation of the final state.
     Args:
-        voltaje_ (float): The voltage value in the state.
+        voltaje (float): The voltage value in the state.
         config_state (np.ndarray): The final configuration state of the simulation.
-        save_path_pkl (Path): The file path where the simulation data will be saved as a CSV file.
+        save_data_path (Path): The file path where the configuration state will be saved as .npz.
         save_path_figures (Path): The directory path where the final state representation will be saved.
+        device_size_x (float): Tamaño del dispositivo en el eje X (entre electrodos) en metros.
+        device_size_y (float): Tamaño del dispositivo en el eje Y (transversal) en metros.
     Returns:
         None
     """
 
-    # Usamos .with_suffix(".npz") por seguridad y guardamos la matriz
     ruta_npz = Path(save_data_path).with_suffix(".npz")
     np.savez_compressed(ruta_npz, actual_state=config_state)
 
     if plot_state:
-        Representate.RepresentateState(config_state, voltaje, str(save_path_figures))
+        Representate.RepresentateState(
+            config_state, voltaje, str(save_path_figures), device_size_x=device_size_x, device_size_y=device_size_y
+        )
 
     return None
 
@@ -369,7 +383,9 @@ def resumen_plots(
         fig_voltage,
         10,
         save_path=rutas["figures_path"] / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_{etapa}.png",
-        device_size=params.device_size,
+        device_size_x=params.device_size_x,
+        device_size_y=params.device_size_y,
+        atom_size=params.atom_size,
         filas_intermedias=filas_intermedias,
     )
 
@@ -378,27 +394,31 @@ def resumen_plots(
         matriz=actual_state,
         voltaje=fig_voltage,
         filename=str(rutas["figures_path"]) + f"/State_{num_simulation}_{fig_voltage}_{etapa}.png",
-        device_size=params.device_size,
+        device_size_x=params.device_size_x,
+        device_size_y=params.device_size_y,
     )
 
     Representate.RepresentateState(
         matriz=actual_state_clean_CF,
         voltaje=fig_voltage,
         filename=str(rutas["figures_path"]) + f"/State_Clean_{num_simulation}_{fig_voltage}_{etapa}.png",
-        device_size=params.device_size,
+        device_size_x=params.device_size_x,
+        device_size_y=params.device_size_y,
     )
 
     # 3. Preparación y plot del muro térmico
+    # centros_calculados son posiciones en el eje Y (columnas)
     matriz_para_plot_muro = np.copy(matriz_temperaturas_fijas)
     for centro, perfil_filamento in zip(centros_calculados, mis_perfiles_extraidos):
         if centro is not None and perfil_filamento is not None:
-            matriz_para_plot_muro[centro, :] = perfil_filamento
+            matriz_para_plot_muro[:, centro] = perfil_filamento
 
     Representate.plot_muro_termico(
         matriz_muros=matriz_para_plot_muro,
         matriz_molde=actual_state_clean_CF,
         filename=rutas["figures_path"] / f"Muro_termico_{num_simulation}_{fig_voltage}_{etapa}.png",
-        device_size=params.device_size,
+        device_size_x=params.device_size_x,
+        device_size_y=params.device_size_y,
     )
 
     # 4. Centros de filamentos
@@ -408,7 +428,9 @@ def resumen_plots(
         filas_intermedias=filas_intermedias,
         centros_calculados=centros_calculados,
         filename=rutas["figures_path"] / f"Centros_filamentos_{num_simulation}_{fig_voltage}_{etapa}.png",
-        device_size=params.device_size,
+        device_size_x=params.device_size_x,
+        device_size_y=params.device_size_y,
+        atom_size=params.atom_size,
     )
 
     # 5. Matriz de probabilidades
@@ -416,7 +438,8 @@ def resumen_plots(
         matriz=matriz_probabilidades,
         voltaje=fig_voltage,
         filename=rutas["figures_path"] / f"Matriz_probabilidades_{num_simulation}_{fig_voltage}_{etapa}.png",
-        device_size=params.device_size,
+        device_size_x=params.device_size_x,
+        device_size_y=params.device_size_y,
     )
 
     # # 6. Perfil térmico

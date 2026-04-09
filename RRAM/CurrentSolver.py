@@ -43,28 +43,23 @@ def Clean_state_matrix(
     validos = []
 
     for c in componentes:
-        # Obtenemos todas las columnas (coordenada j) que ocupa este componente
-        columnas = {n[1] for n in c}
-
-        # CONDICIÓN FÍSICA: El componente DEBE tocar ambos electrodos (0 y W-1)
-        # Opcionalmente, podemos mantener la condición de min_size para mayor robustez
-        if (0 in columnas) and ((W - 1) in columnas):
+        # Obtenemos todas las filas X (coordenada i) que ocupa este componente
+        # CONDICIÓN FÍSICA: el filamento debe tocar ambos electrodos en eje X (filas 0 y H-1)
+        filas = {n[0] for n in c}
+        if (0 in filas) and ((H - 1) in filas):
             validos.append(c)
 
-    # Reconstruimos el grafo solo con los componentes que percola
+    # Reconstruimos el grafo solo con los componentes que percolan
     nodos_finales = set().union(*validos)
     actual_state_clean_grid = actual_state_clean_grid.subgraph(nodos_finales).copy()
 
-    # Nodos con grado 1 (hojas), excluyendo primera y última columna para "podar" ramas muertas
+    # Nodos con grado 1 (hojas), excluyendo electrodos (filas 0 y H-1) para podar ramas muertas
     while True:
-        # Encontrar nodos hoja excluyendo primera y última columna (electrodos)
-        leaf_nodes = [n for n, d in actual_state_clean_grid.degree() if d == 1 and n[1] not in (0, W - 1)]
+        leaf_nodes = [n for n, d in actual_state_clean_grid.degree() if d == 1 and n[0] not in (0, H - 1)]
 
-        # Si no hay más nodos hoja, salir del bucle
         if not leaf_nodes:
             break
 
-        # Eliminar los nodos hoja encontrados
         actual_state_clean_grid.remove_nodes_from(leaf_nodes)
 
     # Crear matriz vacía de ceros para la matriz resistencia
@@ -115,16 +110,17 @@ def Clasificar_CF(
     """
 
     # Nodos de origen y destino
-    nodos_inicio = [n for n in G.nodes() if n[1] == 0]
-    nodos_fin = [n for n in G.nodes() if n[1] == x_max - 1]
+    # Nodos de inicio: fila X=0 (primer electrodo). Nodos de fin: fila X=x_max-1 (segundo electrodo).
+    nodos_inicio = [n for n in G.nodes() if n[0] == 0]
+    nodos_fin = [n for n in G.nodes() if n[0] == x_max - 1]
 
-    # Clasificación de nodos de inicio en filamentos
+    # Clasificación de nodos de inicio según su posición Y (columna) en los rangos de filamento
     nodos_inicio_clasificados = {}
     for nodo in nodos_inicio:
-        fila = nodo[0]
+        columna_y = nodo[1]  # posición Y (transversal) del nodo
         filamento_asignado = None
-        for idx, (fila_min, fila_max) in enumerate(filamentos_ranges, start=0):
-            if fila_min <= fila <= fila_max:  # tolerancia ±0 por defecto
+        for idx, (col_min, col_max) in enumerate(filamentos_ranges, start=0):
+            if col_min <= columna_y <= col_max:
                 filamento_asignado = idx + 1  # Filamentos numerados desde 1
                 break
         if filamento_asignado is None:
@@ -163,33 +159,34 @@ def Existe_filamentos(resultados, num_filamentos) -> list[bool]:
     return Percola_list_bool
 
 
-def Eliminar_filamentos_incompletos(grid_limpio, filamentos_ranges, percola_bools, W=None):
+def Eliminar_filamentos_incompletos(grid_limpio, filamentos_ranges, percola_bools, H=None, W=None):
     """
     Elimina los nodos y aristas de los rangos donde el filamento no se ha formado (no percola).
 
     Args:
-        G : nx.Graph
+        grid_limpio : nx.Graph
             Grafo original copiado, tamaño completo.
         filamentos_ranges : list of tuples
             Lista de rangos de fila [(fila_min, fila_max), ...] para cada filamento.
         percola_bools : list of bool
             Lista booleana que indica si cada filamento percola.
-        W : int representa el ancho del espacio de configuración (número de columnas).
+        H : int, opcional
+            Número de filas de la matriz (eje Y, ancho transversal). Se calcula del grafo si no se pasa.
+        W : int, opcional
+            Número de columnas de la matriz (eje X, distancia entre electrodos). Se calcula del grafo si no se pasa.
 
     Returns:
-        G_limpio : nx.Graph
-            Grafo con los nodos (y sus aristas) solo de los filamentos completos.
+        CF_matrix : np.ndarray
+            Matriz (H x W) con los nodos (y sus aristas) solo de los filamentos completos.
     """
-    # Si no se pasa W, lo calcula automáticamente del tamaño real de la matriz
-
-    # Si no se pasa W, calcularlo del grafo
-    if W is None:
+    # Calcular H y W por separado desde las coordenadas de los nodos (fila=Y, columna=X)
+    if H is None or W is None:
         nodos = list(grid_limpio.nodes())
         if nodos:
-            max_dim = max(max(n[0], n[1]) for n in nodos)
-            W = max_dim + 1
+            H = max(n[0] for n in nodos) + 1  # max fila + 1 = y_size
+            W = max(n[1] for n in nodos) + 1  # max columna + 1 = x_size
         else:
-            raise ValueError("El grafo está vacío y no se proporcionó la dimensión W")
+            raise ValueError("El grafo está vacío y no se proporcionaron las dimensiones H y W")
 
     G_limpio = grid_limpio.copy()
 
@@ -199,45 +196,47 @@ def Eliminar_filamentos_incompletos(grid_limpio, filamentos_ranges, percola_bool
             nodos_a_borrar = [(i, j) for i in range(fila_min, fila_max + 1) for j in range(W)]
             G_limpio.remove_nodes_from(nodos_a_borrar)
 
-    # Crear matriz vacía de ceros para la matriz resistencia
-    CF_matrix = np.zeros((W, W), dtype=int)
+    # Crear matriz rectangular (H filas = eje Y, W columnas = eje X)
+    CF_matrix = np.zeros((H, W), dtype=int)
 
     # Poner 1 en las posiciones de los nodos que siguen en G
     for i, j in G_limpio.nodes():
         CF_matrix[i, j] = 1
-
-    # rp.RepresentateState(CF_matrix, 0.00, os.getcwd() + "/Matriz_resistencia.pdf")
 
     return CF_matrix
 
 
 def calcular_resistencia(CF_matrix, ohm_resistence):
     """
-    Calcula la resistencia total de una matriz de formación de filamentos conductores (CF_matrix).
-    Este método asume que cada columna de la matriz representa un conjunto de resistencias en paralelo.
-    La resistencia total se calcula sumando las resistencias paralelas de cada columna.
+    Calcula la resistencia total de la CF_matrix modelando la corriente a lo largo del eje X.
+
+    Convención de ejes:
+        shape[0] = eje X (filas) = dirección de la corriente, entre electrodos.
+        shape[1] = eje Y (columnas) = ancho transversal.
+
+    Cada fila X representa una capa de resistencias en paralelo (las celdas Y con filamento).
+    La resistencia total es la suma serie de todas las capas X.
+
     Args:
-        CF_matrix (numpy.ndarray): Matriz donde cada elemento representa la presencia (1) o ausencia (0)
-                                    de un filamento conductor.
-        ohm_resistence (float, optional): Resistencia en ohmios asociada a cada filamento conductor.
-                                           Por defecto es 11.5 ohmios.
+        CF_matrix (np.ndarray): Matriz (x_size, y_size), 1=filamento, 0=vacío.
+        ohm_resistence (float): Resistencia de una celda individual [Ohm].
     Returns:
-        float: Resistencia total calculada a partir de la matriz CF_matrix.
+        float: Resistencia total [Ohm].
     """
     total_resistance = 0.0
-    Ny, Nx = CF_matrix.shape
-    for j in range(1, Nx - 1):
-        fil_indices = np.where(CF_matrix == 1)[0]
-        N_total_columna = len(fil_indices)
+    x_size, y_size = CF_matrix.shape
 
-        if N_total_columna == 0:
+    for i in range(x_size):
+        row_data = CF_matrix[i, :]
+        N_paralelo = int(np.sum(row_data))  # celdas Y con filamento en esta fila X
+
+        if N_paralelo == 0:
             continue
 
-        # R equivalente de la columna (N resistencias en paralelo)
-        R_col = ohm_resistence / N_total_columna
+        # R equivalente de la fila (N resistencias en paralelo)
+        R_fila = ohm_resistence / N_paralelo
+        total_resistance += R_fila
 
-        # Se suma la resistencia paralela a la resistencia total
-        total_resistance += R_col
     return total_resistance
 
 
@@ -325,33 +324,33 @@ def limitar_grosor_filamentos(
     m_state_recortada = np.copy(matriz_state)
     m_filamentos_recortada = np.copy(matriz_solo_filamentos)
 
-    # 2. Recorremos cada filamento con su centro y su rango (límites)
+    # 2. Recorremos cada filamento con su centro Y y su rango Y
+    x_size, y_size = m_filamentos_recortada.shape
+
     for centro, rango in zip(centros_calculados, rangos_CF):
         # Si no hay filamento formado en este rango, pasamos al siguiente
         if centro is None or rango is None:
             continue
 
-        ymin, ymax = rango
+        # centro y rango son posiciones en el eje Y (columnas, dirección transversal)
+        col_min, col_max = rango
 
-        # 3. Calculamos las fronteras permitidas para este filamento
+        # 3. Fronteras Y permitidas para el grosor del filamento
         limite_inferior = centro - casillas_mantener
         limite_superior = centro + casillas_mantener
 
-        # 4. Escaneamos solo las filas que pertenecen al rango de este filamento
-        for y in range(ymin, ymax + 1):
-            # Si la fila está FUERA del grosor permitido (muy arriba o muy abajo)
-            if y < limite_inferior or y > limite_superior:
-                # Buscamos en la matriz de SOLO filamentos dónde están las vacantes (los '1')
-                cols_vacantes = np.where(m_filamentos_recortada[y, :] == 1)[0]
+        # 4. Escaneamos columnas Y del rango de este filamento
+        for col_y in range(col_min, col_max + 1):
+            if col_y < 0 or col_y >= y_size:
+                continue  # evitar IndexError en matrices rectangulares
 
-                if len(cols_vacantes) > 0:
-                    # Imprimimos el número de vacantes que se van a eliminar
-                    # print(f"Eliminando {len(cols_vacantes)} vacantes en la fila {y} fuera del rango permitido.")
+            # Si la columna Y está FUERA del grosor permitido alrededor del centro
+            if col_y < limite_inferior or col_y > limite_superior:
+                # Filas X con filamento en esta columna Y
+                filas_vacantes = np.where(m_filamentos_recortada[:, col_y] == 1)[0]
 
-                    # Eliminamos las vacantes de la matriz exclusiva de filamentos
-                    m_filamentos_recortada[y, cols_vacantes] = valor_oxido
-
-                    # Eliminamos ESAS MISMAS vacantes de la matriz de estado general
-                    m_state_recortada[y, cols_vacantes] = valor_oxido
+                if len(filas_vacantes) > 0:
+                    m_filamentos_recortada[filas_vacantes, col_y] = valor_oxido
+                    m_state_recortada[filas_vacantes, col_y] = valor_oxido
 
     return m_state_recortada, m_filamentos_recortada
