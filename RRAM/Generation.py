@@ -1,35 +1,13 @@
-import numpy as np
+import numpy as np  # type: ignore
+# import math
 
 from RRAM import Constants as cte
 
-k_b_ev = 8.617333262145e-5  # Boltzmann constant in eV/K
 
-
-def vecinos_verticales(matriz, i, j):
-    x_size = matriz.shape[0]
-    return (i > 0 and matriz[i - 1, j] > 0) or (i < x_size - 1 and matriz[i + 1, j] > 0)
-
-
-def vecinos_horizontales(matriz, i, j):
-    y_size = matriz.shape[1]
-    return (j > 0 and matriz[i, j - 1] > 0) or (j < y_size - 1 and matriz[i, j + 1] > 0)
-
-
-def vecinos_izquierda(matriz, i, j):
-    """
-    Comprueba si el elemento en la posición (i, j) tiene un elemento a su izquierda (j-1) mayor que 0.
-    """
-    return j > 0 and matriz[i, j - 1] > 0
-
-
-def tiene_vecinos(matriz, i, j):
-    x_size, y_size = matriz.shape
-    return (
-        (i > 0 and matriz[i - 1, j] > 0)  # arriba
-        or (i < x_size - 1 and matriz[i + 1, j] > 0)  # abajo
-        or (j > 0 and matriz[i, j - 1] > 0)  # izquierda
-        or (j < y_size - 1 and matriz[i, j + 1] > 0)  # derecha
-    )
+def get_required_param(kwargs, param_name):
+    if param_name not in kwargs:
+        raise ValueError(f"El parámetro '{param_name}' es obligatorio")
+    return kwargs[param_name]
 
 
 def initial_state(Eje_x: float, Eje_y: float, num_trampas: int):
@@ -87,7 +65,9 @@ def initial_state_priv(Eje_x: int, Eje_y: int, num_trampas: int, regiones_pesos:
     pesos_flat = pesos.flatten()
 
     # Generate random positions for the traps with weights
-    posiciones_unos = np.random.choice(Eje_x * Eje_y, num_trampas, replace=False, p=pesos_flat / np.sum(pesos_flat))
+    posiciones_unos = np.random.choice(
+        Eje_x * Eje_y, num_trampas, replace=False, p=pesos_flat / np.sum(pesos_flat)
+    )
 
     # Assign the value 1 to the selected positions
     for pos in posiciones_unos:
@@ -97,22 +77,84 @@ def initial_state_priv(Eje_x: int, Eje_y: int, num_trampas: int, regiones_pesos:
     return InitialState
 
 
-def calcular_probabilidad_generacion(
-    time_stp: float,
-    electric_field: np.ndarray | float,
-    temp: np.ndarray | float,
-    vibration_frequency: float,
-    generation_energy: float,
-    cte_red: float,
-    gamma: float,
-) -> np.ndarray | float:
+def Generate(time_stp: float, electric_field: float, temp: float, **kwargs) -> float:
     """
-    Calcula la matriz de probabilidades de generación para una matriz de campo eléctrico.
-    Soporta tanto escalares (float) como matrices (np.ndarray) para el campo y la temperatura.
+    Calculates the generation probability of RRAM devices.
+    Args:
+        time_stp (float): The time step for the calculation.
+        electric_field (float): The electric field applied to the device.
+        temp (float): The temperature of the device.
+        **kwargs: Contains the constants needed for the calculation.
+    Keyword Args:
+        vibration_frequency (float): The vibration frequency constant. Required if kwargs is provided.
+        activation_energy (float): The activation energy constant. Required if kwargs is provided.
+        cte_red (float): The reduction constant. Required if kwargs is provided.
+        gamma (float): The gamma constant. Required if kwargs is provided.
+    Returns:
+        float: The generation probability of generate a vancancy.
     """
 
-    exponente = (generation_energy - (gamma * cte_red * electric_field)) / (k_b_ev * temp)
-    prob_matrix = time_stp * vibration_frequency * np.exp(-exponente)
+    # Obtengo las constantes necesarias para el cálculo
+    if kwargs:
+        t_0 = float(get_required_param(kwargs, "vibration_frequency"))
+        E_a = float(get_required_param(kwargs, "activation_energy"))
+        cte_red = float(get_required_param(kwargs, "cte_red"))
+        gamma = float(get_required_param(kwargs, "gamma"))
+    else:
+        # Aquí reemplaza con tus constantes globales si las tienes
+        t_0 = cte.t_0
+        E_a = cte.E_a
+        cte_red = cte.cte_red
+        gamma = cte.gamma
+
+    exponente = (E_a - (gamma * cte_red * electric_field)) / (cte.k_b_ev * temp)
+    prob_generacion = time_stp * t_0 * (np.exp(-exponente))
+
+    # print("Temperatura:", temp, " K")
+
+    # Imprimir los valores usados solo la primera vez que se ejecuta la función
+    # if not hasattr(Generate, "_has_run"):
+    #     print("Valores utilizados en Generation:")
+    #     print(f"paso_temporal: {time_stp}")
+    #     print(f"t_0: {t_0}")
+    #     print(f"cte red: {cte_red}")
+    #     print(f"E_a: {E_a}")
+    #     print(f"gamma: {gamma}")
+    #     Generate._has_run = True
+
+    return prob_generacion
+
+
+def Generate_vectorized(
+    time_stp: float, electric_field_matrix: np.ndarray, temp: float, **kwargs
+) -> np.ndarray:
+    """
+    Calcula la matriz de probabilidades de generación para una matriz de campo eléctrico.
+
+    Parámetros:
+        time_stp (float): Paso temporal.
+        electric_field_matrix (np.ndarray): Matriz 2D con valores del campo eléctrico, cada fila tiene el mimso valor de campo eléctrico.
+        temp (float): Temperatura (escala única para toda la matriz).
+        **kwargs: Constantes necesarias (vibration_frequency, activation_energy, cte_red, gamma).
+
+    Retorna:
+        np.ndarray: Matriz con probabilidades de generación (mismo tamaño que electric_field_matrix).
+    """
+
+    if kwargs:
+        t_0 = float(get_required_param(kwargs, "vibration_frequency"))
+        E_a = float(get_required_param(kwargs, "activation_energy"))
+        cte_red = float(get_required_param(kwargs, "cte_red"))
+        gamma = float(get_required_param(kwargs, "gamma"))
+    else:
+        # Aquí reemplaza con tus constantes globales si las tienes
+        t_0 = cte.t_0
+        E_a = cte.E_a
+        cte_red = cte.cte_red
+        gamma = cte.gamma
+
+    exponente = (E_a - (gamma * cte_red * electric_field_matrix)) / (cte.k_b_ev * temp)
+    prob_matrix = time_stp * t_0 * np.exp(-exponente)
 
     # Limitar probabilidades máximas a 1
     prob_matrix = np.minimum(prob_matrix, 1.0)
@@ -120,151 +162,82 @@ def calcular_probabilidad_generacion(
     return prob_matrix
 
 
-def get_generation_probabilities_matrix(
-    state: np.ndarray,
-    paso_temporal: float,
-    Electric_field: np.ndarray | float,
-    temperatura: np.ndarray | float,
-    factor_vecinos: float,
-    factor_sin_vecinos: float,
-    vibration_frequency: float,
-    generation_energy: float,
-    cte_red: float,
-    gamma: float,
-    neighbor_mode: str = "both",
-) -> np.ndarray:
+def vecinos_verticales(matriz, i, j):
+    x_size = matriz.shape[0]
+    return (i > 0 and matriz[i - 1, j] > 0) or (i < x_size - 1 and matriz[i + 1, j] > 0)
+
+
+def vecinos_horizontales(matriz, i, j):
+    y_size = matriz.shape[1]
+    return (j > 0 and matriz[i, j - 1] > 0) or (j < y_size - 1 and matriz[i, j + 1] > 0)
+
+
+def vecinos_izquierda(matriz, i, j):
     """
-    Calcula el mapa de probabilidades locales (0 a 1) para generar nuevas vacantes en la red,
-    teniendo en cuenta la temperatura, el campo eléctrico y la topología de vecinos.
+    Comprueba si el elemento en la posición (i, j) tiene un elemento a su izquierda (j-1) mayor que 0.
     """
+    return j > 0 and matriz[i, j - 1] > 0
 
-    # 1. Máscara de posiciones libres
-    free_mask = state == 0
-    vecino_mask = np.zeros_like(state, dtype=bool)
 
-    # 2. Lógica de Vecinos
-    if neighbor_mode in ["horizontal", "both"]:
-        left_neighbor = np.zeros_like(state, dtype=bool)
-        left_neighbor[:, 1:] = state[:, :-1] == 1
-        right_neighbor = np.zeros_like(state, dtype=bool)
-        right_neighbor[:, :-1] = state[:, 1:] == 1
-        vecino_mask |= left_neighbor | right_neighbor
-
-    if neighbor_mode in ["vertical", "both"]:
-        up_neighbor = np.zeros_like(state, dtype=bool)
-        up_neighbor[1:, :] = state[:-1, :] == 1
-        down_neighbor = np.zeros_like(state, dtype=bool)
-        down_neighbor[:-1, :] = state[1:, :] == 1
-        vecino_mask |= up_neighbor | down_neighbor
-
-    free_with_vecino = free_mask & vecino_mask
-    free_without_vecino = free_mask & (~vecino_mask)
-
-    # 3. Probabilidad base
-    prob_base_raw = calcular_probabilidad_generacion(
-        time_stp=paso_temporal,
-        electric_field=Electric_field,
-        temp=temperatura,
-        vibration_frequency=vibration_frequency,
-        generation_energy=generation_energy,
-        cte_red=cte_red,
-        gamma=gamma,
+def tiene_vecinos(matriz, i, j):
+    x_size, y_size = matriz.shape
+    return (
+        (i > 0 and matriz[i - 1, j] > 0)  # arriba
+        or (i < x_size - 1 and matriz[i + 1, j] > 0)  # abajo
+        or (j > 0 and matriz[i, j - 1] > 0)  # izquierda
+        or (j < y_size - 1 and matriz[i, j + 1] > 0)  # derecha
     )
 
-    # Si la calculadora devolvió un escalar (float), lo expandimos a una matriz del mismo tamaño que 'state'
-    if not isinstance(prob_base_raw, np.ndarray) or prob_base_raw.ndim == 0:
-        prob_base_matrix = np.full(state.shape, prob_base_raw)
-    else:
-        prob_base_matrix = prob_base_raw
 
-    # 4. Aplicar factores condicionales (Topología)
-    prob_final = np.zeros_like(prob_base_matrix)
-    prob_final[free_with_vecino] = prob_base_matrix[free_with_vecino] * factor_vecinos
-    prob_final[free_without_vecino] = prob_base_matrix[free_without_vecino] * factor_sin_vecinos
+def generate_oxygen(oxygen_state: np.ndarray, num_oxygen: int):
+    eje_y = oxygen_state.shape[1]
 
-    # Saturamos a 1.0 por seguridad
-    prob_final = np.minimum(prob_final, 1.0)
+    # Generar todas las coordenadas y al mismo tiempo
+    y_indices = np.random.randint(0, eje_y, size=num_oxygen)
 
-    return prob_final
+    # Generar todas las probabilidades de una sola vez
+    rand_vals = np.random.rand(num_oxygen)
+
+    # Crear una máscara para las posiciones donde se colocarán oxígenos
+    mask = (oxygen_state[y_indices, 0] == 0) & (rand_vals < 0.35)
+
+    # Asignar oxígeno en las posiciones seleccionadas
+    oxygen_state[y_indices[mask], 0] = 1
+
+    return oxygen_state
 
 
-def get_generation_probabilities_matrix_CF(
-    state: np.ndarray,
-    paso_temporal: float,
-    Electric_field: np.ndarray | float,
-    temperatura: np.ndarray | float,
-    factor_vecinos: float,
-    factor_sin_vecinos: float,
-    vibration_frequency: float,
-    generation_energy: float,
-    cte_red: float,
-    gamma: float,
-    neighbor_mode: str = "both",
-    cf_matrix: np.ndarray | None = None,
-) -> np.ndarray:
+def generate_oxigen_old(oxygen_state: np.ndarray, num_oxygen: int):
     """
-    Calcula el mapa de probabilidades locales (0 a 1) para generar nuevas vacantes en la red.
-    Si se proporciona 'cf_matrix', solo se considerarán como vecinos válidos las vacantes
-    que pertenezcan al filamento. Si no, se considerará cualquier vacante del 'state'.
+    Generates random oxygen positions in the given oxygen state matrix.
+
+    Args:
+        oxigen_state (np.ndarray): The current oxygen state matrix.
+        num_oxigen (int): The number of oxygen to generate.
+
+    Returns:
+        np.ndarray: The updated oxygen state matrix with the generated oxygen positions.
     """
 
-    # 1. Máscara de posiciones libres (siempre miramos 'state' para saber dónde se puede generar)
-    free_mask = state == 0
-    vecino_mask = np.zeros_like(state, dtype=bool)
+    eje_y = oxygen_state.shape[1]
+    y = np.zeros(num_oxygen, dtype=int)
 
-    # Determinar la matriz de referencia para los vecinos
-    # Si nos pasan la matriz de filamentos y no está vacía, buscamos vecinos en ella.
-    if cf_matrix is not None and cf_matrix.size > 0:
-        referencia_vecinos = cf_matrix == 1
-    else:
-        # Si no hay filamento aún, cualquier vacante es un vecino válido
-        referencia_vecinos = state == 1
+    for i in range(num_oxygen):
+        # Genero las coordenadas aleatorias para el eje y donde habrá un oxígeno
+        y[i] = np.random.randint(0, eje_y)
 
-    # 3. Lógica de Vecinos (ahora usando 'referencia_vecinos' en lugar de 'state')
-    if neighbor_mode in ["horizontal", "both"]:
-        left_neighbor = np.zeros_like(state, dtype=bool)
-        left_neighbor[:, 1:] = referencia_vecinos[:, :-1]
+    if num_oxygen == 1:
+        prob = 0.35
+    elif num_oxygen == 7:
+        prob = 0.7
+    elif num_oxygen == 10:
+        prob = 0.8
 
-        right_neighbor = np.zeros_like(state, dtype=bool)
-        right_neighbor[:, :-1] = referencia_vecinos[:, 1:]
+    # Itero sobre cada par coordenada para asignar el valor de 1 que representa que se generó un oxígeno en esa posición
+    for i in range(num_oxygen):
+        random_number = np.random.rand()
+        if oxygen_state[y[i], 0] == 0 and random_number < prob:
+            oxygen_state[y[i], 0] = 1
 
-        vecino_mask |= left_neighbor | right_neighbor
-
-    if neighbor_mode in ["vertical", "both"]:
-        up_neighbor = np.zeros_like(state, dtype=bool)
-        up_neighbor[1:, :] = referencia_vecinos[:-1, :]
-
-        down_neighbor = np.zeros_like(state, dtype=bool)
-        down_neighbor[:-1, :] = referencia_vecinos[1:, :]
-
-        vecino_mask |= up_neighbor | down_neighbor
-
-    free_with_vecino = free_mask & vecino_mask
-    free_without_vecino = free_mask & (~vecino_mask)
-
-    # Probabilidad base
-    prob_base_raw = calcular_probabilidad_generacion(
-        time_stp=paso_temporal,
-        electric_field=Electric_field,
-        temp=temperatura,
-        vibration_frequency=vibration_frequency,
-        generation_energy=generation_energy,
-        cte_red=cte_red,
-        gamma=gamma,
-    )
-
-    # Si la calculadora devolvió un escalar (float), lo expandimos a una matriz
-    if not isinstance(prob_base_raw, np.ndarray) or prob_base_raw.ndim == 0:
-        prob_base_matrix = np.full(state.shape, prob_base_raw)
-    else:
-        prob_base_matrix = prob_base_raw
-
-    # Aplicar factores condicionales
-    prob_final = np.zeros_like(prob_base_matrix)
-    prob_final[free_with_vecino] = prob_base_matrix[free_with_vecino] * factor_vecinos
-    prob_final[free_without_vecino] = prob_base_matrix[free_without_vecino] * factor_sin_vecinos
-
-    # Saturamos a 1.0 por seguridad
-    prob_final = np.minimum(prob_final, 1.0)
-
-    return prob_final
+    # Devuelvo la matriz con los oxígenos generados
+    return oxygen_state

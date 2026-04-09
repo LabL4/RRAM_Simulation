@@ -1,9 +1,13 @@
+from typing import final
 from RRAM import Simulation, utils
+from turtle import back
 from pathlib import Path
+
 
 import matplotlib.pyplot as plt
 import numpy as np
 import matplotlib
+import shutil
 import sys
 
 matplotlib.use("Agg")
@@ -37,20 +41,13 @@ print("\n----------------------------------------------------------------------\
 print(ctes)
 
 # Crear una lista para rastrear si se ha creado el CF para cada rango de filamentos
-eje_x = params.x_size
-eje_y = params.y_size
-num_filamentos = ctes.num_filamentos
 
-filamentos_ranges, _ = utils.generar_configuracion_filamentos(
-    eje_x=eje_x,
-    eje_y=eje_y,
-    num_filamentos=num_filamentos,
-)
+if num_filamentos == 2:
+    filamentos_ranges = [(0, 19), (20, 39)]  # Se incluye el ultimo valor
+elif num_filamentos == 4:
+    filamentos_ranges = [(0, 9), (10, 19), (20, 29), (30, 39)]
 
-print(
-    f"\nSimulación {sim_parmtrs[num_simulation]['num_trampas']} trampas, {num_filamentos} filamentos. El rango de cada filamento es: {filamentos_ranges}\n"
-)
-
+# filamentos_ranges = [(0, 19), (20, 39)]  # Se incluye el ultimo valor
 CF_creado = np.full(len(filamentos_ranges), False, dtype=bool)
 
 final_state_pp_set = Simulation.PP_set(
@@ -73,6 +70,11 @@ final_state_pp_reset = Simulation.PP_reset(
     CF_ranges=filamentos_ranges,
 )
 
+# nuevo_I_0 = 0.0022
+# final_state_pp_reset["sim_ctes"] = final_state_pp_reset["sim_ctes"].update_I_0(
+#     nuevo_I_0
+# )
+
 final_state_sp_reset = Simulation.SP_reset(
     final_state_pp_reset=final_state_pp_reset,
     num_simulation=num_simulation + 1,
@@ -84,14 +86,28 @@ for key, valor in final_state_sp_reset["roturas_dict"].items():
     for campo, dato in valor.items():
         print(f"  {campo}: {dato}")
 
+
+# Diccionario de desplazamiento (dx, dy) para cada punto
+# desplazamiento = {
+#     "a": (0.025, 1.0),  # derecha, misma altura
+#     "b": (-0.005, 0.27),  # izquierda, un poco arriba
+#     "c": (-0.02, 0.35),  # derecha, un poco abajo
+#     "d": (0.02, 1.0),  # izquierda, misma altura
+#     "e": (0.0, 1.0),  # izquierda, misma altura
+#     "f": (0.0, 1.0),  # izquierda, un poco abajo
+#     "g": (0.0, 1.0),  # derecha, un poco arriba
+#     "h": (0.0, 1.0),  # derecha, un poco arriba
+#     "i": (0.0, 1.0),  # derecha, un poco arriba
+# }
+
 desplazamiento = {
     "a": (0.025, 1.0),  # derecha, misma altura
-    "b": (+0.005, 0.27),  # izquierda, un poco arriba
-    "c": (0.02, 0.35),  # derecha, un poco abajo
+    "b": (-0.005, 0.27),  # izquierda, un poco arriba
+    "c": (-0.02, 0.35),  # derecha, un poco abajo
     "d": (0.02, 1.0),  # izquierda, misma altura
     "e": (-0.11, 0.66),  # izquierda, misma altura
-    "f": (0.025, 0.25),  # izquierda, un poco abajo
-    "g": (-0.12, 1),  # derecha, un poco arriba
+    "f": (-0.025, 0.25),  # izquierda, un poco abajo
+    "g": (-0.12, 0.6),  # derecha, un poco arriba
 }
 
 Simulation.simulation_IV(
