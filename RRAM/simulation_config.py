@@ -9,11 +9,11 @@ import os
 MATERIAL_DEFAULTS = {
     "cte_red": 0.25e-9,
     "permitividad_relativa_set": 299.8037,
-    "permitividad_relativa_reset": 158.9084,
+    "permitividad_relativa_reset": 299.9237,
     "generation_energy": 1.0,
     "recombination_energy": 0.955,
     "pb_metal_insul_set": 0.0010,
-    "pb_metal_insul_reset": 0.0858,
+    "pb_metal_insul_reset": 0.0339,
     "recom_enchancement_factor": 3e3,
     "long_decaimiento_concentracion": 1e-9,
     "ohm_resistence_set": 150.0,
@@ -37,7 +37,7 @@ PHYSICAL_CONSTANTS = {
 # ============================================================================
 ELECTRICAL_DEFAULTS = {
     "I_0_set": 1.1179e-03,
-    "I_0_reset": 4.2425e-03,
+    "I_0_reset": 2.5948e-03,
 }
 
 # ============================================================================
@@ -61,7 +61,7 @@ THERMAL_DEFAULTS = {
 SIMULATION_DEFAULTS = {
     "device_size": 10e-9,
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
-    "num_trampas": 100,
+    "num_trampas": 70,
     "total_simulation_time": 10.0,
     "num_pasos": 10000,
     "voltaje_final": 1.1,

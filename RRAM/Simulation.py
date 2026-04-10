@@ -17,15 +17,16 @@ from . import (
 )
 
 from dataclasses import dataclass, replace, asdict, field
+from typing import Dict, Any, List, Union
 from typing import get_type_hints
 from dataclasses import fields
-from typing import List, Dict
 from functools import wraps
 from pathlib import Path
 import pandas as pd
 import numpy as np
 import pickle
 import time
+import ast
 
 
 def medir_tiempo(func):
@@ -102,7 +103,7 @@ class SimulationConstants:
     ohm_resistence_set: float
     ohm_resistence_reset: float
     num_filamentos: int
-    grosor_filamento: int
+    grosor_filamento: Union[int, List[int]]
     gamma: float
     gamma_drift: float
     E_m: float
@@ -131,15 +132,68 @@ class SimulationConstants:
     voltaje_gen_oxigeno_sp: float
     num_oxigenos_sp_reset: int
 
-    @staticmethod
-    def from_dict(d: dict):
-        field_types = get_type_hints(SimulationConstants)
-        kwargs = {}
-        for k in field_types:
-            if k not in d:
-                raise KeyError(f"La clave '{k}' no existe en el diccionario")
-            kwargs[k] = field_types[k](d[k])
-        return SimulationConstants(**kwargs)
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SimulationConstants":
+        """
+        Crea una instancia desde un diccionario, parseando strings que contienen listas.
+        Respeta los tipos definidos en el dataclass.
+
+        Args:
+            data: Diccionario con los valores de las constantes.
+                Los valores pueden ser strings con formato de lista "[1,2,3]".
+
+        Returns:
+            Instancia de SimulationConstants con valores parseados.
+        """
+        from typing import get_type_hints
+        import ast
+
+        # Obtener los tipos definidos en el dataclass
+        type_hints = get_type_hints(cls)
+        parsed_data = {}
+
+        for key, value in data.items():
+            if key not in type_hints:
+                parsed_data[key] = value
+                continue
+
+            expected_type = type_hints[key]
+
+            if isinstance(value, str):
+                value_stripped = value.strip()
+
+                # Detectar si el string representa una lista
+                if value_stripped.startswith("[") and value_stripped.endswith("]"):
+                    try:
+                        parsed_data[key] = ast.literal_eval(value_stripped)
+                    except (ValueError, SyntaxError):
+                        parsed_data[key] = value
+                else:
+                    # Convertir según el tipo esperado
+                    try:
+                        # Manejar Union types (extraer el tipo base)
+                        if hasattr(expected_type, "__origin__"):
+                            # Para Union[int, List[int]], tomar int como base
+                            base_types = expected_type.__args__
+                            # Filtrar tipos que no sean List
+                            non_list_types = [
+                                t for t in base_types if not (hasattr(t, "__origin__") and t.__origin__ is list)
+                            ]
+                            if non_list_types:
+                                expected_type = non_list_types[0]
+
+                        if expected_type == int:
+                            parsed_data[key] = int(float(value))
+                        elif expected_type == float:
+                            parsed_data[key] = float(value)
+                        else:
+                            parsed_data[key] = value
+                    except (ValueError, TypeError):
+                        parsed_data[key] = value
+            else:
+                parsed_data[key] = value
+
+        return cls(**parsed_data)
 
     @property
     def propiedades_termicas(self) -> dict:
@@ -318,6 +372,7 @@ def update_state_generation(
     factor_sin_vecinos: float,
     max_vacantes_permitidas: int,  # <-- NUEVO PARÁMETRO
     neighbor_mode: str = "both",
+    custom_mask: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Orquesta el proceso de generación de vacantes asegurando que no se supere
@@ -351,6 +406,7 @@ def update_state_generation(
         cte_red=sim_ctes.cte_red,
         gamma=sim_ctes.gamma,
         neighbor_mode=neighbor_mode,
+        custom_mask=custom_mask,
     )
 
     # 4. Evaluación de la estocástica (cuáles "intentan" generarse)
@@ -415,7 +471,7 @@ def update_state_recombinate(
             break  # Solo usar el umbral más alto superado
 
     # 2. Movemos los iones
-    oxygen_state, velocidad = Recombination.move_oxygen_ions(
+    oxygen_state, velocidad = Recombination.new_move_oxygen_ions(
         paso_temp=params.paso_temporal,
         oxygen_state=oxygen_state,
         temperature=temperatura,
@@ -449,6 +505,7 @@ def PP_set(
     sim_ctes: SimulationConstants,
     CF_ranges: List[tuple],
     CF_creado: np.ndarray,
+    CF_centros: List[int] | None = None,
 ):
     """
     Executes the first part (PP) of the simulation set process for a resistive random-access memory (RRAM) device.
@@ -463,6 +520,8 @@ def PP_set(
             factor of generation, and material properties.
         CF_ranges (List[tuple]): List of tuples defining the ranges for conductive filaments.
         CF_creado (np.ndarray): Boolean array indicating whether each conductive filament has been created.
+        filas_centrales (List[int] | None): Lista de filas centrales de cada zona de filamento,
+            devuelta por generar_configuracion_filamentos. Si es None, no se usa.
     Raises:
         exceptions.MaxVacantesException: Raised if the maximum number of vacancies is exceeded.
         exceptions.NoPercolationException: Raised if the system does not percolate.
@@ -495,7 +554,7 @@ def PP_set(
 
     sistema_percola = False
     total_vacantes_pp_set = False
-    num_pasos_guardar_estado = 1000
+    num_pasos_guardar_estado = 500
     voltaje_percolacion = params.voltaje_final_set
     # AL inicio como la corriente es de tipo poole frenkel, la resitencia ohmica se considera nula
     resistencia = 0.0
@@ -521,13 +580,16 @@ def PP_set(
     vector_ddp = np.arange(0.000, params.voltaje_final_reset + params.paso_potencial_set, params.paso_potencial_set)
     print("El paso de potencial para la parte de set es:", params.paso_potencial_set, "\n")
 
-    num_columnas = 3  # Tiempo, Voltaje, Intensidad
+    num_columnas = 4  # Tiempo, Voltaje, Intensidad, resistencia
     # Defino la matriz para almacenar los datos
     data_pp_set = np.zeros((params.num_pasos, num_columnas), dtype=np.float64)
     num_vacantes_total = np.zeros((params.num_pasos, num_columnas), dtype=np.float64)
     # config_matrix_pp_set = np.zeros((int((params.num_pasos / params.paso_guardar)), params.x_size, params.y_size))
 
-    print("El valor de gamma es:", sim_ctes.gamma, "\n")
+    # creo la mascara para limitar la generacion a solo la zona del esperado filamento
+    limit_CF_witdh_mask_generation = Generation.create_custom_mask(
+        state=actual_state, centros_CF=CF_centros, grosor_CF=sim_ctes.grosor_filamento
+    )
 
     print(f"Simulacion {num_simulation} - Primera parte del set\n")
 
@@ -651,12 +713,14 @@ def PP_set(
                     if filamentos_actuales == 1:
                         # Se acaba de formar el PRIMERO
                         print("Se ha formado el primer filamento de dos.")
-                        sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 2)
+                        # sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma)
                         # sim_ctes = sim_ctes.update_generation_energy(1.75)
-                        print(f"El nuevo valor de gamma es: {sim_ctes.gamma}")
-                        print("El nuevo valor de la energía de generación es:", sim_ctes.generation_energy, "\n")
+                        # print(f"El nuevo valor de gamma es: {sim_ctes.gamma}")
+                        # print("El nuevo valor de la energía de generación es:", sim_ctes.generation_energy, "\n")
                         # obtengo los centros de los CF
-                        centros_calculados = Temperature.obtener_centro_CF(actual_state_clean_CF, cf_ranges=CF_ranges)
+                        centros_calculados = CF_centros
+                        # Estoy limitando la generacion solo a los filamentos, los centros ya los estoy fijando antes esto ya no tiene sentido
+                        # centros_calculados = Temperature.obtener_centro_CF(actual_state_clean_CF, cf_ranges=CF_ranges)
                         print("Los centros calculados de los filamentos son:", centros_calculados, "\n")
 
                     elif filamentos_actuales == 2:
@@ -668,7 +732,9 @@ def PP_set(
                         print("El nuevo valor de la energía de generación es:", sim_ctes.generation_energy, "\n")
                         all_CFs_created = True
                         # obtengo los centros de los CF
-                        centros_calculados = Temperature.obtener_centro_CF(actual_state_clean_CF, cf_ranges=CF_ranges)
+                        centros_calculados = CF_centros
+                        # Estoy limitando la generacion solo a los filamentos, los centros ya los estoy fijando antes esto ya no tiene sentido
+                        # centros_calculados = Temperature.obtener_centro_CF(actual_state_clean_CF, cf_ranges=CF_ranges)
                         filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(centros_calculados)
 
                         print("Los centros calculados de los filamentos son:", centros_calculados, "\n")
@@ -691,16 +757,16 @@ def PP_set(
 
             cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf)
 
-            # Limito el grosor de los filamentos a un máximo de 3 celdas
-            _, new_cf_clean_matrix = CurrentSolver.limitar_grosor_filamentos(
-                actual_state,
-                cf_clean_matrix,
-                centros_calculados,
-                sim_ctes.grosor_filamento,
-                CF_ranges,
-            )
+            # # Limito el grosor de los filamentos a un máximo de 3 celdas
+            # _, new_cf_clean_matrix = CurrentSolver.limitar_grosor_filamentos(
+            #     actual_state,
+            #     cf_clean_matrix,
+            #     centros_calculados,
+            #     sim_ctes.grosor_filamento,
+            #     CF_ranges,
+            # )
 
-            cf_clean_matrix = new_cf_clean_matrix.copy()
+            # cf_clean_matrix = new_cf_clean_matrix.copy()
 
             # Si ha percolado uso la corriente de Ohm
             try:
@@ -790,22 +856,6 @@ def PP_set(
                 temperatura_anterior = temperatura[:, 1:-1]
 
                 if k % num_pasos_guardar_estado == 0:
-                    # Representate.RepresentateState(
-                    #     matriz=before_cf_clean_matrix,
-                    #     voltaje=fig_voltage,
-                    #     filename=str(rutas["figures_path"])
-                    #     + f"/State_Clean_ANTES_{num_simulation}_{fig_voltage}_pp_set.png",
-                    #     device_size=params.device_size,
-                    # )
-
-                    # Representate.RepresentateState(
-                    #     matriz=cf_clean_matrix,
-                    #     voltaje=fig_voltage,
-                    #     filename=str(rutas["figures_path"])
-                    #     + f"/State_Clean_DESPUES_{num_simulation}_{fig_voltage}_pp_set.png",
-                    #     device_size=params.device_size,
-                    # )
-
                     utils.resumen_plots(
                         k=k,
                         fig_voltage=fig_voltage,
@@ -865,6 +915,7 @@ def PP_set(
                 sim_ctes.factor_vecinos_pp_set,
                 sim_ctes.factor_libre_pp_set,
                 max_vancantes_pp_set,
+                custom_mask=limit_CF_witdh_mask_generation,
             )
 
         elif not total_vacantes_pp_set:
@@ -874,8 +925,8 @@ def PP_set(
             total_vacantes_pp_set = True
 
         # Guardo los datos de la simulación
-        data_pp_set[k] = np.array([simulation_time, voltage, current])
-        num_vacantes_total[k] = np.array([simulation_time, voltage, total_vacantes])
+        data_pp_set[k] = np.array([simulation_time, voltage, current, resistencia])
+        num_vacantes_total[k] = np.array([simulation_time, voltage, current, total_vacantes])
 
         if k % num_pasos_guardar_estado == 0:
             # np.save(rutas["figures_path"] / f"temperatura_{k}_pp_set.npy", temperatura)
@@ -915,7 +966,7 @@ def PP_set(
         voltaje_final=params.voltaje_final_set,
         config_state=actual_state,
         datos_save=data_pp_set,
-        header_files="Tiempo simulacion [s],Voltaje [V],Intensidad [A]",
+        header_files="Tiempo simulacion [s],Voltaje [V],Intensidad [A], resistencia [Ohm]",
         save_path_data=save_path_data,
         save_path_pkl=save_path_pkl,
         save_path_figures=save_path_figures,
@@ -1019,6 +1070,11 @@ def SP_set(
     num_columnas = 3  # Tiempo, Voltaje, Intensidad
     num_pasos_guardar_estado = 1000
     rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="set")
+
+    # creo la mascara para limitar la generacion a solo la zona del esperado filamento
+    limit_CF_witdh_mask_generation = Generation.create_custom_mask(
+        state=actual_state, centros_CF=centros_calculados, grosor_CF=sim_ctes.grosor_filamento
+    )
 
     # print("El valor de las rutas para guardar la simulación es:", rutas, "\n")
 
@@ -1281,6 +1337,7 @@ def SP_set(
                 sim_ctes.factor_vecinos_sp_set,
                 sim_ctes.factor_libre_sp_set,
                 ocupacion_max_sp_set,
+                custom_mask=limit_CF_witdh_mask_generation,
             )
 
         elif not total_vacantes_sp_set:
@@ -1325,6 +1382,7 @@ def SP_set(
         "Temperatura_final": temperatura,
         "tiempo_sp_set": tiempo_sp_set,
         "percola": sistema_percola,
+        "centros_calculados": centros_calculados,
     }
     with open(rutas["simulation_path"] / f"final_state_sp_set_{num_simulation}.pkl", "wb") as f:
         pickle.dump(actual_state, f)
@@ -1345,7 +1403,7 @@ def PP_reset(
     final_state_sp_set: dict,
     num_simulation: int,
     CF_ranges: List[tuple],
-    num_pasos_guardar_estado: int = 2000,  # Antes era cada 2000
+    num_pasos_guardar_estado: int = 1000,  # Antes era cada 2000
 ):
     """
     Simulates the reset process of a resistive switching device, updating the system's state and tracking the evolution of various parameters over time.
@@ -1380,6 +1438,10 @@ def PP_reset(
         "percola"
     ]  # un poco inútil pero bueno, por si acaso (no ha tenido oportunidad de cambir el estado)
     actual_state = final_state_sp_set["actual_state"]
+    centros_calculados = final_state_sp_set["centros_calculados"]
+    temperatura_anterior = final_state_sp_set["Temperatura_final"][:, 1:-1]
+    pendiente_temperatura = sim_ctes.pendiente_temperatura
+    filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(centros_calculados)
 
     rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="reset")
 
@@ -1421,6 +1483,7 @@ def PP_reset(
     for k in range(0, params.num_pasos + 1):
         simulation_time = params.paso_temporal * k
         voltage = vector_ddp[k]
+        fig_voltage = round(vector_ddp[k], 5)
 
         # Obtengo los valores del campo eléctrico
         E_field = abs(ElectricField.SimpleElectricField(voltage, params.device_size))
@@ -1491,14 +1554,80 @@ def PP_reset(
                 factor_generar_calor=sim_ctes.factor_generar_calor,
             )
 
-            # Obtengo la matriz de temperatura
-            temperatura = Temperature.solve_thermal_state(
-                types_map=materials_map,
-                Q_map=Q_source_map,
-                thermal_props=sim_ctes.propiedades_termicas,
-                atom_size=params.atom_size,
-                T_ambient=sim_ctes.Temperatura_electrodo,
-            )
+            if not np.any(CF_destruido):
+                # Todos los filamentos intactos: calculamos con muro térmico
+                # Extracción del perfil térmico de los filamentos del paso anterior
+                if isinstance(temperatura_anterior, (float, int)):
+                    raise ValueError(
+                        "La temperatura no se ha calculado como matriz, no se pueden extraer los perfiles de los filamentos. Se esperaba una matriz de temperaturas, pero se ha recibido un valor escalar."
+                    )
+                else:
+                    mis_perfiles_extraidos = Temperature.extraer_perfiles_filamentos(
+                        matriz_temperaturas=temperatura_anterior, filas_centros=centros_calculados
+                    )
+
+                # Cálculo de los perfiles para los muros y colocación
+                perfiles_muros_calculados = Temperature.calcular_perfiles_muro(
+                    perfiles_filamentos=mis_perfiles_extraidos,
+                    distancias_casillas=dist_casillas,
+                    pendiente_temperatura=pendiente_temperatura,
+                    atom_size=params.atom_size,
+                    T_ambient=params.init_temp,
+                )
+
+                matriz_temperaturas_fijas = Temperature.colocar_muro_termico(
+                    matriz_molde=cf_clean_matrix,
+                    filas_intermedias=filas_intermedias,
+                    perfiles_muros_calculados=perfiles_muros_calculados,
+                )
+
+                # Añadimos columnas de ceros (donde no hay muro) en las posiciones de los electrodos
+                Ny = matriz_temperaturas_fijas.shape[0]
+                columna_ceros = np.zeros((Ny, 1))
+                matriz_temperaturas_fijas_final = np.hstack([columna_ceros, matriz_temperaturas_fijas, columna_ceros])
+
+                # Obtengo la matriz de temperatura con el muro térmico
+                temperatura = Temperature.solve_thermal_state(
+                    types_map=materials_map,
+                    Q_map=Q_source_map,
+                    thermal_props=sim_ctes.propiedades_termicas,
+                    atom_size=params.atom_size,
+                    T_ambient=sim_ctes.Temperatura_electrodo,
+                    matriz_muros=matriz_temperaturas_fijas_final,
+                )
+
+                # Actualizo la temperatura anterior para el siguiente paso
+                temperatura_anterior = temperatura[:, 1:-1]
+
+                if k % num_pasos_guardar_estado == 0:
+                    utils.resumen_plots(
+                        k=k,
+                        fig_voltage=fig_voltage,
+                        filas_intermedias=filas_intermedias,
+                        temperatura=temperatura,
+                        materials_map=materials_map,
+                        rutas=rutas,
+                        num_simulation=num_simulation,
+                        voltage=voltage,
+                        params=params,
+                        actual_state=actual_state,
+                        actual_state_clean_CF=cf_clean_matrix,
+                        matriz_temperaturas_fijas=matriz_temperaturas_fijas,
+                        centros_calculados=centros_calculados,
+                        mis_perfiles_extraidos=mis_perfiles_extraidos,
+                        CF_ranges=CF_ranges,
+                        etapa="pp_reset",
+                        columna_perfil=21,
+                    )
+            else:
+                # Algún filamento ya destruido: temperatura sin muro térmico
+                temperatura = Temperature.solve_thermal_state(
+                    types_map=materials_map,
+                    Q_map=Q_source_map,
+                    thermal_props=sim_ctes.propiedades_termicas,
+                    atom_size=params.atom_size,
+                    T_ambient=sim_ctes.Temperatura_electrodo,
+                )
 
         else:
             percola = False
@@ -1543,7 +1672,6 @@ def PP_reset(
 
         # Represento el estado cada 3000 pasos
         if k % num_pasos_guardar_estado == 0:
-            fig_voltage = round(vector_ddp[k], 3)
             utils.guardar_representar_estado(
                 voltaje=fig_voltage,
                 config_state=actual_state,
@@ -1588,6 +1716,9 @@ def PP_reset(
         "roturas_dict": roturas_dict,
         "temperatura_final": temperatura,
     }
+
+    print(f"La temperatura final del pp reset es: {temperatura}")
+
     with open(rutas["simulation_path"] / f"final_state_pp_reset_{num_simulation}.pkl", "wb") as f:
         pickle.dump(actual_state, f)
 
@@ -1930,13 +2061,13 @@ def simulation_IV(
         puntos_x_sp_reset,
     )
 
-    print("Puntos en la curva I-V:\n")
-    for label, (v, i) in {
-        **puntos_set,
-        **puntos_x_pp_reset,
-        **puntos_x_sp_reset,
-    }.items():
-        print(f"  Punto {label}: V = {v:.6f} V, I = {i:.6e} A")
+    # print("Puntos en la curva I-V:\n")
+    # for label, (v, i) in {
+    #     **puntos_set,
+    #     **puntos_x_pp_reset,
+    #     **puntos_x_sp_reset,
+    # }.items():
+    #     print(f"  Punto {label}: V = {v:.6f} V, I = {i:.6e} A")
 
     # Crear un único diccionario combinando ambos
     puntos_totales = {}

@@ -665,8 +665,8 @@ def plot_IV_marcado(
         #     "puntos finales: ",
         #     (xp + dx, yp * factor_y),
         # )
-        print("\n-----------------------------")
-        print("Marcando punto: ", label, " en (", xp, ",", yp, ")")
+        # print("\n-----------------------------")
+        # print("Marcando punto: ", label, " en (", xp, ",", yp, ")")
         axes.scatter(xp, yp, color="blue", s=80, marker=markers.MarkerStyle("D"), zorder=10)
         axes.text(
             xp + dx,  # Usar la posición calculada en x

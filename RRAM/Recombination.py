@@ -241,3 +241,102 @@ def move_oxygen_ions(
         oxygen_state_new[valid_rows, valid_new_cols] = 1
 
     return oxygen_state_new, oxygen_velocity
+
+
+import numpy as np
+import sys
+
+# Nota: k_b_ev debe estar definido en el módulo o importado de Constants
+k_b_ev = 8.617333262145e-5
+
+
+def new_move_oxygen_ions(
+    paso_temp: float,
+    oxygen_state: np.ndarray,
+    temperature: np.ndarray | float,
+    E_field: float,
+    grid_size: float,
+    vibration_frequency: float,
+    gamma_drift: float,
+    migration_energy: float,
+    cte_red: float,
+) -> tuple[np.ndarray, np.ndarray | float]:
+    """
+    Mueve los iones de oxígeno de forma estocástica. El desplazamiento calculado
+    físicamente actúa como el valor máximo que un ión puede saltar en un paso.
+    """
+
+    # =========================================================================
+    # 1. CÁLCULO FÍSICO DE LA VELOCIDAD (Cinemática)
+    # =========================================================================
+    try:
+        # Se mantiene la lógica original para determinar la capacidad de movimiento
+        senoh = np.sinh((cte_red * E_field * gamma_drift) / (2 * k_b_ev * temperature))
+        exp_velocity = np.exp(-migration_energy / (k_b_ev * temperature))
+        oxygen_velocity = 2 * cte_red * vibration_frequency * (senoh * exp_velocity)
+
+    except OverflowError as Overflow_exception:
+        print(f"\n Error en el cálculo de la velocidad: {Overflow_exception}")
+        sys.exit(1)
+
+    # Arreglo temporal de velocidad según el campo (se mantiene de tu código original)
+    valor_prueba = abs(E_field * (10e-9))
+    if valor_prueba > 0.7:
+        oxygen_velocity = 5.2e-07
+    elif valor_prueba > 0.5:
+        oxygen_velocity = 3e-07
+    else:
+        oxygen_velocity = 0
+
+    # =========================================================================
+    # 2. CÁLCULO DEL DESPLAZAMIENTO MÁXIMO
+    # =========================================================================
+    # Este es el valor "techo" de celdas que un ión podría moverse
+    max_displacement = np.array(np.round((oxygen_velocity * paso_temp) / grid_size), dtype=int)
+
+    # Creamos la nueva matriz vacía
+    oxygen_state_new = np.zeros_like(oxygen_state)
+
+    # =========================================================================
+    # 3. MOVIMIENTO ALEATORIO INDEPENDIENTE
+    # =========================================================================
+    rows, cols = np.where(oxygen_state == 1)
+    num_ions = len(rows)
+
+    if num_ions > 0:
+        # Inicializamos el vector de desplazamientos reales con ceros
+        actual_shifts = np.zeros(num_ions, dtype=int)
+
+        if max_displacement.ndim > 0:
+            # CASO A: El desplazamiento es una matriz (mapa de calor)
+            # Extraemos el máximo permitido para la posición de cada ión
+            max_allowed = max_displacement[rows, cols]
+
+            # Solo intentamos generar aleatorios donde el máximo sea > 0
+            mask = max_allowed > 0
+            if np.any(mask):
+                # Genera un entero aleatorio entre 1 y max_allowed (inclusive)
+                # np.random.randint(low, high) -> high es exclusivo, por eso el +1
+                actual_shifts[mask] = np.random.randint(1, max_allowed[mask] + 1)
+        else:
+            # CASO B: El desplazamiento es un escalar (valor constante)
+            if max_displacement > 0:
+                # Todos los iones tiran el dado entre 1 y el mismo máximo
+                actual_shifts = np.random.randint(1, max_displacement + 1, size=num_ions)
+
+        # Calculamos las nuevas columnas sumando el desplazamiento aleatorio
+        new_cols = cols + actual_shifts
+
+        # =========================================================================
+        # 4. FILTRADO Y ACTUALIZACIÓN
+        # =========================================================================
+        # Verificamos que no se salgan del array
+        valid_mask = (new_cols >= 0) & (new_cols < oxygen_state.shape[1])
+
+        valid_rows = rows[valid_mask]
+        valid_new_cols = new_cols[valid_mask]
+
+        # Actualizamos la matriz con las nuevas posiciones
+        oxygen_state_new[valid_rows, valid_new_cols] = 1
+
+    return oxygen_state_new, oxygen_velocity
