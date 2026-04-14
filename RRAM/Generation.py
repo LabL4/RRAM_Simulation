@@ -166,3 +166,77 @@ def create_custom_mask(state, centros_CF, grosor_CF):
         mask[fila_inicio:fila_fin, :] = True
 
     return mask
+
+
+# Esta función es un intento de que el primer filamento sea grueso para mitigar el salto
+# def get_generation_probabilities_matrix(
+#     state: np.ndarray,
+#     paso_temporal: float,
+#     Electric_field: np.ndarray | float,
+#     temperatura: np.ndarray | float,
+#     factor_vecinos: float,
+#     factor_sin_vecinos: float,
+#     vibration_frequency: float,
+#     generation_energy: float,
+#     cte_red: float,
+#     gamma: float,
+#     neighbor_mode: str = "vertical",
+#     custom_mask: np.ndarray | None = None,
+# ) -> np.ndarray:
+#     """
+#     Calcula el mapa de probabilidades locales (0 a 1) para generar nuevas vacantes en la red.
+
+#     Si se proporciona custom_mask, se aplica la lógica de vecinos según neighbor_mode ("horizontal",
+#     "vertical" o "both"), usando factor_vecinos y factor_sin_vecinos, PERO exclusivamente
+#     restringido a la zona donde custom_mask es True.
+#     """
+
+#     free_mask = state == 0
+
+#     # Probabilidad base
+#     prob_base_raw = calcular_probabilidad_generacion(
+#         time_stp=paso_temporal,
+#         electric_field=Electric_field,
+#         temp=temperatura,
+#         vibration_frequency=vibration_frequency,
+#         generation_energy=generation_energy,
+#         cte_red=cte_red,
+#         gamma=gamma,
+#     )
+
+#     if not isinstance(prob_base_raw, np.ndarray) or prob_base_raw.ndim == 0:
+#         prob_base_matrix = np.full(state.shape, prob_base_raw)
+#     else:
+#         prob_base_matrix = prob_base_raw
+
+#     # 1. Calculamos la lógica de vecinos SIEMPRE
+#     vecino_mask = np.zeros_like(state, dtype=bool)
+#     if neighbor_mode in ["horizontal", "both"]:
+#         left_neighbor = np.zeros_like(state, dtype=bool)
+#         left_neighbor[:, 1:] = state[:, :-1] == 1
+#         right_neighbor = np.zeros_like(state, dtype=bool)
+#         right_neighbor[:, :-1] = state[:, 1:] == 1
+#         vecino_mask |= left_neighbor | right_neighbor
+
+#     if neighbor_mode in ["vertical", "both"]:
+#         up_neighbor = np.zeros_like(state, dtype=bool)
+#         up_neighbor[1:, :] = state[:-1, :] == 1
+#         down_neighbor = np.zeros_like(state, dtype=bool)
+#         down_neighbor[:-1, :] = state[1:, :] == 1
+#         vecino_mask |= up_neighbor | down_neighbor
+
+#     prob_final = np.zeros_like(prob_base_matrix)
+
+#     # 2. Determinamos la máscara final de las zonas válidas para generar vacantes
+#     if custom_mask is not None:
+#         # Tienen que estar vacías (free_mask) Y permitidas por la máscara (custom_mask)
+#         valid_mask = free_mask & custom_mask
+#     else:
+#         # Si no hay máscara personalizada, solo importa que estén vacías
+#         valid_mask = free_mask
+
+#     # 3. Asignamos las probabilidades finales multiplicadas por su factor correspondiente
+#     prob_final[valid_mask & vecino_mask] = prob_base_matrix[valid_mask & vecino_mask] * factor_vecinos
+#     prob_final[valid_mask & ~vecino_mask] = prob_base_matrix[valid_mask & ~vecino_mask] * factor_sin_vecinos
+
+#     return np.minimum(prob_final, 1.0)

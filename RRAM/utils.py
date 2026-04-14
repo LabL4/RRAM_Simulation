@@ -1,3 +1,4 @@
+from RRAM import Representate, Temperature
 from . import Representate, utils
 from typing import List, Dict
 from pathlib import Path
@@ -160,6 +161,7 @@ def guardar_representar_estado(
     config_state: np.ndarray,
     save_path_pkl: Path,
     save_path_figures: Path,
+    representar_estado: bool = False,
 ) -> None:
     """
     Saves simulation data, configuration state, and generates a representation of the final state.
@@ -176,7 +178,8 @@ def guardar_representar_estado(
     with open(str(save_path_pkl), "wb") as f:
         pickle.dump(config_state, f)
 
-    Representate.RepresentateState(config_state, voltaje, str(save_path_figures))
+    if representar_estado:
+        Representate.RepresentateState(config_state, voltaje, str(save_path_figures))
 
     return None
 
@@ -302,8 +305,6 @@ def resumen_plots(
     Genera y guarda todas las gráficas de estado, temperatura y muros térmicos
     para un paso específico de la simulación.
     """
-    from RRAM import Representate, Temperature
-    import numpy as np
 
     print(f"Representando para el paso {k} con voltaje {fig_voltage} V las filas intermedias son {filas_intermedias}\n")
 

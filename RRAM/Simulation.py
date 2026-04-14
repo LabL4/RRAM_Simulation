@@ -1679,12 +1679,6 @@ def PP_reset(
                 save_path_figures=rutas["figures_path"] / f"pp_reset_state_V={fig_voltage}_{num_simulation}.png",
             )
 
-            print(
-                "Representando el estado de la simulación en el voltaje ",
-                fig_voltage,
-                " (V)",
-            )
-
     # Guardo los datos de la simulación
     save_path_pkl = rutas["data_simulation_path"] / f"Data_pp_reset_{num_simulation}.pkl"
     save_path_data = rutas["simulation_path"] / f"Data_pp_reset_{num_simulation}.txt"
@@ -1870,6 +1864,7 @@ def SP_reset(
                     pb_metal_insul=sim_ctes.pb_metal_insul_reset,
                     permitividad_relativa=sim_ctes.permitividad_relativa_reset,
                     I_0=sim_ctes.I_0_reset,
+                    mostrar_datos=True,
                 )
                 * (params.device_size)
             )
@@ -1907,13 +1902,6 @@ def SP_reset(
                 save_path_pkl=rutas["data_simulation_path"] / f"sp_reset_state_V={fig_voltage}_{num_simulation}.pkl",
                 save_path_figures=rutas["figures_path"] / f"sp_reset_state_V={fig_voltage}_{num_simulation}.png",
             )
-
-            # Representate.RepresentateTwoStates(
-            #     matriz1=actual_state,
-            #     matriz2=oxygen_state,
-            #     voltage=fig_voltage,
-            #     filename=str(rutas["figures_path"] / f"sp_reset_full_state_V={fig_voltage}_{num_simulation}.png"),
-            # )
 
             print(
                 "Representando el estado de la simulación en el voltaje: ",

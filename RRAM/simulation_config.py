@@ -8,12 +8,12 @@ import os
 # ============================================================================
 MATERIAL_DEFAULTS = {
     "cte_red": 0.25e-9,
-    "permitividad_relativa_set": 299.8037,
-    "permitividad_relativa_reset": 299.9237,
+    "permitividad_relativa_set": 299.9162,
+    "permitividad_relativa_reset": 299.9544,
     "generation_energy": 1.0,
     "recombination_energy": 0.955,
     "pb_metal_insul_set": 0.0010,
-    "pb_metal_insul_reset": 0.0339,
+    "pb_metal_insul_reset": 0.0304,
     "recom_enchancement_factor": 3e3,
     "long_decaimiento_concentracion": 1e-9,
     "ohm_resistence_set": 150.0,
@@ -36,8 +36,8 @@ PHYSICAL_CONSTANTS = {
 # PARÁMETROS ELÉCTRICOS
 # ============================================================================
 ELECTRICAL_DEFAULTS = {
-    "I_0_set": 1.1179e-03,
-    "I_0_reset": 2.5948e-03,
+    "I_0_set": 1.9402e-03,
+    "I_0_reset": 4.3545e-03,
 }
 
 # ============================================================================

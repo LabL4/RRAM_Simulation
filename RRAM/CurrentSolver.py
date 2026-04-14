@@ -265,7 +265,12 @@ def OmhCurrent(potential: float, resistance_matrix: NDArray, ohm_resistence: flo
 
 # En RRAM/CurrentSolver.py
 def Poole_Frenkel(
-    temperature: float, E_field: float, pb_metal_insul: float, permitividad_relativa: float, I_0: float
+    temperature: float,
+    E_field: float,
+    pb_metal_insul: float,
+    permitividad_relativa: float,
+    I_0: float,
+    mostrar_datos: bool = False,
 ) -> float:
     """
     Calcula la corriente mediante el mecanismo de conducción Poole-Frenkel.
@@ -294,6 +299,11 @@ def Poole_Frenkel(
 
     exponencial = math.exp((beta - pb_metal_insul) / (k_b_ev * temperature))
     I_poole_frenkel = I_0 * E_field * exponencial
+
+    if mostrar_datos:
+        print(
+            f"Poole-Frenkel: T={temperature}K \n exponencial={exponencial} \n Potencial ={E_field * 10e-9} V/m \n Corriente PF={I_poole_frenkel * 10e-9} A"
+        )
 
     return I_poole_frenkel
 
