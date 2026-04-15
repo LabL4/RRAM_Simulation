@@ -94,9 +94,7 @@ def crear_rutas_simulacion(num_simulation: int, state: str) -> dict:
     }
 
 
-def cargar_y_representar_estado(
-    load_data_path: Path, figures_path: Path, voltage: float, plot_state: bool = False, device_size: float = 10e-9
-) -> np.ndarray:
+def cargar_estado(load_data_path: Path) -> np.ndarray:
     """
     Carga el estado de configuración desde archivo pkl y genera una imagen de ese estado.
 
@@ -113,9 +111,6 @@ def cargar_y_representar_estado(
     datos = np.load(f"{load_data_path}.npz")
     actual_state = datos["actual_state"]
     datos.close()  # Siempre es buena práctica cerrar el archivo
-
-    if plot_state:
-        Representate.RepresentateState(actual_state, voltage, str(figures_path), device_size=device_size)
 
     return actual_state
 
@@ -328,8 +323,6 @@ def simulation_IV(
         num_simulation,
         puntos_totales,
         desplazamiento,
-        titulo_figura="",
-        figures_path=str(save_path_marcado),
     )
 
     return None
@@ -369,7 +362,7 @@ def resumen_plots(
         fig_voltage,
         10,
         save_path=rutas["figures_path"] / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_{etapa}.png",
-        device_size=params.device_size,
+        atom_size=params.atom_size,
         filas_intermedias=filas_intermedias,
     )
 
@@ -378,14 +371,14 @@ def resumen_plots(
         matriz=actual_state,
         voltaje=fig_voltage,
         filename=str(rutas["figures_path"]) + f"/State_{num_simulation}_{fig_voltage}_{etapa}.png",
-        device_size=params.device_size,
+        atom_size=params.atom_size,
     )
 
     Representate.RepresentateState(
         matriz=actual_state_clean_CF,
         voltaje=fig_voltage,
         filename=str(rutas["figures_path"]) + f"/State_Clean_{num_simulation}_{fig_voltage}_{etapa}.png",
-        device_size=params.device_size,
+        atom_size=params.atom_size,
     )
 
     # 3. Preparación y plot del muro térmico
@@ -398,7 +391,7 @@ def resumen_plots(
         matriz_muros=matriz_para_plot_muro,
         matriz_molde=actual_state_clean_CF,
         filename=rutas["figures_path"] / f"Muro_termico_{num_simulation}_{fig_voltage}_{etapa}.png",
-        device_size=params.device_size,
+        atom_size=params.atom_size,
     )
 
     # 4. Centros de filamentos
@@ -408,7 +401,7 @@ def resumen_plots(
         filas_intermedias=filas_intermedias,
         centros_calculados=centros_calculados,
         filename=rutas["figures_path"] / f"Centros_filamentos_{num_simulation}_{fig_voltage}_{etapa}.png",
-        device_size=params.device_size,
+        atom_size=params.atom_size,
     )
 
     # 5. Matriz de probabilidades

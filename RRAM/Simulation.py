@@ -60,7 +60,7 @@ class SimulationParameters:
     def __post_init__(self):
         self.x_size = int(np.ceil(self.device_size_x / self.atom_size))  # Número de "casillas" en la dimensión x
         self.y_size = int(np.ceil(self.device_size_y / self.atom_size))  # Número de "casillas" en la dimensión y
-        self.num_max_vacantes = int(0.95 * (self.x_size * self.x_size))  # 95% de la matriz puede llenarse de vacantes
+        self.num_max_vacantes = int(0.95 * (self.x_size * self.y_size))  # 95% de la matriz puede llenarse de vacantes
         self.paso_temporal = self.total_simulation_time / self.num_pasos  # Paso temporal en segundos
         self.paso_potencial_set = self.voltaje_final_set / self.num_pasos  # Paso de voltaje para la parte de set
         self.paso_potencial_reset = self.voltaje_final_reset / self.num_pasos  # Paso de voltaje para la parte de reset
@@ -215,7 +215,6 @@ def procesar_filamentos_creados(
     voltage_CF_creado,
     actual_state,
     num_simulation,
-    params: SimulationParameters,
     plot_filamento: bool = False,
 ):
     """
@@ -243,9 +242,7 @@ def procesar_filamentos_creados(
 
         if plot_filamento:
             nombre_img = imagen_path / f"Filamento_{i + 1}_creado_set_{num_simulation}.png"
-            Representate.RepresentateState(
-                actual_state, round(voltage, 5), str(nombre_img), device_size=params.device_size
-            )
+            Representate.RepresentateState(actual_state, round(voltage, 5), str(nombre_img))
 
         # Guardar estado actual en archivo pkl
         data_name = data_save_path / f"filamento_{i + 1}_creado_set_{num_simulation}.npz"
@@ -265,7 +262,6 @@ def procesar_filamentos_destruidos(
     num_simulation,
     roturas_dict,
     etapa,
-    params: SimulationParameters,
     plot_filamento: bool = False,
 ):
     """
@@ -301,9 +297,7 @@ def procesar_filamentos_destruidos(
 
         if plot_filamento:
             nombre_img = imagen_path / f"Filamento_{i + 1}_roto_reset_{num_simulation}.png"
-            Representate.RepresentateState(
-                actual_state, round(voltage, 5), str(nombre_img), device_size=params.device_size
-            )
+            Representate.RepresentateState(actual_state, round(voltage, 5), str(nombre_img))
 
         data_name = data_save_path / f"filamento_{i + 1}_roto_reset_{num_simulation}.npz"
         np.savez_compressed(data_name, actual_state=actual_state)
@@ -445,6 +439,7 @@ def update_state_recombinate(
         gamma_drift=sim_ctes.gamma_drift,
         migration_energy=sim_ctes.E_m,
         cte_red=sim_ctes.cte_red,
+        potencial=voltage,
     )
 
     # 3.Recombinación de iones con vacantes
@@ -505,19 +500,15 @@ def PP_set(
     rutas["figures_path"].mkdir(parents=True, exist_ok=True)
     rutas["data_simulation_path"].mkdir(parents=True, exist_ok=True)
 
-    # Cargo y represento el estado inicial de configuración
-    actual_state = utils.cargar_y_representar_estado(
-        Path.cwd() / f"Init_data/init_state_{num_simulation - 1}",
-        rutas["figures_path"] / f"Initial_state_{num_simulation}.png",
-        0.0,
-        device_size=params.device_size,
-    )
+    # Cargo el estado inicial de configuración
+    actual_state = utils.cargar_estado(Path.cwd() / f"Init_data/init_state_{num_simulation - 1}")
 
     sistema_percola = False
     total_vacantes_pp_set = False
     num_pasos_guardar_estado = 250
     cf_clean_matrix = None
     voltaje_percolacion = params.voltaje_final_set
+
     # AL inicio como la corriente es de tipo poole frenkel, la resitencia ohmica se considera nula
     resistencia = 0.0
     temperatura_anterior = params.init_temp
@@ -577,7 +568,11 @@ def PP_set(
         # Genero el vector campo eléctrico
         for i in range(0, params.x_size):
             E_field_vector[i] = ElectricField.GapElectricField(
-                voltage, i, actual_state, device_size=params.device_size, grid_size=params.atom_size
+                potential=voltage,
+                pos_y=i,
+                actual_state=actual_state,
+                device_size_x=params.device_size_x,
+                grid_size=params.atom_size,
             )
 
         # Verifica si el sistema ha percolado
@@ -631,7 +626,7 @@ def PP_set(
             sistema_percola = True
 
             actual_state_clean_CF, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
-            filamentos = CurrentSolver.Clasificar_CF(CF_graph, params.x_size, params.y_size, CF_ranges)
+            filamentos = CurrentSolver.Clasificar_CF(CF_graph, actual_state, CF_ranges)
             exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(CF_ranges))
 
             # Compruebo si hay filamentos nuevos
@@ -645,7 +640,6 @@ def PP_set(
                     voltage_CF_creado=voltage_CF_creado,
                     actual_state=actual_state,
                     num_simulation=num_simulation,
-                    params=params,
                 )
 
             filamentos_actuales = sum(CF_creado)
@@ -707,7 +701,7 @@ def PP_set(
                 # Actualizamos el historial para que no vuelva a entrar en iteraciones futuras
                 filamentos_previos = filamentos_actuales
 
-            cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf)
+            cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf, actual_state)
 
             # Limito el grosor de los filamentos a un máximo de 3 celdas
             _, new_cf_clean_matrix = CurrentSolver.limitar_grosor_filamentos(
@@ -814,6 +808,7 @@ def PP_set(
             )
             # print(f"El valor de la temperatura es {temperatura} K, se usa el modelo de temperatura de Joule\n")
 
+            # TODO Confirmar que la corriente es por device_size_y
             # simple_field = ElectricField.SimpleElectricField(voltage, params.device_size)
             # Si no ha percolado uso la corriente de Poole-Frenkel
             if not total_vacantes_pp_set:
@@ -823,7 +818,7 @@ def PP_set(
                     pb_metal_insul=sim_ctes.pb_metal_insul_set,
                     permitividad_relativa=sim_ctes.permitividad_relativa_set,
                     I_0=sim_ctes.I_0_set,
-                ) * (params.device_size)
+                ) * (params.device_size_y)
 
         if total_vacantes < max_vancantes_pp_set:
             if all_CFs_created:
@@ -1038,7 +1033,7 @@ def SP_set(
     print("La distancia entre casillas es:", dist_casillas, "\n")
 
     actual_state_clean_CF, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
-    filamentos = CurrentSolver.Clasificar_CF(CF_graph, params.x_size, params.y_size, CF_ranges)
+    filamentos = CurrentSolver.Clasificar_CF(CF_graph, actual_state, CF_ranges)
     exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(CF_ranges))
 
     # cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf)
@@ -1071,7 +1066,7 @@ def SP_set(
         # Genero el vector campo eléctrico
         for i in range(0, params.x_size):
             E_field_vector[i] = ElectricField.GapElectricField(
-                voltage, i, actual_state, device_size=params.device_size, grid_size=params.atom_size
+                voltage, i, actual_state, device_size_x=params.device_size_x, grid_size=params.atom_size
             )
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
@@ -1361,14 +1356,14 @@ def PP_reset(
         for i in range(0, actual_state.shape[0]):
             E_field_vector[i] = abs(
                 ElectricField.GapElectricField(
-                    voltage, i, actual_state, device_size=params.device_size, grid_size=params.atom_size
+                    voltage, i, actual_state, device_size_x=params.device_size_x, grid_size=params.atom_size
                 )
             )
 
         _, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
 
         max_x, max_y = actual_state.shape
-        filamentos = CurrentSolver.Clasificar_CF(CF_graph, max_x, max_y, CF_ranges)
+        filamentos = CurrentSolver.Clasificar_CF(CF_graph, actual_state, CF_ranges)
         exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(CF_ranges))
 
         if any(~CF_destruido):  # mientras haya alguno sin romper
@@ -1383,13 +1378,12 @@ def PP_reset(
                 num_simulation=num_simulation,
                 roturas_dict=roturas_dict,
                 etapa="pp",
-                params=params,
             )
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
             # Obtengo los caminos de percolación
-            cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf)
+            cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf, actual_state)
             percola = True
 
             # Si ha percolado uso la corriente de Ohm
@@ -1569,14 +1563,14 @@ def SP_reset(
         for i in range(0, actual_state.shape[0]):
             E_field_vector[i] = abs(
                 ElectricField.GapElectricField(
-                    voltage, i, actual_state, device_size=params.device_size, grid_size=params.atom_size
+                    voltage, i, actual_state, device_size_x=params.device_size_x, grid_size=params.atom_size
                 )
             )
 
         actual_state_clean_CF, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
 
         max_x, max_y = actual_state.shape
-        filamentos = CurrentSolver.Clasificar_CF(CF_graph, max_x, max_y, CF_ranges)
+        filamentos = CurrentSolver.Clasificar_CF(CF_graph, actual_state, CF_ranges)
         exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(CF_ranges))
 
         anterior_voltage_CF = voltage_CF_destruido.copy()
@@ -1593,13 +1587,12 @@ def SP_reset(
                 num_simulation=num_simulation,
                 roturas_dict=roturas_dict,
                 etapa="sp",
-                params=params,
             )
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
             # Obtengo los caminos de percolación
-            cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf)
+            cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf, actual_state)
             percola = True
 
             # Si ha percolado uso la corriente de Ohm
@@ -1851,8 +1844,6 @@ def simulation_IV(
         num_simulation - 1,
         puntos_totales,
         desplazamiento,
-        titulo_figura="",
-        figures_path=str(save_path_marcado),
     )
 
     return None

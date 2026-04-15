@@ -5,20 +5,20 @@ import sys
 k_b_ev = 8.617333262145e-5  # Boltzmann constant in eV/K
 
 
-def Init_OxygenState(espesor_dispositivo: float, atom_size: float):
+def Init_OxygenState(device_size_x: float, device_size_y: float, atom_size: float):
     """
-    Initializes the state of oxygen atoms in a device.
+    Inicializa la matriz de estado de iones de oxígeno con las dimensiones del dieléctrico.
 
-    Parameters:
-    - espesor_dispositivo (float): The thickness of the device.
-    - atom_size (float): The size of each atom, is equal to the mesh size of the simulation.
+    Parámetros:
+    - device_size_x (float): Distancia entre electrodos [m] → shape[0].
+    - device_size_y (float): Ancho del dispositivo [m] → shape[1].
+    - atom_size (float): Tamaño de celda de la malla [m].
 
-    Returns:
-    - InitialOxigenState (numpy.ndarray): The initial state of oxygen atoms in the device.
+    Retorna:
+    - InitialOxygenState (np.ndarray): Matriz de ceros con shape (eje_x, eje_y).
     """
-
-    eje_x = round(espesor_dispositivo / atom_size)
-    eje_y = round(espesor_dispositivo / atom_size)
+    eje_x = int(math.ceil(device_size_x / atom_size))
+    eje_y = int(math.ceil(device_size_y / atom_size))
 
     InitialOxygenState = np.zeros((eje_x, eje_y), dtype=int)
 
@@ -162,6 +162,7 @@ def move_oxygen_ions(
     gamma_drift: float,
     migration_energy: float,
     cte_red: float,
+    potencial: float,
 ) -> tuple[np.ndarray, np.ndarray | float]:
     """
     Mueve los iones de oxígeno en la simulación calculando su velocidad de deriva (drift).
@@ -188,10 +189,10 @@ def move_oxygen_ions(
 
     # print("Velocidad de los iones de oxígeno: ", oxygen_velocity)
     # Esto es un arreglo temporal para dar cuenta que hay un tiempo hasta que los iones de oxígeno se muevan
-    valor_prueba = abs(E_field * (10e-9))
-    if valor_prueba > 0.7:
+    potencial_imbral = abs(potencial)
+    if potencial_imbral > 0.7:
         oxygen_velocity = 5.2e-07
-    elif valor_prueba > 0.5:
+    elif potencial_imbral > 0.5:
         oxygen_velocity = 3e-07
     else:
         oxygen_velocity = 0

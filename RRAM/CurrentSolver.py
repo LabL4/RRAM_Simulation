@@ -9,9 +9,7 @@ from RRAM import Representate as rp
 from RRAM import Constants as cte
 
 
-def Clean_state_matrix(
-    config_matrix: np.ndarray, min_size: int = 60, plot_resmatrix: bool = False
-) -> tuple[np.ndarray, nx.Graph]:
+def Clean_state_matrix(config_matrix: np.ndarray) -> tuple[np.ndarray, nx.Graph]:
     """
     Limpia la matriz de estado eliminando clústeres aislados y pseudo-filamentos.
     Garantiza que solo sobreviven las estructuras ancladas a AMBOS electrodos.
@@ -79,8 +77,7 @@ def Clean_state_matrix(
 
 def Clasificar_CF(
     G: nx.Graph,
-    x_max: int,
-    y_max: int,
+    actual_state: np.ndarray,
     filamentos_ranges: list[tuple[int, int]],
 ) -> dict:
     """
@@ -114,9 +111,13 @@ def Clasificar_CF(
         }
     """
 
+    # Obtenemos el tamaño directamente de la matriz
+    # Si el crecimiento es horizontal, el espesor es el número de columnas
+    L_x = actual_state.shape[1]
+
     # Nodos de origen y destino
     nodos_inicio = [n for n in G.nodes() if n[1] == 0]
-    nodos_fin = [n for n in G.nodes() if n[1] == x_max - 1]
+    nodos_fin = [n for n in G.nodes() if n[1] == L_x - 1]
 
     # Clasificación de nodos de inicio en filamentos
     nodos_inicio_clasificados = {}
@@ -163,7 +164,7 @@ def Existe_filamentos(resultados, num_filamentos) -> list[bool]:
     return Percola_list_bool
 
 
-def Eliminar_filamentos_incompletos(grid_limpio, filamentos_ranges, percola_bools, W=None):
+def Eliminar_filamentos_incompletos(grid_limpio, filamentos_ranges, percola_bools, actual_state):
     """
     Elimina los nodos y aristas de los rangos donde el filamento no se ha formado (no percola).
 
@@ -181,9 +182,10 @@ def Eliminar_filamentos_incompletos(grid_limpio, filamentos_ranges, percola_bool
             Grafo con los nodos (y sus aristas) solo de los filamentos completos.
     """
     # Si no se pasa W, lo calcula automáticamente del tamaño real de la matriz
+    W = actual_state.shape[1]
 
     # Si no se pasa W, calcularlo del grafo
-    if W is None:
+    if W is None or W == 0:
         nodos = list(grid_limpio.nodes())
         if nodos:
             max_dim = max(max(n[0], n[1]) for n in nodos)
