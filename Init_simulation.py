@@ -7,6 +7,7 @@ ruta_raiz = os.getcwd() + "/"
 sys.path.append(ruta_raiz)
 
 from RRAM import Generation as gn
+from RRAM import utils
 
 import numpy as np
 import math
@@ -29,7 +30,7 @@ def generar_configuracion_filamentos(eje_x, eje_y, num_filamentos, peso_central=
     regiones_pesos = []
 
     # Calculamos el ancho de cada zona dividiendo el espacio total entre el número de filamentos
-    ancho_zona = eje_x // num_filamentos
+    ancho_zona = eje_y // num_filamentos
 
     for n in range(num_filamentos):
         # 1. Calcular el rango (zona) de este filamento
@@ -79,14 +80,19 @@ print(f"Construyendo estados iniciales para {num_simulations} simulaciones...")
 
 for i, row in df_params.iterrows():
     # Calculamos el tamaño de la matriz a partir de los parámetros físicos
-    eje_x = int(math.ceil(row["device_size_x"] / row["atom_size"]))
-    eje_y = int(math.ceil(row["device_size_y"] / row["atom_size"]))
+    eje_x = int(math.ceil(row["device_size_y"] / row["atom_size"]))
+    eje_y = int(math.ceil(row["device_size_x"] / row["atom_size"]))
     num_trampas = int(row["num_trampas"])
 
-    f_ranges, regiones_pesos = generar_configuracion_filamentos(eje_x, eje_y, num_filamentos=2)
+    f_ranges, regiones_pesos, _ = utils.generar_configuracion_filamentos(eje_x, eje_y, num_filamentos=2)
+    # Esto se debe poner más claro en el futuro para indicar el numero de filas y columnaskkk
     init_state = gn.initial_state_priv(eje_x, eje_y, num_trampas, regiones_pesos)
+
+    print(
+        f"\nSimulación {i}: Tamaño del dispositivo = ({eje_x}, {eje_y}), Número de trampas = {num_trampas}\n Los rangos de los filamentos son: {f_ranges} y las regiones de peso son: {regiones_pesos}\n"
+    )
 
     # Guardamos como npz usando la clave 'actual_state' que utils.py va a buscar
     np.savez_compressed(f"{carpeta}/init_state_{i}.npz", actual_state=init_state)
 
-print("Estados iniciales generados correctamente.")
+print("\nEstados iniciales generados correctamente.")

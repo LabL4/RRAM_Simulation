@@ -153,10 +153,12 @@ def RepresentateState(
     config_ax_state(ax)
 
     # 1. CÁLCULO DE DIMENSIONES (Crecimiento en X, Clasificación en Y)
-    device_size_x, device_size_y = matriz.shape
+    device_size_y, device_size_x = matriz.shape  # ¡Fíjate en el orden Y, X!
 
     size_x_nm = device_size_x * atom_size * 1e9  # Convertir a nm ya que siempre se representa en nm
     size_y_nm = device_size_y * atom_size * 1e9  # Convertir a nm ya que siempre se representa en nm
+
+    print(f"Dimensiones del dispositivo: {size_x_nm:.2f} nm x {size_y_nm:.2f} nm")
 
     # 1. MATRIZ
     ax.imshow(
@@ -187,9 +189,10 @@ def RepresentateState(
 
     # Ajustar formato visual
     ax.set_aspect("equal")
+    ax.set_aspect("equal", adjustable="box")
 
     # 3. LÍMITES AJUSTADOS
-    ax.set_xlim(-electrode_width, size_y_nm + electrode_width)
+    ax.set_xlim(-electrode_width, size_x_nm + electrode_width)
 
     # MEJORA 2: Un margen vertical invisible (0.05) para que el marco negro del gráfico
     # no "pise" ni ampute los píxeles de las vacantes en los extremos.
@@ -407,8 +410,8 @@ def plot_IV(
     # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Set_1t'
     # ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Reset_1.txt'
 
-    ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt"
-    ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt"
+    ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1600.txt"
+    ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1600.txt"
 
     # ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Medidas_Eduardo/D_Set_1_Run35.txt"
     # ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Medidas_Eduardo/D_Reset_1_Run35.txt"
@@ -555,8 +558,6 @@ def plot_IV_marcado(
 
     for label, (xp, yp) in lista_puntos.items():
         dx, factor_y = desplazamiento.get(label, (0.02, 1.0))  # 1.0 = sin desplazamiento en y
-        print("\n-----------------------------")
-        print("Marcando punto: ", label, " en (", xp, ",", yp, ")")
         axes.scatter(xp, yp, color="blue", s=80, marker=markers.MarkerStyle("D"), zorder=10)
         axes.text(
             xp + dx,  # Usar la posición calculada en x

@@ -36,19 +36,20 @@ print(params)
 print("\n----------------------------------------------------------------------\n")
 print(ctes)
 
-# Crear una lista para rastrear si se ha creado el CF para cada rango de filamentos
-eje_x = params.x_size
-eje_y = params.y_size
+# Crear una lista para rastrear si se ha creado el CF para cada rango de filamentos hay que tener en cuenta que el numero de filas viene dado por el tamaño del dispositivo en el eje y y el numero de columnas por el tamaño del dispositivo en el eje x.
+num_filas = params.y_size
+num_columnas = params.x_size
 num_filamentos = ctes.num_filamentos
 
-filamentos_ranges, _ = utils.generar_configuracion_filamentos(
-    eje_x=eje_x,
-    eje_y=eje_y,
+filamentos_ranges, _, centros_CF = utils.generar_configuracion_filamentos(
+    eje_x=num_filas,
+    eje_y=num_columnas,
     num_filamentos=num_filamentos,
 )
+CF_creado = np.full(len(filamentos_ranges), False, dtype=bool)
 
 print(
-    f"\nSimulación {sim_parmtrs[num_simulation]['num_trampas']} trampas, {num_filamentos} filamentos. El rango de cada filamento es: {filamentos_ranges}\n"
+    f"\nSimulación {sim_parmtrs[num_simulation]['num_trampas']} trampas, {num_filamentos} filamentos. El rango de cada filamento es: {filamentos_ranges} el centro de cada filamento es: {centros_CF} y el estado de creación de cada filamento es: {CF_creado}\n"
 )
 
 CF_creado = np.full(len(filamentos_ranges), False, dtype=bool)
@@ -59,6 +60,7 @@ final_state_pp_set = Simulation.PP_set(
     sim_ctes=ctes,
     CF_ranges=filamentos_ranges,
     CF_creado=CF_creado,
+    CF_centros=centros_CF,
 )
 
 final_state_sp_set = Simulation.SP_set(

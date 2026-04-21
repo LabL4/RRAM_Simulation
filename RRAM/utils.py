@@ -19,13 +19,14 @@ def generar_configuracion_filamentos(eje_x, eje_y, num_filamentos, peso_central=
         peso_central (int): Probabilidad asignada a la zona central (por defecto 70).
 
     Retorna:
-        tuple: (filamentos_ranges, regiones_pesos)
+        tuple: (filamentos_ranges, regiones_pesos, filas_centrales)
     """
     filamentos_ranges = []
     regiones_pesos = []
+    filas_centrales = []
 
     # Calculamos el ancho de cada zona dividiendo el espacio total entre el número de filamentos
-    ancho_zona = eje_x // num_filamentos
+    ancho_zona = eje_y // num_filamentos
 
     for n in range(num_filamentos):
         # 1. Calcular el rango (zona) de este filamento
@@ -36,10 +37,11 @@ def generar_configuracion_filamentos(eje_x, eje_y, num_filamentos, peso_central=
 
         # 2. Identificar la fila central de dicha zona
         fila_central = (inicio_rango + fin_rango) // 2
+        filas_centrales.append(fila_central)
 
         # 3. Definir la región de alta probabilidad (Fila central + 2 arriba + 2 abajo)
         # x_start: fila_central - 2
-        # x_end: fila_central + 3 (se usa +3 porque en el slicing el límite superior es exclusivo)
+        # x_end: fila_central + 3 (se usa +3 porque en el slicing el límite superior no se incluye)
         x_start = max(0, fila_central - 2)
         x_end = min(eje_x, fila_central + 3)
 
@@ -47,7 +49,7 @@ def generar_configuracion_filamentos(eje_x, eje_y, num_filamentos, peso_central=
         region = (x_start, x_end, 0, eje_y)
         regiones_pesos.append((region, peso_central))
 
-    return filamentos_ranges, regiones_pesos
+    return filamentos_ranges, regiones_pesos, filas_centrales
 
 
 def obtener_puntos_en_curva(v_array, i_array, puntos_x):

@@ -17,13 +17,15 @@ from . import (
 )
 
 from dataclasses import dataclass, replace, asdict, field
+from typing import Dict, Any, List, Union
 from typing import get_type_hints
 from dataclasses import fields
-from typing import List, Dict
 from functools import wraps
 from pathlib import Path
+import pandas as pd
 import numpy as np
 import time
+import ast
 
 
 def medir_tiempo(func):
@@ -130,15 +132,68 @@ class SimulationConstants:
     voltaje_gen_oxigeno_sp: float
     num_oxigenos_sp_reset: int
 
-    @staticmethod
-    def from_dict(d: dict):
-        field_types = get_type_hints(SimulationConstants)
-        kwargs = {}
-        for k in field_types:
-            if k not in d:
-                raise KeyError(f"La clave '{k}' no existe en el diccionario")
-            kwargs[k] = field_types[k](d[k])
-        return SimulationConstants(**kwargs)
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "SimulationConstants":
+        """
+        Crea una instancia desde un diccionario, parseando strings que contienen listas.
+        Respeta los tipos definidos en el dataclass.
+
+        Args:
+            data: Diccionario con los valores de las constantes.
+                Los valores pueden ser strings con formato de lista "[1,2,3]".
+
+        Returns:
+            Instancia de SimulationConstants con valores parseados.
+        """
+        from typing import get_type_hints
+        import ast
+
+        # Obtener los tipos definidos en el dataclass
+        type_hints = get_type_hints(cls)
+        parsed_data = {}
+
+        for key, value in data.items():
+            if key not in type_hints:
+                parsed_data[key] = value
+                continue
+
+            expected_type = type_hints[key]
+
+            if isinstance(value, str):
+                value_stripped = value.strip()
+
+                # Detectar si el string representa una lista
+                if value_stripped.startswith("[") and value_stripped.endswith("]"):
+                    try:
+                        parsed_data[key] = ast.literal_eval(value_stripped)
+                    except (ValueError, SyntaxError):
+                        parsed_data[key] = value
+                else:
+                    # Convertir según el tipo esperado
+                    try:
+                        # Manejar Union types (extraer el tipo base)
+                        if hasattr(expected_type, "__origin__"):
+                            # Para Union[int, List[int]], tomar int como base
+                            base_types = expected_type.__args__
+                            # Filtrar tipos que no sean List
+                            non_list_types = [
+                                t for t in base_types if not (hasattr(t, "__origin__") and t.__origin__ is list)
+                            ]
+                            if non_list_types:
+                                expected_type = non_list_types[0]
+
+                        if expected_type == int:
+                            parsed_data[key] = int(float(value))
+                        elif expected_type == float:
+                            parsed_data[key] = float(value)
+                        else:
+                            parsed_data[key] = value
+                    except (ValueError, TypeError):
+                        parsed_data[key] = value
+            else:
+                parsed_data[key] = value
+
+        return cls(**parsed_data)
 
     @property
     def propiedades_termicas(self) -> dict:
@@ -313,14 +368,16 @@ def update_state_generation(
     temperatura: np.ndarray | float,
     factor_vecinos: float,
     factor_sin_vecinos: float,
-    max_vacantes_permitidas: int,  # <-- NUEVO PARÁMETRO
+    max_vacantes_permitidas: int,
     neighbor_mode: str = "both",
-    CF_clean_matrix: np.ndarray | None = None,
+    custom_mask: np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Orquesta el proceso de generación de vacantes asegurando que no se supere
     el límite máximo establecido. Prioriza aquellas con mayor probabilidad.
     """
+
+    # En NumPy el primer valor devuelto por shape son las filas y el segundo las columnas, por lo que asumo que x_size son tus filas en el eje Y físico, y y_size son tus columnas en el eje X físico. Mientras mantengas esa lógica, es perfecto).
     act_state = state.copy()
     x_size, y_size = state.shape
 
@@ -336,23 +393,8 @@ def update_state_generation(
     else:
         temp_matrix = temperatura
 
-    # # 3. Cálculo de la matriz de probabilidades
-    # prob_final = Generation.get_generation_probabilities_matrix(
-    #     state=state,
-    #     paso_temporal=params.paso_temporal,
-    #     Electric_field=E_field_matrix,
-    #     temperatura=temp_matrix,
-    #     factor_vecinos=factor_vecinos,
-    #     factor_sin_vecinos=factor_sin_vecinos,
-    #     vibration_frequency=sim_ctes.vibration_frequency,
-    #     generation_energy=sim_ctes.generation_energy,
-    #     cte_red=sim_ctes.cte_red,
-    #     gamma=sim_ctes.gamma,
-    #     neighbor_mode=neighbor_mode,
-    # )
-
     # 3. Cálculo de la matriz de probabilidades
-    prob_final = Generation.get_generation_probabilities_matrix_CF(
+    prob_final = Generation.get_generation_probabilities_matrix(
         state=state,
         paso_temporal=params.paso_temporal,
         Electric_field=E_field_matrix,
@@ -364,7 +406,7 @@ def update_state_generation(
         cte_red=sim_ctes.cte_red,
         gamma=sim_ctes.gamma,
         neighbor_mode=neighbor_mode,
-        cf_matrix=CF_clean_matrix,
+        custom_mask=custom_mask,
     )
 
     # 4. Evaluación de la estocástica (cuáles "intentan" generarse)
@@ -464,6 +506,7 @@ def PP_set(
     sim_ctes: SimulationConstants,
     CF_ranges: List[tuple],
     CF_creado: np.ndarray,
+    CF_centros: List[int] | None = None,
 ):
     """
     Executes the first part (PP) of the simulation set process for a resistive random-access memory (RRAM) device.
@@ -539,6 +582,13 @@ def PP_set(
     data_pp_set = np.zeros((params.num_pasos, num_columnas), dtype=np.float64)
     resistencia_vector = np.zeros((params.num_pasos, num_columnas), dtype=np.float64)
     num_vacantes_total = np.zeros((params.num_pasos, num_columnas), dtype=np.float64)
+
+    print(f"El grosor de los filamentos es de {sim_ctes.grosor_filamento} filas\n")
+
+    # creo la mascara para limitar la generacion a solo la zona del esperado filamento
+    limit_CF_witdh_mask_generation = Generation.create_custom_mask(
+        state=actual_state, centros_CF=CF_centros, grosor_CF=sim_ctes.grosor_filamento
+    )
 
     # Inicializamos las matrices variables a None para que existan desde el principio
     cf_clean_matrix = None
@@ -662,8 +712,8 @@ def PP_set(
                     if filamentos_actuales == 1:
                         # Se acaba de formar el PRIMERO
                         print("Se ha formado el primer filamento de dos.")
-                        sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 4)
-                        sim_ctes = sim_ctes.update_generation_energy(sim_ctes.generation_energy + 0.1)
+                        # sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 4)
+                        # sim_ctes = sim_ctes.update_generation_energy(sim_ctes.generation_energy + 0.1)
                         print(f"El nuevo valor de gamma es: {sim_ctes.gamma}")
                         print("El nuevo valor de la energía de generación es:", sim_ctes.generation_energy, "\n")
                         # obtengo los centros de los CF
@@ -703,16 +753,16 @@ def PP_set(
 
             cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf, actual_state)
 
-            # Limito el grosor de los filamentos a un máximo de 3 celdas
-            _, new_cf_clean_matrix = CurrentSolver.limitar_grosor_filamentos(
-                actual_state,
-                cf_clean_matrix,
-                centros_calculados,
-                sim_ctes.grosor_filamento,
-                CF_ranges,
-            )
+            # # Limito el grosor de los filamentos a un máximo de 3 celdas
+            # _, new_cf_clean_matrix = CurrentSolver.limitar_grosor_filamentos(
+            #     actual_state,
+            #     cf_clean_matrix,
+            #     centros_calculados,
+            #     sim_ctes.grosor_filamento,
+            #     CF_ranges,
+            # )
 
-            cf_clean_matrix = new_cf_clean_matrix.copy()
+            # cf_clean_matrix = new_cf_clean_matrix.copy()
 
             # Si ha percolado uso la corriente de Ohm
             try:
@@ -821,36 +871,26 @@ def PP_set(
                 ) * (params.device_size_y)
 
         if total_vacantes < max_vancantes_pp_set:
-            if all_CFs_created:
-                # Actualizo el estado del sistema
-                actual_state, probabilidad_matrix = update_state_generation(
-                    actual_state,
-                    params,
-                    sim_ctes,
-                    E_field_vector,
-                    temperatura,
-                    sim_ctes.factor_vecinos_pp_set,
-                    sim_ctes.factor_libre_pp_set,
-                    max_vancantes_pp_set,
-                )
-            else:
-                actual_state, probabilidad_matrix = update_state_generation(
-                    actual_state,
-                    params,
-                    sim_ctes,
-                    E_field_vector,
-                    temperatura,
-                    sim_ctes.factor_vecinos_pp_set,
-                    sim_ctes.factor_libre_pp_set,
-                    max_vancantes_pp_set,
-                    CF_clean_matrix=cf_clean_matrix,
-                )
+            # Actualizo el estado del sistema
+            actual_state, probabilidad_matrix = update_state_generation(
+                actual_state,
+                params,
+                sim_ctes,
+                E_field_vector,
+                temperatura,
+                sim_ctes.factor_vecinos_pp_set,
+                sim_ctes.factor_libre_pp_set,
+                max_vancantes_pp_set,
+                custom_mask=limit_CF_witdh_mask_generation,
+            )
 
         elif not total_vacantes_pp_set:
             print(
                 f"\nSe ha alcanzado la ocupación máxima del {sim_ctes.ocupacion_max_pp_set * 100}% en la primera parte del set en el paso {k}.\n"
             )
             total_vacantes_pp_set = True
+
+        # region GUARDAR ESTADO
 
         # Guardo los datos de la simulación
         data_pp_set[k] = np.array([simulation_time, voltage, current])
@@ -882,6 +922,7 @@ def PP_set(
                 probabilidad_matrix=locals().get("probabilidad_matrix"),
                 matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
             )
+            # endregion
 
     # Muestro el valor de temperatura más alto alcanzado en la simulación
     print(f"\nLa temperatura máxima alcanzada en la simulación ha sido de: {round(np.max(temperatura), 4)} K\n")
@@ -912,6 +953,13 @@ def PP_set(
         datos_sim=data_pp_set,
         vacantes=num_vacantes_total,
         resistencia=resistencia_vector,
+    )
+
+    # Guardo los datos de la simulacion
+    utils.guardar_datos(
+        save_path_data=rutas["simulation_path"] / f"Data_pp_set_{num_simulation}",
+        headers={"datos_simulacion": "Tiempo [s],Voltaje [V],Intensidad [A]"},
+        datos_sim=data_pp_set,
     )
 
     np.save(rutas["simulation_path"] / f"Final_state_{num_simulation}_pp_set.npz", actual_state)
@@ -1181,7 +1229,7 @@ def SP_set(
             temperatura_anterior = temperatura[:, 1:-1]
 
             if k % num_pasos_guardar_estado == 0:
-                if locals().get("matriz_temperaturas_fijas"):
+                if "matriz_temperaturas_fijas" in locals():
                     matriz_para_plot_muro = np.copy(matriz_temperaturas_fijas)
                     for centro, perfil_filamento in zip(centros_calculados, mis_perfiles_extraidos):
                         if centro is not None and perfil_filamento is not None:
@@ -1214,7 +1262,7 @@ def SP_set(
                     pb_metal_insul=sim_ctes.pb_metal_insul_set,
                     permitividad_relativa=sim_ctes.permitividad_relativa_set,
                     I_0=sim_ctes.I_0_set,
-                ) * (params.device_size)
+                ) * (params.device_size_y)
 
         if total_vacantes < max_vancantes_sp_set:
             # Actualizo el estado del sistema
@@ -1263,7 +1311,7 @@ def SP_set(
 
     np.save(rutas["simulation_path"] / f"final_state_pp_set_{num_simulation}.npz", actual_state)
 
-    print("\nSimulación del set finalizada correctamente.\n")
+    print("Simulación del set finalizada correctamente.\n")
 
     return final_state_sp_set
 
@@ -1350,7 +1398,7 @@ def PP_reset(
         voltage = vector_ddp[k]
 
         # Obtengo los valores del campo eléctrico
-        E_field = abs(ElectricField.SimpleElectricField(voltage, params.device_size))
+        E_field = abs(ElectricField.SimpleElectricField(voltage, params.device_size_x))
 
         # Genero el vector campo eléctrico
         for i in range(0, actual_state.shape[0]):
@@ -1438,7 +1486,7 @@ def PP_reset(
                     permitividad_relativa=sim_ctes.permitividad_relativa_reset,
                     I_0=sim_ctes.I_0_reset,
                 )
-                * (params.device_size)
+                * (params.device_size_y)
             )
 
         # Actualizo el estado del sistema con la recombinación
@@ -1488,7 +1536,7 @@ def PP_reset(
         headers=data_encabezados,
         datos_sim=data_pp_reset,
     )
-
+    print(f"La temperatura final alcanzada en el reset es: {temperatura} K\n")
     np.save(rutas["simulation_path"] / f"final_state_pp_reset_{num_simulation}.npz", actual_state)
 
     # Guardo todas las variables del estado final del PP set para usarlas en el PS set
@@ -1557,7 +1605,7 @@ def SP_reset(
         voltage = vector_ddp[k]
 
         # Obtengo los valores del campo eléctrico y la temperatura
-        E_field = abs(ElectricField.SimpleElectricField(voltage, params.device_size))
+        E_field = abs(ElectricField.SimpleElectricField(voltage, params.device_size_x))
 
         # Genero el vector campo eléctrico
         for i in range(0, actual_state.shape[0]):
@@ -1646,7 +1694,7 @@ def SP_reset(
                     permitividad_relativa=sim_ctes.permitividad_relativa_reset,
                     I_0=sim_ctes.I_0_reset,
                 )
-                * (params.device_size)
+                * (params.device_size_y)
             )
 
             temperatura = Temperature.Temperature_Joule(
@@ -1682,18 +1730,14 @@ def SP_reset(
             )
 
     # Guardo los datos de la simulación
-    save_path_pkl = rutas["data_simulation_path"] / f"Data_sp_reset_{num_simulation}.pkl"
     save_path_data = rutas["simulation_path"] / f"Data_sp_reset_{num_simulation}.txt"
-    save_path_figures = rutas["figures_path"] / f"Final_state_sp_reset_{num_simulation}.png"
+    data_encabezados = {"datos_simulacion": "Tiempo [s],Voltaje [V],Intensidad [A]"}
 
+    # Guardo los datos de la simulacion
     utils.guardar_datos(
-        voltaje_final=voltage,
-        config_state=actual_state,
-        datos_save=data_sp_reset,
-        header_files="Tiempo simulacion [s],Voltaje [V],Intensidad [A]",
         save_path_data=save_path_data,
-        save_path_pkl=save_path_pkl,
-        save_path_figures=save_path_figures,
+        headers=data_encabezados,
+        datos_sim=data_sp_reset,
     )
 
     np.save(rutas["simulation_path"] / f"final_state_sp_reset_{num_simulation}.npz", actual_state)
@@ -1737,79 +1781,35 @@ def simulation_IV(
     # Cargar archivos de forma automatizada
     for prefix in prefixes:
         for stage in stages:
-            name = f"data_{prefix}_{stage}_{num_simulation}.npz"
+            name = f"Data_{prefix}_{stage}_{num_simulation}.npz"
             key = f"{prefix}_{stage}"
             data[key] = np.load(simulation_path / name)
-    # Extraer y concatenar columnas de interés
-    i_set = np.concatenate([abs(data["pp_set"]["datos"][:, 2]), abs(data["sp_set"]["datos"][:, 2])])
-    v_set = np.concatenate([data["pp_set"]["datos"][:, 1], data["sp_set"]["datos"][:, 1]])
-    v_reset = np.concatenate([data["pp_reset"]["datos"][:, 1], data["sp_reset"]["datos"][:, 1]])
-    i_reset = np.concatenate([abs(data["pp_reset"]["datos"][:, 2]), abs(data["sp_reset"]["datos"][:, 2])])
 
-    # # Diccionario de puntos que quieres ubicar
-    # letras_ruptura = [
-    #     "e",
-    #     "f",
-    #     "g",
-    #     "h",
-    #     "i",
-    #     "j",
-    #     "k",
-    #     "l",
-    #     "m",
-    #     "n",
-    #     "o",
-    #     "p",
-    #     "q",
-    #     "r",
-    #     "s",
-    # ]
+    # Unir las partes PP y SP para el SET
+    i_set = np.concatenate([abs(data["pp_set"]["datos_sim"][:, 2]), abs(data["sp_set"]["datos_sim"][:, 2])])
+    v_set = np.concatenate([data["pp_set"]["datos_sim"][:, 1], data["sp_set"]["datos_sim"][:, 1]])
+    # Unir las partes PP y SP para el RESET
+    i_reset = np.concatenate([abs(data["pp_reset"]["datos_sim"][:, 2]), abs(data["sp_reset"]["datos_sim"][:, 2])])
+    v_reset = np.concatenate([data["pp_reset"]["datos_sim"][:, 1], data["sp_reset"]["datos_sim"][:, 1]])
 
     puntos_x_set = {"a": 1e-9, "b": voltaje_percolacion, "c": 1.1}
     puntos_x_pp_reset = {"d": -0.44, "e": roturas_dict[0]["voltaje"], "f": -1.1}
     puntos_x_sp_reset = {"g": -2e-8}
 
-    # contador_pp = sum(1 for v in roturas_dict.values() if v["etapa"] == "pp")
-
-    # puntos_x_sp_reset = {}
-
-    # Contador para seguir la última letra usada
-    # ultima_letra_usada = 0
-
-    # # Añado puntos de ruptura
-    # for clave, datos in roturas_dict.items():
-    #     voltaje = datos["voltaje"]
-    #     etapa = datos["etapa"]
-    #     if etapa == "pp" and ultima_letra_usada < len(letras_ruptura):
-    #         puntos_x_pp_reset[letras_ruptura[ultima_letra_usada]] = voltaje
-    #         # print("Los puntos de la pp reset son:", puntos_x_pp_reset, "\n")
-
-    #     elif etapa == "sp" and ultima_letra_usada < len(letras_ruptura):
-    #         puntos_x_sp_reset[letras_ruptura[ultima_letra_usada + contador_pp]] = (
-    #             voltaje
-    #         )
-    #         # print("Los puntos de la sp reset son:", puntos_x_sp_reset)
-
-    #     ultima_letra_usada += 1
-
-    # # Añadir el punto final -1.4 usando la siguiente letra disponible
-    # puntos_x_pp_reset[letras_ruptura[contador_pp]] = -1.4
-    # puntos_x_sp_reset[letras_ruptura[contador_pp + ultima_letra_usada]] = -0.001
-
     # Obtener puntos en cada curva
     puntos_set = utils.obtener_puntos_en_curva(
-        data["pp_set"]["datos"][:, 1], abs(data["pp_set"]["datos"][:, 2]), puntos_x_set
+        data["pp_set"]["datos_sim"][:, 1], abs(data["pp_set"]["datos_sim"][:, 2]), puntos_x_set
     )
 
     puntos_x_pp_reset = utils.obtener_puntos_en_curva(
-        data["pp_reset"]["datos"][:, 1],
-        abs(data["pp_reset"]["datos"][:, 2]),
+        data["pp_reset"]["datos_sim"][:, 1],
+        abs(data["pp_reset"]["datos_sim"][:, 2]),
         puntos_x_pp_reset,
     )
 
     puntos_x_sp_reset = utils.obtener_puntos_en_curva(
-        data["sp_reset"]["datos"][:, 1],
-        abs(data["sp_reset"]["datos"][:, 2]),
+        data["sp_reset"]["datos_sim"][:, 1],
+        abs(data["sp_reset"]["datos_sim"][:, 2]),
         puntos_x_sp_reset,
     )
 
