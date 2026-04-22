@@ -61,7 +61,7 @@ THERMAL_DEFAULTS = {
 SIMULATION_DEFAULTS = {
     "device_size": 10e-9,
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
-    "num_trampas": 80,
+    "num_trampas": 90,
     "total_simulation_time": 10.0,
     "num_pasos": 10000,
     "voltaje_final": 1.1,

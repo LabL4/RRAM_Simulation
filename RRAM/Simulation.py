@@ -733,8 +733,8 @@ def PP_set(
                     if filamentos_actuales == 1:
                         # Se acaba de formar el PRIMERO
                         print("Se ha formado el primer filamento de dos.")
-                        sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 2)
-                        # sim_ctes = sim_ctes.update_generation_energy(sim_ctes.generation_energy + 0.1)
+                        sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 5)
+                        # sim_ctes = sim_ctes.update_generation_energy(sim_ctes.generation_energy + 0.2)
                         print(f"El nuevo valor de gamma es: {sim_ctes.gamma}")
                         print("El nuevo valor de la energía de generación es:", sim_ctes.generation_energy, "\n")
                         # obtengo los centros de los CF
