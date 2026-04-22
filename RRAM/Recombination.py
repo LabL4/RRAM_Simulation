@@ -135,6 +135,9 @@ def Recombine_opt(
 
     # Saturamos a 1.0 por seguridad usando la versión de NumPy
     active_probs = np.minimum(active_probs, 1.0)
+    # print(
+    #     f"Las coordenadas activas de recombinación son: {list(zip(active_indices[0], active_indices[1]))}, con velocidades: {active_vels} y temperaturas: {active_temps} con probabilidades de recombinación: {active_probs}"
+    # )
 
     # 4. Tirar los dados
     random_values = np.random.rand(num_coincidencias)
@@ -248,6 +251,89 @@ import sys
 
 # Nota: k_b_ev debe estar definido en el módulo o importado de Constants
 k_b_ev = 8.617333262145e-5
+
+import numpy as np
+import sys
+
+
+def newer_move_oxygen_ions(
+    paso_temp: float,
+    oxygen_state: np.ndarray,
+    temperature: np.ndarray | float,
+    E_field: float,
+    grid_size: float,
+    vibration_frequency: float,
+    gamma_drift: float,
+    migration_energy: float,
+    cte_red: float,
+    voltage: float,  # Nuevo parámetro de entrada
+    velocity_thresholds: dict,  # Diccionario pasado como argumento
+) -> tuple[np.ndarray, np.ndarray | float]:
+    """
+    Mueve los iones de oxígeno de forma estocástica. La velocidad se determina
+    comparando el parámetro 'voltage' contra los umbrales en 'velocity_thresholds'.
+    """
+
+    # =========================================================================
+    # 1. CÁLCULO FÍSICO DE LA VELOCIDAD (Opcional/Referencia)
+    # =========================================================================
+    try:
+        senoh = np.sinh((cte_red * E_field * gamma_drift) / (2 * k_b_ev * temperature))
+        exp_velocity = np.exp(-migration_energy / (k_b_ev * temperature))
+        # Nota: Esta variable se calcula pero será sobrescrita por la lógica de umbrales
+        oxygen_velocity_fisica = 2 * cte_red * vibration_frequency * (senoh * exp_velocity)
+
+    except OverflowError as Overflow_exception:
+        print(f"\n Error en el cálculo de la velocidad: {Overflow_exception}")
+        sys.exit(1)
+
+    # =========================================================================
+    # 2. LÓGICA DINÁMICA DE UMBRALES
+    # =========================================================================
+    # Inicializamos con el valor por defecto (si no supera ningún umbral)
+    oxygen_velocity = 0
+
+    # Ordenamos las llaves de mayor a menor para asegurar la asignación correcta
+    for threshold in sorted(velocity_thresholds.keys(), reverse=True):
+        if abs(voltage) > abs(threshold):
+            oxygen_velocity = velocity_thresholds[threshold]
+            # print(f"Voltage {voltage} supera el umbral {threshold}, asignando velocidad {oxygen_velocity}")
+            break  # Salimos al encontrar el primer umbral que se cumple
+
+    # =========================================================================
+    # 3. CÁLCULO DEL DESPLAZAMIENTO MÁXIMO
+    # =========================================================================
+    max_displacement = np.array(np.round((oxygen_velocity * paso_temp) / grid_size), dtype=int)
+    oxygen_state_new = np.zeros_like(oxygen_state)
+
+    # =========================================================================
+    # 4. MOVIMIENTO ALEATORIO INDEPENDIENTE
+    # =========================================================================
+    rows, cols = np.where(oxygen_state == 1)
+    num_ions = len(rows)
+
+    if num_ions > 0:
+        actual_shifts = np.zeros(num_ions, dtype=int)
+
+        if max_displacement.ndim > 0:
+            max_allowed = max_displacement[rows, cols]
+            mask = max_allowed > 0
+            if np.any(mask):
+                actual_shifts[mask] = np.random.randint(1, max_allowed[mask] + 1)
+        else:
+            if max_displacement > 0:
+                actual_shifts = np.random.randint(1, max_displacement + 1, size=num_ions)
+
+        new_cols = cols + actual_shifts
+
+        # Verificamos límites del array
+        valid_mask = (new_cols >= 0) & (new_cols < oxygen_state.shape[1])
+        valid_rows = rows[valid_mask]
+        valid_new_cols = new_cols[valid_mask]
+
+        oxygen_state_new[valid_rows, valid_new_cols] = 1
+
+    return oxygen_state_new, oxygen_velocity
 
 
 def new_move_oxygen_ions(

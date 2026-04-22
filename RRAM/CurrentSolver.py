@@ -211,22 +211,20 @@ def Eliminar_filamentos_incompletos(grid_limpio, filamentos_ranges, percola_bool
     return CF_matrix
 
 
-def calcular_resistencia(CF_matrix, ohm_resistence):
+def old_calcular_resistencia(CF_matrix, ohm_resistence, mostrar_calculo: bool = False) -> float:
     """
     Calcula la resistencia total de una matriz de formación de filamentos conductores (CF_matrix).
     Este método asume que cada columna de la matriz representa un conjunto de resistencias en paralelo.
     La resistencia total se calcula sumando las resistencias paralelas de cada columna.
     Args:
-        CF_matrix (numpy.ndarray): Matriz donde cada elemento representa la presencia (1) o ausencia (0)
-                                    de un filamento conductor.
+        CF_matrix (numpy.ndarray): Matriz donde cada elemento representa la presencia (1) o ausencia (0) de un filamento conductor.
         ohm_resistence (float, optional): Resistencia en ohmios asociada a cada filamento conductor.
-                                           Por defecto es 11.5 ohmios.
     Returns:
         float: Resistencia total calculada a partir de la matriz CF_matrix.
     """
     total_resistance = 0.0
     Ny, Nx = CF_matrix.shape
-    for j in range(1, Nx - 1):
+    for j in range(1, Ny - 1):
         fil_indices = np.where(CF_matrix == 1)[0]
         N_total_columna = len(fil_indices)
 
@@ -238,10 +236,73 @@ def calcular_resistencia(CF_matrix, ohm_resistence):
 
         # Se suma la resistencia paralela a la resistencia total
         total_resistance += R_col
+
+        if mostrar_calculo:
+            rp.RepresentateState(
+                CF_matrix,
+                1.23,
+                "C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Resistencia_state.png",
+                device_size=10e-9,
+            )
+
+            print(
+                f"Hay {N_total_columna} elementos en la columna {j} y si resistencia es: {R_col:.4f} ohmios \n Resistencia total acumulada: {total_resistance:.4f} ohmios\n"
+            )
     return total_resistance
 
 
-def OmhCurrent(potential: float, resistance_matrix: NDArray, ohm_resistence: float) -> tuple[float, float]:
+def calcular_resistencia(CF_matrix, ohm_resistence, potencial, num_simulation, mostrar_calculo: bool = False) -> float:
+    """
+    Calcula la resistencia total de una matriz de formación de filamentos conductores (CF_matrix).
+    Este método asume que cada columna de la matriz representa un conjunto de resistencias en paralelo.
+    La resistencia total se calcula sumando las resistencias paralelas de cada columna.
+    """
+    total_resistance = 0.0
+    Ny, Nx = CF_matrix.shape
+
+    # Recorremos todas las columnas (desde 0 hasta Nx-1)
+    # Si intencionalmente querías saltarte la primera y última columna (ej. electrodos),
+    # entonces usa: for j in range(1, Nx - 1):
+    for j in range(Nx):
+        # Obtenemos la columna 'j' entera y sumamos sus valores
+        N_total_columna = np.sum(CF_matrix[:, j])
+
+        if N_total_columna == 0:
+            # ¡CUIDADO AQUÍ CON LA FÍSICA!
+            # Si una columna entera no tiene ningún '1', significa que hay un hueco
+            # en el filamento. En un circuito en serie, un hueco = resistencia infinita.
+            # Al hacer 'continue', básicamente le estás diciendo que la resistencia de
+            # esa columna es 0 ohmios, lo cual equivale a un cortocircuito perfecto.
+            continue
+
+        # R equivalente de la columna (N resistencias en paralelo)
+        R_col = ohm_resistence / N_total_columna
+
+        # Se suma la resistencia paralela a la resistencia total (columnas en serie)
+        total_resistance += R_col
+
+        if mostrar_calculo:
+            rp.RepresentateState(
+                CF_matrix,
+                round(potencial, 5),
+                f"C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Resistencia_state_{num_simulation}.png",
+                device_size=10e-9,
+            )
+
+            print(
+                f"Hay {N_total_columna} elementos en la columna {j} y su resistencia es: {R_col:.4f} ohmios \n Resistencia total acumulada: {total_resistance:.4f} ohmios\n"
+            )
+
+    return total_resistance
+
+
+def OmhCurrent(
+    potential: float,
+    resistance_matrix: NDArray,
+    ohm_resistence: float,
+    num_simulation,
+    mostrar_calculo: bool = False,
+) -> tuple[float, float]:
     """
     Calculates the Ohmic current based on the given parameters.
 
@@ -254,8 +315,10 @@ def OmhCurrent(potential: float, resistance_matrix: NDArray, ohm_resistence: flo
     - tuple[float, float]: A tuple containing the calculated Ohmic current and the total resistance.
     """
 
-    # Se calcula la resistencia total usando el valor explícito que se le pasa
-    total_resistance = calcular_resistencia(resistance_matrix, ohm_resistence)
+    # Se calcula la resis  0tencia total usando el valor explícito que se le pasa
+    total_resistance = calcular_resistencia(
+        resistance_matrix, ohm_resistence, potential, num_simulation, mostrar_calculo
+    )
 
     # Se calcula la corriente de Ohm (I = V/R)
     intensidad_ohmica = potential / total_resistance

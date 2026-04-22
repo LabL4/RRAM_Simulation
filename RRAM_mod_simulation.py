@@ -32,6 +32,11 @@ params = Simulation.SimulationParameters.from_dict(sim_parmtrs[num_simulation])
 sim_cte = utils.read_csv_to_dic("Init_data/simulation_constants.csv")
 ctes = Simulation.SimulationConstants.from_dict(sim_cte[num_simulation])
 
+# Si la resistencia de set y la de reset NO son iguales, se corta la simulacion
+if ctes.ohm_resistence_set != ctes.ohm_resistence_reset:
+    # Se elimina el fichero de log de la simulacion actual para evitar confusiones la ruta de uno es C:\Users\Usuario\Documents\GitHub\RRAM_Simulation\logs\log_simulacion_46.log
+    raise ValueError("La resistencia de set y reset deben ser iguales para esta simulación.")
+
 print(params)
 print("\n----------------------------------------------------------------------\n")
 print(ctes)

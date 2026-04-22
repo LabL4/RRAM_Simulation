@@ -220,6 +220,12 @@ class SimulationConstants:
         # Usamos un diccionario para pasar el argumento dinámicamente a replace()
         return replace(self, **{atributo: nuevo_valor})
 
+    def update_ohm_resistence_reset(self, nuevo_valor: float):
+        """Actualiza la resistencia óhmica dependiendo de la fase ('set' o 'reset')."""
+        atributo = f"ohm_resistence_reset"
+        # Usamos un diccionario para pasar el argumento dinámicamente a replace()
+        return replace(self, **{atributo: nuevo_valor})
+
     def update_I_0(self, nuevo_I_0: float, fase: str = "set"):
         """Actualiza la corriente de referencia I_0 dependiendo de la fase ('set' o 'reset')."""
         if fase not in ["set", "reset"]:
@@ -320,6 +326,7 @@ def procesar_filamentos_destruidos(
     roturas_dict,
     etapa,
     params: SimulationParameters,
+    constantes_simulacion: SimulationConstants | None,
 ):
     """
     Detecta filamentos rotos, actualiza su estado y guarda imágenes e
@@ -351,6 +358,14 @@ def procesar_filamentos_destruidos(
                 "etapa": etapa,
             }
             print(f"\nEl filamento {i + 1} se ha roto en el voltaje {round(voltage, 4)} (V)")
+            # TODO: esto cuando haya más de dos filamentos hay que cambiarlo
+            if constantes_simulacion is not None:
+                # constantes_simulacion = SimulationConstants.update_ohm_resistence_reset(
+                #     constantes_simulacion, nuevo_valor=constantes_simulacion.ohm_resistence_reset * 0.1
+                # )
+                print(
+                    f"El nuevo valor de resistencia óhmica para reset es: {constantes_simulacion.ohm_resistence_reset} \n"
+                )
 
         nombre_img = imagen_path / f"Filamento_{i + 1}_roto_reset_{num_simulation}.png"
         Representate.RepresentateState(actual_state, round(voltage, 5), str(nombre_img), device_size=params.device_size)
@@ -456,6 +471,7 @@ def update_state_recombinate(
     actual_state: np.ndarray,
     oxygen_state: np.ndarray,
     temperatura: float | np.ndarray,
+    velocity_thresholds: dict,  # Diccionario pasado como argumento
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Orquesta el proceso completo de RESET en un paso de tiempo:
@@ -466,12 +482,12 @@ def update_state_recombinate(
 
     # 1. Se generan oxígenos según el voltaje
     for threshold_voltage, max_oxigenos in oxygen_config.items():
-        if abs(voltage) > threshold_voltage:
+        if abs(voltage) > abs(threshold_voltage):
             oxygen_state = Recombination.generate_oxygen(oxygen_state, max_oxigenos)
             break  # Solo usar el umbral más alto superado
 
-    # 2. Movemos los iones
-    oxygen_state, velocidad = Recombination.new_move_oxygen_ions(
+    # 2. Movemos los ionesx
+    oxygen_state, velocidad = Recombination.newer_move_oxygen_ions(
         paso_temp=params.paso_temporal,
         oxygen_state=oxygen_state,
         temperature=temperatura,
@@ -481,7 +497,11 @@ def update_state_recombinate(
         gamma_drift=sim_ctes.gamma_drift,
         migration_energy=sim_ctes.E_m,
         cte_red=sim_ctes.cte_red,
+        voltage=voltage,
+        velocity_thresholds=velocity_thresholds,
     )
+
+    # print(f"Velocidad de los iones oxígeno en este paso: {velocidad:.4e} m/s")
 
     # 3.Recombinación de iones con vacantes
     actual_state_update, oxygen_state_update = Recombination.Recombine_opt(
@@ -713,10 +733,10 @@ def PP_set(
                     if filamentos_actuales == 1:
                         # Se acaba de formar el PRIMERO
                         print("Se ha formado el primer filamento de dos.")
-                        # sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma)
-                        # sim_ctes = sim_ctes.update_generation_energy(1.75)
-                        # print(f"El nuevo valor de gamma es: {sim_ctes.gamma}")
-                        # print("El nuevo valor de la energía de generación es:", sim_ctes.generation_energy, "\n")
+                        sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 2)
+                        # sim_ctes = sim_ctes.update_generation_energy(sim_ctes.generation_energy + 0.1)
+                        print(f"El nuevo valor de gamma es: {sim_ctes.gamma}")
+                        print("El nuevo valor de la energía de generación es:", sim_ctes.generation_energy, "\n")
                         # obtengo los centros de los CF
                         centros_calculados = CF_centros
                         # Estoy limitando la generacion solo a los filamentos, los centros ya los estoy fijando antes esto ya no tiene sentido
@@ -726,16 +746,17 @@ def PP_set(
                     elif filamentos_actuales == 2:
                         # Se acaba de formar el SEGUNDO
                         print("Se ha formado el segundo filamento de dos.")
-                        sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 2)
-                        # sim_ctes = sim_ctes.update_generation_energy(2)
+                        # sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 1.5)
+                        # sim_ctes = sim_ctes.update_generation_energy(sim_ctes.generation_energy + 0.2)
                         print(f"El nuevo valor de gamma es: {sim_ctes.gamma}")
                         print("El nuevo valor de la energía de generación es:", sim_ctes.generation_energy, "\n")
                         all_CFs_created = True
+
                         # obtengo los centros de los CF
                         centros_calculados = CF_centros
                         # Estoy limitando la generacion solo a los filamentos, los centros ya los estoy fijando antes esto ya no tiene sentido
                         # centros_calculados = Temperature.obtener_centro_CF(actual_state_clean_CF, cf_ranges=CF_ranges)
-                        filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(centros_calculados)
+                        filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(centros_calculados)  # type: ignore
 
                         print("Los centros calculados de los filamentos son:", centros_calculados, "\n")
                         print("Las filas intermedias calculadas son:", filas_intermedias, "\n")
@@ -771,7 +792,7 @@ def PP_set(
             # Si ha percolado uso la corriente de Ohm
             try:
                 current, resistencia = CurrentSolver.OmhCurrent(
-                    voltage, cf_clean_matrix, ohm_resistence=sim_ctes.ohm_resistence_set
+                    voltage, cf_clean_matrix, ohm_resistence=sim_ctes.ohm_resistence_set, num_simulation=num_simulation
                 )
             except ZeroDivisionError:
                 raise exceptions.NullResistanceException(
@@ -808,7 +829,8 @@ def PP_set(
                     )
                 else:
                     mis_perfiles_extraidos = Temperature.extraer_perfiles_filamentos(
-                        matriz_temperaturas=temperatura_anterior, filas_centros=centros_calculados
+                        matriz_temperaturas=temperatura_anterior,
+                        filas_centros=centros_calculados,  # type: ignore
                     )
                 # print("\n--- Resultados de la Extracción ---")
                 # for i, (centro, perfil) in enumerate(zip(centros_calculados, mis_perfiles_extraidos)):
@@ -1205,7 +1227,10 @@ def SP_set(
             try:
                 if voltage <= compliance_voltage:
                     current, resistencia = CurrentSolver.OmhCurrent(
-                        voltage, cf_clean_matrix, ohm_resistence=sim_ctes.ohm_resistence_set
+                        voltage,
+                        cf_clean_matrix,
+                        ohm_resistence=sim_ctes.ohm_resistence_set,
+                        num_simulation=num_simulation,
                     )
             except ZeroDivisionError:
                 raise exceptions.NullResistanceException(
@@ -1449,7 +1474,7 @@ def PP_reset(
 
     oxygen_state = np.zeros_like(actual_state, dtype=np.int8)
 
-    num_columnas = 3  # Tiempo, Voltaje, Intensidad
+    num_columnas = 4  # Tiempo, Voltaje, Intensidad
     data_pp_reset = np.zeros((params.num_pasos + 1, num_columnas), dtype=np.float64)
 
     # CUIDADO Configuración de umbrales, tiene q estar ordenado de mayor a menor!!
@@ -1458,9 +1483,18 @@ def PP_reset(
         float(sim_ctes.voltaje_gen_oxigeno_pp_1): int(sim_ctes.num_oxigenos_pp_reset_1),
     }
 
-    print("La configuración de generación de oxígeno es:")
+    velocity_thresholds = {
+        float(sim_ctes.voltaje_gen_oxigeno_pp_2): 5.2e-07,
+        float(sim_ctes.voltaje_gen_oxigeno_pp_1): 3e-07,
+    }
+
+    print("La configuración de generación de oxígeno en la pp reset es:")
     for key, value in oxygen_config.items():
         print(f"  - {key} V: {value} oxígenos")
+
+        print("La configuración de velocidades de oxígeno en la pp reset es:")
+    for key, value in velocity_thresholds.items():
+        print(f"  - {key} V: {value} m/s")
 
     CF_destruido = np.full(len(CF_ranges), False, dtype=bool)
     all_df_destruidos = False
@@ -1502,6 +1536,7 @@ def PP_reset(
         filamentos = CurrentSolver.Clasificar_CF(CF_graph, max_x, max_y, CF_ranges)
         exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(CF_ranges))
 
+        CF_destruido_anterior = CF_destruido.copy()
         if any(~CF_destruido):  # mientras haya alguno sin romper
             procesar_filamentos_destruidos(
                 imagen_path=rutas["figures_path"],
@@ -1515,7 +1550,16 @@ def PP_reset(
                 roturas_dict=roturas_dict,
                 etapa="pp",
                 params=params,
+                constantes_simulacion=sim_ctes,
             )
+
+        if not np.array_equal(CF_destruido, CF_destruido_anterior):
+            mostar_cal = True
+            print(
+                f"Se ha detectado la destrucción de un filamento en el paso {k} para el voltaje {voltage} V. Se mostrarán los cálculos detallados para este paso."
+            )
+        else:
+            mostar_cal = False
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
@@ -1526,7 +1570,11 @@ def PP_reset(
             # Si ha percolado uso la corriente de Ohm
             try:
                 current, resistencia = CurrentSolver.OmhCurrent(
-                    voltage, cf_clean_matrix, ohm_resistence=sim_ctes.ohm_resistence_reset
+                    voltage,
+                    cf_clean_matrix,
+                    ohm_resistence=sim_ctes.ohm_resistence_reset,
+                    num_simulation=num_simulation,
+                    mostrar_calculo=mostar_cal,
                 )
                 # print("Para el voltaje", voltage, "la resistencia es: ", resistencia)
 
@@ -1620,6 +1668,7 @@ def PP_reset(
                         columna_perfil=21,
                     )
             else:
+                # TODO Punto crítico REVISAR
                 # Algún filamento ya destruido: temperatura sin muro térmico
                 temperatura = Temperature.solve_thermal_state(
                     types_map=materials_map,
@@ -1661,11 +1710,12 @@ def PP_reset(
             actual_state=actual_state,
             oxygen_state=oxygen_state,
             temperatura=temperatura,
+            velocity_thresholds=velocity_thresholds,
         )
 
         # Tiempo total de la simulacion
         tiempo_total = simulation_time + tiempo_sp_set
-        data_pp_reset[k] = np.array([tiempo_total, voltage, current])
+        data_pp_reset[k] = np.array([tiempo_total, voltage, current, resistencia])
 
         # if k % num_pasos_guardar_estado == 0:
         # np.save(rutas["figures_path"] / f"temperatura_{k}_pp_reset.npy", temperatura)
@@ -1688,11 +1738,22 @@ def PP_reset(
         voltaje_final=voltage,
         config_state=actual_state,
         datos_save=data_pp_reset,
-        header_files="Tiempo simulacion [s],Voltaje [V],Intensidad [A]",
+        header_files="Tiempo simulacion [s],Voltaje [V],Intensidad [A], Resisencia [Ohm]",
         save_path_data=save_path_data,
         save_path_pkl=save_path_pkl,
         save_path_figures=save_path_figures,
     )
+
+    if sum(CF_destruido) < len(CF_ranges):
+        raise exceptions.FilamentosNoDestruidosException(
+            simulation_path=rutas["simulation_path"],
+            figures_path=rutas["figures_path"],
+            voltage=voltage,
+            num_simulation=num_simulation,
+            actual_state=actual_state,
+            CF_destruidos=sum(CF_destruido),
+            CF_esperados=len(CF_ranges),
+        )
 
     # Guardo todas las variables del estado final del PP set para usarlas en el PS set
     final_state_pp_reset = {
@@ -1722,6 +1783,7 @@ def PP_reset(
         str(rutas["figures_path"]) + f"/final_state_pp_reset_{num_simulation}.png",
         device_size=params.device_size,
     )
+
     print("La temperatura final del pp reset es:", temperatura, "\n")
     print("La intensidad al final de la primera parte del reset es:", current, "\n")
 
@@ -1746,7 +1808,7 @@ def SP_reset(
     voltage_CF_destruido = final_state_pp_reset["voltage_CF_destruido"]
     roturas_dict = final_state_pp_reset["roturas_dict"]
 
-    print("Lol voltaje de rotura de pp reset son: ", voltage_CF_destruido)
+    print("Los voltaje de rotura de pp reset son: ", voltage_CF_destruido)
 
     rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="reset")
 
@@ -1755,6 +1817,15 @@ def SP_reset(
 
     # configuración de generación de oxígeno, si el voltaje supera el umbral se generan el número de oxígenos indicados, si hay varios umbrales se comprueba de mayor a menor y se asigna el número de oxígenos correspondiente al primer umbral que se supere
     oxygen_config = {float(sim_ctes.voltaje_gen_oxigeno_sp): int(sim_ctes.num_oxigenos_sp_reset)}
+    velocity_thresholds = {float(sim_ctes.voltaje_gen_oxigeno_sp): 5.2e-07}
+
+    print("La configuración de generación de oxígeno en la sp reset es:")
+    for key, value in oxygen_config.items():
+        print(f"  - {key} V: {value} oxígenos")
+
+    print("La configuración de velocidades de oxígeno en la sp reset es:")
+    for key, value in velocity_thresholds.items():
+        print(f"  - {key} V: {value} m/s")
 
     print("Los filamentos destruidos al inicio del SP reset son: ", CF_destruido)
 
@@ -1764,7 +1835,7 @@ def SP_reset(
         0,
         params.paso_potencial_reset,
     )
-    print("El paso de potencial para la parte de set es:", params.paso_potencial_reset, "\n")
+    print("El paso de potencial para la parte de set es:", params.paso_potencial_reset)
 
     print(f"\nSimulacion {num_simulation} - segunda parte del reset\n")
 
@@ -1805,6 +1876,7 @@ def SP_reset(
                 roturas_dict=roturas_dict,
                 etapa="sp",
                 params=params,
+                constantes_simulacion=sim_ctes,
             )
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
@@ -1816,7 +1888,10 @@ def SP_reset(
             # Si ha percolado uso la corriente de Ohm
             try:
                 current, _ = CurrentSolver.OmhCurrent(
-                    voltage, cf_clean_matrix, ohm_resistence=sim_ctes.ohm_resistence_reset
+                    voltage,
+                    cf_clean_matrix,
+                    ohm_resistence=sim_ctes.ohm_resistence_reset,
+                    num_simulation=num_simulation,
                 )
             except ZeroDivisionError:
                 raise exceptions.NullResistanceException(
@@ -1864,7 +1939,6 @@ def SP_reset(
                     pb_metal_insul=sim_ctes.pb_metal_insul_reset,
                     permitividad_relativa=sim_ctes.permitividad_relativa_reset,
                     I_0=sim_ctes.I_0_reset,
-                    mostrar_datos=True,
                 )
                 * (params.device_size)
             )
@@ -1883,6 +1957,7 @@ def SP_reset(
             actual_state=actual_state,
             oxygen_state=oxygen_state,
             temperatura=temperatura,
+            velocity_thresholds=velocity_thresholds,
         )
 
         # Tiempo total de la simulacion
@@ -2072,16 +2147,16 @@ def simulation_IV(
         titulo_figura="",
         figures_path=str(save_path),
     )
-    Representate.plot_IV_marcado(
-        v_set,
-        i_set,
-        v_reset,
-        i_reset,
-        num_simulation - 1,
-        puntos_totales,
-        desplazamiento,
-        titulo_figura="",
-        figures_path=str(save_path_marcado),
-    )
+    # Representate.plot_IV_marcado(
+    #     v_set,
+    #     i_set,
+    #     v_reset,
+    #     i_reset,
+    #     num_simulation - 1,
+    #     puntos_totales,
+    #     desplazamiento,
+    #     titulo_figura="",
+    #     figures_path=str(save_path_marcado),
+    # )
 
     return None

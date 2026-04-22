@@ -8,12 +8,12 @@ import os
 # ============================================================================
 MATERIAL_DEFAULTS = {
     "cte_red": 0.25e-9,
-    "permitividad_relativa_set": 299.9162,
-    "permitividad_relativa_reset": 299.9544,
+    "permitividad_relativa_set": 299.9526,
+    "permitividad_relativa_reset": 299.9675,
     "generation_energy": 1.0,
     "recombination_energy": 0.955,
     "pb_metal_insul_set": 0.0010,
-    "pb_metal_insul_reset": 0.0304,
+    "pb_metal_insul_reset": 0.0325,
     "recom_enchancement_factor": 3e3,
     "long_decaimiento_concentracion": 1e-9,
     "ohm_resistence_set": 150.0,
@@ -36,8 +36,8 @@ PHYSICAL_CONSTANTS = {
 # PARÁMETROS ELÉCTRICOS
 # ============================================================================
 ELECTRICAL_DEFAULTS = {
-    "I_0_set": 1.9402e-03,
-    "I_0_reset": 4.3545e-03,
+    "I_0_set": 1.9283e-03,
+    "I_0_reset": 4.5414e-03,
 }
 
 # ============================================================================
@@ -61,7 +61,7 @@ THERMAL_DEFAULTS = {
 SIMULATION_DEFAULTS = {
     "device_size": 10e-9,
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
-    "num_trampas": 70,
+    "num_trampas": 80,
     "total_simulation_time": 10.0,
     "num_pasos": 10000,
     "voltaje_final": 1.1,
@@ -75,16 +75,16 @@ SIMULATION_DEFAULTS = {
 SET_RESET_DEFAULTS = {
     "ocupacion_max_pp_set": 0.45,
     "ocupacion_max_sp_set": 0.45,
-    "factor_vecinos_pp_set": 1.5,
+    "factor_vecinos_pp_set": 1.0,
     "factor_libre_pp_set": 1.0,
     "factor_vecinos_sp_set": 1.0,
     "factor_libre_sp_set": 0.9,
     "lim_voltage_percolacion": 1.2,
     "compliance_voltage": 0.6,
-    "voltaje_gen_oxigeno_pp_1": 0.45,
+    "voltaje_gen_oxigeno_pp_1": 1.1,
     "num_oxigenos_pp_reset_1": 1,
-    "voltaje_gen_oxigeno_pp_2": 0.65,
-    "num_oxigenos_pp_reset_2": 3,
+    "voltaje_gen_oxigeno_pp_2": 1.2,
+    "num_oxigenos_pp_reset_2": 10,
     "voltaje_gen_oxigeno_sp": -0.2,
     "num_oxigenos_sp_reset": 5,
 }

@@ -111,3 +111,36 @@ class FilamentosNoFormadosException(Exception):
             pickle.dump({"actual_state": self.actual_state}, f)
 
         super().__init__(f"Se esperaba que se formaran {CF_esperados} y se han formado {CF_formados}.")
+
+
+# Excepción para cuando no se han formado todos los filamentos conductores (CF)
+class FilamentosNoDestruidosException(Exception):
+    """Excepción para manejar casos donde no se destruyen todos los filamentos esperados"""
+
+    def __init__(
+        self,
+        simulation_path,
+        figures_path,
+        voltage,
+        num_simulation,
+        actual_state,
+        CF_destruidos,
+        CF_esperados,
+    ):
+        self.filename = str(simulation_path) + f"/state_not_all_CF_destroyed.npz"
+        self.voltage = voltage
+        self.simulation_path = simulation_path
+        self.num_simulation = num_simulation + 1
+        self.actual_state = actual_state
+        self.figures_path = str(figures_path) + f"/state_not_all_CF_destroyed_{self.num_simulation}.png"
+
+        print(f"Se esperaba que se destruyeran {CF_esperados} y se han destruido {CF_destruidos}.")
+
+        # Generar representación visual
+        Representate.RepresentateState(self.actual_state, round(self.voltage, 3), self.figures_path)
+
+        # Guardar estado
+        with open(self.filename, "wb") as f:
+            pickle.dump({"actual_state": self.actual_state}, f)
+
+        super().__init__(f"Se esperaba que se destruyeran {CF_esperados} y se han destruido {CF_destruidos}.")
