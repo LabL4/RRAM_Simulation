@@ -162,83 +162,71 @@ def move_oxygen_ions(
     gamma_drift: float,
     migration_energy: float,
     cte_red: float,
-    potencial: float,
+    voltage: float,
+    velocity_thresholds: dict,  # Diccionario pasado como argumento
 ) -> tuple[np.ndarray, np.ndarray | float]:
     """
-    Mueve los iones de oxígeno en la simulación calculando su velocidad de deriva (drift).
-    Soporta tanto un valor constante de temperatura (escalar) como mapas de calor (matriz 2D).
-
-    Returns:
-        tuple: (Nueva matriz de estado de oxígenos, velocidad calculada)
+    Mueve los iones de oxígeno de forma estocástica. La velocidad se determina
+    comparando el parámetro 'voltage' contra los umbrales en 'velocity_thresholds'.
     """
 
     # =========================================================================
-    # 1. CÁLCULO FÍSICO DE LA VELOCIDAD (Cinemática)
+    # 1. CÁLCULO FÍSICO DE LA VELOCIDAD (Referencia que luego no se usa)
     # =========================================================================
     try:
         senoh = np.sinh((cte_red * E_field * gamma_drift) / (2 * k_b_ev * temperature))
         exp_velocity = np.exp(-migration_energy / (k_b_ev * temperature))
-        oxygen_velocity = 2 * cte_red * vibration_frequency * (senoh * exp_velocity)
+        # Nota: Esta variable se calcula pero será sobrescrita por la lógica de umbrales
+        oxygen_velocity_fisica = 2 * cte_red * vibration_frequency * (senoh * exp_velocity)
 
     except OverflowError as Overflow_exception:
-        print("\n Error en el cálculo de la velocidad de los iones de oxígeno, los valores empleados son:")
-        print(f"OverflowError: {Overflow_exception}")
-        print(f"cte_red: {cte_red}, E_field: {E_field}, gamma_drift: {gamma_drift}")
-        print(f"k_b_ev: {k_b_ev}, temperature: {temperature}, E_m: {migration_energy}")
+        print(f"\n Error en el cálculo de la velocidad: {Overflow_exception}")
         sys.exit(1)
 
-    # print("Velocidad de los iones de oxígeno: ", oxygen_velocity)
-    # Esto es un arreglo temporal para dar cuenta que hay un tiempo hasta que los iones de oxígeno se muevan
-    potencial_imbral = abs(potencial)
-    if potencial_imbral > 0.7:
-        oxygen_velocity = 5.2e-07
-    elif potencial_imbral > 0.5:
-        oxygen_velocity = 3e-07
-    else:
-        oxygen_velocity = 0
+    # =========================================================================
+    # 2. LÓGICA DINÁMICA DE UMBRALES
+    # =========================================================================
+    # Inicializamos con el valor por defecto (si no supera ningún umbral)
+    oxygen_velocity = 0
+
+    # Ordenamos las llaves de mayor a menor para asegurar la asignación correcta
+    for threshold in sorted(velocity_thresholds.keys(), reverse=True):
+        if abs(voltage) > abs(threshold):
+            oxygen_velocity = velocity_thresholds[threshold]
+            # print(f"Voltage {voltage} supera el umbral {threshold}, asignando velocidad {oxygen_velocity}")
+            break  # Salimos al encontrar el primer umbral que se cumple
 
     # =========================================================================
-    # 2. CÁLCULO DEL DESPLAZAMIENTO (Cuántas "casillas" se mueve el ión)
+    # 3. CÁLCULO DEL DESPLAZAMIENTO MÁXIMO
     # =========================================================================
-    # Convierte el resultado a un array NumPy de tipo entero.
-    # Si oxigen_velocity es float, displacement será un array de 0 dimensiones.
-    # Si oxigen_velocity es matriz, displacement será una matriz (2D).
-    displacement = np.array(np.round((oxygen_velocity * paso_temp) / grid_size), dtype=int)
-
-    # Creamos la nueva matriz vacía (el "nuevo lienzo")
+    max_displacement = np.array(np.round((oxygen_velocity * paso_temp) / grid_size), dtype=int)
     oxygen_state_new = np.zeros_like(oxygen_state)
 
     # =========================================================================
-    # 3. EXTRACCIÓN Y MOVIMIENTO INDEPENDIENTE SI LO HUBIESE
+    # 4. MOVIMIENTO ALEATORIO INDEPENDIENTE
     # =========================================================================
-    # rows y cols guardan las coordenadas exactas de cada ión existente (los 1s)
     rows, cols = np.where(oxygen_state == 1)
+    num_ions = len(rows)
 
-    # Solo procesamos si realmente hay algún ión en la red
-    if len(rows) > 0:
-        # Comprobación de dimensiones
-        if displacement.ndim > 0:
-            # Si tiene dimensiones (es matriz/mapa), extraemos el desplazamiento local
-            shifts = displacement[rows, cols]
+    if num_ions > 0:
+        actual_shifts = np.zeros(num_ions, dtype=int)
+
+        if max_displacement.ndim > 0:
+            max_allowed = max_displacement[rows, cols]
+            mask = max_allowed > 0
+            if np.any(mask):
+                actual_shifts[mask] = np.random.randint(1, max_allowed[mask] + 1)
         else:
-            # Si tiene 0 dimensiones (es un escalar), todos se mueven lo mismo
-            shifts = displacement
+            if max_displacement > 0:
+                actual_shifts = np.random.randint(1, max_displacement + 1, size=num_ions)
 
-        # Calculamos sus nuevas posiciones sumando el desplazamiento a la columna actual
-        new_cols = cols + shifts
+        new_cols = cols + actual_shifts
 
-        # =========================================================================
-        # 4. FILTRADO DE LÍMITES DE FRONTERA
-        # =========================================================================
-        # Comprobamos que el ión no se haya salido del dispositivo (ni por izquierda ni por derecha)
+        # Verificamos límites del array
         valid_mask = (new_cols >= 0) & (new_cols < oxygen_state.shape[1])
-
-        # Nos quedamos solo con las coordenadas válidas de los iones que siguen dentro
         valid_rows = rows[valid_mask]
         valid_new_cols = new_cols[valid_mask]
 
-        # Pintamos los iones en sus nuevas posiciones en la matriz vacía
-        # (Si dos iones acaban en la misma coordenada, NumPy lo gestiona sin errores)
         oxygen_state_new[valid_rows, valid_new_cols] = 1
 
     return oxygen_state_new, oxygen_velocity

@@ -52,18 +52,19 @@ THERMAL_DEFAULTS = {
     "conductividad_termica_aislante": 0.000001,
     "conductividad_termica_electrodo": 5.0,
     "Temperatura_electrodo": 300,
-    "Factor_generar_calor": 0.000001,
-    "pendiente_temperatura": -25,
+    "factor_generar_calor": 5.5e-5,
+    "pendiente_temperatura": -24.7,
 }
+
 
 # ============================================================================
 # PARÁMETROS GEOMÉTRICOS Y DE SIMULACIÓN
 # ============================================================================
 SIMULATION_DEFAULTS = {
     "device_size_x": 10e-9,  # Ancho entre electrodos, debe corresponder a los dispositivos medidos
-    "device_size_y": 12.5e-9,
+    "device_size_y": 10e-9,
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
-    "num_trampas": 70,
+    "num_trampas": 90,
     "total_simulation_time": 10.0,
     "num_pasos": 10000,
     "voltaje_final": 1.1,
@@ -75,18 +76,18 @@ SIMULATION_DEFAULTS = {
 # PARÁMETROS SET / RESET
 # ============================================================================
 SET_RESET_DEFAULTS = {
-    "ocupacion_max_pp_set": 0.5,
-    "ocupacion_max_sp_set": 0.5,
-    "factor_vecinos_pp_set": 1.5,
+    "ocupacion_max_pp_set": 0.45,
+    "ocupacion_max_sp_set": 0.45,
+    "factor_vecinos_pp_set": 1.0,
     "factor_libre_pp_set": 1.0,
-    "factor_vecinos_sp_set": 1.5,
-    "factor_libre_sp_set": 1.0,
+    "factor_vecinos_sp_set": 1.0,
+    "factor_libre_sp_set": 0.9,
     "lim_voltage_percolacion": 1.2,
     "compliance_voltage": 0.6,
-    "voltaje_gen_oxigeno_pp_1": 0.45,
+    "voltaje_gen_oxigeno_pp_1": 1.1,
     "num_oxigenos_pp_reset_1": 1,
-    "voltaje_gen_oxigeno_pp_2": 0.65,
-    "num_oxigenos_pp_reset_2": 3,
+    "voltaje_gen_oxigeno_pp_2": 1.2,
+    "num_oxigenos_pp_reset_2": 10,
     "voltaje_gen_oxigeno_sp": -0.2,
     "num_oxigenos_sp_reset": 5,
 }
