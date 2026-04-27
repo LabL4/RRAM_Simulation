@@ -1,6 +1,7 @@
 from RRAM import Representate, Temperature
 from . import Representate, utils
 from typing import List, Dict
+from typing import Optional
 from pathlib import Path
 
 import numpy as np
@@ -205,6 +206,114 @@ def simulation_IV(
     simulation_path: Path,
     desplazamiento: dict,
     voltaje_percolacion: float,
+    roturas_dict: dict,
+):
+    # region Representar datos
+    save_path = figures_path / f"I-V_{num_simulation}"
+    save_path_marcado = figures_path / f"I-V_{num_simulation}_marcado"
+
+    # Definir nombres base y tipos
+    prefixes = ["pp", "sp"]
+    stages = ["set", "reset"]
+
+    # Diccionario para guardar los datos cargados en memoria
+    data = {}
+
+    # Cargar archivos de forma automatizada
+    for prefix in prefixes:
+        for stage in stages:
+            # ACTUALIZACIÓN 1: Nombre de archivo ajustado a tu nuevo formato
+            name = f"ALL_data_{prefix}_{stage}_{num_simulation}.npz"
+            key = f"{prefix}_{stage}"
+
+            try:
+                # Cargamos el archivo .npz
+                archivo_npz = np.load(simulation_path / name)
+
+                # ACTUALIZACIÓN 2: Extraemos solo la matriz "datos_sim" a la memoria
+                # Si en el futuro guardas vectores sueltos (ej: voltaje=v), aquí usarías archivo_npz["voltaje"]
+                data[key] = archivo_npz["datos_sim"]
+
+                # Cerramos el archivo npz (buena práctica de manejo de I/O)
+                archivo_npz.close()
+            except FileNotFoundError:
+                print(f"Advertencia: No se encontró el archivo {name}")
+                # Podrías inicializar un array vacío o manejar el error según convenga
+                data[key] = np.zeros((0, 3))
+
+    # Unir las partes PP y SP para el SET
+    # Nota: Ya que hemos extraído 'datos_sim', podemos acceder a las columnas directamente
+    # Columna 1 = Voltaje, Columna 2 = Intensidad
+    i_set = np.concatenate([abs(data["pp_set"][:, 2]), abs(data["sp_set"][:, 2])])
+    v_set = np.concatenate([data["pp_set"][:, 1], data["sp_set"][:, 1]])
+
+    # Unir las partes PP y SP para el RESET
+    i_reset = np.concatenate([abs(data["pp_reset"][:, 2]), abs(data["sp_reset"][:, 2])])
+    v_reset = np.concatenate([data["pp_reset"][:, 1], data["sp_reset"][:, 1]])
+
+    puntos_x_set = {"a": 1e-9, "b": voltaje_percolacion, "c": 1.1}
+    puntos_x_pp_reset = {"d": -0.44, "e": roturas_dict[0]["voltaje"], "f": -1.1}
+    puntos_x_sp_reset = {"g": -2e-8}
+
+    # Obtener puntos en cada curva (se elimina el llamado anidado a ["datos_sim"])
+    puntos_set = utils.obtener_puntos_en_curva(data["pp_set"][:, 1], abs(data["pp_set"][:, 2]), puntos_x_set)
+
+    puntos_x_pp_reset = utils.obtener_puntos_en_curva(
+        data["pp_reset"][:, 1],
+        abs(data["pp_reset"][:, 2]),
+        puntos_x_pp_reset,
+    )
+
+    puntos_x_sp_reset = utils.obtener_puntos_en_curva(
+        data["sp_reset"][:, 1],
+        abs(data["sp_reset"][:, 2]),
+        puntos_x_sp_reset,
+    )
+
+    print("Puntos en la curva I-V:\n")
+    for label, (v, i) in {
+        **puntos_set,
+        **puntos_x_pp_reset,
+        **puntos_x_sp_reset,
+    }.items():
+        print(f"  Punto {label}: V = {v:.6f} V, I = {i:.6e} A")
+
+    # Crear un único diccionario combinando ambos
+    puntos_totales = {}
+    puntos_totales.update(puntos_set)
+    puntos_totales.update(puntos_x_pp_reset)
+    puntos_totales.update(puntos_x_sp_reset)
+
+    Representate.plot_IV(
+        v_set,
+        i_set,
+        v_reset,
+        i_reset,
+        num_simulation - 1,
+        titulo_figura="",
+        figures_path=str(save_path),
+    )
+    Representate.plot_IV_marcado(
+        v_set,
+        i_set,
+        v_reset,
+        i_reset,
+        num_simulation - 1,
+        puntos_totales,
+        desplazamiento,
+        titulo_figura="",  # Añadido para que coincida con tu firma de plot_IV
+        figures_path=str(save_path_marcado),  # Faltaba guardar el path del marcado
+    )
+
+    return None
+
+
+def old_simulation_IV(
+    num_simulation: int,
+    figures_path: Path,
+    simulation_path: Path,
+    desplazamiento: dict,
+    voltaje_percolacion: float,
     voltage_CF_destruido: list,
 ):
     # region Representar datos
@@ -226,10 +335,10 @@ def simulation_IV(
             data[key] = np.load(simulation_path / name)
 
     # Extraer y concatenar columnas de interés
-    i_set = np.concatenate([data["pp_set"]["datos"][:, 2], data["sp_set"]["datos"][:, 2]])
-    v_set = np.concatenate([data["pp_set"]["datos"][:, 1], data["sp_set"]["datos"][:, 1]])
-    v_reset = np.concatenate([data["pp_reset"]["datos"][:, 1], data["sp_reset"]["datos"][:, 1]])
-    i_reset = np.concatenate([data["pp_reset"]["datos"][:, 2], data["sp_reset"]["datos"][:, 2]])
+    i_set = np.concatenate([data["pp_set"]["datos_sim"][:, 2], data["sp_set"]["datos_sim"][:, 2]])
+    v_set = np.concatenate([data["pp_set"]["datos_sim"][:, 1], data["sp_set"]["datos_sim"][:, 1]])
+    v_reset = np.concatenate([data["pp_reset"]["datos_sim"][:, 1], data["sp_reset"]["datos_sim"][:, 1]])
+    i_reset = np.concatenate([data["pp_reset"]["datos_sim"][:, 2], data["sp_reset"]["datos_sim"][:, 2]])
 
     # Diccionario de puntos que quieres ubicar
     puntos_x_set = {"a": 1e-6, "b": voltaje_percolacion, "c": 1.1}
@@ -238,16 +347,16 @@ def simulation_IV(
 
     # Obtener puntos en cada curva
     puntos_set = utils.obtener_puntos_en_curva(
-        data["pp_set"]["datos"][:, 1], data["pp_set"]["datos"][:, 2], puntos_x_set
+        data["pp_set"]["datos_sim"][:, 1], data["pp_set"]["datos_sim"][:, 2], puntos_x_set
     )
     puntos_x_pp_reset = utils.obtener_puntos_en_curva(
-        data["pp_reset"]["datos"][:, 1],
-        data["pp_reset"]["datos"][:, 2],
+        data["pp_reset"]["datos_sim"][:, 1],
+        data["pp_reset"]["datos_sim"][:, 2],
         puntos_x_pp_reset,
     )
     puntos_x_sp_reset = utils.obtener_puntos_en_curva(
-        data["sp_reset"]["datos"][:, 1],
-        data["sp_reset"]["datos"][:, 2],
+        data["sp_reset"]["datos_sim"][:, 1],
+        data["sp_reset"]["datos_sim"][:, 2],
         puntos_x_sp_reset,
     )
 
@@ -335,17 +444,29 @@ def resumen_plots(
     )
 
     # 3. Preparación y plot del muro térmico
-    matriz_para_plot_muro = np.copy(matriz_temperaturas_fijas)
-    for centro, perfil_filamento in zip(centros_calculados, mis_perfiles_extraidos):
-        if centro is not None and perfil_filamento is not None:
-            matriz_para_plot_muro[centro, :] = perfil_filamento
+    if etapa == "pp_reset":
+        matriz_para_plot_muro = np.copy(matriz_temperaturas_fijas)
+        for centro, perfil_filamento in zip(centros_calculados, mis_perfiles_extraidos):
+            if centro is not None and perfil_filamento is not None:
+                matriz_para_plot_muro[centro, :] = perfil_filamento
 
-    Representate.plot_muro_termico(
-        matriz_muros=matriz_para_plot_muro,
-        matriz_molde=actual_state_clean_CF,
-        filename=rutas["figures_path"] / f"Muro_termico_{num_simulation}_{fig_voltage}_{etapa}.png",
-        device_size=params.device_size,
-    )
+        Representate.plot_muro_termico(
+            matriz_muros=matriz_para_plot_muro,
+            filename=rutas["figures_path"] / f"Muro_termico_{num_simulation}_{fig_voltage}_pp_reset.png",
+            device_size=params.device_size,
+        )
+    else:
+        matriz_para_plot_muro = np.copy(matriz_temperaturas_fijas)
+        for centro, perfil_filamento in zip(centros_calculados, mis_perfiles_extraidos):
+            if centro is not None and perfil_filamento is not None:
+                matriz_para_plot_muro[centro, :] = perfil_filamento
+
+        Representate.plot_muro_termico(
+            matriz_muros=matriz_para_plot_muro,
+            matriz_molde=actual_state_clean_CF,
+            filename=rutas["figures_path"] / f"Muro_termico_{num_simulation}_{fig_voltage}_{etapa}.png",
+            device_size=params.device_size,
+        )
 
     # 4. Centros de filamentos
     Representate.plot_centros_filamento_det(
@@ -367,3 +488,58 @@ def resumen_plots(
     #     perfiles=perfiles,
     #     save_path=rutas["figures_path"] / f"Perfil_termico_{num_simulation}_{fig_voltage}_{etapa}.png",
     # )
+
+
+def guardar_estado_intermedio(ruta_destino: Path, etapa: str, num_simulation: int, k: int, **matrices) -> None:
+    """
+    Guarda todas las matrices relevantes de un paso de simulación en un único archivo .npz comprimido.
+    Garantiza que todas las claves pasadas existan en el archivo final.
+    """
+
+    # 1. Reemplazamos los valores None por un array vacío de NumPy.
+    # Esto es mejor que guardar 'None' a secas, porque NumPy prefiere trabajar con arrays.
+    matrices_seguras = {}
+    for nombre, matriz in matrices.items():
+        if matriz is None:
+            matrices_seguras[nombre] = np.array([])  # Array vacío indicando que no hay datos
+        else:
+            matrices_seguras[nombre] = matriz
+
+    # 2. Construimos el nombre del archivo estandarizado
+    nombre_archivo = ruta_destino / f"Estado_{etapa}_sim_{num_simulation}_paso_{k}.npz"
+
+    # 3. Guardamos de forma comprimida asegurando que todas las claves se escriben
+    np.savez_compressed(nombre_archivo, **matrices_seguras)
+
+
+def guardar_datos_vectores(save_path_data: Path, headers: Optional[dict] = None, **vectores) -> None:
+    """
+    Guarda múltiples vectores, matrices o datos escalares en un archivo .npz comprimido.
+    Asocia dinámicamente encabezados a los datos si se proporcionan.
+
+    Args:
+        ruta_destino (Path): Ruta del archivo donde se guardarán los datos.
+        headers (dict, opcional): Diccionario con los encabezados. Las claves deben
+                                  coincidir con los nombres dados en **vectores.
+        **vectores: Datos a guardar pasados como argumentos con nombre (ej: datos_iv=matriz).
+    """
+    if headers is None:
+        headers = {}
+
+    datos_seguros = {}
+
+    for nombre, vector in vectores.items():
+        if vector is not None:
+            datos_seguros[nombre] = vector
+
+            # Si el usuario ha proporcionado un encabezado para este vector específico,
+            # lo guardamos en el .npz añadiendo el prefijo 'header_' al nombre original.
+            if nombre in headers:
+                # Lo convertimos a array de NumPy de 1 elemento para guardarlo de forma nativa
+                datos_seguros[f"header_{nombre}"] = np.array([headers[nombre]])
+        else:
+            # Si se pasa un None, guardamos un array vacío para mantener la estructura de claves
+            datos_seguros[nombre] = np.array([])
+
+    # Guardamos todo el paquete de forma consolidada y comprimida
+    np.savez_compressed(save_path_data.with_suffix(".npz"), **datos_seguros)

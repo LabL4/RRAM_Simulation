@@ -165,108 +165,7 @@ def move_oxygen_ions(
     gamma_drift: float,
     migration_energy: float,
     cte_red: float,
-) -> tuple[np.ndarray, np.ndarray | float]:
-    """
-    Mueve los iones de oxígeno en la simulación calculando su velocidad de deriva (drift).
-    Soporta tanto un valor constante de temperatura (escalar) como mapas de calor (matriz 2D).
-
-    Returns:
-        tuple: (Nueva matriz de estado de oxígenos, velocidad calculada)
-    """
-
-    # =========================================================================
-    # 1. CÁLCULO FÍSICO DE LA VELOCIDAD (Cinemática)
-    # =========================================================================
-    try:
-        senoh = np.sinh((cte_red * E_field * gamma_drift) / (2 * k_b_ev * temperature))
-        exp_velocity = np.exp(-migration_energy / (k_b_ev * temperature))
-        oxygen_velocity = 2 * cte_red * vibration_frequency * (senoh * exp_velocity)
-
-    except OverflowError as Overflow_exception:
-        print("\n Error en el cálculo de la velocidad de los iones de oxígeno, los valores empleados son:")
-        print(f"OverflowError: {Overflow_exception}")
-        print(f"cte_red: {cte_red}, E_field: {E_field}, gamma_drift: {gamma_drift}")
-        print(f"k_b_ev: {k_b_ev}, temperature: {temperature}, E_m: {migration_energy}")
-        sys.exit(1)
-
-    # print("Velocidad de los iones de oxígeno: ", oxygen_velocity)
-    # Esto es un arreglo temporal para dar cuenta que hay un tiempo hasta que los iones de oxígeno se muevan
-    valor_prueba = abs(E_field * (10e-9))
-    if valor_prueba > 0.7:
-        oxygen_velocity = 5.2e-07
-    elif valor_prueba > 0.5:
-        oxygen_velocity = 3e-07
-    else:
-        oxygen_velocity = 0
-
-    # =========================================================================
-    # 2. CÁLCULO DEL DESPLAZAMIENTO (Cuántas "casillas" se mueve el ión)
-    # =========================================================================
-    # Convierte el resultado a un array NumPy de tipo entero.
-    # Si oxigen_velocity es float, displacement será un array de 0 dimensiones.
-    # Si oxigen_velocity es matriz, displacement será una matriz (2D).
-    displacement = np.array(np.round((oxygen_velocity * paso_temp) / grid_size), dtype=int)
-
-    # Creamos la nueva matriz vacía (el "nuevo lienzo")
-    oxygen_state_new = np.zeros_like(oxygen_state)
-
-    # =========================================================================
-    # 3. EXTRACCIÓN Y MOVIMIENTO INDEPENDIENTE SI LO HUBIESE
-    # =========================================================================
-    # rows y cols guardan las coordenadas exactas de cada ión existente (los 1s)
-    rows, cols = np.where(oxygen_state == 1)
-
-    # Solo procesamos si realmente hay algún ión en la red
-    if len(rows) > 0:
-        # Comprobación de dimensiones
-        if displacement.ndim > 0:
-            # Si tiene dimensiones (es matriz/mapa), extraemos el desplazamiento local
-            shifts = displacement[rows, cols]
-        else:
-            # Si tiene 0 dimensiones (es un escalar), todos se mueven lo mismo
-            shifts = displacement
-
-        # Calculamos sus nuevas posiciones sumando el desplazamiento a la columna actual
-        new_cols = cols + shifts
-
-        # =========================================================================
-        # 4. FILTRADO DE LÍMITES DE FRONTERA
-        # =========================================================================
-        # Comprobamos que el ión no se haya salido del dispositivo (ni por izquierda ni por derecha)
-        valid_mask = (new_cols >= 0) & (new_cols < oxygen_state.shape[1])
-
-        # Nos quedamos solo con las coordenadas válidas de los iones que siguen dentro
-        valid_rows = rows[valid_mask]
-        valid_new_cols = new_cols[valid_mask]
-
-        # Pintamos los iones en sus nuevas posiciones en la matriz vacía
-        # (Si dos iones acaban en la misma coordenada, NumPy lo gestiona sin errores)
-        oxygen_state_new[valid_rows, valid_new_cols] = 1
-
-    return oxygen_state_new, oxygen_velocity
-
-
-import numpy as np
-import sys
-
-# Nota: k_b_ev debe estar definido en el módulo o importado de Constants
-k_b_ev = 8.617333262145e-5
-
-import numpy as np
-import sys
-
-
-def newer_move_oxygen_ions(
-    paso_temp: float,
-    oxygen_state: np.ndarray,
-    temperature: np.ndarray | float,
-    E_field: float,
-    grid_size: float,
-    vibration_frequency: float,
-    gamma_drift: float,
-    migration_energy: float,
-    cte_red: float,
-    voltage: float,  # Nuevo parámetro de entrada
+    voltage: float,
     velocity_thresholds: dict,  # Diccionario pasado como argumento
 ) -> tuple[np.ndarray, np.ndarray | float]:
     """
@@ -275,7 +174,7 @@ def newer_move_oxygen_ions(
     """
 
     # =========================================================================
-    # 1. CÁLCULO FÍSICO DE LA VELOCIDAD (Opcional/Referencia)
+    # 1. CÁLCULO FÍSICO DE LA VELOCIDAD (Referencia que luego no se usa)
     # =========================================================================
     try:
         senoh = np.sinh((cte_red * E_field * gamma_drift) / (2 * k_b_ev * temperature))
@@ -331,98 +230,6 @@ def newer_move_oxygen_ions(
         valid_rows = rows[valid_mask]
         valid_new_cols = new_cols[valid_mask]
 
-        oxygen_state_new[valid_rows, valid_new_cols] = 1
-
-    return oxygen_state_new, oxygen_velocity
-
-
-def new_move_oxygen_ions(
-    paso_temp: float,
-    oxygen_state: np.ndarray,
-    temperature: np.ndarray | float,
-    E_field: float,
-    grid_size: float,
-    vibration_frequency: float,
-    gamma_drift: float,
-    migration_energy: float,
-    cte_red: float,
-) -> tuple[np.ndarray, np.ndarray | float]:
-    """
-    Mueve los iones de oxígeno de forma estocástica. El desplazamiento calculado
-    físicamente actúa como el valor máximo que un ión puede saltar en un paso.
-    """
-
-    # =========================================================================
-    # 1. CÁLCULO FÍSICO DE LA VELOCIDAD (Cinemática)
-    # =========================================================================
-    try:
-        # Se mantiene la lógica original para determinar la capacidad de movimiento
-        senoh = np.sinh((cte_red * E_field * gamma_drift) / (2 * k_b_ev * temperature))
-        exp_velocity = np.exp(-migration_energy / (k_b_ev * temperature))
-        oxygen_velocity = 2 * cte_red * vibration_frequency * (senoh * exp_velocity)
-
-    except OverflowError as Overflow_exception:
-        print(f"\n Error en el cálculo de la velocidad: {Overflow_exception}")
-        sys.exit(1)
-
-    # Arreglo temporal de velocidad según el campo (se mantiene de tu código original)
-    valor_prueba = abs(E_field * (10e-9))
-    if valor_prueba > 0.7:
-        oxygen_velocity = 5.2e-07
-    elif valor_prueba > 0.5:
-        oxygen_velocity = 3e-07
-    else:
-        oxygen_velocity = 0
-
-    # =========================================================================
-    # 2. CÁLCULO DEL DESPLAZAMIENTO MÁXIMO
-    # =========================================================================
-    # Este es el valor "techo" de celdas que un ión podría moverse
-    max_displacement = np.array(np.round((oxygen_velocity * paso_temp) / grid_size), dtype=int)
-
-    # Creamos la nueva matriz vacía
-    oxygen_state_new = np.zeros_like(oxygen_state)
-
-    # =========================================================================
-    # 3. MOVIMIENTO ALEATORIO INDEPENDIENTE
-    # =========================================================================
-    rows, cols = np.where(oxygen_state == 1)
-    num_ions = len(rows)
-
-    if num_ions > 0:
-        # Inicializamos el vector de desplazamientos reales con ceros
-        actual_shifts = np.zeros(num_ions, dtype=int)
-
-        if max_displacement.ndim > 0:
-            # CASO A: El desplazamiento es una matriz (mapa de calor)
-            # Extraemos el máximo permitido para la posición de cada ión
-            max_allowed = max_displacement[rows, cols]
-
-            # Solo intentamos generar aleatorios donde el máximo sea > 0
-            mask = max_allowed > 0
-            if np.any(mask):
-                # Genera un entero aleatorio entre 1 y max_allowed (inclusive)
-                # np.random.randint(low, high) -> high es exclusivo, por eso el +1
-                actual_shifts[mask] = np.random.randint(1, max_allowed[mask] + 1)
-        else:
-            # CASO B: El desplazamiento es un escalar (valor constante)
-            if max_displacement > 0:
-                # Todos los iones tiran el dado entre 1 y el mismo máximo
-                actual_shifts = np.random.randint(1, max_displacement + 1, size=num_ions)
-
-        # Calculamos las nuevas columnas sumando el desplazamiento aleatorio
-        new_cols = cols + actual_shifts
-
-        # =========================================================================
-        # 4. FILTRADO Y ACTUALIZACIÓN
-        # =========================================================================
-        # Verificamos que no se salgan del array
-        valid_mask = (new_cols >= 0) & (new_cols < oxygen_state.shape[1])
-
-        valid_rows = rows[valid_mask]
-        valid_new_cols = new_cols[valid_mask]
-
-        # Actualizamos la matriz con las nuevas posiciones
         oxygen_state_new[valid_rows, valid_new_cols] = 1
 
     return oxygen_state_new, oxygen_velocity

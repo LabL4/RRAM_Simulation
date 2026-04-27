@@ -281,17 +281,17 @@ def calcular_resistencia(CF_matrix, ohm_resistence, potencial, num_simulation, m
         # Se suma la resistencia paralela a la resistencia total (columnas en serie)
         total_resistance += R_col
 
-        if mostrar_calculo:
-            rp.RepresentateState(
-                CF_matrix,
-                round(potencial, 5),
-                f"C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Resistencia_state_{num_simulation}.png",
-                device_size=10e-9,
-            )
+        # if mostrar_calculo:
+        #     rp.RepresentateState(
+        #         CF_matrix,
+        #         round(potencial, 5),
+        #         f"C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Resistencia_state_{num_simulation}.png",
+        #         device_size=10e-9,
+        #     )
 
-            print(
-                f"Hay {N_total_columna} elementos en la columna {j} y su resistencia es: {R_col:.4f} ohmios \n Resistencia total acumulada: {total_resistance:.4f} ohmios\n"
-            )
+        #     print(
+        #         f"Hay {N_total_columna} elementos en la columna {j} y su resistencia es: {R_col:.4f} ohmios \n Resistencia total acumulada: {total_resistance:.4f} ohmios\n"
+        #     )
 
     return total_resistance
 

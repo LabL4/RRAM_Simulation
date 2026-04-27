@@ -8,12 +8,12 @@ import os
 # ============================================================================
 MATERIAL_DEFAULTS = {
     "cte_red": 0.25e-9,
-    "permitividad_relativa_set": 299.9526,
-    "permitividad_relativa_reset": 299.9675,
+    "permitividad_relativa_set": 299.5606,
+    "permitividad_relativa_reset": 299.9989,
     "generation_energy": 1.0,
     "recombination_energy": 0.955,
-    "pb_metal_insul_set": 0.0010,
-    "pb_metal_insul_reset": 0.0325,
+    "pb_metal_insul_set": 0.0129,
+    "pb_metal_insul_reset": 0.0219,
     "recom_enchancement_factor": 3e3,
     "long_decaimiento_concentracion": 1e-9,
     "ohm_resistence_set": 150.0,
@@ -36,8 +36,8 @@ PHYSICAL_CONSTANTS = {
 # PARÁMETROS ELÉCTRICOS
 # ============================================================================
 ELECTRICAL_DEFAULTS = {
-    "I_0_set": 1.9283e-03,
-    "I_0_reset": 4.5414e-03,
+    "I_0_set": 3.7148e-03,
+    "I_0_reset": 4.3766e-03,
 }
 
 # ============================================================================
@@ -51,8 +51,8 @@ THERMAL_DEFAULTS = {
     "conductividad_termica_aislante": 0.000001,
     "conductividad_termica_electrodo": 5.0,
     "Temperatura_electrodo": 300,
-    "Factor_generar_calor": 0.000001,
-    "pendiente_temperatura": -25,
+    "factor_generar_calor": 5.5e-5,
+    "pendiente_temperatura": -24.7,
 }
 
 # ============================================================================
@@ -81,10 +81,10 @@ SET_RESET_DEFAULTS = {
     "factor_libre_sp_set": 0.9,
     "lim_voltage_percolacion": 1.2,
     "compliance_voltage": 0.6,
-    "voltaje_gen_oxigeno_pp_1": 1.1,
+    "voltaje_gen_oxigeno_pp_1": 1.0,
     "num_oxigenos_pp_reset_1": 1,
-    "voltaje_gen_oxigeno_pp_2": 1.2,
-    "num_oxigenos_pp_reset_2": 10,
+    "voltaje_gen_oxigeno_pp_2": 1.15,
+    "num_oxigenos_pp_reset_2": 20,
     "voltaje_gen_oxigeno_sp": -0.2,
     "num_oxigenos_sp_reset": 5,
 }
