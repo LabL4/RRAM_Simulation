@@ -7,6 +7,9 @@ import os
 from scipy.constants import elementary_charge, Boltzmann, epsilon_0
 from RRAM import Representate as rp
 from RRAM import Constants as cte
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def Clean_state_matrix(config_matrix: np.ndarray) -> tuple[np.ndarray, nx.Graph]:
@@ -245,9 +248,7 @@ def calcular_resistencia(CF_matrix, ohm_resistence, mostrar_calculo: bool = Fals
         total_resistance += R_col
 
         if mostrar_calculo:
-            print(
-                f"Hay {N_total_columna} elementos en la columna {j} y su resistencia es: {R_col:.4f} ohmios \n Resistencia total acumulada: {total_resistance:.4f} ohmios\n"
-            )
+            logger.info(f"Hay {N_total_columna} elementos en la columna {j} y su resistencia es: {R_col:.4f} ohmios \n Resistencia total acumulada: {total_resistance:.4f} ohmios")
 
     return total_resistance
 

@@ -5,6 +5,9 @@ from pathlib import Path
 import numpy as np
 
 from . import Representate, utils
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def simulation_IV(
@@ -44,7 +47,7 @@ def simulation_IV(
                 # Cerramos el archivo npz (buena práctica de manejo de I/O)
                 archivo_npz.close()
             except FileNotFoundError:
-                print(f"Advertencia: No se encontró el archivo {name}")
+                logger.info(f"Advertencia: No se encontró el archivo {name}")
                 # Podrías inicializar un array vacío o manejar el error según convenga
                 data[key] = np.zeros((0, 3))
 
@@ -77,13 +80,13 @@ def simulation_IV(
         puntos_x_sp_reset,
     )
 
-    print("Puntos en la curva I-V:\n")
+    logger.info('Puntos en la curva I-V:')
     for label, (v, i) in {
         **puntos_set,
         **puntos_x_pp_reset,
         **puntos_x_sp_reset,
     }.items():
-        print(f"  Punto {label}: V = {v:.6f} V, I = {i:.6e} A")
+        logger.info(f"  Punto {label}: V = {v:.6f} V, I = {i:.6e} A")
 
     # Crear un único diccionario combinando ambos
     puntos_totales = {}

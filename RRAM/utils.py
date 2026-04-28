@@ -4,6 +4,9 @@ from typing import Optional
 from pathlib import Path
 import numpy as np
 import csv
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def generar_configuracion_filamentos(eje_x, eje_y, num_filamentos, peso_central=70):
@@ -284,7 +287,7 @@ def simulation_IV(
                 # Cerramos el archivo npz (buena práctica de manejo de I/O)
                 archivo_npz.close()
             except FileNotFoundError:
-                print(f"Advertencia: No se encontró el archivo {name}")
+                logger.info(f"Advertencia: No se encontró el archivo {name}")
                 # Podrías inicializar un array vacío o manejar el error según convenga
                 data[key] = np.zeros((0, 3))
 
@@ -317,13 +320,13 @@ def simulation_IV(
         puntos_x_sp_reset,
     )
 
-    print("Puntos en la curva I-V:\n")
+    logger.info('Puntos en la curva I-V:')
     for label, (v, i) in {
         **puntos_set,
         **puntos_x_pp_reset,
         **puntos_x_sp_reset,
     }.items():
-        print(f"  Punto {label}: V = {v:.6f} V, I = {i:.6e} A")
+        logger.info(f"  Punto {label}: V = {v:.6f} V, I = {i:.6e} A")
 
     # Crear un único diccionario combinando ambos
     puntos_totales = {}
@@ -459,7 +462,7 @@ def resumen_plots(
     para un paso específico de la simulación.
     """
 
-    print(f"Representando para el paso {k} con voltaje {fig_voltage} V las filas intermedias son {filas_intermedias}\n")
+    logger.info(f"Representando para el paso {k} con voltaje {fig_voltage} V las filas intermedias son {filas_intermedias}")
 
     # 1. Mapa de temperatura y muros
     Representate.plot_thermal_state_muro(

@@ -2,6 +2,9 @@ from typing import Dict, Any, Optional, List
 import pandas as pd
 import itertools
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================================
@@ -139,7 +142,7 @@ class ConfigManager:
             sim_id = len(self.simulations)
             self.simulations.append(SimulationConfig.from_base(sim_id, mods))
             casos_totales += 1
-        print(f"-> Generadas {casos_totales} combinaciones.")
+        logger.info(f"-> Generadas {casos_totales} combinaciones.")
 
     def export_to_init_data(self, output_dir: str = "Init_data"):
         if not os.path.exists(output_dir):
@@ -214,4 +217,4 @@ class ConfigManager:
         df_params.to_csv(os.path.join(output_dir, "simulation_parameters.csv"), index=False)
         df_ctes.to_csv(os.path.join(output_dir, "simulation_constants.csv"), index=False)
 
-        print(f"✅ Exportados parámetros y constantes ({len(self.simulations)} casos) a {output_dir}/")
+        logger.info(f"✅ Exportados parámetros y constantes ({len(self.simulations)} casos) a {output_dir}/")

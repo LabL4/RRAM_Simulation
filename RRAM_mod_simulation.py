@@ -1,106 +1,35 @@
-from RRAM import Simulation, utils
-from pathlib import Path
+"""
+DEPRECATED: este script se mantiene como shim por compatibilidad con
+invocaciones antiguas (notebooks que llaman `python RRAM_mod_simulation.py N`).
 
-import matplotlib.pyplot as plt
-import numpy as np
-import matplotlib
+La lógica vive ahora en el paquete `RRAM`. Equivalencia:
+
+    python RRAM_mod_simulation.py <num> <guardar_datos> <num_filamentos>
+        ↓ (equivale a)
+    python -m RRAM all <num> [--guardar-datos] [--num-filamentos <n>]
+
+Migra los notebooks a `python -m RRAM all <num>` cuando puedas.
+"""
+
 import sys
 
-matplotlib.use("Agg")
+from RRAM.__main__ import main as _main
 
-# Asegúrate de que se ha pasado un parámetro
-if len(sys.argv) > 1:
-    num_simulation = int(sys.argv[1])
-    guardar_datos = sys.argv[2]
-    num_filamentos = int(sys.argv[3])
 
-    guardar_datos = True if guardar_datos == "True" else False
-    print(f"El número de simulacion es: {num_simulation + 1}")
-    print(f"Se guardan las configuraciones: {guardar_datos}")
-else:
-    num_simulation = 1
-    guardar_datos = False
-    num_filamentos = 4
+def _to_argv(argv: list[str]) -> list[str]:
+    """Traduce los argumentos posicionales antiguos al nuevo CLI."""
+    if not argv:
+        # Default histórico
+        return ["all", "1", "--num-filamentos", "4"]
 
-    print(f"El número de simulaciones es: {num_simulation}")
-    print(f"Se guardan las configuraciones: {guardar_datos}")
+    num = argv[0]
+    new = ["all", num]
+    if len(argv) > 1 and argv[1] == "True":
+        new.append("--guardar-datos")
+    if len(argv) > 2:
+        new += ["--num-filamentos", argv[2]]
+    return new
 
-# Se podria leer fuera y luego pasar el diccionario de cada simulación
-sim_parmtrs = utils.read_csv_to_dic("Init_data/simulation_parameters.csv")
-params = Simulation.SimulationParameters.from_dict(sim_parmtrs[num_simulation])
 
-sim_cte = utils.read_csv_to_dic("Init_data/simulation_constants.csv")
-ctes = Simulation.SimulationConstants.from_dict(sim_cte[num_simulation])
-
-print(params)
-print("\n----------------------------------------------------------------------\n")
-print(ctes)
-
-# Crear una lista para rastrear si se ha creado el CF para cada rango de filamentos hay que tener en cuenta que el numero de filas viene dado por el tamaño del dispositivo en el eje y y el numero de columnas por el tamaño del dispositivo en el eje x.
-num_filas = params.y_size
-num_columnas = params.x_size
-num_filamentos = ctes.num_filamentos
-
-filamentos_ranges, _, centros_CF = utils.generar_configuracion_filamentos(
-    eje_x=num_filas,
-    eje_y=num_columnas,
-    num_filamentos=num_filamentos,
-)
-CF_creado = np.full(len(filamentos_ranges), False, dtype=bool)
-
-print(
-    f"\nSimulación {sim_parmtrs[num_simulation]['num_trampas']} trampas, {num_filamentos} filamentos. El rango de cada filamento es: {filamentos_ranges} el centro de cada filamento es: {centros_CF} y el estado de creación de cada filamento es: {CF_creado}\n"
-)
-
-CF_creado = np.full(len(filamentos_ranges), False, dtype=bool)
-
-final_state_pp_set = Simulation.PP_set(
-    num_simulation=num_simulation + 1,
-    params=params,
-    sim_ctes=ctes,
-    CF_ranges=filamentos_ranges,
-    CF_creado=CF_creado,
-    CF_centros=centros_CF,
-)
-
-final_state_sp_set = Simulation.SP_set(
-    final_state_pp_set=final_state_pp_set,
-    num_simulation=num_simulation + 1,
-    CF_ranges=filamentos_ranges,
-)
-
-final_state_pp_reset = Simulation.PP_reset(
-    final_state_sp_set=final_state_sp_set,
-    num_simulation=num_simulation + 1,
-    CF_ranges=filamentos_ranges,
-)
-
-final_state_sp_reset = Simulation.SP_reset(
-    final_state_pp_reset=final_state_pp_reset,
-    num_simulation=num_simulation + 1,
-    CF_ranges=filamentos_ranges,
-)
-print("Resultados de la destruccion de filamentos:\n")
-for key, valor in final_state_sp_reset["roturas_dict"].items():
-    print(f"Filamento destruido {key}:")
-    for campo, dato in valor.items():
-        print(f"  {campo}: {dato}")
-
-desplazamiento = {
-    "a": (0.025, 1.0),  # derecha, misma altura
-    "b": (+0.005, 0.27),  # izquierda, un poco arriba
-    "c": (0.02, 0.35),  # derecha, un poco abajo
-    "d": (0.02, 1.0),  # izquierda, misma altura
-    "e": (-0.11, 0.66),  # izquierda, misma altura
-    "f": (0.025, 0.25),  # izquierda, un poco abajo
-    "g": (-0.12, 1),  # derecha, un poco arriba
-}
-
-Simulation.simulation_IV(
-    num_simulation=num_simulation + 1,
-    figures_path=Path.cwd() / "Results" / f"Simulation_{num_simulation}" / "Figures",
-    simulation_path=Path.cwd() / "Results" / f"Simulation_{num_simulation + 1}",
-    desplazamiento=desplazamiento,
-    voltaje_percolacion=final_state_pp_set["voltaje_percolacion"],
-    roturas_dict=final_state_sp_reset["roturas_dict"],
-)
+if __name__ == "__main__":
+    sys.exit(_main(_to_argv(sys.argv[1:])))

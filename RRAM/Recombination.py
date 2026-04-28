@@ -1,6 +1,9 @@
 import numpy as np
 import math
 import sys
+import logging
+
+logger = logging.getLogger(__name__)
 
 k_b_ev = 8.617333262145e-5  # Boltzmann constant in eV/K
 
@@ -180,7 +183,7 @@ def move_oxygen_ions(
         oxygen_velocity_fisica = 2 * cte_red * vibration_frequency * (senoh * exp_velocity)
 
     except OverflowError as Overflow_exception:
-        print(f"\n Error en el cálculo de la velocidad: {Overflow_exception}")
+        logger.info(f"\n Error en el cálculo de la velocidad: {Overflow_exception}")
         sys.exit(1)
 
     # =========================================================================

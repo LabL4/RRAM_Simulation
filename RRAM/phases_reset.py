@@ -14,6 +14,9 @@ from . import (
 )
 from .filament_tracking import procesar_filamentos_destruidos
 from .state_updates import update_state_recombinate
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def PP_reset(
@@ -80,13 +83,13 @@ def PP_reset(
         float(sim_ctes.voltaje_gen_oxigeno_pp_1): 3e-07,
     }
 
-    print("La configuración de generación de oxígeno en la pp reset es:")
+    logger.info('La configuración de generación de oxígeno en la pp reset es:')
     for key, value in oxygen_config.items():
-        print(f"  - {key} V: {value} oxígenos")
+        logger.info(f"  - {key} V: {value} oxígenos")
 
-        print("La configuración de velocidades de oxígeno en la pp reset es:")
+        logger.info('La configuración de velocidades de oxígeno en la pp reset es:')
     for key, value in velocity_thresholds.items():
-        print(f"  - {key} V: {value} m/s")
+        logger.info(f"  - {key} V: {value} m/s")
 
     CF_destruido = np.full(len(CF_ranges), False, dtype=bool)
     all_df_destruidos = False
@@ -98,12 +101,12 @@ def PP_reset(
         -(params.voltaje_final_reset + params.paso_potencial_reset),
         -params.paso_potencial_reset,
     )
-    print("El paso de potencial para la parte de set es:", params.paso_potencial_reset, "\n")
+    logger.info(f"El paso de potencial para la parte de set es: {params.paso_potencial_reset} ")
 
     CF_destruido_index = 1
     roturas_dict = {}
 
-    print(f"Simulacion {num_simulation} - primera parte del reset")
+    logger.info(f"Simulacion {num_simulation} - primera parte del reset")
 
     # Ciclo para la primera parte del reset
     for k in range(0, params.num_pasos + 1):
@@ -279,7 +282,7 @@ def PP_reset(
         headers={"datos_simulacion": "Tiempo [s],Voltaje [V],Intensidad [A]"},
         datos_sim=data_pp_reset,
     )
-    print(f"La temperatura final alcanzada en el reset es: {temperatura} K\n")
+    logger.info(f"La temperatura final alcanzada en el reset es: {temperatura} K")
     np.save(rutas["simulation_path"] / f"Final_state_pp_reset_{num_simulation}.npz", actual_state)
 
     if sum(CF_destruido) < len(CF_ranges):
@@ -348,7 +351,7 @@ def SP_reset(
         # ValueError explicativo en lugar de NameError.
         temperatura_anterior = temperatura
 
-    print("Lol voltaje de rotura de pp reset son: ", voltage_CF_destruido)
+    logger.info(f"Lol voltaje de rotura de pp reset son:  {voltage_CF_destruido}")
 
     rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="reset")
 
@@ -360,15 +363,15 @@ def SP_reset(
     oxygen_config = {float(sim_ctes.voltaje_gen_oxigeno_sp): int(sim_ctes.num_oxigenos_sp_reset)}
     velocity_thresholds = {float(sim_ctes.voltaje_gen_oxigeno_sp): 5.2e-07}
 
-    print("La configuración de generación de oxígeno en la sp reset es:")
+    logger.info('La configuración de generación de oxígeno en la sp reset es:')
     for key, value in oxygen_config.items():
-        print(f"  - {key} V: {value} oxígenos")
+        logger.info(f"  - {key} V: {value} oxígenos")
 
-    print("La configuración de velocidades de oxígeno en la sp reset es:")
+    logger.info('La configuración de velocidades de oxígeno en la sp reset es:')
     for key, value in velocity_thresholds.items():
-        print(f"  - {key} V: {value} m/s")
+        logger.info(f"  - {key} V: {value} m/s")
 
-    print("Los filamentos destruidos al inicio del SP reset son: ", CF_destruido)
+    logger.info(f"Los filamentos destruidos al inicio del SP reset son:  {CF_destruido}")
 
     E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
     vector_ddp = np.arange(
@@ -376,9 +379,9 @@ def SP_reset(
         0,
         params.paso_potencial_reset,
     )
-    print("El paso de potencial para la parte de set es:", params.paso_potencial_reset, "\n")
+    logger.info(f"El paso de potencial para la parte de set es: {params.paso_potencial_reset} ")
 
-    print(f"\nSimulacion {num_simulation} - segunda parte del reset\n")
+    logger.info(f"\nSimulacion {num_simulation} - segunda parte del reset")
 
     # Ciclo para la primera parte del reset
     for k in range(0, params.num_pasos):
@@ -568,7 +571,7 @@ def SP_reset(
 
     np.save(rutas["simulation_path"] / f"Final_state_sp_reset_{num_simulation}.npz", actual_state)
 
-    print(f"\nSimulación {num_simulation} finalizada correctamente.\n")
+    logger.info(f"\nSimulación {num_simulation} finalizada correctamente.")
 
     # Guardo todas las variables del estado final del PP set para usarlas en el PS set
     final_state_sp_reset = {

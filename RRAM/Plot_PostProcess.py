@@ -4,6 +4,9 @@ import numpy as np
 
 from matplotlib.colors import LinearSegmentedColormap
 from typing import Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Varias funciones para representar los datos obtenidos de la simulación
 
@@ -94,7 +97,7 @@ def Plot_paneles(
     num_plots = min(len(col_indices_x), len(col_indices_y), max_plots)
 
     if num_plots == 0:
-        print("No hay datos suficientes para graficar.")
+        logger.info('No hay datos suficientes para graficar.')
         return
 
     # Leer los datos desde el archivo CSV
@@ -190,9 +193,9 @@ def plot_DifAxes(
     # Extraigo las variables dependientes
     y2 = data.iloc[:, col_indices_y[1]]
 
-    print(data.columns[col_indices_x])
-    print(data.columns[col_indices_y[0]])
-    print(data.columns[col_indices_y[1]])
+    logger.info(data.columns[col_indices_x])
+    logger.info(data.columns[col_indices_y[0]])
+    logger.info(data.columns[col_indices_y[1]])
 
     fig, axes = plt.subplots()
     config_ax(axes)
@@ -295,8 +298,8 @@ def plot_simple(
     # Extraigo las variables dependientes
     y1 = data.iloc[:, col_indices_y]
 
-    print(data.columns[col_indices_x])
-    print(data.columns[col_indices_y])
+    logger.info(data.columns[col_indices_x])
+    logger.info(data.columns[col_indices_y])
 
     fig, axes = plt.subplots()
     config_ax(axes)

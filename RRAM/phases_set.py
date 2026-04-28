@@ -22,6 +22,9 @@ from .filament_tracking import (
 )
 from .parameters import SimulationParameters
 from .state_updates import update_state_generation
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def PP_set(
@@ -31,12 +34,14 @@ def PP_set(
     CF_ranges: List[tuple],
     CF_creado: np.ndarray,
     CF_centros: List[int] | None = None,
+    actual_state: np.ndarray | None = None,
 ):
     """
     Executes the first part (PP) of the simulation set process for a resistive random-access memory (RRAM) device.
     This function simulates the physical processes involved in the formation of conductive filaments (CFs)
     in an RRAM device during the set operation. It initializes the simulation environment, updates the
     state of the system, and records the results at each simulation step.
+
     Args:
         num_simulation (int): The simulation number (used for naming and saving results).
         params (SimulationParameters): Object containing simulation parameters such as device size,
@@ -45,19 +50,20 @@ def PP_set(
             factor of generation, and material properties.
         CF_ranges (List[tuple]): List of tuples defining the ranges for conductive filaments.
         CF_creado (np.ndarray): Boolean array indicating whether each conductive filament has been created.
+        CF_centros (List[int] | None): Centro vertical de cada filamento esperado.
+        actual_state (np.ndarray | None): Estado inicial precargado. Si es None,
+            se carga desde `Init_data/init_state_{num_simulation - 1}` por
+            compatibilidad hacia atrás. La nueva arquitectura init→exec→plot
+            siempre debería pasarlo explícito.
+
     Raises:
         exceptions.MaxVacantesException: Raised if the maximum number of vacancies is exceeded.
         exceptions.NoPercolationException: Raised if the system does not percolate.
         exceptions.HighPercolationVoltageException: Raised if the percolation voltage is too high.
         exceptions.NullResistanceException: Raised if the resistance becomes null during the simulation.
-    Notes:
-        - The function creates directories for saving simulation results and figures.
-        - It uses various helper functions and classes for tasks such as representing the state,
-          solving currents, and calculating probabilities.
-        - The simulation stops early if certain conditions are met, such as exceeding the maximum
-          number of vacancies or reaching the final set voltage.
+
     Returns:
-        None
+        dict: Estado final del PP set con todas las variables necesarias para SP_set.
     """
     np.set_printoptions(threshold=sys.maxsize)
     # Declaro todas las variables que voy a usar exclusivamente en la primera parte (PP) del set.
@@ -67,8 +73,11 @@ def PP_set(
     rutas["figures_path"].mkdir(parents=True, exist_ok=True)
     rutas["data_simulation_path"].mkdir(parents=True, exist_ok=True)
 
-    # Cargo el estado inicial de configuración
-    actual_state = utils.cargar_estado(Path.cwd() / f"Init_data/init_state_{num_simulation - 1}")
+    # Cargo el estado inicial: prioridad al argumento explícito, fallback al disco.
+    if actual_state is None:
+        actual_state = utils.cargar_estado(Path.cwd() / f"Init_data/init_state_{num_simulation - 1}")
+    else:
+        actual_state = actual_state.copy()
 
     sistema_percola = False
     total_vacantes_pp_set = False
@@ -81,16 +90,11 @@ def PP_set(
     temperatura_anterior = params.init_temp
     pendiente_temperatura = sim_ctes.pendiente_temperatura
 
-    print(
-        "Los valores de factor vecinos y factor libre son:",
-        sim_ctes.factor_vecinos_pp_set,
-        "y",
-        sim_ctes.factor_libre_pp_set,
-        "\n",
-    )
+    logger.info(f"Los valores de factor vecinos y factor libre son: {sim_ctes.factor_vecinos_pp_set} y {sim_ctes.factor_libre_pp_set} ")
 
     max_vancantes_pp_set = int(sim_ctes.ocupacion_max_pp_set * params.num_max_vacantes)
     voltage_CF_creado = np.full(len(CF_ranges), 0.0)
+    creaciones_dict: dict = {}  # Mismo formato que roturas_dict
     filamentos_previos = 0
 
     # Inicializo vectores donde almaceno datos y condiciones iniciales
@@ -98,7 +102,7 @@ def PP_set(
     current = 0.0
     E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
     vector_ddp = np.arange(0.000, params.voltaje_final_reset + params.paso_potencial_set, params.paso_potencial_set)
-    print("El paso de potencial para la parte de set es:", params.paso_potencial_set, "\n")
+    logger.info(f"El paso de potencial para la parte de set es: {params.paso_potencial_set} ")
 
     centros_calculados = CF_centros
 
@@ -109,7 +113,7 @@ def PP_set(
     resistencia_vector = np.zeros((params.num_pasos, num_columnas), dtype=np.float64)
     num_vacantes_total = np.zeros((params.num_pasos, num_columnas), dtype=np.float64)
 
-    print(f"El grosor de los filamentos es de {sim_ctes.grosor_filamento} filas\n")
+    logger.info(f"El grosor de los filamentos es de {sim_ctes.grosor_filamento} filas")
 
     # creo la mascara para limitar la generacion a solo la zona del esperado filamento
     limit_CF_witdh_mask_generation = Generation.create_custom_mask(
@@ -121,9 +125,16 @@ def PP_set(
     probabilidad_matrix = None
     matriz_para_plot_muro = None
 
-    print("El valor de gamma es:", sim_ctes.gamma, "\n")
+    # `filas_intermedias` y `dist_casillas` solo se calculan cuando hay >=2
+    # filamentos (muros térmicos entre filamentos). Para 1 filamento se
+    # quedan en None y el bloque de muros térmicos se salta.
+    filas_intermedias = None
+    dist_casillas = None
+    mis_perfiles_extraidos = None
 
-    print(f"Simulacion {num_simulation} - Primera parte del set\n")
+    logger.info(f"El valor de gamma es: {sim_ctes.gamma} ")
+
+    logger.info(f"Simulacion {num_simulation} - Primera parte del set")
     all_CFs_created = False
 
     for k in range(0, params.num_pasos + 1):
@@ -161,13 +172,7 @@ def PP_set(
                 k - 1
             )  # Le quitamos un paso porque se ha superado el voltaje de ruptura
 
-            print(
-                "Voltaje final set",
-                voltaje_max_set,
-                "en el tiempo",
-                tiempo_pp_set,
-                "\n",
-            )
+            logger.info(f"Voltaje final set {voltaje_max_set} en el tiempo {tiempo_pp_set} ")
             # Elimino las filas sobrantes del array de datos y las lleno de nans para eliminarlas luego
             data_pp_set[k - 1 :] = np.nan  # Añadir valores nulos a partir de la fila k
             data_pp_set = data_pp_set[~np.isnan(data_pp_set).any(axis=1)]  # Eliminar filas con valores nulos
@@ -179,17 +184,7 @@ def PP_set(
             if sistema_percola is False:
                 voltaje_percolacion = voltage  # Guardo el voltaje de percolación
                 ocupacion_percola = np.sum(actual_state)
-                print(
-                    "\nEl sistema ha percolado en la iteración:",
-                    k,
-                    " que corresponde con el voltaje:",
-                    round(voltaje_percolacion, 5),
-                    " con una ocupación del:",
-                    round((np.sum(actual_state) / (params.num_max_vacantes)), 4) * 100,
-                    "que corresponde con un numero de vacantes de:",
-                    int(np.sum(actual_state)),
-                    "\n",
-                )
+                logger.info(f"\nEl sistema ha percolado en la iteración: {k}  que corresponde con el voltaje: {round(voltaje_percolacion, 5)}  con una ocupación del: {round((np.sum(actual_state) / (params.num_max_vacantes)), 4) * 100} que corresponde con un numero de vacantes de: {int(np.sum(actual_state))} ")
 
                 if voltaje_percolacion >= sim_ctes.lim_voltage_percolacion:
                     # Si el voltaje de percolación es demasiado alto no va a coincidir con los datos experimentales, y no merece la pena seguir con la simulación
@@ -216,6 +211,8 @@ def PP_set(
                     voltage_CF_creado=voltage_CF_creado,
                     actual_state=actual_state,
                     num_simulation=num_simulation,
+                    creaciones_dict=creaciones_dict,
+                    etapa="pp_set",
                 )
 
             filamentos_actuales = sum(CF_creado)
@@ -281,33 +278,47 @@ def PP_set(
                 # =====================================================================
                 # 5. CÁLCULO DE LOS PERFILES PARA LOS MUROS Y COLOCACIÓN
                 # =====================================================================
-                perfiles_muros_calculados = Temperature.calcular_perfiles_muro(
-                    perfiles_filamentos=mis_perfiles_extraidos,
-                    distancias_casillas=dist_casillas,
-                    pendiente_temperatura=pendiente_temperatura,
-                    atom_size=params.atom_size,
-                    T_ambient=params.init_temp,
-                )
+                # Solo aplica con >=2 filamentos: hay paredes intermedias.
+                # Con 1 filamento, filas_intermedias y dist_casillas siguen None
+                # tras `actualizar_parametros_por_filamento`; saltamos los muros.
+                if filas_intermedias is not None and dist_casillas is not None:
+                    perfiles_muros_calculados = Temperature.calcular_perfiles_muro(
+                        perfiles_filamentos=mis_perfiles_extraidos,
+                        distancias_casillas=dist_casillas,
+                        pendiente_temperatura=pendiente_temperatura,
+                        atom_size=params.atom_size,
+                        T_ambient=params.init_temp,
+                    )
 
-                matriz_temperaturas_fijas = Temperature.colocar_muro_termico(
-                    matriz_molde=actual_state_clean_CF,
-                    filas_intermedias=filas_intermedias,
-                    perfiles_muros_calculados=perfiles_muros_calculados,
-                )
+                    matriz_temperaturas_fijas = Temperature.colocar_muro_termico(
+                        matriz_molde=actual_state_clean_CF,
+                        filas_intermedias=filas_intermedias,
+                        perfiles_muros_calculados=perfiles_muros_calculados,
+                    )
 
-                # Añadimos columnas de ceros (donde no hay muro) en las posiciones de los electrodos
-                Ny = matriz_temperaturas_fijas.shape[0]
-                columna_ceros = np.zeros((Ny, 1))
-                matriz_temperaturas_fijas_final = np.hstack([columna_ceros, matriz_temperaturas_fijas, columna_ceros])
+                    # Añadimos columnas de ceros (donde no hay muro) en las posiciones de los electrodos
+                    Ny = matriz_temperaturas_fijas.shape[0]
+                    columna_ceros = np.zeros((Ny, 1))
+                    matriz_temperaturas_fijas_final = np.hstack([columna_ceros, matriz_temperaturas_fijas, columna_ceros])
 
-                temperatura = Temperature.solve_thermal_state(
-                    types_map=materials_map,
-                    Q_map=Q_source_map,
-                    thermal_props=sim_ctes.propiedades_termicas,
-                    atom_size=params.atom_size,
-                    T_ambient=params.init_temp,
-                    matriz_muros=matriz_temperaturas_fijas_final,
-                )
+                    temperatura = Temperature.solve_thermal_state(
+                        types_map=materials_map,
+                        Q_map=Q_source_map,
+                        thermal_props=sim_ctes.propiedades_termicas,
+                        atom_size=params.atom_size,
+                        T_ambient=params.init_temp,
+                        matriz_muros=matriz_temperaturas_fijas_final,
+                    )
+                else:
+                    # Caso 1 filamento (sin muros): resolver térmica sin matriz_muros.
+                    temperatura = Temperature.solve_thermal_state(
+                        types_map=materials_map,
+                        Q_map=Q_source_map,
+                        thermal_props=sim_ctes.propiedades_termicas,
+                        atom_size=params.atom_size,
+                        T_ambient=params.init_temp,
+                        matriz_muros=None,
+                    )
 
                 # Actualizo la temperatura anterior para el siguiente paso, NO guardo las columnas primera y ultima ya q corresponden a los electrodos
                 temperatura_anterior = temperatura[:, 1:-1]
@@ -356,9 +367,7 @@ def PP_set(
             )
 
         elif not total_vacantes_pp_set:
-            print(
-                f"\nSe ha alcanzado la ocupación máxima del {sim_ctes.ocupacion_max_pp_set * 100}% en la primera parte del set en el paso {k}.\n"
-            )
+            logger.info(f"\nSe ha alcanzado la ocupación máxima del {sim_ctes.ocupacion_max_pp_set * 100}% en la primera parte del set en el paso {k}.")
             total_vacantes_pp_set = True
 
         # region GUARDAR ESTADO
@@ -396,7 +405,7 @@ def PP_set(
             # endregion
 
     # Muestro el valor de temperatura más alto alcanzado en la simulación
-    print(f"\nLa temperatura máxima alcanzada en la simulación ha sido de: {round(np.max(temperatura), 4)} K\n")
+    logger.info(f"\nLa temperatura máxima alcanzada en la simulación ha sido de: {round(np.max(temperatura), 4)} K")
 
     # Si no se fomran los flamentos esperados se decarta la simulación
     if filamentos_actuales < len(CF_ranges):
@@ -446,6 +455,7 @@ def PP_set(
         "ocupacion_percola": ocupacion_percola,
         "intensidad_final": current,
         "CF_centros": CF_centros,
+        "creaciones_dict": creaciones_dict,
     }
 
     return final_state_pp_set
@@ -495,7 +505,7 @@ def SP_set(
 
     # Extraigo las variables del estado final del PP set
     actual_state = final_state_pp_set["actual_state"]
-    print("El número inicial de vacantes es:", np.sum(actual_state))
+    logger.info(f"El número inicial de vacantes es: {np.sum(actual_state)}")
 
     k_max = final_state_pp_set["k_maxima"] - 1
     sistema_percola = final_state_pp_set["sistema_percola"]
@@ -509,8 +519,8 @@ def SP_set(
     CF_centros = final_state_pp_set["CF_centros"]
     cf_clean_matrix = final_state_pp_set["cf_clean_matrix"]
 
-    print("El numero de vacantes al inicio del SP set es:", np.sum(actual_state))
-    print("El numero de vacantes al percolar fue :", max_vancantes_pp_set)
+    logger.info(f"El numero de vacantes al inicio del SP set es: {np.sum(actual_state)}")
+    logger.info(f"El numero de vacantes al percolar fue : {max_vancantes_pp_set}")
 
     ocupacion_max_sp_set = 0 + 0  # 0.35
     max_vancantes_sp_set = max_vancantes_pp_set + int(ocupacion_max_sp_set * params.num_max_vacantes)
@@ -523,7 +533,7 @@ def SP_set(
     # Elimino las columnas 0 y ultima de la matriz de temperatura porque corresponden a los electrodos
     temperatura_anterior = final_state_pp_set["Temperatura_final"][:, 1:-1]
 
-    print("El paso de potencial para sp set es:", params.paso_potencial_set, "\n")
+    logger.info(f"El paso de potencial para sp set es: {params.paso_potencial_set} ")
     vector_ddp = np.arange(voltaje_max_set, 0.000, -params.paso_potencial_set)
 
     E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
@@ -534,9 +544,9 @@ def SP_set(
 
     filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(CF_centros)
 
-    print("Los centros calculados de los filamentos son:", CF_centros)
-    print("Las filas intermedias calculadas son:", filas_intermedias)
-    print("La distancia entre casillas es:", dist_casillas, "\n")
+    logger.info(f"Los centros calculados de los filamentos son: {CF_centros}")
+    logger.info(f"Las filas intermedias calculadas son: {filas_intermedias}")
+    logger.info(f"La distancia entre casillas es: {dist_casillas} ")
 
     actual_state_clean_CF, _ = CurrentSolver.Clean_state_matrix(actual_state)
 
@@ -549,7 +559,7 @@ def SP_set(
     #     CF_ranges,
     # )
 
-    print(f"Simulacion {num_simulation} - Segunda parte del set\n")
+    logger.info(f"Simulacion {num_simulation} - Segunda parte del set")
     for k in range(0, k_max):
         total_vacantes = np.sum(actual_state)
 
@@ -733,9 +743,7 @@ def SP_set(
             )
 
         elif not total_vacantes_sp_set:
-            print(
-                f"Se ha alcanzado la ocupación máxima del {ocupacion_max_sp_set * 100}% en la primera segunda del set en el paso {k}.\n"
-            )
+            logger.info(f"Se ha alcanzado la ocupación máxima del {ocupacion_max_sp_set * 100}% en la primera segunda del set en el paso {k}.")
             total_vacantes_sp_set = True
 
         # Guardo los datos de la simulación
@@ -763,6 +771,6 @@ def SP_set(
 
     np.save(rutas["simulation_path"] / f"Final_state_pp_set_{num_simulation}.npz", actual_state)
 
-    print("Simulación del set finalizada correctamente.\n")
+    logger.info('Simulación del set finalizada correctamente.')
 
     return final_state_sp_set

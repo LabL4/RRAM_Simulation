@@ -6,6 +6,9 @@ import numpy as np
 
 from . import Representate, Temperature
 from .constants_simulation import SimulationConstants
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def procesar_filamentos_creados(
@@ -17,6 +20,8 @@ def procesar_filamentos_creados(
     voltage_CF_creado,
     actual_state,
     num_simulation,
+    creaciones_dict: dict | None = None,
+    etapa: str = "pp_set",
     plot_filamento: bool = False,
 ):
     """
@@ -24,15 +29,20 @@ def procesar_filamentos_creados(
     imágenes correspondientes, además guarda el estado actual en PKL.
 
     Args:
-        filamentos (list): Lista de filamentos en el estado actual.
+        existentes (list[bool]): Lista booleana indicando existencia actual de filamentos.
         CF_creado (np.ndarray): Vector booleano que indica si cada filamento fue creado.
         voltage (float): Voltaje actual.
         voltage_CF_creado (np.ndarray): Array para registrar voltajes de creación.
         actual_state (np.ndarray): Estado actual del sistema.
         num_simulation (int): Número de simulación.
+        creaciones_dict (dict | None): Diccionario donde se acumulan los eventos
+            de creación con el mismo formato que `roturas_dict`. Si es None se
+            ignora (compatibilidad hacia atrás).
+        etapa (str): Etapa donde se ha producido la creación ('pp_set', 'sp_set').
+        plot_filamento (bool): Si True, guarda imagen del estado.
 
     Returns:
-        int: Índice actualizado para el filamento.
+        None
     """
 
     filamentos_nuevos = [i for i, v in enumerate(existentes) if v and not CF_creado[i]]
@@ -40,7 +50,16 @@ def procesar_filamentos_creados(
     for i in filamentos_nuevos:
         CF_creado[i] = True
         voltage_CF_creado[i] = voltage
-        print(f"El filamento {i + 1} se ha creado en el voltaje {round(voltage, 4)} (V)")
+        logger.info(f"El filamento {i + 1} se ha creado en el voltaje {round(voltage, 4)} (V)")
+
+        # Registrar evento en el dict global de creaciones (mismo patrón que roturas_dict)
+        if creaciones_dict is not None:
+            j = len(creaciones_dict)  # siguiente índice disponible
+            creaciones_dict[j] = {
+                "filamento": i + 1,
+                "voltaje": float(voltage),
+                "etapa": etapa,
+            }
 
         if plot_filamento:
             nombre_img = imagen_path / f"Filamento_{i + 1}_creado_set_{num_simulation}.png"
@@ -95,7 +114,7 @@ def procesar_filamentos_destruidos(
                 "voltaje": voltage,
                 "etapa": etapa,
             }
-            print(f"\nEl filamento {i + 1} se ha roto en el voltaje {round(voltage, 4)} (V)")
+            logger.info(f"\nEl filamento {i + 1} se ha roto en el voltaje {round(voltage, 4)} (V)")
 
         if plot_filamento:
             nombre_img = imagen_path / f"Filamento_{i + 1}_roto_reset_{num_simulation}.png"
@@ -126,7 +145,7 @@ def actualizar_parametros_por_filamento(
     # 1. Caso para un solo filamento
     if num_esperados == 1:
         if filamentos_actuales == 1:
-            print("Todos los filamentos creados.")
+            logger.info('Todos los filamentos creados.')
             sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 5)
             sim_ctes = sim_ctes.update_generation_energy(1.75)
             all_CFs_created = True
@@ -134,11 +153,11 @@ def actualizar_parametros_por_filamento(
     # 2. Caso para dos filamentos
     elif num_esperados == 2:
         if filamentos_actuales == 1:
-            print("Se ha formado el primer filamento de dos.")
+            logger.info('Se ha formado el primer filamento de dos.')
             sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 5)
 
         elif filamentos_actuales == 2:
-            print("Se ha formado el segundo filamento de dos.")
+            logger.info('Se ha formado el segundo filamento de dos.')
             all_CFs_created = True
             filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(CF_centros)
 
@@ -149,12 +168,12 @@ def actualizar_parametros_por_filamento(
             sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma - 1)
 
         if filamentos_actuales == num_esperados:
-            print("Todos los filamentos creados.")
+            logger.info('Todos los filamentos creados.')
             all_CFs_created = True
 
     # Logs comunes
-    print(f"Filamentos: {filamentos_actuales}/{num_esperados}. Gamma: {sim_ctes.gamma}")
+    logger.info(f"Filamentos: {filamentos_actuales}/{num_esperados}. Gamma: {sim_ctes.gamma}")
     if all_CFs_created:
-        print(f"Todos los filamentos esperados se han creado: {all_CFs_created}")
+        logger.info(f"Todos los filamentos esperados se han creado: {all_CFs_created}")
 
     return sim_ctes, all_CFs_created, filas_intermedias, dist_casillas

@@ -2,6 +2,9 @@
 
 import time
 from functools import wraps
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def medir_tiempo(func):
@@ -11,7 +14,7 @@ def medir_tiempo(func):
         inicio = time.time()
         resultado = func(*args, **kwargs)
         fin = time.time()
-        print(f"Función '{func.__name__}' ejecutada en {fin - inicio:.6f} segundos\n")
+        logger.info(f"Función '{func.__name__}' ejecutada en {fin - inicio:.6f} segundos")
         return resultado
 
     return wrapper

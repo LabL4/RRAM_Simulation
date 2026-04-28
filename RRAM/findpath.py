@@ -6,6 +6,9 @@ from copy import deepcopy
 from scipy import sparse
 from numba import njit
 from collections import OrderedDict
+import logging
+
+logger = logging.getLogger(__name__)
 
 class Tree:
 
@@ -171,7 +174,7 @@ def vacancy_matrix_from_adj_matrix(adj_list: list[int], n_rows: int, n_cols: int
 def pretty_print_tree(tree: Tree):
 
     def pretty_print_tree_aux(tree: Tree, level: int):
-        print(" " * level + str(tree.node) + " (" + str(tree.weight) + ")")
+        logger.info(" " * level + str(tree.node) + " (" + str(tree.weight) + ")")
         for child in tree.children:
             pretty_print_tree_aux(child, level + 1)
 

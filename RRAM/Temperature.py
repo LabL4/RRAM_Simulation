@@ -4,6 +4,9 @@ from collections import Counter
 import matplotlib.pyplot as plt
 from typing import Optional
 import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def Temperature_Joule(potencial: float, intensidad: float, T_0: float, r_termica: float) -> float:
@@ -600,7 +603,7 @@ def extraer_perfiles_filamentos(matriz_temperaturas: np.ndarray, filas_centros: 
         if fila is None:
             # Añadimos None a la lista para mantener la correspondencia de índices
             perfiles.append(None)
-            print("Advertencia: Se detectó un filamento no formado (None). Perfil omitido.")
+            logger.info('Advertencia: Se detectó un filamento no formado (None). Perfil omitido.')
 
         # Caso B: La fila es un índice válido dentro de la matriz
         elif 0 <= fila < Ny:

@@ -3,6 +3,9 @@
 from RRAM import Representate
 import numpy as np
 import pickle
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class NoPercolationException(Exception):
@@ -70,7 +73,7 @@ class NullResistanceException(Exception):
         self.num_simulation = num_simulation + 1
         self.actual_state = actual_state
 
-        print("Null resistance matrix in ", self.filename)
+        logger.info(f"Null resistance matrix in  {self.filename}")
 
         # Guardar estado
         np.save(self.filename, self.actual_state)
@@ -124,7 +127,7 @@ class FilamentosNoDestruidosException(Exception):
         self.actual_state = actual_state
         self.figures_path = str(figures_path) + f"/state_not_all_CF_destroyed_{self.num_simulation}.png"
 
-        print(f"Se esperaba que se destruyeran {CF_esperados} y se han destruido {CF_destruidos}.")
+        logger.info(f"Se esperaba que se destruyeran {CF_esperados} y se han destruido {CF_destruidos}.")
 
         # Generar representación visual
         Representate.RepresentateState(self.actual_state, round(self.voltage, 3), self.figures_path)

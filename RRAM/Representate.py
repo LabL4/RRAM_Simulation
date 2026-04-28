@@ -99,6 +99,9 @@ def setup_plt(plt, latex=True, scaling=1):
 # setup_paper_plt(plt, latex=True, scaling=3)
 
 import matplotlib.pyplot as plt
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def guardar_figura(fig: Figure, ruta_base: str, extension: str, dpi: int = 300) -> None:
@@ -123,7 +126,7 @@ def guardar_figura(fig: Figure, ruta_base: str, extension: str, dpi: int = 300) 
             fig.savefig(f"{ruta_base}.svg", bbox_inches="tight", dpi=dpi)
         case _:
             # Caso por defecto si se introduce una extensión no contemplada
-            print(f"Advertencia: Formato '{formato}' no soportado. Guardando como .png")
+            logger.info(f"Advertencia: Formato '{formato}' no soportado. Guardando como .png")
             fig.savefig(f"{ruta_base}.png", bbox_inches="tight", dpi=dpi)
 
 
@@ -158,7 +161,7 @@ def RepresentateState(
     size_x_nm = device_size_x * atom_size * 1e9  # Convertir a nm ya que siempre se representa en nm
     size_y_nm = device_size_y * atom_size * 1e9  # Convertir a nm ya que siempre se representa en nm
 
-    print(f"Dimensiones del dispositivo: {size_x_nm:.2f} nm x {size_y_nm:.2f} nm")
+    logger.info(f"Dimensiones del dispositivo: {size_x_nm:.2f} nm x {size_y_nm:.2f} nm")
 
     # 1. MATRIZ
     ax.imshow(
@@ -453,7 +456,7 @@ def plot_IV(
             fig.savefig(f"{ruta_base}.svg", bbox_inches="tight", dpi=300)
         case _:
             # Caso por defecto si se introduce una extensión no contemplada
-            print(f"Advertencia: Formato '{extension_guardado}' no soportado. Guardando como .png")
+            logger.info(f"Advertencia: Formato '{extension_guardado}' no soportado. Guardando como .png")
             fig.savefig(f"{ruta_base}.png", bbox_inches="tight", dpi=300)
 
     # Cierre de la figura unificado para todos los casos (evita fugas de memoria)
@@ -593,7 +596,7 @@ def plot_IV_marcado(
             fig.savefig(f"{ruta_base}.svg", bbox_inches="tight", dpi=300)
         case _:
             # Caso por defecto si se introduce una extensión no contemplada
-            print(f"Advertencia: Formato '{extension_guardado}' no soportado. Guardando como .png")
+            logger.info(f"Advertencia: Formato '{extension_guardado}' no soportado. Guardando como .png")
             fig.savefig(f"{ruta_base}.png", bbox_inches="tight", dpi=300)
 
     # Cierre de la figura unificado para todos los casos (evita fugas de memoria)
