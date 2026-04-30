@@ -404,6 +404,20 @@ def PP_set(
             )
             # endregion
 
+    # Guardo el estado final si el último k no cayó en múltiplo de num_pasos_guardar_estado
+    if k % num_pasos_guardar_estado != 0:
+        utils.guardar_estado_intermedio(
+            ruta_destino=rutas["data_simulation_path"],
+            etapa="pp_set",
+            num_simulation=num_simulation,
+            k=k,
+            actual_state=actual_state,
+            cf_clean_matrix=locals().get("cf_clean_matrix"),
+            temperatura=locals().get("temperatura"),
+            probabilidad_matrix=locals().get("probabilidad_matrix"),
+            matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
+        )
+
     # Muestro el valor de temperatura más alto alcanzado en la simulación
     logger.info(f"\nLa temperatura máxima alcanzada en la simulación ha sido de: {round(np.max(temperatura), 4)} K")
 
@@ -750,6 +764,19 @@ def SP_set(
         data_sp_set[k] = np.array([simulation_time + tiempo_pp_set, voltage, current])
 
     tiempo_sp_set = simulation_time + tiempo_pp_set
+
+    # Guardo el estado final si el último k no cayó en múltiplo de num_pasos_guardar_estado
+    if k % num_pasos_guardar_estado != 0:
+        utils.guardar_estado_intermedio(
+            ruta_destino=rutas["data_simulation_path"],
+            etapa="sp_set",
+            num_simulation=num_simulation,
+            k=k,
+            actual_state=actual_state,
+            cf_clean_matrix=locals().get("cf_clean_matrix"),
+            temperatura=locals().get("temperatura"),
+            matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
+        )
 
     # Guardo los datos de la simulación
     utils.guardar_datos(

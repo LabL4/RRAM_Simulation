@@ -276,6 +276,19 @@ def PP_reset(
                 temperatura=locals().get("temperatura"),
             )
 
+    # Guardo el estado final si el último k no cayó en múltiplo de num_pasos_guardar_estado
+    if k % num_pasos_guardar_estado != 0:
+        utils.guardar_estado_intermedio(
+            ruta_destino=rutas["data_simulation_path"],
+            etapa="pp_reset",
+            num_simulation=num_simulation,
+            k=k,
+            actual_state=actual_state,
+            cf_clean_matrix=locals().get("cf_clean_matrix"),
+            temperatura=locals().get("temperatura"),
+            matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
+        )
+
     # Guardo los datos de la simulacion
     utils.guardar_datos(
         save_path_data=rutas["simulation_path"] / f"Data_pp_reset_{num_simulation}",
@@ -557,6 +570,19 @@ def SP_reset(
                 cf_clean_matrix=locals().get("cf_clean_matrix"),  # Si no existe, devuelve None
                 temperatura=locals().get("temperatura"),
             )
+
+    # Guardo el estado final si el último k no cayó en múltiplo de num_pasos_guardar_estado
+    if k % num_pasos_guardar_estado != 0:
+        utils.guardar_estado_intermedio(
+            ruta_destino=rutas["data_simulation_path"],
+            etapa="sp_reset",
+            num_simulation=num_simulation,
+            k=k,
+            actual_state=actual_state,
+            cf_clean_matrix=locals().get("cf_clean_matrix"),
+            temperatura=locals().get("temperatura"),
+            matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
+        )
 
     # Guardo los datos de la simulación
     save_path_data = rutas["simulation_path"] / f"Data_sp_reset_{num_simulation}.txt"

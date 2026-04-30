@@ -608,12 +608,21 @@ def plot_thermal_state(T_map, types_map, voltage, num_levels=10, atom_size: floa
     Visualiza el mapa de temperatura con superposición de materiales e isotermas alineadas.
 
     Argumentos:
-    - T_map: Matriz de temperaturas (resultado del solver).
+    - T_map: Dato de temperatura. Debe ser una matriz 2D (np.ndarray de ndim==2).
+             Si es escalar o 1D se descarta y la función retorna sin generar figura.
     - types_map: Matriz de materiales (ID 1: Filamento, ID 3: Electrodo).
-    - title: Título del gráfico.
+    - voltage: Voltaje aplicado (usado en el título).
     - num_levels: Cantidad de líneas de contorno para las isotermas.
-    - save_path: (Opcional) Ruta completa con nombre de archivo para guardar la imagen (ej: 'img/termico.png').
+    - save_path: (Opcional) Ruta completa con nombre de archivo para guardar la imagen.
     """
+
+    # Guardia: solo procesar si T_map es una matriz 2D con variación térmica real
+    if not isinstance(T_map, np.ndarray) or T_map.ndim < 2:
+        logger.debug("plot_thermal_state: T_map no es matriz 2D — salto.")
+        return
+    if np.ptp(T_map) == 0:
+        logger.debug("plot_thermal_state: T_map uniforme (sin gradiente) — salto isotermas.")
+        # Continúa pero sin isotermas (ver abajo)
 
     # 2. Aplicar los estilos globales ANTES de crear la figura
     setup_paper_plt(plt, latex=True, scaling=3)
@@ -642,19 +651,22 @@ def plot_thermal_state(T_map, types_map, voltage, num_levels=10, atom_size: floa
     overlay[types_map == 1] = [0.5, 0.5, 0.5, 0.4]  # Filamento: Gris claro
     ax.imshow(overlay, origin="lower", extent=extent, aspect="equal")
 
-    # 7. Capa de Isotermas
-    niveles = np.linspace(np.min(T_map), np.max(T_map), num_levels)
-    contours = ax.contour(
-        T_map,
-        levels=niveles,
-        colors="white",
-        linewidths=1.5,
-        alpha=1,
-        origin="lower",
-        extent=extent,
-    )
-    # Eliminado el fontsize=7 para que herede la proporción del documento
-    ax.clabel(contours, fontsize=18, inline=True, fmt="%d")
+    # 7. Capa de Isotermas (solo si hay gradiente real)
+    if np.ptp(T_map) > 0:
+        niveles = np.linspace(np.min(T_map), np.max(T_map), num_levels)
+        # Eliminar duplicados que puedan surgir por precisión numérica
+        niveles = np.unique(niveles)
+        if len(niveles) > 1:
+            contours = ax.contour(
+                T_map,
+                levels=niveles,
+                colors="white",
+                linewidths=1.5,
+                alpha=1,
+                origin="lower",
+                extent=extent,
+            )
+            ax.clabel(contours, fontsize=18, inline=True, fmt="%d")
 
     paso_ticks_x = 2 if size_x_nm <= 15 else (5 if size_x_nm <= 30 else 10)
     paso_ticks_y = 2 if size_y_nm <= 15 else (5 if size_y_nm <= 30 else 10)
