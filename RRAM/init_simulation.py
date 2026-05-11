@@ -12,18 +12,19 @@ Dos responsabilidades:
 
 from __future__ import annotations
 
-import logging
-import math
+from typing import List, Optional, Tuple
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Optional, Tuple
+import logging
+import math
+import ast
 
-import numpy as np
 import pandas as pd
+import numpy as np
 
-from . import Generation, utils
 from .constants_simulation import SimulationConstants
 from .parameters import SimulationParameters
+from . import Generation, utils
 
 logger = logging.getLogger(__name__)
 
@@ -46,32 +47,25 @@ class SimulationConfig:
 # 1. Pre-generación de estados iniciales (todas las simulaciones del CSV)
 # ---------------------------------------------------------------------------
 
+
 def build_initial_states(
     init_data_dir: Path | str = "Init_data",
     num_filamentos_para_pesos: int = 2,
 ) -> int:
-    """
-    Genera `init_state_{i}.npz` para cada fila del CSV de parámetros.
-
-    Args:
-        init_data_dir: Carpeta con `simulation_parameters.csv` (también destino).
-        num_filamentos_para_pesos: Nº de filamentos usado para repartir las
-            regiones de peso al sortear las trampas iniciales (no es el número
-            real de filamentos del ciclo, sino una heurística de distribución).
-
-    Returns:
-        Nº de estados iniciales generados.
-    """
     init_data_dir = Path(init_data_dir)
     archivo_params = init_data_dir / "simulation_parameters.csv"
     if not archivo_params.is_file():
         raise FileNotFoundError(
-            f"No se encuentra {archivo_params}. "
-            "Lanza ConfigManager.export_to_init_data() en el notebook primero."
+            f"No se encuentra {archivo_params}. Lanza ConfigManager.export_to_init_data() en el notebook primero."
         )
 
     df_params = pd.read_csv(archivo_params)
     num_simulations = len(df_params)
+
+    # Leer constantes para obtener grosor_filamento por simulación
+    archivo_ctes = init_data_dir / "simulation_constants.csv"
+    df_ctes = pd.read_csv(archivo_ctes) if archivo_ctes.is_file() else None
+
     logger.info(f"Construyendo estados iniciales para {num_simulations} simulaciones...")
 
     for i, row in df_params.iterrows():
@@ -79,14 +73,27 @@ def build_initial_states(
         eje_y = int(math.ceil(row["device_size_x"] / row["atom_size"]))
         num_trampas = int(row["num_trampas"])
 
+        # Extraer grosor_filamento de las constantes si está disponible
+        grosor_filamento = None
+        if df_ctes is not None and i < len(df_ctes):
+            raw = df_ctes.iloc[i].get("grosor_filamento", None)
+            if raw is not None:
+                try:
+                    grosor_filamento = ast.literal_eval(str(raw).strip())
+                except (ValueError, SyntaxError):
+                    grosor_filamento = int(float(raw))
+
         f_ranges, regiones_pesos, _ = utils.generar_configuracion_filamentos(
-            eje_x, eje_y, num_filamentos=num_filamentos_para_pesos
+            eje_x,
+            eje_y,
+            num_filamentos=num_filamentos_para_pesos,
+            grosores_filamento=grosor_filamento,
         )
         init_state = Generation.initial_state_priv(eje_x, eje_y, num_trampas, regiones_pesos)
 
         logger.info(
             f"Simulación {i}: dispositivo=({eje_x},{eje_y}) "
-            f"trampas={num_trampas} ranges={f_ranges} regiones={regiones_pesos}"
+            f"trampas={num_trampas} ranges={f_ranges} grosor={grosor_filamento}"
         )
 
         out = init_data_dir / f"init_state_{i}.npz"
@@ -99,6 +106,7 @@ def build_initial_states(
 # ---------------------------------------------------------------------------
 # 2. Carga de la config de una simulación concreta
 # ---------------------------------------------------------------------------
+
 
 def load_simulation_config(
     num_simulation: int,

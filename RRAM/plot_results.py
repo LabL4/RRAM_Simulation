@@ -16,17 +16,17 @@ O vía CLI: `python -m RRAM plot 3`.
 
 from __future__ import annotations
 
-import json
-import logging
-import re
-from pathlib import Path
 from typing import Literal, Optional
+from pathlib import Path
+import logging
+import json
+import re
 
 import numpy as np
 
-from .iv_analysis import simulation_IV
 from .persistence import load_metadata, save_metadata
 from .run_cycle import DESPLAZAMIENTO_IV_DEFAULT
+from .iv_analysis import simulation_IV
 
 logger = logging.getLogger(__name__)
 
@@ -94,8 +94,7 @@ def plot_results(
     if skip_failed:
         if status != "completed":
             logger.warning(
-                f"Sim {num_simulation} no completada (status={status!r}). "
-                f"Salto plot. Causa: {error_msg or 'sin info'}"
+                f"Sim {num_simulation} no completada (status={status!r}). Salto plot. Causa: {error_msg or 'sin info'}"
             )
             return False
         if not meta.roturas_dict:
@@ -141,6 +140,7 @@ def plot_results(
 # Helpers privados
 # ---------------------------------------------------------------------------
 
+
 def _extraer_fase_y_paso(nombre: str) -> tuple[str, int] | None:
     """
     Extrae fase y paso del nombre de un archivo Estado.
@@ -156,9 +156,7 @@ def _extraer_fase_y_paso(nombre: str) -> tuple[str, int] | None:
     return m.group("fase"), int(m.group("paso"))
 
 
-def _cargar_voltaje_por_fase(
-    simulation_path: Path, num_simulation: int
-) -> dict[str, np.ndarray]:
+def _cargar_voltaje_por_fase(simulation_path: Path, num_simulation: int) -> dict[str, np.ndarray]:
     """
     Carga el array datos_sim (col 1 = voltaje) por fase desde los Data_*.npz.
 
@@ -207,6 +205,7 @@ def _construir_types_map(actual_state: np.ndarray, t_shape: tuple[int, int]) -> 
 # ---------------------------------------------------------------------------
 # Función principal
 # ---------------------------------------------------------------------------
+
 
 def plot_estados(
     plot_types: list[PlotType] | None = None,
@@ -260,8 +259,7 @@ def plot_estados(
 
     # Validar y normalizar plot_types
     tipos_activos: tuple[PlotType, ...] = (
-        tuple(TODOS_PLOT_TYPES) if plot_types is None
-        else tuple(pt for pt in plot_types if pt in TIPO_SUBCARPETA)
+        tuple(TODOS_PLOT_TYPES) if plot_types is None else tuple(pt for pt in plot_types if pt in TIPO_SUBCARPETA)
     )
     invalidos = [pt for pt in (plot_types or []) if pt not in TIPO_SUBCARPETA]
     if invalidos:
@@ -333,24 +331,29 @@ def plot_estados(
                     claves_disponibles = set(datos.files)
 
                     # Campos requeridos por tipo de plot (carga lazy)
-                    necesita_state  = "state" in tipos_activos or update_metadata  # actual_state siempre útil
-                    necesita_temp   = "thermal" in tipos_activos or update_metadata  # T_final siempre
-                    necesita_prob   = "probability" in tipos_activos
-                    necesita_muro   = "muro" in tipos_activos
+                    necesita_state = "state" in tipos_activos or update_metadata
+                    necesita_temp = "thermal" in tipos_activos or update_metadata
+                    necesita_prob = "probability" in tipos_activos
+                    necesita_muro = "muro" in tipos_activos
 
                     actual_state: np.ndarray = (
-                        datos["actual_state"] if "actual_state" in claves_disponibles else np.zeros((1, 1), dtype=np.int64)
+                        datos["actual_state"]
+                        if "actual_state" in claves_disponibles
+                        else np.zeros((1, 1), dtype=np.int64)
                     )
                     temp_data: np.ndarray = (
-                        datos["temperatura"] if (necesita_temp and "temperatura" in claves_disponibles)
+                        datos["temperatura"]
+                        if (necesita_temp and "temperatura" in claves_disponibles)
                         else np.array(0.0)
                     )
                     prob_matrix: np.ndarray = (
-                        datos["probabilidad_matrix"] if (necesita_prob and "probabilidad_matrix" in claves_disponibles)
+                        datos["probabilidad_matrix"]
+                        if (necesita_prob and "probabilidad_matrix" in claves_disponibles)
                         else np.zeros_like(actual_state, dtype=np.float64)
                     )
                     muro_matrix: np.ndarray = (
-                        datos["matriz_para_plot_muro"] if (necesita_muro and "matriz_para_plot_muro" in claves_disponibles)
+                        datos["matriz_para_plot_muro"]
+                        if (necesita_muro and "matriz_para_plot_muro" in claves_disponibles)
                         else np.zeros_like(actual_state, dtype=np.float64)
                     )
 
@@ -393,10 +396,10 @@ def plot_estados(
                                 voltaje=voltaje_r,
                                 titulo="Generation Probability",
                                 filename=str(out_path),
-                                cmap_name="hot",
-                                label_colorbar="P (a.u.)",
+                                cmap_name="viridis",
+                                label_colorbar="Probability",
                                 cero_blanco=True,
-                                device_size=actual_state.shape[1] * atom_size,
+                                atom_size=atom_size,  # ✅ CAMBIO: ya no se usa device_size
                             )
 
                         elif pt == "muro":

@@ -34,11 +34,11 @@ Obtener logger con helpers para tracing de valores:
 
 from __future__ import annotations
 
+from typing import Optional, Union
+from pathlib import Path
+import numpy as np
 import logging
 import os
-from pathlib import Path
-from typing import Optional, Union
-import numpy as np
 
 # Logger raíz del paquete. Todo handler/configuración cuelga de aquí.
 ROOT_LOGGER_NAME = "RRAM"
@@ -143,9 +143,7 @@ def set_subsystem_level(subsystem: str, level: Union[int, str]) -> None:
         set_subsystem_level("Generation", "DEBUG")
         set_subsystem_level("Temperature", logging.WARNING)
     """
-    full_name = f"{ROOT_LOGGER_NAME}.{subsystem}" if not subsystem.startswith(
-        ROOT_LOGGER_NAME
-    ) else subsystem
+    full_name = f"{ROOT_LOGGER_NAME}.{subsystem}" if not subsystem.startswith(ROOT_LOGGER_NAME) else subsystem
     if isinstance(level, int):
         resolved = level
     else:
@@ -157,6 +155,7 @@ def set_subsystem_level(subsystem: str, level: Union[int, str]) -> None:
 # ============================================================================
 # HELPERS PARA TRACING DE VALORES (nivel TRACE)
 # ============================================================================
+
 
 def add_trace_method() -> None:
     """
@@ -171,6 +170,7 @@ def add_trace_method() -> None:
         logger = get_logger("Generation")
         logger.trace(f"gamma={gamma}")
     """
+
     def trace(self, message: str, *args, **kwargs):
         """Log un mensaje con nivel TRACE (5)."""
         if self.isEnabledFor(TRACE):
@@ -200,8 +200,7 @@ def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(full_name)
 
 
-def trace_array(logger: logging.Logger, name: str, arr: np.ndarray,
-                stats: bool = True, precision: int = 4) -> None:
+def trace_array(logger: logging.Logger, name: str, arr: np.ndarray, stats: bool = True, precision: int = 4) -> None:
     """
     Registra un array NumPy con estadísticas en nivel TRACE.
 
@@ -225,14 +224,12 @@ def trace_array(logger: logging.Logger, name: str, arr: np.ndarray,
 
     msg = f"{name}: shape={arr.shape}, dtype={arr.dtype}"
     if stats:
-        msg += (f", min={arr.min():.{precision}g}, max={arr.max():.{precision}g}, "
-                f"mean={arr.mean():.{precision}g}")
+        msg += f", min={arr.min():.{precision}g}, max={arr.max():.{precision}g}, mean={arr.mean():.{precision}g}"
 
     logger.trace(msg)
 
 
-def trace_scalar(logger: logging.Logger, name: str, value: float | int,
-                 context: str = "") -> None:
+def trace_scalar(logger: logging.Logger, name: str, value: float | int, context: str = "") -> None:
     """
     Registra un escalar en nivel TRACE.
 

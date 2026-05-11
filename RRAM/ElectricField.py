@@ -1,6 +1,11 @@
+from numba import njit
 import numpy as np
+import logging
+
+logger = logging.getLogger(__name__)
 
 
+@njit
 def SimpleElectricField(DDP: float, dist_electrodos: float) -> float:
     """
     Calcula el campo eléctrico en función de la diferencia de potencial y el espesor de la capa de óxido.
@@ -37,4 +42,4 @@ def GapElectricField(
     if L == 0:
         return potential / device_size_x
     else:
-        return potential / L
+        return abs(potential / L)

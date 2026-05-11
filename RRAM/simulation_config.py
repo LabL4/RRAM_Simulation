@@ -1,8 +1,8 @@
 from typing import Dict, Any, Optional, List
 import pandas as pd
 import itertools
-import os
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -12,18 +12,18 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 MATERIAL_DEFAULTS = {
     "cte_red": 0.25e-9,
-    "permitividad_relativa_set": 299.9526,
-    "permitividad_relativa_reset": 299.9675,
-    "generation_energy": 1.0,
-    "recombination_energy": 0.955,
+    "permitividad_relativa_set": 299.6653,
+    "permitividad_relativa_reset": 299.9641,
+    "generation_energy": 1.02,
+    "recombination_energy": 1.5,
     "pb_metal_insul_set": 0.0010,
-    "pb_metal_insul_reset": 0.0325,
+    "pb_metal_insul_reset": 0.0334,
     "recom_enchancement_factor": 3e3,
     "long_decaimiento_concentracion": 1e-9,
-    "ohm_resistence_set": 150.0,
-    "ohm_resistence_reset": 150.0,
+    "ohm_resistence_set": 4.3,
+    "ohm_resistence_reset": 4.3,
     "num_filamentos": 2,
-    "grosor_filamento": 1,
+    "grosor_filamento": [20, 20],
 }
 
 # ============================================================================
@@ -40,8 +40,8 @@ PHYSICAL_CONSTANTS = {
 # PARÁMETROS ELÉCTRICOS
 # ============================================================================
 ELECTRICAL_DEFAULTS = {
-    "I_0_set": 1.9283e-03,
-    "I_0_reset": 4.5414e-03,
+    "I_0_set": 0.0010731,
+    "I_0_reset": 0.002505,
 }
 
 # ============================================================================
@@ -65,9 +65,9 @@ THERMAL_DEFAULTS = {
 # ============================================================================
 SIMULATION_DEFAULTS = {
     "device_size_x": 10e-9,  # Ancho entre electrodos, debe corresponder a los dispositivos medidos
-    "device_size_y": 10e-9,
+    "device_size_y": 30e-9,
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
-    "num_trampas": 90,
+    "num_trampas": 197,
     "total_simulation_time": 10.0,
     "num_pasos": 10000,
     "voltaje_final": 1.1,
@@ -79,15 +79,15 @@ SIMULATION_DEFAULTS = {
 # PARÁMETROS SET / RESET
 # ============================================================================
 SET_RESET_DEFAULTS = {
-    "ocupacion_max_pp_set": 0.45,
-    "ocupacion_max_sp_set": 0.45,
+    "ocupacion_max_pp_set": 0.95,
+    "ocupacion_max_sp_set": 0.95,
     "factor_vecinos_pp_set": 1.0,
     "factor_libre_pp_set": 1.0,
     "factor_vecinos_sp_set": 1.0,
-    "factor_libre_sp_set": 0.9,
-    "lim_voltage_percolacion": 1.2,
+    "factor_libre_sp_set": 1.0,
+    "lim_voltage_percolacion": 1.4,
     "compliance_voltage": 0.6,
-    "voltaje_gen_oxigeno_pp_1": 1.1,
+    "voltaje_gen_oxigeno_pp_1": 1.0,
     "num_oxigenos_pp_reset_1": 1,
     "voltaje_gen_oxigeno_pp_2": 1.2,
     "num_oxigenos_pp_reset_2": 10,
@@ -131,6 +131,39 @@ class ConfigManager:
 
     def add_config(self, config: SimulationConfig):
         self.simulations.append(config)
+
+    def add_zip(self, zip_params: Dict[str, List[Any]], fixed_params: Optional[Dict[str, Any]] = None):
+        """
+        Genera simulaciones emparejando los valores por posición (zip), no por
+        producto cartesiano. Todas las listas deben tener la misma longitud.
+
+        Args:
+            zip_params: Diccionario de parámetros a emparejar por posición.
+                Ej: {"grosor_filamento": [[15,15],[15,10]], "num_trampas": [197, 100]}
+            fixed_params: Parámetros fijos adicionales aplicados a todas las sims.
+                Ej: {"device_size_y": 15e-9}
+
+        Raises:
+            ValueError: Si las listas no tienen la misma longitud.
+        """
+        longitudes = {k: len(v) for k, v in zip_params.items()}
+        if len(set(longitudes.values())) > 1:
+            raise ValueError(
+                f"Todas las listas en zip_params deben tener la misma longitud. Longitudes encontradas: {longitudes}"
+            )
+
+        keys = list(zip_params.keys())
+        casos_totales = 0
+
+        for valores in zip(*zip_params.values()):
+            mods = dict(zip(keys, valores))
+            if fixed_params:
+                mods.update(fixed_params)
+            sim_id = len(self.simulations)
+            self.simulations.append(SimulationConfig.from_base(sim_id, mods))
+            casos_totales += 1
+
+        logger.info(f"-> Generadas {casos_totales} combinaciones por zip.")
 
     def add_sweep(self, sweep_params: Dict[str, List[Any]]):
         # ... (Este método se queda igual) ...

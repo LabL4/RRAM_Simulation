@@ -1,3 +1,4 @@
+from numba import njit
 import numpy as np
 
 from RRAM import Constants as cte
@@ -43,6 +44,7 @@ def initial_state_priv(Eje_x: int, Eje_y: int, num_trampas: int, regiones_pesos:
     return InitialState
 
 
+@njit
 def calcular_probabilidad_generacion(
     time_stp: float,
     electric_field: np.ndarray | float,

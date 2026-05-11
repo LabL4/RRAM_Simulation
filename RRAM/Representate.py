@@ -96,7 +96,7 @@ def setup_plt(plt, latex=True, scaling=1):
     plt.rc("axes", titlesize=BIGGER_SIZE * 1.5)
 
 
-# setup_paper_plt(plt, latex=True, scaling=3)
+# setup_paper_plt(plt, latex=True, scaling=2.5)
 
 import matplotlib.pyplot as plt
 import logging
@@ -152,7 +152,7 @@ def RepresentateState(
     fig, ax = plt.subplots(figsize=(12, 9))
 
     # Descomenta estas líneas según tu entorno
-    setup_paper_plt(plt, latex=True, scaling=3)
+    setup_paper_plt(plt, latex=True, scaling=2.5)
     config_ax_state(ax)
 
     # 1. CÁLCULO DE DIMENSIONES (Crecimiento en X, Clasificación en Y)
@@ -257,7 +257,7 @@ def RepresentateTwoStates(
 
     fig, ax = plt.subplots(figsize=(12, 9))  # Tamaño de la figura ajustado
 
-    setup_paper_plt(plt, latex=True, scaling=3)
+    setup_paper_plt(plt, latex=True, scaling=2.5)
     config_ax_state(ax)
 
     # 1. CÁLCULO DE DIMENSIONES (Crecimiento en X, Clasificación en Y)
@@ -370,7 +370,7 @@ def plot_IV(
     figures_path = os.getcwd() + "/Results/Figures"
 
     # Configuración de la figura
-    setup_paper_plt(plt, latex=True, scaling=3)
+    setup_paper_plt(plt, latex=True, scaling=2.5)
 
     fig, axes = plt.subplots(figsize=(12, 9))
     config_ax_IV(axes)
@@ -387,7 +387,7 @@ def plot_IV(
 
     # ---------- EJE Y ----------
     # Marcas en potencias de 10 de 10⁻⁷ a 10⁻²
-    y_ticks = [1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2]
+    y_ticks = [1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1]
     axes.set_yticks(y_ticks)
     axes.get_yaxis().set_major_formatter(ticker.FormatStrFormatter("$10^{%d}$"))
 
@@ -402,6 +402,7 @@ def plot_IV(
             r"$10^{-4}$",
             r"$10^{-3}$",
             r"$10^{-2}$",
+            r"$10^{-1}$",
         ]
     )
 
@@ -413,24 +414,24 @@ def plot_IV(
     # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Set_1t'
     # ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Reset_1.txt'
 
-    ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1600.txt"
-    ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1600.txt"
+    # ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1600.txt"
+    # ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1600.txt"
 
     # ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Medidas_Eduardo/D_Set_1_Run35.txt"
     # ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Medidas_Eduardo/D_Reset_1_Run35.txt"
 
     # Cargar datos experimentales
-    data_set = np.loadtxt(ruta_archivo_set, skiprows=1)
-    data_reset = np.loadtxt(ruta_archivo_reset, skiprows=1)
+    # data_set = np.loadtxt(ruta_archivo_set, skiprows=1)
+    # data_reset = np.loadtxt(ruta_archivo_reset, skiprows=1)
 
-    x_set = data_set[:, 0]
-    y_set = data_set[:, 1]
-    x_reset = data_reset[:, 0]  # * (-1.0)   TODO: Importante comprobar si las medidas se leen con el signo ya o no
-    y_reset = abs(data_reset[:, 1])
+    # x_set = data_set[:, 0]
+    # y_set = data_set[:, 1]
+    # x_reset = data_reset[:, 0]  # * (-1.0)   TODO: Importante comprobar si las medidas se leen con el signo ya o no
+    # y_reset = abs(data_reset[:, 1])
 
     # Curvas experimentales
-    axes.plot(x_set, y_set, "black", label="Set experimental", linewidth=2)
-    axes.plot(x_reset, y_reset, "black", label="Reset experimental", linewidth=2)
+    # axes.plot(x_set, y_set, "black", label="Set experimental", linewidth=2)
+    # axes.plot(x_reset, y_reset, "black", label="Reset experimental", linewidth=2)
     # Antes ponia 2.5 de grosor de linea (antes de las medidas de arturo)
     # Leyenda ajustada en la parte inferior izquierda
     axes.legend(
@@ -491,7 +492,7 @@ def plot_IV_marcado(
     figures_path = os.getcwd() + "/Results/Figures"
 
     # Configuración de la figura
-    setup_paper_plt(plt, latex=True, scaling=3)
+    setup_paper_plt(plt, latex=True, scaling=2.5)
 
     # plt.rcParams["axes.labelsize"] = 32
 
@@ -509,7 +510,7 @@ def plot_IV_marcado(
 
     # ---------- EJE Y ----------
     # Marcas en potencias de 10 de 10⁻⁷ a 10⁻²
-    y_ticks = [1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2]
+    y_ticks = [1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1]
     axes.set_yticks(y_ticks)
     axes.get_yaxis().set_major_formatter(ticker.FormatStrFormatter("$10^{%d}$"))
 
@@ -524,6 +525,7 @@ def plot_IV_marcado(
             r"$10^{-4}$",
             r"$10^{-3}$",
             r"$10^{-2}$",
+            r"$10^{-1}$",
         ]
     )
 
@@ -532,17 +534,17 @@ def plot_IV_marcado(
     axes.plot(v_reset, i_reset, color="red", linewidth=4, label="RESET")
 
     # Ruta de los datos experimentales
-    ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1600.txt"
-    ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1600.txt"
+    # ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1600.txt"
+    # ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1600.txt"
 
     # Cargar datos experimentales
-    data_set = np.loadtxt(ruta_archivo_set, skiprows=1)
-    data_reset = np.loadtxt(ruta_archivo_reset, skiprows=1)
+    # data_set = np.loadtxt(ruta_archivo_set, skiprows=1)
+    # data_reset = np.loadtxt(ruta_archivo_reset, skiprows=1)
 
-    x_set = data_set[:, 0]
-    y_set = data_set[:, 1]
-    x_reset = data_reset[:, 0]  # * (-1.0)   TODO: Importante comprobar si las medidas se leen con el signo ya o no
-    y_reset = abs(data_reset[:, 1])
+    # x_set = data_set[:, 0]
+    # y_set = data_set[:, 1]
+    # x_reset = data_reset[:, 0]  # * (-1.0)   TODO: Importante comprobar si las medidas se leen con el signo ya o no
+    # y_reset = abs(data_reset[:, 1])
 
     (x_0, y_0) = next(iter(lista_puntos.values()))
     # print("Punto de referencia (0,0): ", (x_0, y_0))
@@ -556,8 +558,8 @@ def plot_IV_marcado(
     )
 
     # Curvas experimentales
-    axes.plot(x_set, y_set, "black", label="Set Exp.", linewidth=2)
-    axes.plot(x_reset, y_reset, "black", label="Reset Exp.", linewidth=2)
+    # axes.plot(x_set, y_set, "black", label="Set Exp.", linewidth=2)
+    # axes.plot(x_reset, y_reset, "black", label="Reset Exp.", linewidth=2)
 
     for label, (xp, yp) in lista_puntos.items():
         dx, factor_y = desplazamiento.get(label, (0.02, 1.0))  # 1.0 = sin desplazamiento en y
@@ -625,10 +627,10 @@ def plot_thermal_state(T_map, types_map, voltage, num_levels=10, atom_size: floa
         # Continúa pero sin isotermas (ver abajo)
 
     # 2. Aplicar los estilos globales ANTES de crear la figura
-    setup_paper_plt(plt, latex=True, scaling=3)
+    setup_paper_plt(plt, latex=True, scaling=2.5)
 
     # 3. Crear la figura y los ejes
-    fig, ax = plt.subplots(figsize=(12, 9))
+    fig, ax = plt.subplots(figsize=(52, 12))
 
     # 4. Aplicar configuración de estilo específica para los ejes
     config_ax_state(ax)
@@ -704,97 +706,113 @@ def RepresentateHeatmap(
     vmax: float | None = None,
     electrode_width: float = 0.2,
     cero_blanco: bool = True,
-    device_size: float = 10e-09,
+    atom_size: float = 0.25e-9,
 ) -> None:
     """
-    Representa una matriz de valores continuos.
-    Permite forzar que el valor 0 exacto se represente en color blanco.
-    """
-    fig, ax = plt.subplots(figsize=(12, 9))
+    Representa una matriz de valores continuos (ej: probabilidades, temperaturas).
 
-    # Descomenta estas líneas según tu entorno si usas LaTeX
-    setup_paper_plt(plt, latex=True, scaling=3)
+    **Cambio principal:** Ahora usa las dimensiones reales del dispositivo
+    (device_size_x × device_size_y) derivadas de `matriz.shape` y `atom_size`,
+    exactamente como `plot_thermal_state`. La matriz de entrada ya NO incluye
+    electrodos; estos se dibujan como patches grises externos al extent.
+
+    Args:
+        matriz: Matriz 2D a representar (Ny, Nx) donde Ny=device_size_y/atom_size
+                y Nx=device_size_x/atom_size. Sin columnas de electrodos.
+        voltaje: Voltaje aplicado (usado en el título).
+        titulo: Título base de la figura.
+        filename: Ruta completa para guardar. Si None, no se guarda.
+        cmap_name: Nombre del colormap de matplotlib.
+        label_colorbar: Etiqueta de la barra de colores.
+        vmin, vmax: Límites del colormap. Si None, se calculan automáticamente.
+        electrode_width: Ancho visual de los electrodos en nm.
+        cero_blanco: Si True, los ceros exactos se enmascaran (color blanco).
+        atom_size: Tamaño físico de cada celda [m].
+
+    Returns:
+        None
+    """
+    fig, ax = plt.subplots(figsize=(9, 15))
+
+    # Aplicar estilos globales y específicos de los ejes
+    setup_paper_plt(plt, latex=True, scaling=2.5)
     config_ax_state(ax)
 
-    size_nm = device_size * 1e9  # Convertir a nm
+    # 1. CÁLCULO DE DIMENSIONES REALES (igual que plot_thermal_state)
+    Ny, Nx = matriz.shape
+    size_x_nm = Nx * atom_size * 1e9  # Distancia entre electrodos
+    size_y_nm = Ny * atom_size * 1e9  # Ancho del dispositivo (clasificación)
 
-    # 1. GESTIÓN DEL COLOR Y MÁSCARA PARA EL CERO
-    # Obtenemos una copia del mapa de colores para poder modificarlo de forma segura
+    extent = (0, size_x_nm, 0, size_y_nm)
+
+    # 2. GESTIÓN DEL COLOR Y MÁSCARA PARA EL CERO
     cmap = plt.get_cmap(cmap_name).copy()
 
     if cero_blanco:
-        # Le decimos al mapa de colores que los valores "inválidos" o enmascarados sean blancos
         cmap.set_bad(color="white")
-        # Enmascaramos (ocultamos) todos los valores de la matriz que sean exactamente 0
         matriz_dibujo = np.ma.masked_where(matriz == 0, matriz)
     else:
         matriz_dibujo = matriz
 
-    # Si no se pasan vmin/vmax, se calculan automáticamente
+    matriz_dibujo = matriz
+    # Límites del colormap
     val_min = vmin if vmin is not None else matriz.min()
     val_max = vmax if vmax is not None else matriz.max()
 
-    # 2. MATRIZ
+    # 3. DIBUJO DE LA MATRIZ (zorder=2)
     im = ax.imshow(
-        matriz_dibujo,  # <-- Usamos la matriz enmascarada
+        matriz_dibujo,
         cmap=cmap,
         vmin=val_min,
         vmax=val_max,
-        extent=(0, size_nm, 0, size_nm),
+        extent=extent,
         origin="lower",
         interpolation="nearest",
         aspect="equal",
         zorder=2,
     )
 
-    # 3. ELECTRODOS
+    # 4. ELECTRODOS (zorder=1, detrás de la matriz)
     y_start = 0
-    electrode_height = size_nm
+    electrode_height = size_y_nm
 
     left_electrode = patches.Rectangle(
         (-electrode_width, y_start), electrode_width, electrode_height, color="gray", zorder=1
     )
-
-    right_electrode = patches.Rectangle((size_nm, y_start), electrode_width, electrode_height, color="gray", zorder=1)
+    right_electrode = patches.Rectangle((size_x_nm, y_start), electrode_width, electrode_height, color="gray", zorder=1)
 
     ax.add_patch(left_electrode)
     ax.add_patch(right_electrode)
 
-    # Ajustar formato visual
+    # 5. LÍMITES Y ASPECTO
     ax.set_aspect("equal")
+    ax.set_xlim(-electrode_width, size_x_nm + electrode_width)
 
-    # 4. LÍMITES AJUSTADOS
-    ax.set_xlim(-electrode_width, size_nm + electrode_width)
     margen_y = 0.05
-    ax.set_ylim(-margen_y, size_nm + margen_y)
+    ax.set_ylim(-margen_y, size_y_nm + margen_y)
 
-    # Configurar marcas (ticks)
-    paso_ticks = 2 if size_nm <= 15 else (5 if size_nm <= 30 else 10)
-    ax.set_xticks(np.arange(0, size_nm + 1, paso_ticks))
-    ax.set_yticks(np.arange(0, size_nm + 1, paso_ticks))
+    # 6. MARCAS (TICKS) DINÁMICAS
+    paso_ticks_x = 2 if size_x_nm <= 15 else (5 if size_x_nm <= 30 else 10)
+    paso_ticks_y = 2 if size_y_nm <= 15 else (5 if size_y_nm <= 30 else 10)
 
-    # Configurar etiquetas y título
+    ax.set_xticks(np.arange(0, size_x_nm + 1, paso_ticks_x))
+    ax.set_yticks(np.arange(0, size_y_nm + 1, paso_ticks_y))
+
+    # 7. ETIQUETAS Y TÍTULO
     ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
     ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
+    ax.set_title(rf"{titulo} ($V_{{RRAM}}$ = {voltaje} V)", pad=20)
 
-    ax.set_title(
-        rf"{titulo} ($V_{{RRAM}}$ = {voltaje} V)",
-        pad=20,
-    )
-
-    # 5. COLORBAR
+    # 8. COLORBAR
     cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
     if label_colorbar:
         cbar.set_label(label_colorbar)
 
     plt.subplots_adjust(top=0.85)
 
-    # Guardar archivos
+    # 9. GUARDADO
     if filename:
         plt.savefig(filename, bbox_inches="tight", dpi=300)
-
-        # ruta_pdf = os.path.splitext(filename)[0] + ".pdf"
-        # plt.savefig(ruta_pdf, bbox_inches="tight")
 
     plt.close(fig)
 
@@ -818,10 +836,10 @@ def plot_centros_filamento_det(
     # 1. Aplicar estilos y crear figura (Estándar RRAM)
     fig, ax = plt.subplots(figsize=(12, 9))
 
-    setup_paper_plt(plt, latex=True, scaling=3)
+    setup_paper_plt(plt, latex=True, scaling=2.5)
     config_ax_state(ax)
 
-    device_size_x, device_size_y = matriz_state.shape
+    device_size_y, device_size_x = matriz_state.shape
 
     size_x_nm = device_size_x * atom_size * 1e9  # Convertir a nm ya que siempre se representa en nm
     size_y_nm = device_size_y * atom_size * 1e9  # Convertir a nm ya que siempre se representa en nm
@@ -952,12 +970,12 @@ def plot_muro_termico(
     la ubicación de los muros térmicos (colores) y los electrodos (gris oscuro).
     """
     # 1. Aplicar estilos estándar
-    setup_paper_plt(plt, latex=True, scaling=3)
+    setup_paper_plt(plt, latex=True, scaling=2.5)
     fig, ax = plt.subplots(figsize=(12, 9))
     config_ax_state(ax)
 
     # 1. CÁLCULO DE DIMENSIONES (Crecimiento en X, Clasificación en Y)
-    device_size_x, device_size_y = matriz_muros.shape
+    device_size_y, device_size_x = matriz_muros.shape
 
     size_x_nm = device_size_x * atom_size * 1e9  # Convertir a nm ya que siempre se representa en nm
     size_y_nm = device_size_y * atom_size * 1e9  # Convertir a nm ya que siempre se representa en nm
@@ -1013,9 +1031,9 @@ def plot_muro_termico(
     ax.set_aspect("equal")
 
     # Ajustar límites para mostrar electrodos
-    ax.set_xlim(-electrode_width, size_y_nm + electrode_width)
+    ax.set_xlim(-electrode_width, size_x_nm + electrode_width)
     margen_y = 0.05
-    ax.set_ylim(-margen_y, size_y_nm + margen_y)
+    ax.set_ylim(-margen_y, size_x_nm + margen_y)
 
     # Ticks dinámicos
     paso_ticks_x = 2 if size_x_nm <= 15 else (5 if size_x_nm <= 30 else 10)
@@ -1058,7 +1076,7 @@ def plot_thermal_state_muro(
     """
 
     # 1. Aplicar los estilos globales ANTES de crear la figura
-    setup_paper_plt(plt, latex=True, scaling=3)
+    setup_paper_plt(plt, latex=True, scaling=2.5)
 
     # 2. Crear la figura y los ejes
     fig, ax = plt.subplots(figsize=(12, 9))

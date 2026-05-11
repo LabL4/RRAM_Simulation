@@ -1,7 +1,8 @@
+from numba import njit
 import numpy as np
+import logging
 import math
 import sys
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,7 @@ def generate_oxygen(oxygen_state: np.ndarray, max_num_oxygen: int) -> np.ndarray
     return oxygen_state
 
 
+@njit
 def Prob_Recombination(
     paso_temporal: float,
     velocidad: float | np.ndarray,

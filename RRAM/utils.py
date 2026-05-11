@@ -3,13 +3,19 @@ from typing import List, Dict
 from typing import Optional
 from pathlib import Path
 import numpy as np
-import csv
 import logging
+import csv
 
 logger = logging.getLogger(__name__)
 
 
-def generar_configuracion_filamentos(eje_x, eje_y, num_filamentos, peso_central=70):
+def generar_configuracion_filamentos(
+    eje_x: int,
+    eje_y: int,
+    num_filamentos: int,
+    peso_central: int = 70,
+    grosores_filamento: list | int | None = None,
+) -> tuple:
     """
     Calcula los rangos de cada filamento y define las regiones de peso iniciales.
 
@@ -17,36 +23,41 @@ def generar_configuracion_filamentos(eje_x, eje_y, num_filamentos, peso_central=
         eje_x (int): Número de celdas en el eje X (filas).
         eje_y (int): Número de celdas en el eje Y (columnas).
         num_filamentos (int): Número de filamentos a distribuir.
-        peso_central (int): Probabilidad asignada a la zona central (por defecto 70).
-
-    Retorna:
-        tuple: (filamentos_ranges, regiones_pesos, filas_centrales)
+        peso_central (int): Probabilidad asignada a la zona central.
+        grosores_filamento (list | int | None): Grosor en celdas para cada filamento.
+            Si es lista, un valor por filamento. Si es int, se aplica a todos.
+            Si es None, usa el valor fijo heredado de 2.
     """
+    # Normalizar grosores_filamento a lista de longitud num_filamentos
+    if grosores_filamento is None:
+        grosores = [2] * num_filamentos
+    elif isinstance(grosores_filamento, (int, np.integer)):
+        grosores = [int(grosores_filamento)] * num_filamentos
+    else:
+        grosores_raw = list(grosores_filamento)
+        # Rellenar con el último valor si la lista es más corta que num_filamentos
+        if len(grosores_raw) < num_filamentos:
+            grosores_raw += [grosores_raw[-1]] * (num_filamentos - len(grosores_raw))
+        grosores = [int(g) for g in grosores_raw[:num_filamentos]]
+
     filamentos_ranges = []
     regiones_pesos = []
     filas_centrales = []
 
-    # Calculamos el ancho de cada zona dividiendo el espacio total entre el número de filamentos
-    ancho_zona = eje_y // num_filamentos
+    ancho_zona = eje_x // num_filamentos
 
     for n in range(num_filamentos):
-        # 1. Calcular el rango (zona) de este filamento
         inicio_rango = n * ancho_zona
-        # El último filamento se extiende hasta el final para cubrir el resto por división entera
         fin_rango = (n + 1) * ancho_zona - 1 if n < num_filamentos - 1 else eje_x - 1
         filamentos_ranges.append((inicio_rango, fin_rango))
 
-        # 2. Identificar la fila central de dicha zona
         fila_central = (inicio_rango + fin_rango) // 2
         filas_centrales.append(fila_central)
 
-        # 3. Definir la región de alta probabilidad (Fila central + 2 arriba + 2 abajo)
-        # x_start: fila_central - 2
-        # x_end: fila_central + 3 (se usa +3 porque en el slicing el límite superior no se incluye)
-        x_start = max(0, fila_central - 2)
-        x_end = min(eje_x, fila_central + 3)
+        grosor = grosores[n]
+        x_start = max(0, fila_central - grosor)
+        x_end = min(eje_x, fila_central + grosor + 1)
 
-        # La región cubre todo el ancho del dispositivo (de 0 a eje_y)
         region = (x_start, x_end, 0, eje_y)
         regiones_pesos.append((region, peso_central))
 
@@ -320,7 +331,7 @@ def simulation_IV(
         puntos_x_sp_reset,
     )
 
-    logger.info('Puntos en la curva I-V:')
+    logger.info("Puntos en la curva I-V:")
     for label, (v, i) in {
         **puntos_set,
         **puntos_x_pp_reset,
@@ -462,7 +473,9 @@ def resumen_plots(
     para un paso específico de la simulación.
     """
 
-    logger.info(f"Representando para el paso {k} con voltaje {fig_voltage} V las filas intermedias son {filas_intermedias}")
+    logger.info(
+        f"Representando para el paso {k} con voltaje {fig_voltage} V las filas intermedias son {filas_intermedias}"
+    )
 
     # 1. Mapa de temperatura y muros
     Representate.plot_thermal_state_muro(
