@@ -44,11 +44,12 @@ TIPO_SUBCARPETA: dict[str, str] = {
     "thermal": "thermal_state",
     "probability": "probability",
     "muro": "muro_termico",
+    "clean_state": "clean_state",
 }
 
-PlotType = Literal["state", "thermal", "probability", "muro"]
+PlotType = Literal["state", "thermal", "probability", "muro", "clean_state"]
 
-TODOS_PLOT_TYPES: tuple[PlotType, ...] = ("state", "thermal", "probability", "muro")
+TODOS_PLOT_TYPES: tuple[PlotType, ...] = ("state", "thermal", "probability", "muro", "clean_state")
 
 
 def plot_results(
@@ -229,10 +230,11 @@ def plot_estados(
         ...
 
     Subcarpeta por tipo:
-        - ``"state"``       → ``state/``
-        - ``"thermal"``     → ``thermal_state/``
-        - ``"probability"`` → ``probability/``
-        - ``"muro"``        → ``muro_termico/``
+        - ``"state"``        → ``state/``
+        - ``"thermal"``      → ``thermal_state/``
+        - ``"probability"``  → ``probability/``
+        - ``"muro"``         → ``muro_termico/``
+        - ``"clean_state"``  → ``clean_state/``
 
     La temperatura (``"thermal"``) se trata exactamente igual que el resto de
     tipos: se activa incluyéndola en ``plot_types``. De forma independiente,
@@ -335,10 +337,16 @@ def plot_estados(
                     necesita_temp = "thermal" in tipos_activos or update_metadata
                     necesita_prob = "probability" in tipos_activos
                     necesita_muro = "muro" in tipos_activos
+                    necesita_clean = "clean_state" in tipos_activos
 
                     actual_state: np.ndarray = (
                         datos["actual_state"]
                         if "actual_state" in claves_disponibles
+                        else np.zeros((1, 1), dtype=np.int64)
+                    )
+                    cf_clean_matrix: np.ndarray = (
+                        datos["cf_clean_matrix"]
+                        if (necesita_clean and "cf_clean_matrix" in claves_disponibles)
                         else np.zeros((1, 1), dtype=np.int64)
                     )
                     temp_data: np.ndarray = (
@@ -411,6 +419,18 @@ def plot_estados(
                                 matriz_molde=actual_state,
                                 filename=str(out_path),
                                 titulo=rf"Thermal Wall — $V_{{RRAM}}$ = {voltaje_r} V",
+                                atom_size=atom_size,
+                            )
+
+                        elif pt == "clean_state":
+                            if np.all(cf_clean_matrix == 0):
+                                logger.debug(f"Paso {paso} fase {fase}: cf_clean_matrix no disponible. Salto.")
+                                continue
+                            RepresentateState(
+                                matriz=cf_clean_matrix,
+                                voltaje=voltaje_r,
+                                filename=str(out_path),
+                                guardar_png=(ext == "png"),
                                 atom_size=atom_size,
                             )
 
