@@ -25,7 +25,15 @@ from pathlib import Path
 from typing import Optional
 
 from .init_simulation import SimulationConfig
-from .persistence import SimulationMetadata, save_metadata, serialize_dataclass
+from .persistence import (
+    PHASE_ORDER,
+    PHASE_PRECEDING,
+    SimulationMetadata,
+    load_phase_state,
+    save_metadata,
+    save_phase_state,
+    serialize_dataclass,
+)
 from .phases_reset import PP_reset, SP_reset
 from .phases_set import PP_set, SP_set
 
@@ -102,6 +110,8 @@ def _save_partial_metadata(
 def run_cycle(
     cfg: SimulationConfig,
     results_dir: Path | str = "Results",
+    start_from: Optional[str] = None,
+    init_data_dir: Path | str = "Init_data",
     desplazamiento_iv: Optional[dict] = None,  # noqa: ARG001 (kept for API stability)
 ) -> SimulationStates:
     """
@@ -111,24 +121,50 @@ def run_cycle(
         cfg: Configuración cargada desde `load_simulation_config`.
         results_dir: Carpeta raíz donde cada simulación tiene su subcarpeta
             `simulation_{N+1}` (consistente con `utils.crear_rutas_simulacion`).
+        start_from: Fase desde la que comenzar el ciclo. Valores válidos:
+            ``"sp_set"``, ``"pp_reset"``, ``"sp_reset"``.  Si es ``None``
+            (defecto) el ciclo empieza desde ``pp_set``.
+            El estado de la fase precedente se carga automáticamente desde
+            ``init_data_dir/phase_state_{n_save}_{fase_anterior}.*``.
+        init_data_dir: Carpeta donde se leen/escriben los estados de fase
+            (``phase_state_*.npz`` / ``.json``).  Por defecto ``"Init_data"``.
         desplazamiento_iv: Aceptado por compatibilidad pero NO persistido
             (es preferencia de plot, no estado de simulación).
 
     Returns:
-        `SimulationStates` con los 4 dicts de estado final.
+        `SimulationStates` con los dicts de estado de las fases ejecutadas.
 
     Raises:
+        ValueError: Si ``start_from`` no es un valor reconocido.
+        FileNotFoundError: Si se especifica ``start_from`` pero no existe el
+            estado guardado de la fase precedente en ``init_data_dir``.
         Cualquier excepción de simulación legítima de las fases. Antes de
-        relanzarla, persiste metadata parcial con `status` describiendo dónde
+        relanzarla, persiste metadata parcial con ``status`` describiendo dónde
         falló.
     """
+    _VALID_START = set(PHASE_PRECEDING.keys())
+    if start_from is not None and start_from not in _VALID_START:
+        raise ValueError(
+            f"start_from='{start_from}' no válido. "
+            f"Valores aceptados: {sorted(_VALID_START)}"
+        )
+
     n = cfg.num_simulation
     n_save = n + 1  # offset del código original (simulation_{N+1}/)
     states = SimulationStates()
 
-    logger.info(f"=== Sim {n_save} · ciclo SET → RESET ===")
+    if start_from is not None:
+        preceding = PHASE_PRECEDING[start_from]
+        logger.info(
+            f"=== Sim {n_save} · ciclo desde '{start_from}' "
+            f"(cargando estado de '{preceding}') ==="
+        )
+        loaded = load_phase_state(preceding, n_save, init_data_dir, cfg)
+        setattr(states, preceding, loaded)
+    else:
+        logger.info(f"=== Sim {n_save} · ciclo SET → RESET ===")
 
-    fases = [
+    fases_all = [
         ("pp_set",   lambda: PP_set(
             num_simulation=n_save, params=cfg.params, sim_ctes=cfg.sim_ctes,
             CF_ranges=cfg.cf_ranges, CF_creado=cfg.cf_creado,
@@ -148,10 +184,14 @@ def run_cycle(
         )),
     ]
 
+    start_idx = PHASE_ORDER.index(start_from) if start_from else 0
+    fases = fases_all[start_idx:]
+
     for nombre, ejecutor in fases:
         try:
             resultado = ejecutor()
             setattr(states, nombre, resultado)
+            save_phase_state(resultado, nombre, n_save, init_data_dir)
         except Exception as e:
             logger.error(f"Fase {nombre} abortada: {type(e).__name__}: {e}")
             _save_partial_metadata(
@@ -161,9 +201,12 @@ def run_cycle(
             )
             raise
 
+    last_phase = fases[-1][0]
+    creaciones = (states.pp_set or {}).get("creaciones_dict", {}) or {}
+    roturas = (states.sp_reset or {}).get("roturas_dict", {}) or {}
     logger.info(
-        f"Resumen creaciones: {len(states.pp_set.get('creaciones_dict', {}) or {})} · "
-        f"roturas: {len(states.sp_reset.get('roturas_dict', {}) or {})}"
+        f"Fase final: '{last_phase}' · "
+        f"creaciones: {len(creaciones)} · roturas: {len(roturas)}"
     )
 
     # Todo OK → metadata completa

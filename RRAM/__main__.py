@@ -51,6 +51,16 @@ def _build_parser() -> argparse.ArgumentParser:
     p_exec.add_argument("--num-filamentos", type=int, default=None)
     p_exec.add_argument("--init-data-dir", default="Init_data")
     p_exec.add_argument("--results-dir", default="Results")
+    p_exec.add_argument(
+        "--start-from",
+        choices=["sp_set", "pp_reset", "sp_reset"],
+        default=None,
+        metavar="FASE",
+        help=(
+            "Fase desde la que comenzar el ciclo (sp_set | pp_reset | sp_reset). "
+            "Requiere que exista el estado guardado de la fase precedente en Init_data/."
+        ),
+    )
 
     # plot
     p_plot = sub.add_parser("plot", help="Replotea una simulación previamente ejecutada.")
@@ -64,6 +74,16 @@ def _build_parser() -> argparse.ArgumentParser:
     p_all.add_argument("--guardar-datos", action="store_true")
     p_all.add_argument("--init-data-dir", default="Init_data")
     p_all.add_argument("--results-dir", default="Results")
+    p_all.add_argument(
+        "--start-from",
+        choices=["sp_set", "pp_reset", "sp_reset"],
+        default=None,
+        metavar="FASE",
+        help=(
+            "Fase desde la que comenzar el ciclo (sp_set | pp_reset | sp_reset). "
+            "Requiere que exista el estado guardado de la fase precedente en Init_data/."
+        ),
+    )
 
     return p
 
@@ -86,7 +106,12 @@ def _cmd_exec(args) -> int:
             init_data_dir=args.init_data_dir,
             num_filamentos=args.num_filamentos,
         )
-        run_cycle(cfg, results_dir=args.results_dir)
+        run_cycle(
+            cfg,
+            results_dir=args.results_dir,
+            start_from=args.start_from,
+            init_data_dir=args.init_data_dir,
+        )
         return 0
     except Exception as e:
         # Las fases pueden lanzar excepciones de simulación legítimas
@@ -133,7 +158,12 @@ def _cmd_all(args) -> int:
             init_data_dir=args.init_data_dir,
             num_filamentos=args.num_filamentos,
         )
-        run_cycle(cfg, results_dir=args.results_dir)
+        run_cycle(
+            cfg,
+            results_dir=args.results_dir,
+            start_from=args.start_from,
+            init_data_dir=args.init_data_dir,
+        )
     except Exception as e:
         logger.exception(f"all/exec sim={args.num_simulation + 1} abortado: {e}")
         return 1
