@@ -159,6 +159,118 @@ def load_metadata(simulation_path: Path, num_simulation: int | None = None) -> S
     )
 
 
+# ---------------------------------------------------------------------------
+# Phase state I/O — guardar / cargar el estado de salida de cada fase para
+# poder reanudar el ciclo desde cualquier punto intermedio.
+# ---------------------------------------------------------------------------
+
+#: Fase que precede a cada punto de entrada posible.
+PHASE_PRECEDING: Dict[str, str] = {
+    "sp_set":   "pp_set",
+    "pp_reset": "sp_set",
+    "sp_reset": "pp_reset",
+}
+
+#: Orden canónico de las fases.
+PHASE_ORDER = ["pp_set", "sp_set", "pp_reset", "sp_reset"]
+
+#: Claves cuyos dicts tienen claves enteras (se pierden al round-trip JSON).
+_INT_KEY_DICTS = {"creaciones_dict", "roturas_dict"}
+
+
+def _phase_state_paths(
+    init_data_dir: Path, num_simulation: int, phase_name: str
+) -> tuple[Path, Path]:
+    base = init_data_dir / f"phase_state_{num_simulation}_{phase_name}"
+    return Path(str(base) + ".npz"), Path(str(base) + ".json")
+
+
+def save_phase_state(
+    state_dict: Dict[str, Any],
+    phase_name: str,
+    num_simulation: int,
+    init_data_dir: Path | str,
+) -> None:
+    """
+    Guarda el dict de salida de una fase en Init_data/ para poder reanudar.
+
+    Los arrays numpy se guardan en un .npz; el resto (escalares, listas,
+    dicts de metadatos) en un .json compañero. Los dataclasses (params,
+    sim_ctes) se omiten: se recargan del CSV al cargar la config.
+    """
+    init_data_dir = Path(init_data_dir)
+    init_data_dir.mkdir(parents=True, exist_ok=True)
+    npz_path, json_path = _phase_state_paths(init_data_dir, num_simulation, phase_name)
+
+    arrays: Dict[str, np.ndarray] = {}
+    meta: Dict[str, Any] = {}
+
+    for k, v in state_dict.items():
+        if isinstance(v, np.ndarray):
+            arrays[k] = v
+        elif is_dataclass(v):
+            pass  # params / sim_ctes se reconstruyen desde el CSV
+        else:
+            meta[k] = _to_jsonable(v)
+
+    np.savez_compressed(str(npz_path), **arrays)
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(meta, f, ensure_ascii=False, indent=2, default=_json_default)
+
+    logger.info(f"Estado de fase '{phase_name}' guardado en {npz_path.parent}")
+
+
+def load_phase_state(
+    phase_name: str,
+    num_simulation: int,
+    init_data_dir: Path | str,
+    cfg: Any,  # SimulationConfig — proporciona params y sim_ctes actuales
+) -> Dict[str, Any]:
+    """
+    Carga el estado de salida de una fase desde Init_data/.
+
+    Reconstruye arrays (desde .npz) y escalares (desde .json), e inyecta
+    params/sim_ctes desde *cfg* para que las fases siguientes los reciban
+    con los valores actuales del CSV.
+
+    Args:
+        phase_name:     Nombre de la fase cuyo estado se quiere cargar.
+        num_simulation: ID de simulación (n_save = num_simulation + 1).
+        init_data_dir:  Carpeta Init_data/.
+        cfg:            SimulationConfig cargada para esta ejecución.
+
+    Raises:
+        FileNotFoundError: Si no existe el archivo para la fase pedida.
+    """
+    init_data_dir = Path(init_data_dir)
+    npz_path, json_path = _phase_state_paths(init_data_dir, num_simulation, phase_name)
+
+    if not npz_path.is_file():
+        raise FileNotFoundError(
+            f"No se encontró el estado guardado de la fase '{phase_name}' en {npz_path}.\n"
+            f"Ejecuta primero el ciclo completo (o hasta esa fase) para generarlo."
+        )
+
+    arrays = dict(np.load(npz_path))
+
+    meta: Dict[str, Any] = {}
+    if json_path.is_file():
+        with open(json_path, "r", encoding="utf-8") as f:
+            meta = json.load(f)
+        # Restaurar claves enteras en dicts de eventos
+        for key in _INT_KEY_DICTS:
+            if key in meta and isinstance(meta[key], dict):
+                meta[key] = {int(k): v for k, v in meta[key].items()}
+
+    state = {**meta, **arrays}
+    # Inyectar params / sim_ctes actuales (no se guardan en disco)
+    state["params"] = cfg.params
+    state["sim_ctes"] = cfg.sim_ctes
+
+    logger.info(f"Estado de fase '{phase_name}' cargado desde {npz_path.parent}")
+    return state
+
+
 def _json_default(obj: Any) -> Any:
     """Serializador JSON que tolera tipos numpy y Path."""
     if isinstance(obj, (np.integer,)):
