@@ -83,11 +83,11 @@ def PP_reset(
         float(sim_ctes.voltaje_gen_oxigeno_pp_1): 3e-07,
     }
 
-    logger.info('La configuración de generación de oxígeno en la pp reset es:')
+    logger.info("La configuración de generación de oxígeno en la pp reset es:")
     for key, value in oxygen_config.items():
         logger.info(f"  - {key} V: {value} oxígenos")
 
-        logger.info('La configuración de velocidades de oxígeno en la pp reset es:')
+        logger.info("La configuración de velocidades de oxígeno en la pp reset es:")
     for key, value in velocity_thresholds.items():
         logger.info(f"  - {key} V: {value} m/s")
 
@@ -334,7 +334,7 @@ def SP_reset(
     final_state_pp_reset: dict,
     num_simulation: int,
     CF_ranges: List[tuple],
-    num_pasos_guardar_estado: int = 250,
+    num_pasos_guardar_estado: int = 100,
 ):
     params = final_state_pp_reset["params"]
     sim_ctes = final_state_pp_reset["sim_ctes"]
@@ -376,11 +376,11 @@ def SP_reset(
     oxygen_config = {float(sim_ctes.voltaje_gen_oxigeno_sp): int(sim_ctes.num_oxigenos_sp_reset)}
     velocity_thresholds = {float(sim_ctes.voltaje_gen_oxigeno_sp): 5.2e-07}
 
-    logger.info('La configuración de generación de oxígeno en la sp reset es:')
+    logger.info("La configuración de generación de oxígeno en la sp reset es:")
     for key, value in oxygen_config.items():
         logger.info(f"  - {key} V: {value} oxígenos")
 
-    logger.info('La configuración de velocidades de oxígeno en la sp reset es:')
+    logger.info("La configuración de velocidades de oxígeno en la sp reset es:")
     for key, value in velocity_thresholds.items():
         logger.info(f"  - {key} V: {value} m/s")
 
