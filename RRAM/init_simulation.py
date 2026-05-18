@@ -12,8 +12,8 @@ Dos responsabilidades:
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field, replace as dc_replace
 from typing import List, Optional, Tuple
-from dataclasses import dataclass
 from pathlib import Path
 import logging
 import math
@@ -31,16 +31,32 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class SimulationConfig:
-    """Configuración completa lista para ejecutar el ciclo SET→RESET."""
+    """Configuración completa lista para ejecutar el ciclo SET→RESET.
+
+    cf_ranges, cf_centros y cf_creado se calculan automáticamente en
+    __post_init__ a partir de params y sim_ctes — fuente única de verdad.
+    """
 
     num_simulation: int
     params: SimulationParameters
     sim_ctes: SimulationConstants
-    cf_ranges: List[tuple]
-    cf_centros: List[int]
-    cf_creado: np.ndarray
     actual_state: np.ndarray
     num_trampas: int
+
+    cf_ranges: List[tuple] = field(init=False)
+    cf_centros: List[int] = field(init=False)
+    cf_creado: np.ndarray = field(init=False)
+
+    def __post_init__(self):
+        cf_ranges, _, cf_centros = utils.generar_configuracion_filamentos(
+            eje_x=self.params.y_size,
+            eje_y=self.params.x_size,
+            num_filamentos=self.sim_ctes.num_filamentos,
+            grosores_filamento=self.sim_ctes.grosor_filamento,
+        )
+        self.cf_ranges = cf_ranges
+        self.cf_centros = cf_centros
+        self.cf_creado = np.full(len(cf_ranges), False, dtype=bool)
 
 
 # ---------------------------------------------------------------------------
@@ -50,7 +66,6 @@ class SimulationConfig:
 
 def build_initial_states(
     init_data_dir: Path | str = "Init_data",
-    num_filamentos_para_pesos: int = 2,
 ) -> int:
     init_data_dir = Path(init_data_dir)
     archivo_params = init_data_dir / "simulation_parameters.csv"
@@ -62,7 +77,6 @@ def build_initial_states(
     df_params = pd.read_csv(archivo_params)
     num_simulations = len(df_params)
 
-    # Leer constantes para obtener grosor_filamento por simulación
     archivo_ctes = init_data_dir / "simulation_constants.csv"
     df_ctes = pd.read_csv(archivo_ctes) if archivo_ctes.is_file() else None
 
@@ -73,27 +87,34 @@ def build_initial_states(
         eje_y = int(math.ceil(row["device_size_x"] / row["atom_size"]))
         num_trampas = int(row["num_trampas"])
 
-        # Extraer grosor_filamento de las constantes si está disponible
+        num_filamentos = 2
         grosor_filamento = None
         if df_ctes is not None and i < len(df_ctes):
-            raw = df_ctes.iloc[i].get("grosor_filamento", None)
-            if raw is not None:
+            raw_nf = df_ctes.iloc[i].get("num_filamentos", None)
+            if raw_nf is not None:
                 try:
-                    grosor_filamento = ast.literal_eval(str(raw).strip())
+                    num_filamentos = int(float(raw_nf))
+                except (ValueError, TypeError):
+                    pass
+
+            raw_gf = df_ctes.iloc[i].get("grosor_filamento", None)
+            if raw_gf is not None:
+                try:
+                    grosor_filamento = ast.literal_eval(str(raw_gf).strip())
                 except (ValueError, SyntaxError):
-                    grosor_filamento = int(float(raw))
+                    grosor_filamento = int(float(raw_gf))
 
         f_ranges, regiones_pesos, _ = utils.generar_configuracion_filamentos(
             eje_x,
             eje_y,
-            num_filamentos=num_filamentos_para_pesos,
+            num_filamentos=num_filamentos,
             grosores_filamento=grosor_filamento,
         )
         init_state = Generation.initial_state_priv(eje_x, eje_y, num_trampas, regiones_pesos)
 
         logger.info(
             f"Simulación {i}: dispositivo=({eje_x},{eje_y}) "
-            f"trampas={num_trampas} ranges={f_ranges} grosor={grosor_filamento}"
+            f"trampas={num_trampas} filamentos={num_filamentos} ranges={f_ranges} grosor={grosor_filamento}"
         )
 
         out = init_data_dir / f"init_state_{i}.npz"
@@ -116,11 +137,15 @@ def load_simulation_config(
     """
     Lee CSVs + estado inicial para una simulación concreta.
 
+    num_filamentos se lee de simulation_constants.csv.  Si se proporciona
+    explícitamente, sobreescribe el valor del CSV (útil para experimentos
+    puntuales sin regenerar el CSV).  SimulationConfig deriva
+    cf_ranges/cf_centros/cf_creado automáticamente en __post_init__.
+
     Args:
-        num_simulation: Índice de la simulación dentro del CSV (0-based).
-        init_data_dir: Carpeta con `simulation_parameters.csv`,
-            `simulation_constants.csv` y `init_state_{i}.npz`.
-        num_filamentos: Si se proporciona, sobreescribe `ctes.num_filamentos`.
+        num_simulation:  Índice de la simulación dentro del CSV (0-based).
+        init_data_dir:   Carpeta con los CSVs e init_state_{i}.npz.
+        num_filamentos:  Override opcional sobre el valor del CSV.
 
     Returns:
         SimulationConfig listo para `run_cycle`.
@@ -133,32 +158,27 @@ def load_simulation_config(
     sim_cte = utils.read_csv_to_dic(str(init_data_dir / "simulation_constants.csv"))
     ctes = SimulationConstants.from_dict(sim_cte[num_simulation])
 
-    n_fil = num_filamentos if num_filamentos is not None else ctes.num_filamentos
-
-    cf_ranges, _, cf_centros = utils.generar_configuracion_filamentos(
-        eje_x=params.y_size,
-        eje_y=params.x_size,
-        num_filamentos=n_fil,
-    )
-    cf_creado = np.full(len(cf_ranges), False, dtype=bool)
+    if num_filamentos is not None and num_filamentos != ctes.num_filamentos:
+        logger.info(f"num_filamentos override: CSV={ctes.num_filamentos} → {num_filamentos}")
+        ctes = dc_replace(ctes, num_filamentos=num_filamentos)
 
     init_state_path = init_data_dir / f"init_state_{num_simulation}"
     actual_state = utils.cargar_estado(init_state_path)
 
     num_trampas = int(sim_parmtrs[num_simulation].get("num_trampas", 0) or 0)
 
-    logger.info(
-        f"Config cargada · sim={num_simulation} · trampas={num_trampas} · "
-        f"filamentos={n_fil} · ranges={cf_ranges} · centros={cf_centros}"
-    )
-
-    return SimulationConfig(
+    cfg = SimulationConfig(
         num_simulation=num_simulation,
         params=params,
         sim_ctes=ctes,
-        cf_ranges=cf_ranges,
-        cf_centros=cf_centros,
-        cf_creado=cf_creado,
         actual_state=actual_state,
         num_trampas=num_trampas,
     )
+
+    logger.info(
+        f"Config cargada · sim={num_simulation} · trampas={num_trampas} · "
+        f"filamentos={ctes.num_filamentos} · ranges={cfg.cf_ranges} · centros={cfg.cf_centros} · "
+        f"Energia activacion={ctes.generation_energy} · Energia recombinacion={ctes.recombination_energy}"
+    )
+
+    return cfg

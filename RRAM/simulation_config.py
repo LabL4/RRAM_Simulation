@@ -14,7 +14,7 @@ MATERIAL_DEFAULTS = {
     "cte_red": 0.25e-9,
     "permitividad_relativa_set": 299.6653,
     "permitividad_relativa_reset": 299.9641,
-    "generation_energy": 1.02,
+    "generation_energy": 0.2,
     "recombination_energy": 1.5,
     "pb_metal_insul_set": 0.0010,
     "pb_metal_insul_reset": 0.0334,
@@ -22,8 +22,8 @@ MATERIAL_DEFAULTS = {
     "long_decaimiento_concentracion": 1e-9,
     "ohm_resistence_set": 4.3,
     "ohm_resistence_reset": 4.3,
-    "num_filamentos": 2,
-    "grosor_filamento": [20, 20],
+    "num_filamentos": 1,
+    "grosor_filamento": [30],
 }
 
 # ============================================================================
@@ -55,7 +55,7 @@ THERMAL_DEFAULTS = {
     "conductividad_termica_aislante": 0.000001,
     "conductividad_termica_electrodo": 5.0,
     "Temperatura_electrodo": 300,
-    "factor_generar_calor": 5.5e-5,
+    "factor_generar_calor": 6e-5,
     "pendiente_temperatura": -24.7,
 }
 
@@ -87,8 +87,8 @@ SET_RESET_DEFAULTS = {
     "factor_libre_sp_set": 1.0,
     "lim_voltage_percolacion": 1.4,
     "compliance_voltage": 0.6,
-    "voltaje_gen_oxigeno_pp_1": 1.0,
-    "num_oxigenos_pp_reset_1": 1,
+    "voltaje_gen_oxigeno_pp_1": 0.7,
+    "num_oxigenos_pp_reset_1": 2,
     "voltaje_gen_oxigeno_pp_2": 1.2,
     "num_oxigenos_pp_reset_2": 10,
     "voltaje_gen_oxigeno_sp": -0.2,

@@ -9,9 +9,9 @@ Subcomandos:
 
 Uso:
     python -m RRAM init
-    python -m RRAM exec  <num_simulation> [--num-filamentos N]
+    python -m RRAM exec  <num_simulation>
     python -m RRAM plot  <num_simulation>
-    python -m RRAM all   <num_simulation> [--num-filamentos N] [--guardar-datos]
+    python -m RRAM all   <num_simulation> [--guardar-datos]
 
 Variables de entorno:
     RRAM_LOG_LEVEL=DEBUG|INFO|WARNING|ERROR  (default INFO)
@@ -43,12 +43,12 @@ def _build_parser() -> argparse.ArgumentParser:
     # init
     p_init = sub.add_parser("init", help="Pre-genera estados iniciales en Init_data/")
     p_init.add_argument("--init-data-dir", default="Init_data")
-    p_init.add_argument("--num-filamentos-pesos", type=int, default=2)
 
     # exec
     p_exec = sub.add_parser("exec", help="Ejecuta el ciclo SET → RESET.")
     p_exec.add_argument("num_simulation", type=int)
-    p_exec.add_argument("--num-filamentos", type=int, default=None)
+    p_exec.add_argument("--num-filamentos", type=int, default=None,
+                        help="Sobreescribe num_filamentos del CSV para esta ejecución.")
     p_exec.add_argument("--init-data-dir", default="Init_data")
     p_exec.add_argument("--results-dir", default="Results")
     p_exec.add_argument(
@@ -70,7 +70,8 @@ def _build_parser() -> argparse.ArgumentParser:
     # all (compat con el flujo histórico)
     p_all = sub.add_parser("all", help="init (si falta) + exec + plot.")
     p_all.add_argument("num_simulation", type=int)
-    p_all.add_argument("--num-filamentos", type=int, default=None)
+    p_all.add_argument("--num-filamentos", type=int, default=None,
+                       help="Sobreescribe num_filamentos del CSV para esta ejecución.")
     p_all.add_argument("--guardar-datos", action="store_true")
     p_all.add_argument("--init-data-dir", default="Init_data")
     p_all.add_argument("--results-dir", default="Results")
@@ -90,10 +91,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def _cmd_init(args) -> int:
     setup_logging(num_simulation=None, to_console=True)
-    build_initial_states(
-        init_data_dir=args.init_data_dir,
-        num_filamentos_para_pesos=args.num_filamentos_pesos,
-    )
+    build_initial_states(init_data_dir=args.init_data_dir)
     return 0
 
 
@@ -114,9 +112,6 @@ def _cmd_exec(args) -> int:
         )
         return 0
     except Exception as e:
-        # Las fases pueden lanzar excepciones de simulación legítimas
-        # (NoPercolation, MaxVacantes...). Las logueamos con traceback en el
-        # archivo de log y propagamos código de error al subprocess.
         log.exception(
             f"exec sim={args.num_simulation + 1} abortado: {type(e).__name__}: {e}"
         )
