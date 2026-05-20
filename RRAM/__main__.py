@@ -18,7 +18,7 @@ Variables de entorno:
 """
 
 from __future__ import annotations
-
+import numpy as np
 import argparse
 import logging
 import sys
@@ -47,8 +47,9 @@ def _build_parser() -> argparse.ArgumentParser:
     # exec
     p_exec = sub.add_parser("exec", help="Ejecuta el ciclo SET → RESET.")
     p_exec.add_argument("num_simulation", type=int)
-    p_exec.add_argument("--num-filamentos", type=int, default=None,
-                        help="Sobreescribe num_filamentos del CSV para esta ejecución.")
+    p_exec.add_argument(
+        "--num-filamentos", type=int, default=None, help="Sobreescribe num_filamentos del CSV para esta ejecución."
+    )
     p_exec.add_argument("--init-data-dir", default="Init_data")
     p_exec.add_argument("--results-dir", default="Results")
     p_exec.add_argument(
@@ -61,6 +62,13 @@ def _build_parser() -> argparse.ArgumentParser:
             "Requiere que exista el estado guardado de la fase precedente en Init_data/."
         ),
     )
+    p_exec.add_argument(
+        "--stop-at",
+        choices=["pp_set", "sp_set", "pp_reset", "sp_reset"],
+        default=None,
+        metavar="FASE",
+        help="Fase en la que terminar el ciclo, inclusive (pp_set | sp_set | pp_reset | sp_reset).",
+    )
 
     # plot
     p_plot = sub.add_parser("plot", help="Replotea una simulación previamente ejecutada.")
@@ -70,8 +78,9 @@ def _build_parser() -> argparse.ArgumentParser:
     # all (compat con el flujo histórico)
     p_all = sub.add_parser("all", help="init (si falta) + exec + plot.")
     p_all.add_argument("num_simulation", type=int)
-    p_all.add_argument("--num-filamentos", type=int, default=None,
-                       help="Sobreescribe num_filamentos del CSV para esta ejecución.")
+    p_all.add_argument(
+        "--num-filamentos", type=int, default=None, help="Sobreescribe num_filamentos del CSV para esta ejecución."
+    )
     p_all.add_argument("--guardar-datos", action="store_true")
     p_all.add_argument("--init-data-dir", default="Init_data")
     p_all.add_argument("--results-dir", default="Results")
@@ -85,11 +94,19 @@ def _build_parser() -> argparse.ArgumentParser:
             "Requiere que exista el estado guardado de la fase precedente en Init_data/."
         ),
     )
+    p_all.add_argument(
+        "--stop-at",
+        choices=["pp_set", "sp_set", "pp_reset", "sp_reset"],
+        default=None,
+        metavar="FASE",
+        help="Fase en la que terminar el ciclo, inclusive (pp_set | sp_set | pp_reset | sp_reset).",
+    )
 
     return p
 
 
 def _cmd_init(args) -> int:
+
     setup_logging(num_simulation=None, to_console=True)
     build_initial_states(init_data_dir=args.init_data_dir)
     return 0
@@ -108,13 +125,12 @@ def _cmd_exec(args) -> int:
             cfg,
             results_dir=args.results_dir,
             start_from=args.start_from,
+            stop_at=args.stop_at,
             init_data_dir=args.init_data_dir,
         )
         return 0
     except Exception as e:
-        log.exception(
-            f"exec sim={args.num_simulation + 1} abortado: {type(e).__name__}: {e}"
-        )
+        log.exception(f"exec sim={args.num_simulation + 1} abortado: {type(e).__name__}: {e}")
         return 1
 
 
@@ -157,6 +173,7 @@ def _cmd_all(args) -> int:
             cfg,
             results_dir=args.results_dir,
             start_from=args.start_from,
+            stop_at=args.stop_at,
             init_data_dir=args.init_data_dir,
         )
     except Exception as e:

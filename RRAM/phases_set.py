@@ -81,7 +81,7 @@ def PP_set(
 
     sistema_percola = False
     total_vacantes_pp_set = False
-    num_pasos_guardar_estado = 100
+    num_pasos_guardar_estado = 50
     cf_clean_matrix = None
     voltaje_percolacion = params.voltaje_final_set
 
@@ -90,7 +90,9 @@ def PP_set(
     temperatura_anterior = params.init_temp
     pendiente_temperatura = sim_ctes.pendiente_temperatura
 
-    logger.info(f"Los valores de factor vecinos y factor libre son: {sim_ctes.factor_vecinos_pp_set} y {sim_ctes.factor_libre_pp_set} ")
+    logger.info(
+        f"Los valores de factor vecinos y factor libre son: {sim_ctes.factor_vecinos_pp_set} y {sim_ctes.factor_libre_pp_set} "
+    )
 
     max_vancantes_pp_set = int(sim_ctes.ocupacion_max_pp_set * params.num_max_vacantes)
     voltage_CF_creado = np.full(len(CF_ranges), 0.0)
@@ -184,7 +186,9 @@ def PP_set(
             if sistema_percola is False:
                 voltaje_percolacion = voltage  # Guardo el voltaje de percolación
                 ocupacion_percola = np.sum(actual_state)
-                logger.info(f"\nEl sistema ha percolado en la iteración: {k}  que corresponde con el voltaje: {round(voltaje_percolacion, 5)}  con una ocupación del: {round((np.sum(actual_state) / (params.num_max_vacantes)), 4) * 100} que corresponde con un numero de vacantes de: {int(np.sum(actual_state))} ")
+                logger.info(
+                    f"\nEl sistema ha percolado en la iteración: {k}  que corresponde con el voltaje: {round(voltaje_percolacion, 5)}  con una ocupación del: {round((np.sum(actual_state) / (params.num_max_vacantes)), 4) * 100} que corresponde con un numero de vacantes de: {int(np.sum(actual_state))} "
+                )
 
                 if voltaje_percolacion >= sim_ctes.lim_voltage_percolacion:
                     # Si el voltaje de percolación es demasiado alto no va a coincidir con los datos experimentales, y no merece la pena seguir con la simulación
@@ -299,7 +303,9 @@ def PP_set(
                     # Añadimos columnas de ceros (donde no hay muro) en las posiciones de los electrodos
                     Ny = matriz_temperaturas_fijas.shape[0]
                     columna_ceros = np.zeros((Ny, 1))
-                    matriz_temperaturas_fijas_final = np.hstack([columna_ceros, matriz_temperaturas_fijas, columna_ceros])
+                    matriz_temperaturas_fijas_final = np.hstack(
+                        [columna_ceros, matriz_temperaturas_fijas, columna_ceros]
+                    )
 
                     temperatura = Temperature.solve_thermal_state(
                         types_map=materials_map,
@@ -364,10 +370,13 @@ def PP_set(
                 sim_ctes.factor_libre_pp_set,
                 max_vancantes_pp_set,
                 custom_mask=limit_CF_witdh_mask_generation,
+                num_iteracion=k,
             )
 
         elif not total_vacantes_pp_set:
-            logger.info(f"\nSe ha alcanzado la ocupación máxima del {sim_ctes.ocupacion_max_pp_set * 100}% en la primera parte del set en el paso {k}.")
+            logger.info(
+                f"\nSe ha alcanzado la ocupación máxima del {sim_ctes.ocupacion_max_pp_set * 100}% en la primera parte del set en el paso {k}."
+            )
             total_vacantes_pp_set = True
 
         # region GUARDAR ESTADO
@@ -381,6 +390,32 @@ def PP_set(
             resistencia_vector[k] = np.array([k, voltage, 0])
 
         num_vacantes_total[k] = np.array([k, voltage, total_vacantes])
+
+        # SI la temperatura es un escalar, se muestra tal cual. Si es una matriz, se muestra el valor máximo para no saturar el log
+        temperatura_a_mostrar = temperatura if isinstance(temperatura, (float, int)) else np.max(temperatura)
+        if 4100 <= k <= 8100:
+            logger.debug(
+                f"Estamos en el paso {k} de {params.num_pasos}, el número de vacantes es {np.sum(actual_state):1f}, la corriente es {current:3f}, el voltaje es {vector_ddp[k]:3f} y la temperatura máxima es {temperatura_a_mostrar}"
+            )
+            # Si se ha creado la matriz de temperaturas fijas es porque se ha creado el muro y entonces tiene sentido guardarlo.
+            if locals().get("matriz_temperaturas_fijas") is not None:
+                matriz_para_plot_muro = np.copy(matriz_temperaturas_fijas)
+                for centro, perfil_filamento in zip(centros_calculados, mis_perfiles_extraidos):  # type: ignore
+                    if centro is not None and perfil_filamento is not None:
+                        matriz_para_plot_muro[centro, :] = perfil_filamento
+
+            # Guardo las variables del estado
+            utils.guardar_estado_intermedio(
+                ruta_destino=rutas["data_simulation_path"],
+                etapa="pp_set",
+                num_simulation=num_simulation,
+                k=k,
+                actual_state=actual_state,
+                cf_clean_matrix=locals().get("cf_clean_matrix"),
+                temperatura=locals().get("temperatura"),
+                probabilidad_matrix=locals().get("probabilidad_matrix"),
+                matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
+            )
 
         if k % num_pasos_guardar_estado == 0:
             # Si se ha creado la matriz de temperaturas fijas es porque se ha creado el muro y entonces tiene sentido guardarlo.
@@ -402,7 +437,7 @@ def PP_set(
                 probabilidad_matrix=locals().get("probabilidad_matrix"),
                 matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
             )
-            # endregion
+        # endregion
 
     # Guardo el estado final si el último k no cayó en múltiplo de num_pasos_guardar_estado
     if k % num_pasos_guardar_estado != 0:
@@ -754,10 +789,13 @@ def SP_set(
                 sim_ctes.factor_vecinos_sp_set,
                 sim_ctes.factor_libre_sp_set,
                 ocupacion_max_sp_set,
+                num_iteracion=k,
             )
 
         elif not total_vacantes_sp_set:
-            logger.info(f"Se ha alcanzado la ocupación máxima del {ocupacion_max_sp_set * 100}% en la primera segunda del set en el paso {k}.")
+            logger.info(
+                f"Se ha alcanzado la ocupación máxima del {ocupacion_max_sp_set * 100}% en la primera segunda del set en el paso {k}."
+            )
             total_vacantes_sp_set = True
 
         # Guardo los datos de la simulación
@@ -798,6 +836,6 @@ def SP_set(
 
     np.save(rutas["simulation_path"] / f"Final_state_pp_set_{num_simulation}.npz", actual_state)
 
-    logger.info('Simulación del set finalizada correctamente.')
+    logger.info("Simulación del set finalizada correctamente.")
 
     return final_state_sp_set

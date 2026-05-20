@@ -111,6 +111,7 @@ def run_cycle(
     cfg: SimulationConfig,
     results_dir: Path | str = "Results",
     start_from: Optional[str] = None,
+    stop_at: Optional[str] = None,
     init_data_dir: Path | str = "Init_data",
     desplazamiento_iv: Optional[dict] = None,  # noqa: ARG001 (kept for API stability)
 ) -> SimulationStates:
@@ -124,8 +125,9 @@ def run_cycle(
         start_from: Fase desde la que comenzar el ciclo. Valores válidos:
             ``"sp_set"``, ``"pp_reset"``, ``"sp_reset"``.  Si es ``None``
             (defecto) el ciclo empieza desde ``pp_set``.
-            El estado de la fase precedente se carga automáticamente desde
-            ``init_data_dir/phase_state_{n_save}_{fase_anterior}.*``.
+        stop_at: Fase en la que terminar el ciclo (inclusive). Valores válidos:
+            ``"pp_set"``, ``"sp_set"``, ``"pp_reset"``, ``"sp_reset"``. Si es
+            ``None`` (defecto) el ciclo termina en ``sp_reset``.
         init_data_dir: Carpeta donde se leen/escriben los estados de fase
             (``phase_state_*.npz`` / ``.json``).  Por defecto ``"Init_data"``.
         desplazamiento_iv: Aceptado por compatibilidad pero NO persistido
@@ -135,7 +137,8 @@ def run_cycle(
         `SimulationStates` con los dicts de estado de las fases ejecutadas.
 
     Raises:
-        ValueError: Si ``start_from`` no es un valor reconocido.
+        ValueError: Si ``start_from`` o ``stop_at`` no son valores reconocidos,
+            o si ``stop_at`` es anterior a ``start_from``.
         FileNotFoundError: Si se especifica ``start_from`` pero no existe el
             estado guardado de la fase precedente en ``init_data_dir``.
         Cualquier excepción de simulación legítima de las fases. Antes de
@@ -147,6 +150,11 @@ def run_cycle(
         raise ValueError(
             f"start_from='{start_from}' no válido. "
             f"Valores aceptados: {sorted(_VALID_START)}"
+        )
+    if stop_at is not None and stop_at not in PHASE_ORDER:
+        raise ValueError(
+            f"stop_at='{stop_at}' no válido. "
+            f"Valores aceptados: {PHASE_ORDER}"
         )
 
     n = cfg.num_simulation
@@ -185,7 +193,12 @@ def run_cycle(
     ]
 
     start_idx = PHASE_ORDER.index(start_from) if start_from else 0
-    fases = fases_all[start_idx:]
+    stop_idx  = PHASE_ORDER.index(stop_at) + 1 if stop_at else len(PHASE_ORDER)
+    if stop_idx <= start_idx:
+        raise ValueError(
+            f"stop_at='{stop_at}' debe ser posterior a start_from='{start_from}'."
+        )
+    fases = fases_all[start_idx:stop_idx]
 
     for nombre, ejecutor in fases:
         try:

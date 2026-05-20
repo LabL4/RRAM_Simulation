@@ -146,8 +146,8 @@ def actualizar_parametros_por_filamento(
     if num_esperados == 1:
         if filamentos_actuales == 1:
             logger.info("Todos los filamentos creados.")
-            sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 5)
-            sim_ctes = sim_ctes.update_generation_energy(1.75)
+            sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 3)
+            # sim_ctes = sim_ctes.update_generation_energy(1.75)
             all_CFs_created = True
 
     # 2. Caso para dos filamentos

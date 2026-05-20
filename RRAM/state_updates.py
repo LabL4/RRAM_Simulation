@@ -18,6 +18,7 @@ def update_state_generation(
     max_vacantes_permitidas: int,
     neighbor_mode: str = "both",
     custom_mask: np.ndarray | None = None,
+    num_iteracion=None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Orquesta el proceso de generación de vacantes asegurando que no se supere
@@ -52,11 +53,33 @@ def update_state_generation(
         generation_energy=sim_ctes.generation_energy,
         cte_red=sim_ctes.cte_red,
         gamma=sim_ctes.gamma,
+        num_iteracion=num_iteracion,
         neighbor_mode=neighbor_mode,
         custom_mask=custom_mask,
     )
 
+    # =========================================================================
+    # TEST TEMPORAL: limitar vacantes generadas a un máximo de 20 por paso.
+    # Propósito: aislar si la generación masiva de vacantes dispara la
+    # temperatura en los pasos ~7969. ELIMINAR antes de producción.
+    # =========================================================================
+    # _TEST_MAX_GENERACION_POR_PASO = 20
+    # candidatas_mask = prob_final > 0
+    # num_candidatas = int(np.sum(candidatas_mask))
+    # if num_candidatas > _TEST_MAX_GENERACION_POR_PASO:
+    #     coords_cand = np.argwhere(candidatas_mask)
+    #     probs_cand = prob_final[candidatas_mask]
+    #     top_indices = np.argsort(probs_cand)[::-1][:_TEST_MAX_GENERACION_POR_PASO]
+    #     seleccionadas = coords_cand[top_indices]
+    #     prob_final_test = np.zeros_like(prob_final)
+    #     prob_final_test[seleccionadas[:, 0], seleccionadas[:, 1]] = prob_final[seleccionadas[:, 0], seleccionadas[:, 1]]
+    #     prob_final = prob_final_test
+    # =========================================================================
+    # FIN TEST TEMPORAL
+    # =========================================================================
+
     # 4. Evaluación de la estocástica (cuáles "intentan" generarse)
+    # TODO para que todas las simulaciones sean iguales, eliminar dps
     aleatorios = np.random.rand(x_size, y_size)
     nueva_vacante = aleatorios < prob_final
 
