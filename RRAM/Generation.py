@@ -2,6 +2,9 @@ from numba import njit
 import numpy as np
 
 from RRAM import Constants as cte
+import logging
+
+logger = logging.getLogger(__name__)
 
 k_b_ev = 8.617333262145e-5  # Boltzmann constant in eV/K
 
@@ -44,7 +47,6 @@ def initial_state_priv(Eje_x: int, Eje_y: int, num_trampas: int, regiones_pesos:
     return InitialState
 
 
-@njit
 def calcular_probabilidad_generacion(
     time_stp: float,
     electric_field: np.ndarray | float,
@@ -53,6 +55,7 @@ def calcular_probabilidad_generacion(
     generation_energy: float,
     cte_red: float,
     gamma: float,
+    num_iteracion: None,
 ) -> np.ndarray | float:
     """
     Calcula la matriz de probabilidades de generación para una matriz de campo eléctrico.
@@ -60,7 +63,15 @@ def calcular_probabilidad_generacion(
     """
 
     exponente = (generation_energy - (gamma * cte_red * electric_field)) / (k_b_ev * temp)
+
     prob_matrix = time_stp * vibration_frequency * np.exp(-exponente)
+    if num_iteracion is not None:
+        if 4100 < num_iteracion < 8100:
+            logger.debug(
+                # f"Estamos en el paso {num_iteracion}, La temperatura es {temp:4f}, "
+                # f"el campo eléctrico es {electric_field}, "
+                f"el exponente es {np.max(exponente):3f}y, el máx. prob. base sin limitar es {np.max(prob_matrix):3f}"
+            )
 
     # Limitar probabilidades máximas a 1
     prob_matrix = np.minimum(prob_matrix, 1.0)
@@ -79,6 +90,7 @@ def get_generation_probabilities_matrix(
     generation_energy: float,
     cte_red: float,
     gamma: float,
+    num_iteracion: None,
     neighbor_mode: str = "both",
     custom_mask: np.ndarray | None = None,
 ) -> np.ndarray:
@@ -102,6 +114,7 @@ def get_generation_probabilities_matrix(
         generation_energy=generation_energy,
         cte_red=cte_red,
         gamma=gamma,
+        num_iteracion=num_iteracion,
     )
 
     if not isinstance(prob_base_raw, np.ndarray) or prob_base_raw.ndim == 0:
