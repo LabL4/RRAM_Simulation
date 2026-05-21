@@ -142,8 +142,7 @@ def get_generation_probabilities_matrix(
 
 def contar_vecinos_zona_filamento(
     actual_state: np.ndarray,
-    centros_CF: list,
-    grosor_CF,
+    cf_ranges: list,
     valor_vacante: int = 1,
 ) -> dict:
     """
@@ -156,8 +155,8 @@ def contar_vecinos_zona_filamento(
 
     Args:
         actual_state: Matriz 2D del estado (0=óxido, valor_vacante=vacante).
-        centros_CF:   Lista de filas centrales de cada filamento.
-        grosor_CF:    Filas extra arriba/abajo del centro (int o lista).
+        cf_ranges:    Lista de tuplas (fila_min, fila_max) que delimitan la
+                      zona de cada filamento (igual que CF_ranges en run_cycle).
         valor_vacante: Valor que representa una vacante (por defecto 1).
 
     Returns:
@@ -170,18 +169,9 @@ def contar_vecinos_zona_filamento(
     filas, columnas = estado.shape
     es_vacante = (estado == valor_vacante).astype(int)
 
-    if isinstance(grosor_CF, (int, np.integer)):
-        grosores = [int(grosor_CF)] * len(centros_CF)
-    else:
-        grosores = list(grosor_CF)
-        if len(grosores) < len(centros_CF):
-            grosores += [grosores[-1]] * (len(centros_CF) - len(grosores))
-
     zona_mask = np.zeros((filas, columnas), dtype=bool)
-    for fila_central, grosor in zip(centros_CF, grosores):
-        fila_inicio = max(0, fila_central - grosor)
-        fila_fin = min(filas, fila_central + grosor + 1)
-        zona_mask[fila_inicio:fila_fin, :] = True
+    for fila_min, fila_max in cf_ranges:
+        zona_mask[fila_min:fila_max + 1, :] = True
 
     kernel = np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]])
     conteo_vecinos = convolve2d(

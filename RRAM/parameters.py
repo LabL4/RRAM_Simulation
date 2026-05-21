@@ -17,6 +17,7 @@ class SimulationParameters:
     voltaje_final_reset: float
     voltaje_final_set: float
     init_temp: float
+    densidad_vacantes: float
 
     x_size: int = field(init=False)
     y_size: int = field(init=False)

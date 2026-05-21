@@ -73,6 +73,7 @@ SIMULATION_DEFAULTS = {
     "voltaje_final": 1.1,
     "voltaje_final_set": 1.1,
     "voltaje_final_reset": 1.4,
+    "densidad_vacantes": 20.0,  # vacantes / nm²
 }
 
 # ============================================================================
@@ -194,6 +195,7 @@ class ConfigManager:
             "voltaje_final_set",
             "voltaje_final_reset",
             "init_temp",
+            "densidad_vacantes",
         ]
 
         # Quitamos conductividades calculadas y diccionarios complejos
