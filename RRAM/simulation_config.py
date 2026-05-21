@@ -65,7 +65,7 @@ THERMAL_DEFAULTS = {
 # ============================================================================
 SIMULATION_DEFAULTS = {
     "device_size_x": 10e-9,  # Ancho entre electrodos, debe corresponder a los dispositivos medidos
-    "device_size_y": 30e-9,
+    "device_size_y": 40e-9,
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
     "num_trampas": 197,
     "total_simulation_time": 10.0,
