@@ -80,11 +80,13 @@ def _save_partial_metadata(
 ) -> None:
     """Persiste metadata con la mayor cantidad de datos disponibles."""
     pp_set = states.pp_set or {}
+    sp_set = states.sp_set or {}
     sp_reset = states.sp_reset or {}
 
     voltaje_perco = pp_set.get("voltaje_percolacion", 0.0)
     creaciones = pp_set.get("creaciones_dict", {}) or {}
     roturas = sp_reset.get("roturas_dict", {}) or {}
+    vecindad_inicial = sp_set.get("vecindad_inicial", None)
 
     meta = SimulationMetadata(
         num_simulation=n_save,
@@ -100,6 +102,7 @@ def _save_partial_metadata(
         extra={
             "status": status,
             **({"error": error} if error else {}),
+            **({"vecindad_inicial": vecindad_inicial} if vecindad_inicial is not None else {}),
         },
     )
     sim_path = _resolve_simulation_path(results_dir, n_save)

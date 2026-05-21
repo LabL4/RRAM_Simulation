@@ -63,15 +63,7 @@ def calcular_probabilidad_generacion(
     """
 
     exponente = (generation_energy - (gamma * cte_red * electric_field)) / (k_b_ev * temp)
-
     prob_matrix = time_stp * vibration_frequency * np.exp(-exponente)
-    if num_iteracion is not None:
-        if 4100 < num_iteracion < 8100:
-            logger.debug(
-                # f"Estamos en el paso {num_iteracion}, La temperatura es {temp:4f}, "
-                # f"el campo eléctrico es {electric_field}, "
-                f"el exponente es {np.max(exponente):3f}y, el máx. prob. base sin limitar es {np.max(prob_matrix):3f}"
-            )
 
     # Limitar probabilidades máximas a 1
     prob_matrix = np.minimum(prob_matrix, 1.0)
@@ -146,6 +138,63 @@ def get_generation_probabilities_matrix(
         prob_final[free_mask & ~vecino_mask] = prob_base_matrix[free_mask & ~vecino_mask] * factor_sin_vecinos
 
     return np.minimum(prob_final, 1.0)
+
+
+def contar_vecinos_zona_filamento(
+    actual_state: np.ndarray,
+    centros_CF: list,
+    grosor_CF,
+    valor_vacante: int = 1,
+) -> dict:
+    """
+    Cuenta vecinos de vacantes SOLO dentro de la zona de filamentos.
+
+    Para cada vacante en la zona permitida cuenta cuántos de sus 4 vecinos
+    directos (arriba, abajo, izquierda, derecha) son también vacantes.
+    Las vacantes fuera de la zona no se contabilizan pero sí influyen en el
+    conteo de vecinos de las que están en el borde de la zona.
+
+    Args:
+        actual_state: Matriz 2D del estado (0=óxido, valor_vacante=vacante).
+        centros_CF:   Lista de filas centrales de cada filamento.
+        grosor_CF:    Filas extra arriba/abajo del centro (int o lista).
+        valor_vacante: Valor que representa una vacante (por defecto 1).
+
+    Returns:
+        Dict con claves ``vecinos_0``..``vecinos_4`` (nº de vacantes con ese
+        número de vecinos) y ``total_vacantes_zona``.
+    """
+    from scipy.signal import convolve2d
+
+    estado = np.array(actual_state)
+    filas, columnas = estado.shape
+    es_vacante = (estado == valor_vacante).astype(int)
+
+    if isinstance(grosor_CF, (int, np.integer)):
+        grosores = [int(grosor_CF)] * len(centros_CF)
+    else:
+        grosores = list(grosor_CF)
+        if len(grosores) < len(centros_CF):
+            grosores += [grosores[-1]] * (len(centros_CF) - len(grosores))
+
+    zona_mask = np.zeros((filas, columnas), dtype=bool)
+    for fila_central, grosor in zip(centros_CF, grosores):
+        fila_inicio = max(0, fila_central - grosor)
+        fila_fin = min(filas, fila_central + grosor + 1)
+        zona_mask[fila_inicio:fila_fin, :] = True
+
+    kernel = np.array([[0, 1, 0], [1, 0, 1], [0, 1, 0]])
+    conteo_vecinos = convolve2d(
+        es_vacante, kernel, mode="same", boundary="fill", fillvalue=0
+    )
+
+    vacantes_en_zona = (es_vacante == 1) & zona_mask
+    resultados = {
+        f"vecinos_{i}": int(np.sum((conteo_vecinos == i) & vacantes_en_zona))
+        for i in range(5)
+    }
+    resultados["total_vacantes_zona"] = int(np.sum(vacantes_en_zona))
+    return resultados
 
 
 def create_custom_mask(state, centros_CF, grosor_CF):
