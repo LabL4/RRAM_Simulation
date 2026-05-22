@@ -23,7 +23,7 @@ MATERIAL_DEFAULTS = {
     "ohm_resistence_set": 4.3,
     "ohm_resistence_reset": 4.3,
     "num_filamentos": 1,
-    "grosor_filamento": [30],
+    "grosor_filamento": [22],
 }
 
 # ============================================================================
