@@ -149,10 +149,10 @@ def RepresentateState(
 
     # El blanco SIEMPRE será el valor 0, y tu color SIEMPRE será el valor 1.
     cmap = ListedColormap([(1, 1, 1), color])
-    fig, ax = plt.subplots(figsize=(12, 9))
+    fig, ax = plt.subplots(figsize=(12, 10))
 
     # Descomenta estas líneas según tu entorno
-    setup_paper_plt(plt, latex=True, scaling=2.5)
+    setup_paper_plt(plt, latex=True, scaling=2)
     config_ax_state(ax)
 
     # 1. CÁLCULO DE DIMENSIONES (Crecimiento en X, Clasificación en Y)
@@ -224,6 +224,8 @@ def RepresentateState(
     # Guardar archivos
     if guardar_png:
         plt.savefig(filename, bbox_inches="tight", dpi=300)
+        ruta_pdf = os.path.splitext(filename)[0] + ".pdf"
+        plt.savefig(ruta_pdf, bbox_inches="tight")
     else:
         ruta_pdf = os.path.splitext(filename)[0] + ".pdf"
         plt.savefig(ruta_pdf, bbox_inches="tight")
@@ -387,51 +389,51 @@ def plot_IV(
 
     # ---------- EJE Y ----------
     # Marcas en potencias de 10 de 10⁻⁷ a 10⁻²
-    y_ticks = [1e-9, 1e-8, 1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1]
+    y_ticks = [1e-7, 1e-6, 1e-5, 1e-4, 1e-3, 1e-2, 1e-1]
     axes.set_yticks(y_ticks)
     axes.get_yaxis().set_major_formatter(ticker.FormatStrFormatter("$10^{%d}$"))
 
     # Esto imprime las etiquetas en forma 10⁻⁷, 10⁻⁶, etc.
-    axes.set_yticklabels(
-        [
-            r"$10^{-9}$",
-            r"$10^{-8}$",
-            r"$10^{-7}$",
-            r"$10^{-6}$",
-            r"$10^{-5}$",
-            r"$10^{-4}$",
-            r"$10^{-3}$",
-            r"$10^{-2}$",
-            r"$10^{-1}$",
-        ]
-    )
+    # axes.set_yticklabels(
+    #     [
+    #         r"$10^{-9}$",
+    #         r"$10^{-8}$",
+    #         r"$10^{-7}$",
+    #         r"$10^{-6}$",
+    #         r"$10^{-5}$",
+    #         r"$10^{-4}$",
+    #         r"$10^{-3}$",
+    #         r"$10^{-2}$",
+    #         r"$10^{-1}$",
+    #     ]
+    # )
 
     # Represento una línea para el set y otra para el reset
-    axes.plot(v_set, i_set, color="red", linewidth=4, label="SET")
-    axes.plot(v_reset, i_reset, color="red", linewidth=4, label="RESET")
+    axes.plot(v_set, i_set, color="red", linewidth=4, label="Simulation")
+    # axes.plot(v_reset, i_reset, color="red", linewidth=4, label="RESET")
 
     # Ruta de los datos experimentales
     # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Set_1t'
     # ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Reset_1.txt'
 
-    # ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1600.txt"
-    # ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1600.txt"
+    ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt"
+    ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt"
 
     # ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Medidas_Eduardo/D_Set_1_Run35.txt"
     # ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Medidas_Eduardo/D_Reset_1_Run35.txt"
 
     # Cargar datos experimentales
-    # data_set = np.loadtxt(ruta_archivo_set, skiprows=1)
-    # data_reset = np.loadtxt(ruta_archivo_reset, skiprows=1)
+    data_set = np.loadtxt(ruta_archivo_set, skiprows=1)
+    data_reset = np.loadtxt(ruta_archivo_reset, skiprows=1)
 
-    # x_set = data_set[:, 0]
-    # y_set = data_set[:, 1]
-    # x_reset = data_reset[:, 0]  # * (-1.0)   TODO: Importante comprobar si las medidas se leen con el signo ya o no
-    # y_reset = abs(data_reset[:, 1])
+    x_set = data_set[:, 0]
+    y_set = data_set[:, 1]
+    x_reset = data_reset[:, 0]  # * (-1.0)   TODO: Importante comprobar si las medidas se leen con el signo ya o no
+    y_reset = abs(data_reset[:, 1])
 
     # Curvas experimentales
-    # axes.plot(x_set, y_set, "black", label="Set experimental", linewidth=2)
-    # axes.plot(x_reset, y_reset, "black", label="Reset experimental", linewidth=2)
+    axes.plot(x_set, y_set, "black", label="Experimental", linewidth=2)
+    axes.plot(x_reset, y_reset, "black", linewidth=2)
     # Antes ponia 2.5 de grosor de linea (antes de las medidas de arturo)
     # Leyenda ajustada en la parte inferior izquierda
     axes.legend(
@@ -534,17 +536,17 @@ def plot_IV_marcado(
     axes.plot(v_reset, i_reset, color="red", linewidth=4, label="RESET")
 
     # Ruta de los datos experimentales
-    # ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1600.txt"
-    # ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1600.txt"
+    ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt"
+    ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt"
 
     # Cargar datos experimentales
-    # data_set = np.loadtxt(ruta_archivo_set, skiprows=1)
-    # data_reset = np.loadtxt(ruta_archivo_reset, skiprows=1)
+    data_set = np.loadtxt(ruta_archivo_set, skiprows=1)
+    data_reset = np.loadtxt(ruta_archivo_reset, skiprows=1)
 
-    # x_set = data_set[:, 0]
-    # y_set = data_set[:, 1]
-    # x_reset = data_reset[:, 0]  # * (-1.0)   TODO: Importante comprobar si las medidas se leen con el signo ya o no
-    # y_reset = abs(data_reset[:, 1])
+    x_set = data_set[:, 0]
+    y_set = data_set[:, 1]
+    x_reset = data_reset[:, 0]  # * (-1.0)   TODO: Importante comprobar si las medidas se leen con el signo ya o no
+    y_reset = abs(data_reset[:, 1])
 
     (x_0, y_0) = next(iter(lista_puntos.values()))
     # print("Punto de referencia (0,0): ", (x_0, y_0))
@@ -558,8 +560,8 @@ def plot_IV_marcado(
     )
 
     # Curvas experimentales
-    # axes.plot(x_set, y_set, "black", label="Set Exp.", linewidth=2)
-    # axes.plot(x_reset, y_reset, "black", label="Reset Exp.", linewidth=2)
+    axes.plot(x_set, y_set, "black", label="Set Exp.", linewidth=2)
+    axes.plot(x_reset, y_reset, "black", label="Reset Exp.", linewidth=2)
 
     for label, (xp, yp) in lista_puntos.items():
         dx, factor_y = desplazamiento.get(label, (0.02, 1.0))  # 1.0 = sin desplazamiento en y

@@ -53,6 +53,7 @@ class SimulationConfig:
             eje_y=self.params.x_size,
             num_filamentos=self.sim_ctes.num_filamentos,
             grosores_filamento=self.sim_ctes.grosor_filamento,
+            centros_override=self.sim_ctes.centros_filamento,  # ← nuevo
         )
         self.cf_ranges = cf_ranges
         self.cf_centros = cf_centros
@@ -89,6 +90,7 @@ def build_initial_states(
 
         num_filamentos = 2
         grosor_filamento = None
+        centros_filamento = None
         if df_ctes is not None and i < len(df_ctes):
             raw_nf = df_ctes.iloc[i].get("num_filamentos", None)
             if raw_nf is not None:
@@ -104,11 +106,21 @@ def build_initial_states(
                 except (ValueError, SyntaxError):
                     grosor_filamento = int(float(raw_gf))
 
+            raw_cf = df_ctes.iloc[i].get("centros_filamento", None)
+            if raw_cf is not None:
+                try:
+                    parsed = ast.literal_eval(str(raw_cf).strip())
+                    if isinstance(parsed, list):
+                        centros_filamento = parsed
+                except (ValueError, SyntaxError):
+                    pass
+
         f_ranges, regiones_pesos, _ = utils.generar_configuracion_filamentos(
             eje_x,
             eje_y,
             num_filamentos=num_filamentos,
             grosores_filamento=grosor_filamento,
+            centros_override=centros_filamento,
         )
         init_state = Generation.initial_state_priv(eje_x, eje_y, num_trampas, regiones_pesos)
 

@@ -2,7 +2,7 @@
 
 import ast
 from dataclasses import dataclass, replace
-from typing import Any, Dict, get_type_hints
+from typing import Any, Dict, List, Optional, get_type_hints
 
 
 @dataclass(frozen=True)
@@ -48,6 +48,7 @@ class SimulationConstants:
     num_oxigenos_pp_reset_2: int
     voltaje_gen_oxigeno_sp: float
     num_oxigenos_sp_reset: int
+    centros_filamento: Optional[List[int]] = None  # ← nuevo
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SimulationConstants":

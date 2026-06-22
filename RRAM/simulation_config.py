@@ -12,18 +12,18 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 MATERIAL_DEFAULTS = {
     "cte_red": 0.25e-9,
-    "permitividad_relativa_set": 299.6653,
+    "permitividad_relativa_set": 299.8869,
     "permitividad_relativa_reset": 299.9641,
-    "generation_energy": 0.2,
-    "recombination_energy": 1.5,
-    "pb_metal_insul_set": 0.0010,
+    "generation_energy": 1.02,
+    "recombination_energy": 1.55,
+    "pb_metal_insul_set": 0.1692,
     "pb_metal_insul_reset": 0.0334,
     "recom_enchancement_factor": 3e3,
     "long_decaimiento_concentracion": 1e-9,
     "ohm_resistence_set": 4.3,
     "ohm_resistence_reset": 4.3,
-    "num_filamentos": 1,
-    "grosor_filamento": [10],
+    "num_filamentos": 2,
+    "grosor_filamento": [5, 3],
 }
 
 # ============================================================================
@@ -40,7 +40,7 @@ PHYSICAL_CONSTANTS = {
 # PARÁMETROS ELÉCTRICOS
 # ============================================================================
 ELECTRICAL_DEFAULTS = {
-    "I_0_set": 0.0010731,
+    "I_0_set": 9.7482e-01,
     "I_0_reset": 0.002505,
 }
 
@@ -65,7 +65,7 @@ THERMAL_DEFAULTS = {
 # ============================================================================
 SIMULATION_DEFAULTS = {
     "device_size_x": 10e-9,  # Ancho entre electrodos, debe corresponder a los dispositivos medidos
-    "device_size_y": 40e-9,
+    "device_size_y": 30e-9,
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
     "num_trampas": 197,
     "total_simulation_time": 10.0,
@@ -73,22 +73,23 @@ SIMULATION_DEFAULTS = {
     "voltaje_final": 1.1,
     "voltaje_final_set": 1.1,
     "voltaje_final_reset": 1.4,
-    "densidad_vacantes": 20.0,  # vacantes / nm²
+    "densidad_vacantes": 4.0,  # vacantes / nm²
+    "centros_filamento": None,
 }
 
 # ============================================================================
 # PARÁMETROS SET / RESET
 # ============================================================================
 SET_RESET_DEFAULTS = {
-    "ocupacion_max_pp_set": 0.95,
-    "ocupacion_max_sp_set": 0.95,
+    "ocupacion_max_pp_set": 0.45,
+    "ocupacion_max_sp_set": 0.45,
     "factor_vecinos_pp_set": 1.0,
     "factor_libre_pp_set": 1.0,
     "factor_vecinos_sp_set": 1.0,
-    "factor_libre_sp_set": 1.0,
+    "factor_libre_sp_set": 0.9,
     "lim_voltage_percolacion": 1.4,
     "compliance_voltage": 0.6,
-    "voltaje_gen_oxigeno_pp_1": 0.7,
+    "voltaje_gen_oxigeno_pp_1": 1.1,
     "num_oxigenos_pp_reset_1": 2,
     "voltaje_gen_oxigeno_pp_2": 1.2,
     "num_oxigenos_pp_reset_2": 10,
@@ -241,6 +242,7 @@ class ConfigManager:
             "num_oxigenos_pp_reset_2",
             "voltaje_gen_oxigeno_sp",
             "num_oxigenos_sp_reset",
+            "centros_filamento",  # ← añadir al final
         ]
 
         data_params = [{col: sim.params[col] for col in cols_params} for sim in self.simulations]

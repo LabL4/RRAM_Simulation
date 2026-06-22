@@ -79,6 +79,9 @@ def PP_set(
     else:
         actual_state = actual_state.copy()
 
+    logger.info(f"EL numero de vacanes iniciales es {actual_state.sum()}")
+    logger.info(f"Los centros de cada filamento son: {CF_centros}")
+
     sistema_percola = False
     total_vacantes_pp_set = False
     num_pasos_guardar_estado = 50
@@ -391,31 +394,31 @@ def PP_set(
 
         num_vacantes_total[k] = np.array([k, voltage, total_vacantes])
 
-        # SI la temperatura es un escalar, se muestra tal cual. Si es una matriz, se muestra el valor máximo para no saturar el log
-        temperatura_a_mostrar = temperatura if isinstance(temperatura, (float, int)) else np.max(temperatura)
-        if 4100 <= k <= 8100:
-            logger.debug(
-                f"Estamos en el paso {k} de {params.num_pasos}, el número de vacantes es {np.sum(actual_state):1f}, la corriente es {current:3f}, el voltaje es {vector_ddp[k]:3f} y la temperatura máxima es {temperatura_a_mostrar}"
-            )
-            # Si se ha creado la matriz de temperaturas fijas es porque se ha creado el muro y entonces tiene sentido guardarlo.
-            if locals().get("matriz_temperaturas_fijas") is not None:
-                matriz_para_plot_muro = np.copy(matriz_temperaturas_fijas)
-                for centro, perfil_filamento in zip(centros_calculados, mis_perfiles_extraidos):  # type: ignore
-                    if centro is not None and perfil_filamento is not None:
-                        matriz_para_plot_muro[centro, :] = perfil_filamento
+        # Si la temperatura es un escalar, se muestra tal cual. Si es una matriz, se muestra el valor máximo para no saturar el log
+        # temperatura_a_mostrar = temperatura if isinstance(temperatura, (float, int)) else np.max(temperatura)
+        # if 4100 <= k <= 8100:
+        #     logger.debug(
+        #         f"Estamos en el paso {k} de {params.num_pasos}, el número de vacantes es {np.sum(actual_state):1f}, la corriente es {current:3f}, el voltaje es {vector_ddp[k]:3f} y la temperatura máxima es {temperatura_a_mostrar}"
+        #     )
+        #     # Si se ha creado la matriz de temperaturas fijas es porque se ha creado el muro y entonces tiene sentido guardarlo.
+        #     if locals().get("matriz_temperaturas_fijas") is not None:
+        #         matriz_para_plot_muro = np.copy(matriz_temperaturas_fijas)
+        #         for centro, perfil_filamento in zip(centros_calculados, mis_perfiles_extraidos):  # type: ignore
+        #             if centro is not None and perfil_filamento is not None:
+        #                 matriz_para_plot_muro[centro, :] = perfil_filamento
 
-            # Guardo las variables del estado
-            utils.guardar_estado_intermedio(
-                ruta_destino=rutas["data_simulation_path"],
-                etapa="pp_set",
-                num_simulation=num_simulation,
-                k=k,
-                actual_state=actual_state,
-                cf_clean_matrix=locals().get("cf_clean_matrix"),
-                temperatura=locals().get("temperatura"),
-                probabilidad_matrix=locals().get("probabilidad_matrix"),
-                matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
-            )
+        #     # Guardo las variables del estado
+        #     utils.guardar_estado_intermedio(
+        #         ruta_destino=rutas["data_simulation_path"],
+        #         etapa="pp_set",
+        #         num_simulation=num_simulation,
+        #         k=k,
+        #         actual_state=actual_state,
+        #         cf_clean_matrix=locals().get("cf_clean_matrix"),
+        #         temperatura=locals().get("temperatura"),
+        #         probabilidad_matrix=locals().get("probabilidad_matrix"),
+        #         matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
+        #     )
 
         if k % num_pasos_guardar_estado == 0:
             # Si se ha creado la matriz de temperaturas fijas es porque se ha creado el muro y entonces tiene sentido guardarlo.
@@ -481,7 +484,8 @@ def PP_set(
         resistencia=resistencia_vector,
     )
 
-    np.save(rutas["simulation_path"] / f"Final_state_{num_simulation}_pp_set.npz", actual_state)
+    # Guardo el estado final
+    np.savez(rutas["simulation_path"] / f"Final_state_{num_simulation}_pp_set.npz", actual_state)
 
     # Se decarta la simulación si no se ha llegado a la resistencia mínima necesaria para la segunda parte del set, ya que no va a coincidir con los datos experimentales.
     # if not (35 <= resistencia <= 55):
@@ -834,7 +838,7 @@ def SP_set(
         "tiempo_sp_set": tiempo_sp_set,
     }
 
-    np.save(rutas["simulation_path"] / f"Final_state_pp_set_{num_simulation}.npz", actual_state)
+    np.savez(rutas["simulation_path"] / f"Final_state_sp_set_{num_simulation}.npz", actual_state)
 
     logger.info("Simulación del set finalizada correctamente.")
 

@@ -15,6 +15,7 @@ def generar_configuracion_filamentos(
     num_filamentos: int,
     peso_central: int = 70,
     grosores_filamento: list | int | None = None,
+    centros_override: list[int] | None = None,
 ) -> tuple:
     """
     Calcula los rangos de cada filamento y define las regiones de peso iniciales.
@@ -27,6 +28,8 @@ def generar_configuracion_filamentos(
         grosores_filamento (list | int | None): Grosor en celdas para cada filamento.
             Si es lista, un valor por filamento. Si es int, se aplica a todos.
             Si es None, usa el valor fijo heredado de 2.
+        centros_override (list[int] | None): Filas centrales explícitas por filamento.
+            Si es None, lista vacía o no-lista, usa midpoint automático.
     """
     # Normalizar grosores_filamento a lista de longitud num_filamentos
     if grosores_filamento is None:
@@ -35,10 +38,11 @@ def generar_configuracion_filamentos(
         grosores = [int(grosores_filamento)] * num_filamentos
     else:
         grosores_raw = list(grosores_filamento)
-        # Rellenar con el último valor si la lista es más corta que num_filamentos
         if len(grosores_raw) < num_filamentos:
             grosores_raw += [grosores_raw[-1]] * (num_filamentos - len(grosores_raw))
         grosores = [int(g) for g in grosores_raw[:num_filamentos]]
+
+    usar_override = isinstance(centros_override, list) and len(centros_override) > 0
 
     filamentos_ranges = []
     regiones_pesos = []
@@ -51,7 +55,12 @@ def generar_configuracion_filamentos(
         fin_rango = (n + 1) * ancho_zona - 1 if n < num_filamentos - 1 else eje_x - 1
         filamentos_ranges.append((inicio_rango, fin_rango))
 
-        fila_central = (inicio_rango + fin_rango) // 2
+        if usar_override:
+            fila_central = int(centros_override[n])
+            if not (inicio_rango <= fila_central <= fin_rango):
+                raise ValueError(f"centros_override[{n}]={fila_central} fuera de rango [{inicio_rango}, {fin_rango}]")
+        else:
+            fila_central = (inicio_rango + fin_rango) // 2
         filas_centrales.append(fila_central)
 
         grosor = grosores[n]
@@ -448,99 +457,99 @@ def old_simulation_IV(
     return None
 
 
-def resumen_plots(
-    k,
-    fig_voltage,
-    filas_intermedias,
-    temperatura,
-    materials_map,
-    rutas,
-    num_simulation,
-    voltage,
-    params,
-    actual_state,
-    actual_state_clean_CF,
-    matriz_temperaturas_fijas,
-    matriz_probabilidades,
-    centros_calculados,
-    mis_perfiles_extraidos,
-    CF_ranges,
-    etapa="pp_set",
-    columna_perfil=21,
-):
-    """
-    Genera y guarda todas las gráficas de estado, temperatura y muros térmicos
-    para un paso específico de la simulación.
-    """
+# def resumen_plots(
+#     k,
+#     fig_voltage,
+#     filas_intermedias,
+#     temperatura,
+#     materials_map,
+#     rutas,
+#     num_simulation,
+#     voltage,
+#     params,
+#     actual_state,
+#     actual_state_clean_CF,
+#     matriz_temperaturas_fijas,
+#     matriz_probabilidades,
+#     centros_calculados,
+#     mis_perfiles_extraidos,
+#     CF_ranges,
+#     etapa="pp_set",
+#     columna_perfil=21,
+# ):
+#     """
+#     Genera y guarda todas las gráficas de estado, temperatura y muros térmicos
+#     para un paso específico de la simulación.
+#     """
 
-    logger.info(
-        f"Representando para el paso {k} con voltaje {fig_voltage} V las filas intermedias son {filas_intermedias}"
-    )
+#     logger.info(
+#         f"Representando para el paso {k} con voltaje {fig_voltage} V las filas intermedias son {filas_intermedias}"
+#     )
 
-    # 1. Mapa de temperatura y muros
-    Representate.plot_thermal_state_muro(
-        temperatura,
-        materials_map,
-        fig_voltage,
-        10,
-        save_path=rutas["figures_path"] / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_{etapa}.png",
-        atom_size=params.atom_size,
-        filas_intermedias=filas_intermedias,
-    )
+#     # 1. Mapa de temperatura y muros
+#     Representate.plot_thermal_state_muro(
+#         temperatura,
+#         materials_map,
+#         fig_voltage,
+#         10,
+#         save_path=rutas["figures_path"] / f"Mapa_temperatura_{num_simulation}_{round(voltage, 4)}_{etapa}.png",
+#         atom_size=params.atom_size,
+#         filas_intermedias=filas_intermedias,
+#     )
 
-    # 2. Estados de la matriz
-    Representate.RepresentateState(
-        matriz=actual_state,
-        voltaje=fig_voltage,
-        filename=str(rutas["figures_path"]) + f"/State_{num_simulation}_{fig_voltage}_{etapa}.png",
-        atom_size=params.atom_size,
-    )
+#     # 2. Estados de la matriz
+#     Representate.RepresentateState(
+#         matriz=actual_state,
+#         voltaje=fig_voltage,
+#         filename=str(rutas["figures_path"]) + f"/State_{num_simulation}_{fig_voltage}_{etapa}.png",
+#         atom_size=params.atom_size,
+#     )
 
-    Representate.RepresentateState(
-        matriz=actual_state_clean_CF,
-        voltaje=fig_voltage,
-        filename=str(rutas["figures_path"]) + f"/State_Clean_{num_simulation}_{fig_voltage}_{etapa}.png",
-        atom_size=params.atom_size,
-    )
+#     Representate.RepresentateState(
+#         matriz=actual_state_clean_CF,
+#         voltaje=fig_voltage,
+#         filename=str(rutas["figures_path"]) + f"/State_Clean_{num_simulation}_{fig_voltage}_{etapa}.png",
+#         atom_size=params.atom_size,
+#     )
 
-    # 3. Preparación y plot del muro térmico
-    matriz_para_plot_muro = np.copy(matriz_temperaturas_fijas)
-    for centro, perfil_filamento in zip(centros_calculados, mis_perfiles_extraidos):
-        if centro is not None and perfil_filamento is not None:
-            matriz_para_plot_muro[centro, :] = perfil_filamento
+#     # 3. Preparación y plot del muro térmico
+#     matriz_para_plot_muro = np.copy(matriz_temperaturas_fijas)
+#     for centro, perfil_filamento in zip(centros_calculados, mis_perfiles_extraidos):
+#         if centro is not None and perfil_filamento is not None:
+#             matriz_para_plot_muro[centro, :] = perfil_filamento
 
-    Representate.plot_muro_termico(
-        matriz_muros=matriz_para_plot_muro,
-        matriz_molde=actual_state_clean_CF,
-        filename=rutas["figures_path"] / f"Muro_termico_{num_simulation}_{fig_voltage}_{etapa}.png",
-        atom_size=params.atom_size,
-    )
+#     Representate.plot_muro_termico(
+#         matriz_muros=matriz_para_plot_muro,
+#         matriz_molde=actual_state_clean_CF,
+#         filename=rutas["figures_path"] / f"Muro_termico_{num_simulation}_{fig_voltage}_{etapa}.png",
+#         atom_size=params.atom_size,
+#     )
 
-    # 4. Centros de filamentos
-    Representate.plot_centros_filamento_det(
-        matriz_state=actual_state,
-        rangos_CF=CF_ranges,
-        filas_intermedias=filas_intermedias,
-        centros_calculados=centros_calculados,
-        filename=rutas["figures_path"] / f"Centros_filamentos_{num_simulation}_{fig_voltage}_{etapa}.png",
-        atom_size=params.atom_size,
-    )
+#     # 4. Centros de filamentos
+#     Representate.plot_centros_filamento_det(
+#         matriz_state=actual_state,
+#         rangos_CF=CF_ranges,
+#         filas_intermedias=filas_intermedias,
+#         centros_calculados=centros_calculados,
+#         filename=rutas["figures_path"] / f"Centros_filamentos_{num_simulation}_{fig_voltage}_{etapa}.png",
+#         atom_size=params.atom_size,
+#     )
 
-    # 5. Matriz de probabilidades
-    Representate.RepresentateHeatmap(
-        matriz=matriz_probabilidades,
-        voltaje=fig_voltage,
-        filename=rutas["figures_path"] / f"Matriz_probabilidades_{num_simulation}_{fig_voltage}_{etapa}.png",
-        device_size=params.device_size,
-    )
+#     # 5. Matriz de probabilidades
+#     Representate.RepresentateHeatmap(
+#         matriz=matriz_probabilidades,
+#         voltaje=fig_voltage,
+#         filename=rutas["figures_path"] / f"Matriz_probabilidades_{num_simulation}_{fig_voltage}_{etapa}.png",
+#         device_size=params.device_size,
+#     )
 
-    # # 6. Perfil térmico
-    # distancias, perfiles = Temperature.extraer_perfiles_temperatura(
-    #     lista_matrices=[temperatura], etiquetas=[f"{fig_voltage}"], columna_x=columna_perfil, atom_size=params.atom_size
-    # )
+# # 6. Perfil térmico
+# distancias, perfiles = Temperature.extraer_perfiles_temperatura(
+#     lista_matrices=[temperatura], etiquetas=[f"{fig_voltage}"], columna_x=columna_perfil, atom_size=params.atom_size
+# )
 
-    # Representate.plot_perfil_temperatura(
-    #     distancias=distancias,
-    #     perfiles=perfiles,
-    #     save_path=rutas["figures_path"] / f"Perfil_termico_{num_simulation}_{fig_voltage}_{etapa}.png",
-    # )
+# Representate.plot_perfil_temperatura(
+#     distancias=distancias,
+#     perfiles=perfiles,
+#     save_path=rutas["figures_path"] / f"Perfil_termico_{num_simulation}_{fig_voltage}_{etapa}.png",
+# )

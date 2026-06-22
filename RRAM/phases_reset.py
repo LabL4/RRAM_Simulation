@@ -296,7 +296,7 @@ def PP_reset(
         datos_sim=data_pp_reset,
     )
     logger.info(f"La temperatura final alcanzada en el reset es: {temperatura} K")
-    np.save(rutas["simulation_path"] / f"Final_state_pp_reset_{num_simulation}.npz", actual_state)
+    np.savez(rutas["simulation_path"] / f"Final_state_pp_reset_{num_simulation}.npz", actual_state)
 
     if sum(CF_destruido) < len(CF_ranges):
         raise exceptions.FilamentosNoDestruidosException(
@@ -595,7 +595,7 @@ def SP_reset(
         datos_sim=data_sp_reset,
     )
 
-    np.save(rutas["simulation_path"] / f"Final_state_sp_reset_{num_simulation}.npz", actual_state)
+    np.savez(rutas["simulation_path"] / f"Final_state_sp_reset_{num_simulation}.npz", actual_state)
 
     logger.info(f"\nSimulación {num_simulation} finalizada correctamente.")
 
