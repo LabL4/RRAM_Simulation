@@ -23,7 +23,8 @@ def PP_reset(
     final_state_sp_set: dict,
     num_simulation: int,
     CF_ranges: List[tuple],
-    num_pasos_guardar_estado: int = 100,  # Antes era cada 2000
+    num_pasos_guardar_estado: int = 50,  # Antes era cada 2000
+    usar_muro: bool = True,
 ):
     """
     Simulates the reset process of a resistive switching device, updating the system's state and tracking the evolution of various parameters over time.
@@ -105,6 +106,7 @@ def PP_reset(
 
     CF_destruido_index = 1
     roturas_dict = {}
+    current = 0.0  # inicialización para T_joule en k=0
 
     logger.info(f"Simulacion {num_simulation} - primera parte del reset")
 
@@ -144,18 +146,20 @@ def PP_reset(
                 etapa="pp",
             )
 
-        # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
-        if Percolation.is_path(actual_state):
-            # Obtengo los caminos de percolación
-            cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf, actual_state)
-            percola = True
+        # Temperatura Joule como semilla escalar (barato, siempre disponible).
+        # Usa el current del paso anterior: en k=0 current=0 → T_joule=init_temp.
+        T_joule = Temperature.Temperature_Joule(
+            voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola
+        )
 
-            # Si ha percolado uso la corriente de Ohm
+        if Percolation.is_path(actual_state):
+            percola = True
+            cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf, actual_state)
+
             try:
                 current, _ = CurrentSolver.OmhCurrent(
                     voltage, cf_clean_matrix, ohm_resistence=sim_ctes.ohm_resistence_reset
                 )
-
             except ZeroDivisionError:
                 raise exceptions.NullResistanceException(
                     simulation_path=rutas["simulation_path"],
@@ -164,10 +168,7 @@ def PP_reset(
                     actual_state=actual_state,
                 )
 
-            # El sistema percola por lo que resuelvo la ecuación del calor. Primero se obtiene el mapa de materiales
             materials_map = Temperature.crear_matriz_materiales(cf_clean_matrix)
-
-            # Cáculo de las fuentes de calor (el filamento)
             Q_source_map = Temperature.calculate_heat_source(
                 types_map=materials_map,
                 atom_size=params.atom_size,
@@ -176,19 +177,18 @@ def PP_reset(
                 factor_generar_calor=sim_ctes.factor_generar_calor,
             )
 
-            if not np.any(CF_destruido):
-                # Todos los filamentos intactos: calculamos con muro térmico
-                # Extracción del perfil térmico de los filamentos del paso anterior
+            # El muro solo aplica cuando TODOS los filamentos están intactos y hay ≥2
+            filamentos_intactos = int(np.sum(~CF_destruido))
+            muro_activo = not np.any(CF_destruido) and usar_muro and filamentos_intactos >= 2
+
+            if muro_activo:
                 if isinstance(temperatura_anterior, (float, int)):
                     raise ValueError(
                         "La temperatura no se ha calculado como matriz, no se pueden extraer los perfiles de los filamentos. Se esperaba una matriz de temperaturas, pero se ha recibido un valor escalar."
                     )
-                else:
-                    mis_perfiles_extraidos = Temperature.extraer_perfiles_filamentos(
-                        matriz_temperaturas=temperatura_anterior, filas_centros=CF_centros
-                    )
-
-                # Cálculo de los perfiles para los muros y colocación
+                mis_perfiles_extraidos = Temperature.extraer_perfiles_filamentos(
+                    matriz_temperaturas=temperatura_anterior, filas_centros=CF_centros
+                )
                 perfiles_muros_calculados = Temperature.calcular_perfiles_muro(
                     perfiles_filamentos=mis_perfiles_extraidos,
                     distancias_casillas=dist_casillas,
@@ -196,19 +196,14 @@ def PP_reset(
                     atom_size=params.atom_size,
                     T_ambient=params.init_temp,
                 )
-
                 matriz_temperaturas_fijas = Temperature.colocar_muro_termico(
                     matriz_molde=cf_clean_matrix,
                     filas_intermedias=filas_intermedias,
                     perfiles_muros_calculados=perfiles_muros_calculados,
                 )
-
-                # Añadimos columnas de ceros (donde no hay muro) en las posiciones de los electrodos
                 Ny = matriz_temperaturas_fijas.shape[0]
                 columna_ceros = np.zeros((Ny, 1))
                 matriz_temperaturas_fijas_final = np.hstack([columna_ceros, matriz_temperaturas_fijas, columna_ceros])
-
-                # Obtengo la matriz de temperatura con el muro térmico
                 temperatura = Temperature.solve_thermal_state(
                     types_map=materials_map,
                     Q_map=Q_source_map,
@@ -217,28 +212,32 @@ def PP_reset(
                     T_ambient=sim_ctes.Temperatura_electrodo,
                     matriz_muros=matriz_temperaturas_fijas_final,
                 )
+            else:
+                temperatura = Temperature.solve_thermal_state(
+                    types_map=materials_map,
+                    Q_map=Q_source_map,
+                    thermal_props=sim_ctes.propiedades_termicas,
+                    atom_size=params.atom_size,
+                    T_ambient=sim_ctes.Temperatura_electrodo,
+                    matriz_muros=None,
+                )
 
-                # Actualizo la temperatura anterior para el siguiente paso
-                temperatura_anterior = temperatura[:, 1:-1]
+            temperatura_anterior = temperatura[:, 1:-1]
 
         else:
             percola = False
-
-            # Calculo la temperatura cuando no hay percolación
-            temperatura = Temperature.Temperature_Joule(
-                voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola
-            )
-
-            # Si no percola uso la corriente de Poole-Frenkel
             current = abs(
                 CurrentSolver.Poole_Frenkel(
-                    temperatura,
+                    T_joule,
                     E_field,
                     pb_metal_insul=sim_ctes.pb_metal_insul_reset,
                     permitividad_relativa=sim_ctes.permitividad_relativa_reset,
                     I_0=sim_ctes.I_0_reset,
                 )
                 * (params.device_size_y)
+            )
+            temperatura = Temperature.Temperature_Joule(
+                voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola
             )
 
         # Actualizo el estado del sistema con la recombinación
@@ -260,10 +259,14 @@ def PP_reset(
 
         # Represento el estado cada X pasos
         if k % num_pasos_guardar_estado == 0:
-            matriz_para_plot_muro = np.copy(matriz_temperaturas_fijas)
-            for centro, perfil_filamento in zip(CF_centros, mis_perfiles_extraidos):
-                if centro is not None and perfil_filamento is not None:
-                    matriz_para_plot_muro[centro, :] = perfil_filamento
+            if (
+                locals().get("matriz_temperaturas_fijas") is not None
+                and locals().get("mis_perfiles_extraidos") is not None
+            ):
+                matriz_para_plot_muro = np.copy(matriz_temperaturas_fijas)
+                for centro, perfil_filamento in zip(CF_centros, mis_perfiles_extraidos):
+                    if centro is not None and perfil_filamento is not None:
+                        matriz_para_plot_muro[centro, :] = perfil_filamento
 
             # Guardo las variables del estado
             utils.guardar_estado_intermedio(
@@ -334,7 +337,7 @@ def SP_reset(
     final_state_pp_reset: dict,
     num_simulation: int,
     CF_ranges: List[tuple],
-    num_pasos_guardar_estado: int = 100,
+    num_pasos_guardar_estado: int = 50,
 ):
     params = final_state_pp_reset["params"]
     sim_ctes = final_state_pp_reset["sim_ctes"]
@@ -476,32 +479,14 @@ def SP_reset(
                     filas_centros=centros_calculados,
                 )
 
-            # =====================================================================
-            # 5. CÁLCULO DE LOS PERFILES PARA LOS MUROS Y COLOCACIÓN
-            # =====================================================================
-            perfiles_muros_calculados = Temperature.calcular_perfiles_muro(
-                perfiles_filamentos=mis_perfiles_extraidos,
-                distancias_casillas=dist_casillas,
-                pendiente_temperatura=pendiente_temperatura,
-                atom_size=params.atom_size,
-                T_ambient=params.init_temp,
-            )
-            matriz_temperaturas_fijas = Temperature.colocar_muro_termico(
-                matriz_molde=actual_state_clean_CF,
-                filas_intermedias=filas_intermedias,
-                perfiles_muros_calculados=perfiles_muros_calculados,
-            )
-            # Añadimos columnas de ceros (donde no hay muro) en las posiciones de los electrodos
-            Ny = matriz_temperaturas_fijas.shape[0]
-            columna_ceros = np.zeros((Ny, 1))
-            matriz_temperaturas_fijas_final = np.hstack([columna_ceros, matriz_temperaturas_fijas, columna_ceros])
+            # En SP_reset no hay filamentos intactos: el muro térmico nunca aplica.
             temperatura = Temperature.solve_thermal_state(
                 types_map=materials_map,
                 Q_map=Q_source_map,
                 thermal_props=sim_ctes.propiedades_termicas,
                 atom_size=params.atom_size,
                 T_ambient=params.init_temp,
-                matriz_muros=matriz_temperaturas_fijas_final,
+                matriz_muros=None,
             )
             # Actualizo la temperatura anterior para el siguiente paso, NO guardo las columnas primera y ultima ya q corresponden a los electrodos
             temperatura_anterior = temperatura[:, 1:-1]
@@ -556,7 +541,7 @@ def SP_reset(
         if k % num_pasos_guardar_estado == 0:
             # Si se ha creado la matriz de temperaturas fijas es porque se ha creado el muro y entonces tiene sentido guardarlo.
             if locals().get("matriz_temperaturas_fijas") is not None:
-                matriz_para_plot_muro = np.copy(matriz_temperaturas_fijas)
+                matriz_para_plot_muro = np.copy(matriz_temperaturas_fijas)  # type: ignore
                 for centro, perfil_filamento in zip(centros_calculados, mis_perfiles_extraidos):  # type: ignore
                     if centro is not None and perfil_filamento is not None:
                         matriz_para_plot_muro[centro, :] = perfil_filamento

@@ -12,18 +12,18 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 MATERIAL_DEFAULTS = {
     "cte_red": 0.25e-9,
-    "permitividad_relativa_set": 299.8869,
+    "permitividad_relativa_set": 299.6653,
     "permitividad_relativa_reset": 299.9641,
-    "generation_energy": 1.02,
+    "generation_energy": 1.15,
     "recombination_energy": 1.55,
-    "pb_metal_insul_set": 0.1692,
+    "pb_metal_insul_set": 0.001,
     "pb_metal_insul_reset": 0.0334,
     "recom_enchancement_factor": 3e3,
     "long_decaimiento_concentracion": 1e-9,
     "ohm_resistence_set": 4.3,
     "ohm_resistence_reset": 4.3,
     "num_filamentos": 2,
-    "grosor_filamento": [5, 3],
+    "grosor_filamento": [0, 1],
 }
 
 # ============================================================================
@@ -40,7 +40,7 @@ PHYSICAL_CONSTANTS = {
 # PARÁMETROS ELÉCTRICOS
 # ============================================================================
 ELECTRICAL_DEFAULTS = {
-    "I_0_set": 9.7482e-01,
+    "I_0_set": 0.0010731,
     "I_0_reset": 0.002505,
 }
 
@@ -55,7 +55,7 @@ THERMAL_DEFAULTS = {
     "conductividad_termica_aislante": 0.000001,
     "conductividad_termica_electrodo": 5.0,
     "Temperatura_electrodo": 300,
-    "factor_generar_calor": 6e-5,
+    "factor_generar_calor": 5.5e-5,  # 6e-5,
     "pendiente_temperatura": -24.7,
 }
 
@@ -65,9 +65,9 @@ THERMAL_DEFAULTS = {
 # ============================================================================
 SIMULATION_DEFAULTS = {
     "device_size_x": 10e-9,  # Ancho entre electrodos, debe corresponder a los dispositivos medidos
-    "device_size_y": 30e-9,
+    "device_size_y": 10e-9,
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
-    "num_trampas": 197,
+    "num_trampas": 90,
     "total_simulation_time": 10.0,
     "num_pasos": 10000,
     "voltaje_final": 1.1,

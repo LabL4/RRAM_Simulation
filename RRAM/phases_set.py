@@ -35,6 +35,7 @@ def PP_set(
     CF_creado: np.ndarray,
     CF_centros: List[int] | None = None,
     actual_state: np.ndarray | None = None,
+    usar_muro: bool = True,
 ):
     """
     Executes the first part (PP) of the simulation set process for a resistive random-access memory (RRAM) device.
@@ -285,10 +286,8 @@ def PP_set(
                 # =====================================================================
                 # 5. CÁLCULO DE LOS PERFILES PARA LOS MUROS Y COLOCACIÓN
                 # =====================================================================
-                # Solo aplica con >=2 filamentos: hay paredes intermedias.
-                # Con 1 filamento, filas_intermedias y dist_casillas siguen None
-                # tras `actualizar_parametros_por_filamento`; saltamos los muros.
-                if filas_intermedias is not None and dist_casillas is not None:
+                # Solo aplica con >=2 filamentos Y usar_muro=True.
+                if usar_muro and filas_intermedias is not None and dist_casillas is not None:
                     perfiles_muros_calculados = Temperature.calcular_perfiles_muro(
                         perfiles_filamentos=mis_perfiles_extraidos,
                         distancias_casillas=dist_casillas,
@@ -518,6 +517,7 @@ def SP_set(
     final_state_pp_set: dict,
     num_simulation: int,
     CF_ranges: List[tuple],
+    usar_muro: bool = True,
 ) -> dict:
     """
     Simulates the second part of the "set" process in a resistive switching device.
@@ -718,31 +718,42 @@ def SP_set(
                 )
 
             # CÁLCULO DE LOS PERFILES PARA LOS MUROS Y COLOCACIÓN
-            perfiles_muros_calculados = Temperature.calcular_perfiles_muro(
-                perfiles_filamentos=mis_perfiles_extraidos,
-                distancias_casillas=dist_casillas,
-                pendiente_temperatura=sim_ctes.pendiente_temperatura,
-                atom_size=params.atom_size,
-                T_ambient=params.init_temp,
-            )
-            matriz_temperaturas_fijas = Temperature.colocar_muro_termico(
-                matriz_molde=actual_state_clean_CF,
-                filas_intermedias=filas_intermedias,
-                perfiles_muros_calculados=perfiles_muros_calculados,
-            )
-            # Añadimos columnas de ceros (donde no hay muro) en las posiciones de los electrodos
-            Ny = matriz_temperaturas_fijas.shape[0]
-            columna_ceros = np.zeros((Ny, 1))
-            matriz_temperaturas_fijas_final = np.hstack([columna_ceros, matriz_temperaturas_fijas, columna_ceros])
+            # Solo aplica con >=2 filamentos Y usar_muro=True.
+            if usar_muro and filas_intermedias is not None and dist_casillas is not None:
+                perfiles_muros_calculados = Temperature.calcular_perfiles_muro(
+                    perfiles_filamentos=mis_perfiles_extraidos,
+                    distancias_casillas=dist_casillas,
+                    pendiente_temperatura=sim_ctes.pendiente_temperatura,
+                    atom_size=params.atom_size,
+                    T_ambient=params.init_temp,
+                )
+                matriz_temperaturas_fijas = Temperature.colocar_muro_termico(
+                    matriz_molde=actual_state_clean_CF,
+                    filas_intermedias=filas_intermedias,
+                    perfiles_muros_calculados=perfiles_muros_calculados,
+                )
+                # Añadimos columnas de ceros (donde no hay muro) en las posiciones de los electrodos
+                Ny = matriz_temperaturas_fijas.shape[0]
+                columna_ceros = np.zeros((Ny, 1))
+                matriz_temperaturas_fijas_final = np.hstack([columna_ceros, matriz_temperaturas_fijas, columna_ceros])
 
-            temperatura = Temperature.solve_thermal_state(
-                types_map=materials_map,
-                Q_map=Q_source_map,
-                thermal_props=sim_ctes.propiedades_termicas,
-                atom_size=params.atom_size,
-                T_ambient=params.init_temp,
-                matriz_muros=matriz_temperaturas_fijas_final,
-            )
+                temperatura = Temperature.solve_thermal_state(
+                    types_map=materials_map,
+                    Q_map=Q_source_map,
+                    thermal_props=sim_ctes.propiedades_termicas,
+                    atom_size=params.atom_size,
+                    T_ambient=params.init_temp,
+                    matriz_muros=matriz_temperaturas_fijas_final,
+                )
+            else:
+                temperatura = Temperature.solve_thermal_state(
+                    types_map=materials_map,
+                    Q_map=Q_source_map,
+                    thermal_props=sim_ctes.propiedades_termicas,
+                    atom_size=params.atom_size,
+                    T_ambient=params.init_temp,
+                    matriz_muros=None,
+                )
 
             # Importante para que se actualice el perfil termico de los filamentos
             temperatura_anterior = temperatura[:, 1:-1]

@@ -69,6 +69,12 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="FASE",
         help="Fase en la que terminar el ciclo, inclusive (pp_set | sp_set | pp_reset | sp_reset).",
     )
+    p_exec.add_argument(
+        "--no-muro",
+        action="store_true",
+        default=False,
+        help="Desactiva el muro térmico en las fases de reset (pasa matriz_muros=None al solver).",
+    )
 
     # plot
     p_plot = sub.add_parser("plot", help="Replotea una simulación previamente ejecutada.")
@@ -127,6 +133,7 @@ def _cmd_exec(args) -> int:
             start_from=args.start_from,
             stop_at=args.stop_at,
             init_data_dir=args.init_data_dir,
+            usar_muro=not args.no_muro,
         )
         return 0
     except Exception as e:

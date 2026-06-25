@@ -213,7 +213,7 @@ def plot_estados(
     phases: list[str] | None = None,
     results_dir: Path | str = "Results",
     sim_indices: list[int] | None = None,
-    extension: str = "png",
+    extension: str = "svg",
     update_metadata: bool = True,
 ) -> dict[int, dict[str, float]]:
     """
@@ -389,7 +389,7 @@ def plot_estados(
                             if temp_data.ndim < 2:
                                 logger.debug(f"Paso {paso} fase {fase}: temp escalar, sin mapa térmico. Salto.")
                                 continue
-                            types_map = _construir_types_map(actual_state, temp_data.shape)
+                            types_map = _construir_types_map(actual_state, temp_data.shape)  # type: ignore
                             plot_thermal_state(
                                 T_map=temp_data,
                                 types_map=types_map,

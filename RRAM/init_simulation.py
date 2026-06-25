@@ -172,7 +172,11 @@ def load_simulation_config(
 
     if num_filamentos is not None and num_filamentos != ctes.num_filamentos:
         logger.info(f"num_filamentos override: CSV={ctes.num_filamentos} → {num_filamentos}")
-        ctes = dc_replace(ctes, num_filamentos=num_filamentos)
+        grosor = ctes.grosor_filamento
+        if isinstance(grosor, list) and len(grosor) > num_filamentos:
+            grosor = grosor[:num_filamentos]
+            logger.info(f"grosor_filamento truncado a {num_filamentos} elemento(s): {grosor}")
+        ctes = dc_replace(ctes, num_filamentos=num_filamentos, grosor_filamento=grosor)
 
     init_state_path = init_data_dir / f"init_state_{num_simulation}"
     actual_state = utils.cargar_estado(init_state_path)

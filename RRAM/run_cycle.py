@@ -117,6 +117,7 @@ def run_cycle(
     stop_at: Optional[str] = None,
     init_data_dir: Path | str = "Init_data",
     desplazamiento_iv: Optional[dict] = None,  # noqa: ARG001 (kept for API stability)
+    usar_muro: bool = True,
 ) -> SimulationStates:
     """
     Ejecuta SET (PP+SP) → RESET (PP+SP) y guarda metadatos.
@@ -180,14 +181,15 @@ def run_cycle(
             num_simulation=n_save, params=cfg.params, sim_ctes=cfg.sim_ctes,
             CF_ranges=cfg.cf_ranges, CF_creado=cfg.cf_creado,
             CF_centros=cfg.cf_centros, actual_state=cfg.actual_state,
+            usar_muro=usar_muro,
         )),
         ("sp_set",   lambda: SP_set(
             final_state_pp_set=states.pp_set, num_simulation=n_save,
-            CF_ranges=cfg.cf_ranges,
+            CF_ranges=cfg.cf_ranges, usar_muro=usar_muro,
         )),
         ("pp_reset", lambda: PP_reset(
             final_state_sp_set=states.sp_set, num_simulation=n_save,
-            CF_ranges=cfg.cf_ranges,
+            CF_ranges=cfg.cf_ranges, usar_muro=usar_muro,
         )),
         ("sp_reset", lambda: SP_reset(
             final_state_pp_reset=states.pp_reset, num_simulation=n_save,

@@ -1,7 +1,9 @@
+from matplotlib.ticker import FuncFormatter
 import matplotlib.patches as mpatches
 import matplotlib.patches as patches
 import matplotlib.ticker as ticker
 import matplotlib.pyplot as plt
+
 
 from matplotlib.colors import ListedColormap
 from matplotlib import markers
@@ -138,7 +140,7 @@ def RepresentateState(
     voltaje: float,
     filename: str,
     color=(0.0000, 0.0000, 0.5451),
-    guardar_png: bool = False,
+    guardar_png: bool = True,
     atom_size: float = 0.25e-9,  # Tamaño físico de una celda en metros (ej: 0.2 nm)
 ) -> None:
     """
@@ -214,7 +216,7 @@ def RepresentateState(
     ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
 
     ax.set_title(
-        rf"$V_{{RRAM}}$ = {voltaje} V",
+        rf"$V_{{RRAM}}$ = {voltaje:.2f} V",
         pad=20,
     )
 
@@ -223,12 +225,12 @@ def RepresentateState(
     # TODO Cambiar esto y que se guarde siempre
     # Guardar archivos
     if guardar_png:
-        plt.savefig(filename, bbox_inches="tight", dpi=300)
-        ruta_pdf = os.path.splitext(filename)[0] + ".pdf"
-        plt.savefig(ruta_pdf, bbox_inches="tight")
+        plt.savefig(filename, bbox_inches="tight", dpi=600)
+        # ruta_pdf = os.path.splitext(filename)[0] + ".svg"
+        # plt.savefig(ruta_pdf, bbox_inches="tight")
     else:
-        ruta_pdf = os.path.splitext(filename)[0] + ".pdf"
-        plt.savefig(ruta_pdf, bbox_inches="tight")
+        ruta_svg = os.path.splitext(filename)[0] + ".svg"
+        plt.savefig(ruta_svg, bbox_inches="tight")
 
     plt.close(fig)
 
@@ -410,7 +412,7 @@ def plot_IV(
 
     # Represento una línea para el set y otra para el reset
     axes.plot(v_set, i_set, color="red", linewidth=4, label="Simulation")
-    # axes.plot(v_reset, i_reset, color="red", linewidth=4, label="RESET")
+    axes.plot(v_reset, i_reset, color="red", linewidth=4)
 
     # Ruta de los datos experimentales
     # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Set_1t'
@@ -632,7 +634,7 @@ def plot_thermal_state(T_map, types_map, voltage, num_levels=10, atom_size: floa
     setup_paper_plt(plt, latex=True, scaling=2.5)
 
     # 3. Crear la figura y los ejes
-    fig, ax = plt.subplots(figsize=(52, 12))
+    fig, ax = plt.subplots(figsize=(16, 12))
 
     # 4. Aplicar configuración de estilo específica para los ejes
     config_ax_state(ax)
@@ -647,7 +649,7 @@ def plot_thermal_state(T_map, types_map, voltage, num_levels=10, atom_size: floa
     # 5. Capa base: Temperatura
     im = ax.imshow(T_map, cmap="coolwarm", origin="lower", extent=extent, aspect="equal")
     cbar = fig.colorbar(im, ax=ax, fraction=0.05, pad=0.04)
-    cbar.set_label("Temperatura (K)")
+    cbar.set_label("Temperature (K)")
 
     # 6. Capa de materiales (Overlay)
     overlay = np.zeros((Ny, Nx, 4))
@@ -679,7 +681,7 @@ def plot_thermal_state(T_map, types_map, voltage, num_levels=10, atom_size: floa
     ax.set_yticks(np.arange(0, size_y_nm + 1, paso_ticks_y))
 
     # 8. Estética y Leyenda
-    ax.set_title(f"$V_{{RRAM}}$ = {voltage} V", pad=25)  # Eliminado fontsize=14
+    ax.set_title(f"$V_{{RRAM}}$ = {voltage:.2f} V", pad=25)  # Eliminado fontsize=14
     ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
     ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
 
@@ -691,8 +693,7 @@ def plot_thermal_state(T_map, types_map, voltage, num_levels=10, atom_size: floa
     # 9. Guardar si se especifica la ruta
     if save_path:
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
-        # bbox_inches='tight' es crucial para que no recorte la leyenda exterior
-        plt.savefig(save_path, dpi=300, bbox_inches="tight")
+        plt.savefig(save_path, dpi=600, bbox_inches="tight")
 
     plt.close(fig)  # Cierra para liberar memoria
 
