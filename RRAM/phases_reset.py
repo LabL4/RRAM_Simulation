@@ -70,7 +70,15 @@ def PP_reset(
 
     oxygen_state = np.zeros_like(actual_state, dtype=np.int8)
 
-    num_columnas = 3  # Tiempo, Voltaje, Intensidad
+    N = len(CF_ranges)
+    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], R_1[Ohm], ..., I_N[A], R_N[Ohm], T_1[K], ..., T_N[K]
+    num_columnas = 4 + 3 * N
+    cols = ["t[s]", "V[V]", "I_total[A]", "R_total[Ohm]"]
+    for i in range(1, N + 1):
+        cols += [f"I_{i}[A]", f"R_{i}[Ohm]"]
+    cols += [f"T_{i}[K]" for i in range(1, N + 1)]
+    header_pp_reset = ",".join(cols)
+
     data_pp_reset = np.zeros((params.num_pasos + 1, num_columnas), dtype=np.float64)
 
     # CUIDADO Configuración de umbrales, tiene q estar ordenado de mayor a menor!!
@@ -157,8 +165,8 @@ def PP_reset(
             cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf, actual_state)
 
             try:
-                current, _ = CurrentSolver.OmhCurrent(
-                    voltage, cf_clean_matrix, ohm_resistence=sim_ctes.ohm_resistence_reset
+                current, R_total, I_fils, R_fils = CurrentSolver.OmhCurrent_filamentos(
+                    voltage, cf_clean_matrix, CF_ranges, ohm_resistence=sim_ctes.ohm_resistence_reset
                 )
             except ZeroDivisionError:
                 raise exceptions.NullResistanceException(
@@ -224,6 +232,12 @@ def PP_reset(
 
             temperatura_anterior = temperatura[:, 1:-1]
 
+            # Temperatura por filamento: extraída del mapa FVM ya resuelto, en la fila central de cada filamento
+            perfiles_T_fils = Temperature.extraer_perfiles_filamentos(
+                matriz_temperaturas=temperatura_anterior, filas_centros=CF_centros
+            )
+            T_fils = [float(np.max(p)) if p is not None else params.init_temp for p in perfiles_T_fils]
+
         else:
             percola = False
             current = abs(
@@ -240,6 +254,12 @@ def PP_reset(
                 voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola
             )
 
+            # No ha percolado: valores neutros por filamento (no hay resistencia/corriente/mapa FVM por filamento)
+            R_total = np.nan
+            I_fils = [np.nan] * N
+            R_fils = [np.nan] * N
+            T_fils = [temperatura] * N
+
         # Actualizo el estado del sistema con la recombinación
         actual_state, oxygen_state = update_state_recombinate(
             voltage=voltage,
@@ -255,7 +275,8 @@ def PP_reset(
 
         # Tiempo total de la simulacion
         tiempo_total = simulation_time + tiempo_sp_set
-        data_pp_reset[k] = np.array([tiempo_total, voltage, current])
+        fila = [tiempo_total, voltage, current, R_total] + I_fils + R_fils + T_fils
+        data_pp_reset[k] = fila
 
         # Represento el estado cada X pasos
         if k % num_pasos_guardar_estado == 0:
@@ -295,7 +316,7 @@ def PP_reset(
     # Guardo los datos de la simulacion
     utils.guardar_datos(
         save_path_data=rutas["simulation_path"] / f"Data_pp_reset_{num_simulation}",
-        headers={"datos_simulacion": "Tiempo [s],Voltaje [V],Intensidad [A]"},
+        headers={"datos_simulacion": header_pp_reset},
         datos_sim=data_pp_reset,
     )
     logger.info(f"La temperatura final alcanzada en el reset es: {temperatura} K")
@@ -371,9 +392,17 @@ def SP_reset(
 
     rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="reset")
 
-    num_columnas = 3  # Tiempo, Voltaje, Intensidad
+    N = len(CF_ranges)
+    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], R_1[Ohm], ..., I_N[A], R_N[Ohm], T_1[K], ..., T_N[K]
+    num_columnas = 4 + 3 * N
+    cols = ["t[s]", "V[V]", "I_total[A]", "R_total[Ohm]"]
+    for i in range(1, N + 1):
+        cols += [f"I_{i}[A]", f"R_{i}[Ohm]"]
+    cols += [f"T_{i}[K]" for i in range(1, N + 1)]
+    header_sp_reset = ",".join(cols)
+
     data_sp_reset = np.zeros((params.num_pasos, num_columnas), dtype=np.float64)
-    resistencia_vector = np.zeros((params.num_pasos, num_columnas), dtype=np.float64)
+    resistencia_vector = np.zeros((params.num_pasos, 3), dtype=np.float64)
 
     # configuración de generación de oxígeno, si el voltaje supera el umbral se generan el número de oxígenos indicados, si hay varios umbrales se comprueba de mayor a menor y se asigna el número de oxígenos correspondiente al primer umbral que se supere
     oxygen_config = {float(sim_ctes.voltaje_gen_oxigeno_sp): int(sim_ctes.num_oxigenos_sp_reset)}
@@ -445,9 +474,10 @@ def SP_reset(
 
             # Si ha percolado uso la corriente de Ohm
             try:
-                current, resistencia = CurrentSolver.OmhCurrent(
-                    voltage, cf_clean_matrix, ohm_resistence=sim_ctes.ohm_resistence_reset
+                current, R_total, I_fils, R_fils = CurrentSolver.OmhCurrent_filamentos(
+                    voltage, cf_clean_matrix, CF_ranges, ohm_resistence=sim_ctes.ohm_resistence_reset
                 )
+                resistencia = R_total
             except ZeroDivisionError:
                 raise exceptions.NullResistanceException(
                     simulation_path=rutas["simulation_path"],
@@ -491,6 +521,12 @@ def SP_reset(
             # Actualizo la temperatura anterior para el siguiente paso, NO guardo las columnas primera y ultima ya q corresponden a los electrodos
             temperatura_anterior = temperatura[:, 1:-1]
 
+            # Temperatura por filamento: extraída del mapa FVM ya resuelto, en la fila central de cada filamento
+            perfiles_T_fils = Temperature.extraer_perfiles_filamentos(
+                matriz_temperaturas=temperatura_anterior, filas_centros=centros_calculados
+            )
+            T_fils = [float(np.max(p)) if p is not None else params.init_temp for p in perfiles_T_fils]
+
         else:
             percola = False
 
@@ -515,6 +551,12 @@ def SP_reset(
                 voltage, current, params.init_temp, r_termica=sim_ctes.r_termica_no_percola
             )
 
+            # No ha percolado: valores neutros por filamento (no hay resistencia/corriente/mapa FVM por filamento)
+            R_total = np.nan
+            I_fils = [np.nan] * N
+            R_fils = [np.nan] * N
+            T_fils = [temperatura] * N
+
         # Actualizo el estado del sistema con la recombinación
         actual_state, oxygen_state = update_state_recombinate(
             voltage=voltage,
@@ -530,7 +572,8 @@ def SP_reset(
 
         # Tiempo total de la simulacion
         tiempo_total = simulation_time + tiempo_pp_reset
-        data_sp_reset[k] = np.array([tiempo_total, voltage, current])
+        fila = [tiempo_total, voltage, current, R_total] + I_fils + R_fils + T_fils
+        data_sp_reset[k] = fila
 
         if locals().get("resistencia") is not None:
             resistencia_vector[k] = np.array([k, voltage, resistencia])
@@ -571,7 +614,7 @@ def SP_reset(
 
     # Guardo los datos de la simulación
     save_path_data = rutas["simulation_path"] / f"Data_sp_reset_{num_simulation}.txt"
-    data_encabezados = {"datos_simulacion": "Tiempo [s],Voltaje [V],Intensidad [A]"}
+    data_encabezados = {"datos_simulacion": header_sp_reset}
 
     # Guardo los datos de la simulacion
     utils.guardar_datos(

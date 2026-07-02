@@ -647,3 +647,20 @@ def extraer_perfiles_temperatura(lista_matrices: list, etiquetas: list, columna_
         perfiles[etiqueta] = matriz[:, columna_x]
 
     return distancias, perfiles
+
+
+def Temperature_Joule_filamentos(
+    T_0: float,
+    I_fils: list[float],
+    R_fils: list[float],
+    r_termica: float,
+) -> list[float]:
+    """
+    Calcula el incremento de temperatura por efecto Joule de cada filamento por separado,
+    a partir de su corriente y resistencia individuales.
+    """
+    T_fils = []
+    for I_i, R_i in zip(I_fils, R_fils):
+        P_i = 0.0 if (R_i == np.inf or np.isnan(R_i)) else I_i**2 * R_i
+        T_fils.append(T_0 + P_i * r_termica)
+    return T_fils

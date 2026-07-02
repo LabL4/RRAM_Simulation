@@ -396,3 +396,49 @@ def limitar_grosor_filamentos(
                     m_state_recortada[y, cols_vacantes] = valor_oxido
 
     return m_state_recortada, m_filamentos_recortada
+
+
+def calcular_resistencia_por_filamento(
+    CF_matrix: np.ndarray,
+    CF_ranges: list[tuple[int, int]],
+    ohm_resistence: float,
+) -> list[float]:
+    """
+    Calcula la resistencia de cada filamento por separado, aplicando `calcular_resistencia`
+    solo sobre el bloque de filas que le corresponde a cada uno según `CF_ranges`.
+    """
+    resistencias = []
+    for fila_min, fila_max in CF_ranges:
+        sub = CF_matrix[fila_min : fila_max + 1, :]
+        if sub.sum() == 0:
+            resistencias.append(np.inf)
+        else:
+            resistencias.append(calcular_resistencia(sub, ohm_resistence))
+    return resistencias
+
+
+def calcular_resistencia_paralelo(resistencias_fils: list[float]) -> float:
+    """
+    Combina las resistencias de varios filamentos en paralelo (1/R_total = sum(1/R_i)).
+    """
+    conductancias = [1 / r for r in resistencias_fils if r != np.inf]
+    if not conductancias:
+        return np.inf
+    return 1 / sum(conductancias)
+
+
+def OmhCurrent_filamentos(
+    potential: float,
+    cf_clean_matrix: np.ndarray,
+    CF_ranges: list[tuple[int, int]],
+    ohm_resistence: float,
+) -> tuple[float, float, list[float], list[float]]:
+    """
+    Calcula la corriente y resistencia total del dispositivo (filamentos en paralelo)
+    junto con la corriente y resistencia de cada filamento individual.
+    """
+    R_fils = calcular_resistencia_por_filamento(cf_clean_matrix, CF_ranges, ohm_resistence)
+    R_total = calcular_resistencia_paralelo(R_fils)
+    I_fils = [potential / r if r != np.inf else 0.0 for r in R_fils]
+    I_total = potential / R_total
+    return I_total, R_total, I_fils, R_fils

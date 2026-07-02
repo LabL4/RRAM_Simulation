@@ -65,9 +65,9 @@ THERMAL_DEFAULTS = {
 # ============================================================================
 SIMULATION_DEFAULTS = {
     "device_size_x": 10e-9,  # Ancho entre electrodos, debe corresponder a los dispositivos medidos
-    "device_size_y": 10e-9,
+    "device_size_y": 30e-9,
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
-    "num_trampas": 90,
+    "num_trampas": 150,
     "total_simulation_time": 10.0,
     "num_pasos": 10000,
     "voltaje_final": 1.1,
@@ -81,7 +81,7 @@ SIMULATION_DEFAULTS = {
 # PARÁMETROS SET / RESET
 # ============================================================================
 SET_RESET_DEFAULTS = {
-    "ocupacion_max_pp_set": 0.45,
+    "ocupacion_max_pp_set": 0.8,
     "ocupacion_max_sp_set": 0.45,
     "factor_vecinos_pp_set": 1.0,
     "factor_libre_pp_set": 1.0,

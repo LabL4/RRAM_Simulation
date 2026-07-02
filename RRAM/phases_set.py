@@ -89,6 +89,11 @@ def PP_set(
     cf_clean_matrix = None
     voltaje_percolacion = params.voltaje_final_set
 
+    # --- TEMPORAL: pausa de generación tras percolar (quitar cuando ya no haga falta) ---
+    k_percolacion = None
+    PASOS_PAUSA_GENERACION_POST_PERCOLACION = 1000
+    # --- FIN TEMPORAL ---
+
     # AL inicio como la corriente es de tipo poole frenkel, la resitencia ohmica se considera nula
     resistencia = 0.0
     temperatura_anterior = params.init_temp
@@ -112,12 +117,19 @@ def PP_set(
 
     centros_calculados = CF_centros
 
-    num_columnas = 3  # Tiempo, Voltaje, Intensidad
+    N = len(CF_ranges)
+    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], R_1[Ohm], ..., I_N[A], R_N[Ohm], T_1[K], ..., T_N[K]
+    num_columnas = 4 + 3 * N
+    cols = ["t[s]", "V[V]", "I_total[A]", "R_total[Ohm]"]
+    for i in range(1, N + 1):
+        cols += [f"I_{i}[A]", f"R_{i}[Ohm]"]
+    cols += [f"T_{i}[K]" for i in range(1, N + 1)]
+    header_pp_set = ",".join(cols)
 
     # Defino la matriz para almacenar los datos
     data_pp_set = np.zeros((params.num_pasos, num_columnas), dtype=np.float64)
-    resistencia_vector = np.zeros((params.num_pasos, num_columnas), dtype=np.float64)
-    num_vacantes_total = np.zeros((params.num_pasos, num_columnas), dtype=np.float64)
+    resistencia_vector = np.zeros((params.num_pasos, 3), dtype=np.float64)
+    num_vacantes_total = np.zeros((params.num_pasos, 3), dtype=np.float64)
 
     logger.info(f"El grosor de los filamentos es de {sim_ctes.grosor_filamento} filas")
 
@@ -188,6 +200,7 @@ def PP_set(
         if Percolation.is_path(actual_state):
             # Si es la primera vez que percola, siste_percola será falso y entra aquí
             if sistema_percola is False:
+                k_percolacion = k  # TEMPORAL: usado para pausar la generación tras percolar
                 voltaje_percolacion = voltage  # Guardo el voltaje de percolación
                 ocupacion_percola = np.sum(actual_state)
                 logger.info(
@@ -248,9 +261,10 @@ def PP_set(
 
             # Si ha percolado uso la corriente de Ohm
             try:
-                current, resistencia = CurrentSolver.OmhCurrent(
-                    voltage, cf_clean_matrix, ohm_resistence=sim_ctes.ohm_resistence_set
+                current, R_total, I_fils, R_fils = CurrentSolver.OmhCurrent_filamentos(
+                    voltage, cf_clean_matrix, CF_ranges, ohm_resistence=sim_ctes.ohm_resistence_set
                 )
+                resistencia = R_total
             except ZeroDivisionError:
                 raise exceptions.NullResistanceException(
                     simulation_path=rutas["simulation_path"],
@@ -331,10 +345,18 @@ def PP_set(
                 # Actualizo la temperatura anterior para el siguiente paso, NO guardo las columnas primera y ultima ya q corresponden a los electrodos
                 temperatura_anterior = temperatura[:, 1:-1]
 
+                # Temperatura por filamento: extraída del mapa FVM ya resuelto, en la fila central de cada filamento
+                perfiles_T_fils = Temperature.extraer_perfiles_filamentos(
+                    matriz_temperaturas=temperatura_anterior, filas_centros=centros_calculados
+                )
+                T_fils = [float(np.max(p)) if p is not None else params.init_temp for p in perfiles_T_fils]
+
             else:
                 temperatura = Temperature.Temperature_Joule(
                     voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola * 5
                 )
+                # Temperatura por filamento neutra: no hay mapa FVM, se replica la temperatura escalar del dispositivo
+                T_fils = [float(temperatura)] * N
                 # Extiendo el valor para formar una matriz del mismo tamaño que el estado, para que no de error al usarlo en la función de generación si no ha percolado
                 temperatura = np.full_like(actual_state, temperatura)
 
@@ -347,6 +369,12 @@ def PP_set(
                 voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola
             )
             # print(f"El valor de la temperatura es {temperatura} K, se usa el modelo de temperatura de Joule\n")
+
+            # No ha percolado: valores neutros por filamento (no hay resistencia/corriente/mapa FVM por filamento)
+            R_total = np.nan
+            I_fils = [np.nan] * N
+            R_fils = [np.nan] * N
+            T_fils = [temperatura] * N
 
             # TODO Confirmar que la corriente es por device_size_y
             # simple_field = ElectricField.SimpleElectricField(voltage, params.device_size)
@@ -361,19 +389,24 @@ def PP_set(
                 ) * (params.device_size_y)
 
         if total_vacantes < max_vancantes_pp_set:
-            # Actualizo el estado del sistema
-            actual_state, probabilidad_matrix = update_state_generation(
-                actual_state,
-                params,
-                sim_ctes,
-                E_field_vector,
-                temperatura,
-                sim_ctes.factor_vecinos_pp_set,
-                sim_ctes.factor_libre_pp_set,
-                max_vancantes_pp_set,
-                custom_mask=limit_CF_witdh_mask_generation,
-                num_iteracion=k,
+            # TEMPORAL: tras percolar, no se genera ninguna vacante durante N pasos (ver init de k_percolacion)
+            pausa_generacion_post_percolacion = (
+                k_percolacion is not None and (k - k_percolacion) < PASOS_PAUSA_GENERACION_POST_PERCOLACION
             )
+            if not pausa_generacion_post_percolacion:
+                # Actualizo el estado del sistema
+                actual_state, probabilidad_matrix = update_state_generation(
+                    actual_state,
+                    params,
+                    sim_ctes,
+                    E_field_vector,
+                    temperatura,
+                    sim_ctes.factor_vecinos_pp_set,
+                    sim_ctes.factor_libre_pp_set,
+                    max_vancantes_pp_set,
+                    custom_mask=limit_CF_witdh_mask_generation,
+                    num_iteracion=k,
+                )
 
         elif not total_vacantes_pp_set:
             logger.info(
@@ -384,7 +417,8 @@ def PP_set(
         # region GUARDAR ESTADO
 
         # Guardo los datos de la simulación
-        data_pp_set[k] = np.array([simulation_time, voltage, current])
+        fila = [simulation_time, voltage, current, R_total] + I_fils + R_fils + T_fils
+        data_pp_set[k] = fila
 
         if locals().get("resistencia") is not None:
             resistencia_vector[k] = np.array([k, voltage, resistencia])
@@ -469,7 +503,7 @@ def PP_set(
         )
 
     data_encabezados = {
-        "datos_simulacion": "Tiempo [s],Voltaje [V],Intensidad [A]",
+        "datos_simulacion": header_pp_set,
         "vacantes": "paso, Voltaje [V], Total Vacantes",  # Correcto, porque solo hay 1 columna
         "resistencia": "paso, Voltaje [V], Resistencia [Ohm]",  # Correcto, porque solo hay 1 columna
     }
@@ -592,7 +626,15 @@ def SP_set(
     E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
 
     # Defino la matriz para almacenar los datos
-    num_columnas = 3  # Tiempo, Voltaje, Intensidad
+    N = len(CF_ranges)
+    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], R_1[Ohm], ..., I_N[A], R_N[Ohm], T_1[K], ..., T_N[K]
+    num_columnas = 4 + 3 * N
+    cols = ["t[s]", "V[V]", "I_total[A]", "R_total[Ohm]"]
+    for i in range(1, N + 1):
+        cols += [f"I_{i}[A]", f"R_{i}[Ohm]"]
+    cols += [f"T_{i}[K]" for i in range(1, N + 1)]
+    header_sp_set = ",".join(cols)
+
     data_sp_set = np.zeros((k_max, num_columnas), dtype=np.float64)
 
     filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(CF_centros)
@@ -684,8 +726,8 @@ def SP_set(
 
             # Si ha percolado uso la corriente de Ohm
             try:
-                current, _ = CurrentSolver.OmhCurrent(
-                    voltage, cf_clean_matrix, ohm_resistence=sim_ctes.ohm_resistence_set
+                current, R_total, I_fils, R_fils = CurrentSolver.OmhCurrent_filamentos(
+                    voltage, cf_clean_matrix, CF_ranges, ohm_resistence=sim_ctes.ohm_resistence_set
                 )
             except ZeroDivisionError:
                 raise exceptions.NullResistanceException(
@@ -758,6 +800,12 @@ def SP_set(
             # Importante para que se actualice el perfil termico de los filamentos
             temperatura_anterior = temperatura[:, 1:-1]
 
+            # Temperatura por filamento: extraída del mapa FVM ya resuelto, en la fila central de cada filamento
+            perfiles_T_fils = Temperature.extraer_perfiles_filamentos(
+                matriz_temperaturas=temperatura_anterior, filas_centros=CF_centros
+            )
+            T_fils = [float(np.max(p)) if p is not None else params.init_temp for p in perfiles_T_fils]
+
             if k % num_pasos_guardar_estado == 0:
                 if "matriz_temperaturas_fijas" in locals():
                     matriz_para_plot_muro = np.copy(matriz_temperaturas_fijas)
@@ -793,6 +841,12 @@ def SP_set(
                 I_0=sim_ctes.I_0_set,
             ) * (params.device_size_y)
 
+            # No ha percolado: valores neutros por filamento (no hay resistencia/corriente/mapa FVM por filamento)
+            R_total = np.nan
+            I_fils = [np.nan] * N
+            R_fils = [np.nan] * N
+            T_fils = [temperatura] * N
+
         if total_vacantes < max_vancantes_sp_set:
             # Actualizo el estado del sistema
             actual_state, _ = update_state_generation(
@@ -814,7 +868,8 @@ def SP_set(
             total_vacantes_sp_set = True
 
         # Guardo los datos de la simulación
-        data_sp_set[k] = np.array([simulation_time + tiempo_pp_set, voltage, current])
+        fila = [simulation_time + tiempo_pp_set, voltage, current, R_total] + I_fils + R_fils + T_fils
+        data_sp_set[k] = fila
 
     tiempo_sp_set = simulation_time + tiempo_pp_set
 
@@ -834,7 +889,7 @@ def SP_set(
     # Guardo los datos de la simulación
     utils.guardar_datos(
         save_path_data=rutas["simulation_path"] / f"Data_sp_set_{num_simulation}",
-        headers={"datos_simulacion": "Tiempo [s],Voltaje [V],Intensidad [A]"},
+        headers={"datos_simulacion": header_sp_set},
         datos_sim=data_sp_set,
     )
 
