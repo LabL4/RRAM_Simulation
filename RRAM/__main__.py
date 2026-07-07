@@ -50,6 +50,16 @@ def _build_parser() -> argparse.ArgumentParser:
     p_exec.add_argument(
         "--num-filamentos", type=int, default=None, help="Sobreescribe num_filamentos del CSV para esta ejecución."
     )
+    p_exec.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help=(
+            "Fija la semilla de numpy.random al inicio de cada fase (PP_set, SP_set, "
+            "PP_reset, SP_reset) para que la corrida sea exactamente reproducible. "
+            "Por defecto: aleatorio real (sin fijar)."
+        ),
+    )
     p_exec.add_argument("--init-data-dir", default="Init_data")
     p_exec.add_argument("--results-dir", default="Results")
     p_exec.add_argument(
@@ -86,6 +96,16 @@ def _build_parser() -> argparse.ArgumentParser:
     p_all.add_argument("num_simulation", type=int)
     p_all.add_argument(
         "--num-filamentos", type=int, default=None, help="Sobreescribe num_filamentos del CSV para esta ejecución."
+    )
+    p_all.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help=(
+            "Fija la semilla de numpy.random al inicio de cada fase (PP_set, SP_set, "
+            "PP_reset, SP_reset) para que la corrida sea exactamente reproducible. "
+            "Por defecto: aleatorio real (sin fijar)."
+        ),
     )
     p_all.add_argument("--guardar-datos", action="store_true")
     p_all.add_argument("--init-data-dir", default="Init_data")
@@ -126,6 +146,7 @@ def _cmd_exec(args) -> int:
             num_simulation=args.num_simulation,
             init_data_dir=args.init_data_dir,
             num_filamentos=args.num_filamentos,
+            seed=args.seed,
         )
         run_cycle(
             cfg,
@@ -175,6 +196,7 @@ def _cmd_all(args) -> int:
             num_simulation=args.num_simulation,
             init_data_dir=args.init_data_dir,
             num_filamentos=args.num_filamentos,
+            seed=args.seed,
         )
         run_cycle(
             cfg,

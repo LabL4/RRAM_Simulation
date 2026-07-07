@@ -1,7 +1,7 @@
 """Parámetros geométricos y temporales de la simulación RRAM."""
 
 from dataclasses import dataclass, field, fields
-from typing import get_type_hints
+from typing import Optional, get_type_hints
 
 import numpy as np
 
@@ -18,6 +18,12 @@ class SimulationParameters:
     voltaje_final_set: float
     init_temp: float
     densidad_vacantes: float
+
+    # Semilla de reproducibilidad. None (defecto) = aleatorio real, igual que
+    # el comportamiento histórico. Si se fija (vía --seed en la CLI), cada fase
+    # (PP_set, SP_set, PP_reset, SP_reset) reinicia np.random con este mismo
+    # valor al empezar, para que la corrida sea exactamente reproducible.
+    seed: Optional[int] = None
 
     x_size: int = field(init=False)
     y_size: int = field(init=False)
@@ -49,6 +55,12 @@ class SimulationParameters:
         init_fields = {f.name for f in fields(SimulationParameters) if f.init}
         kwargs = {}
         for k in init_fields:
+            if k == "seed":
+                # Opcional: no viene del CSV de parámetros; se fija por CLI
+                # (--seed) u override explícito, nunca se exige aquí.
+                raw = d.get("seed")
+                kwargs["seed"] = int(raw) if raw not in (None, "") else None
+                continue
             if k not in d:
                 raise KeyError(f"La clave '{k}' no existe en el diccionario")
             kwargs[k] = field_types[k](d[k])

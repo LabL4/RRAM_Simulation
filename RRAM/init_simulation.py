@@ -145,6 +145,7 @@ def load_simulation_config(
     num_simulation: int,
     init_data_dir: Path | str = "Init_data",
     num_filamentos: Optional[int] = None,
+    seed: Optional[int] = None,
 ) -> SimulationConfig:
     """
     Lee CSVs + estado inicial para una simulación concreta.
@@ -158,6 +159,10 @@ def load_simulation_config(
         num_simulation:  Índice de la simulación dentro del CSV (0-based).
         init_data_dir:   Carpeta con los CSVs e init_state_{i}.npz.
         num_filamentos:  Override opcional sobre el valor del CSV.
+        seed:            Override opcional de semilla (--seed en la CLI). Si se
+            especifica, cada fase (PP_set, SP_set, PP_reset, SP_reset) reinicia
+            np.random con este valor al empezar, para reproducibilidad exacta
+            entre corridas. None (defecto) = aleatorio real.
 
     Returns:
         SimulationConfig listo para `run_cycle`.
@@ -166,6 +171,10 @@ def load_simulation_config(
 
     sim_parmtrs = utils.read_csv_to_dic(str(init_data_dir / "simulation_parameters.csv"))
     params = SimulationParameters.from_dict(sim_parmtrs[num_simulation])
+
+    if seed is not None and seed != params.seed:
+        logger.info(f"seed override: {params.seed} → {seed}")
+        params = dc_replace(params, seed=seed)
 
     sim_cte = utils.read_csv_to_dic(str(init_data_dir / "simulation_constants.csv"))
     ctes = SimulationConstants.from_dict(sim_cte[num_simulation])

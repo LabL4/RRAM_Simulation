@@ -9,6 +9,19 @@ import csv
 logger = logging.getLogger(__name__)
 
 
+def aplicar_semilla(params) -> None:
+    """
+    Reinicia np.random con params.seed si se ha especificado (reproducibilidad).
+
+    Se llama al inicio de cada fase (PP_set, SP_set, PP_reset, SP_reset) con el
+    MISMO valor de semilla, de forma que cada fase sea determinista de forma
+    independiente (útil con --start-from/--stop-at). Si params.seed es None
+    (defecto), no hace nada: la simulación es aleatoria real, como siempre.
+    """
+    if params.seed is not None:
+        np.random.seed(params.seed)
+
+
 def generar_configuracion_filamentos(
     eje_x: int,
     eje_y: int,
@@ -92,13 +105,17 @@ def obtener_puntos_en_curva(v_array, i_array, puntos_x):
     return puntos
 
 
-def crear_rutas_simulacion(num_simulation: int, state: str) -> dict:
+def crear_rutas_simulacion(num_simulation: int, state: str, results_dir: str | Path = "Results") -> dict:
     """
     Crea las rutas necesarias para guardar resultados de la simulación.
 
     Args:
         num_simulation (int): Número índice de la simulación.
         state (str): Estado de la simulación, puede ser 'set' o 'reset'.
+        results_dir (str | Path): Carpeta raíz de resultados. Por defecto "Results"
+            (comportamiento histórico, relativo a Path.cwd()). Pasar una ruta
+            distinta (p.ej. para pruebas de diagnóstico) aísla completamente
+            los datos escritos por esta simulación sin tocar Results/ real.
 
     Returns:
         dict: Diccionario con las rutas Path para 'simulation', 'figures' y 'set'.
@@ -106,7 +123,9 @@ def crear_rutas_simulacion(num_simulation: int, state: str) -> dict:
     Side-effects:
         Crea las carpetas en disco si no existen.
     """
-    simulation_path = Path.cwd() / "Results" / f"simulation_{num_simulation}"
+    results_dir = Path(results_dir)
+    base = results_dir if results_dir.is_absolute() else Path.cwd() / results_dir
+    simulation_path = base / f"simulation_{num_simulation}"
     figures_path = simulation_path / "Figures"
     data_simulation_path = simulation_path / state
 

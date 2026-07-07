@@ -181,19 +181,19 @@ def run_cycle(
             num_simulation=n_save, params=cfg.params, sim_ctes=cfg.sim_ctes,
             CF_ranges=cfg.cf_ranges, CF_creado=cfg.cf_creado,
             CF_centros=cfg.cf_centros, actual_state=cfg.actual_state,
-            usar_muro=usar_muro,
+            usar_muro=usar_muro, results_dir=results_dir,
         )),
         ("sp_set",   lambda: SP_set(
             final_state_pp_set=states.pp_set, num_simulation=n_save,
-            CF_ranges=cfg.cf_ranges, usar_muro=usar_muro,
+            CF_ranges=cfg.cf_ranges, usar_muro=usar_muro, results_dir=results_dir,
         )),
         ("pp_reset", lambda: PP_reset(
             final_state_sp_set=states.sp_set, num_simulation=n_save,
-            CF_ranges=cfg.cf_ranges, usar_muro=usar_muro,
+            CF_ranges=cfg.cf_ranges, usar_muro=usar_muro, results_dir=results_dir,
         )),
         ("sp_reset", lambda: SP_reset(
             final_state_pp_reset=states.pp_reset, num_simulation=n_save,
-            CF_ranges=cfg.cf_ranges,
+            CF_ranges=cfg.cf_ranges, results_dir=results_dir,
         )),
     ]
 

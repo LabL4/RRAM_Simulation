@@ -25,6 +25,7 @@ def PP_reset(
     CF_ranges: List[tuple],
     num_pasos_guardar_estado: int = 50,  # Antes era cada 2000
     usar_muro: bool = True,
+    results_dir: str = "Results",
 ):
     """
     Simulates the reset process of a resistive switching device, updating the system's state and tracking the evolution of various parameters over time.
@@ -52,6 +53,7 @@ def PP_reset(
     """
 
     params = final_state_sp_set["params"]
+    utils.aplicar_semilla(params)
     sim_ctes = final_state_sp_set["sim_ctes"]
     temperatura = final_state_sp_set["Temperatura_final"]
     tiempo_sp_set = final_state_sp_set["tiempo_sp_set"]
@@ -64,18 +66,20 @@ def PP_reset(
 
     filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(CF_centros)
 
-    rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="reset")
+    rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="reset", results_dir=results_dir)
 
     rutas["data_simulation_path"].mkdir(parents=True, exist_ok=True)
 
     oxygen_state = np.zeros_like(actual_state, dtype=np.int8)
 
     N = len(CF_ranges)
-    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], R_1[Ohm], ..., I_N[A], R_N[Ohm], T_1[K], ..., T_N[K]
+    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], ..., I_N[A], R_1[Ohm], ..., R_N[Ohm], T_1[K], ..., T_N[K]
+    # El orden por bloques debe coincidir con el ensamblado de cada fila:
+    # [t, V, I_total, R_total] + I_fils + R_fils + T_fils
     num_columnas = 4 + 3 * N
     cols = ["t[s]", "V[V]", "I_total[A]", "R_total[Ohm]"]
-    for i in range(1, N + 1):
-        cols += [f"I_{i}[A]", f"R_{i}[Ohm]"]
+    cols += [f"I_{i}[A]" for i in range(1, N + 1)]
+    cols += [f"R_{i}[Ohm]" for i in range(1, N + 1)]
     cols += [f"T_{i}[K]" for i in range(1, N + 1)]
     header_pp_reset = ",".join(cols)
 
@@ -359,8 +363,10 @@ def SP_reset(
     num_simulation: int,
     CF_ranges: List[tuple],
     num_pasos_guardar_estado: int = 50,
+    results_dir: str = "Results",
 ):
     params = final_state_pp_reset["params"]
+    utils.aplicar_semilla(params)
     sim_ctes = final_state_pp_reset["sim_ctes"]
     temperatura = final_state_pp_reset["Temperatura_final"]
     tiempo_pp_reset = final_state_pp_reset["tiempo_pp_reset"]
@@ -390,14 +396,16 @@ def SP_reset(
 
     logger.info(f"Lol voltaje de rotura de pp reset son:  {voltage_CF_destruido}")
 
-    rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="reset")
+    rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="reset", results_dir=results_dir)
 
     N = len(CF_ranges)
-    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], R_1[Ohm], ..., I_N[A], R_N[Ohm], T_1[K], ..., T_N[K]
+    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], ..., I_N[A], R_1[Ohm], ..., R_N[Ohm], T_1[K], ..., T_N[K]
+    # El orden por bloques debe coincidir con el ensamblado de cada fila:
+    # [t, V, I_total, R_total] + I_fils + R_fils + T_fils
     num_columnas = 4 + 3 * N
     cols = ["t[s]", "V[V]", "I_total[A]", "R_total[Ohm]"]
-    for i in range(1, N + 1):
-        cols += [f"I_{i}[A]", f"R_{i}[Ohm]"]
+    cols += [f"I_{i}[A]" for i in range(1, N + 1)]
+    cols += [f"R_{i}[Ohm]" for i in range(1, N + 1)]
     cols += [f"T_{i}[K]" for i in range(1, N + 1)]
     header_sp_reset = ",".join(cols)
 

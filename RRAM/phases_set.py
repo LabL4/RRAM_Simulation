@@ -36,6 +36,7 @@ def PP_set(
     CF_centros: List[int] | None = None,
     actual_state: np.ndarray | None = None,
     usar_muro: bool = True,
+    results_dir: str = "Results",
 ):
     """
     Executes the first part (PP) of the simulation set process for a resistive random-access memory (RRAM) device.
@@ -66,9 +67,10 @@ def PP_set(
     Returns:
         dict: Estado final del PP set con todas las variables necesarias para SP_set.
     """
+    utils.aplicar_semilla(params)
     np.set_printoptions(threshold=sys.maxsize)
     # Declaro todas las variables que voy a usar exclusivamente en la primera parte (PP) del set.
-    rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="set")
+    rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="set", results_dir=results_dir)
 
     rutas["simulation_path"].mkdir(parents=True, exist_ok=True)
     rutas["figures_path"].mkdir(parents=True, exist_ok=True)
@@ -118,11 +120,13 @@ def PP_set(
     centros_calculados = CF_centros
 
     N = len(CF_ranges)
-    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], R_1[Ohm], ..., I_N[A], R_N[Ohm], T_1[K], ..., T_N[K]
+    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], ..., I_N[A], R_1[Ohm], ..., R_N[Ohm], T_1[K], ..., T_N[K]
+    # El orden por bloques debe coincidir con el ensamblado de cada fila:
+    # [t, V, I_total, R_total] + I_fils + R_fils + T_fils
     num_columnas = 4 + 3 * N
     cols = ["t[s]", "V[V]", "I_total[A]", "R_total[Ohm]"]
-    for i in range(1, N + 1):
-        cols += [f"I_{i}[A]", f"R_{i}[Ohm]"]
+    cols += [f"I_{i}[A]" for i in range(1, N + 1)]
+    cols += [f"R_{i}[Ohm]" for i in range(1, N + 1)]
     cols += [f"T_{i}[K]" for i in range(1, N + 1)]
     header_pp_set = ",".join(cols)
 
@@ -552,6 +556,7 @@ def SP_set(
     num_simulation: int,
     CF_ranges: List[tuple],
     usar_muro: bool = True,
+    results_dir: str = "Results",
 ) -> dict:
     """
     Simulates the second part of the "set" process in a resistive switching device.
@@ -598,6 +603,7 @@ def SP_set(
     sistema_percola = final_state_pp_set["sistema_percola"]
     sim_ctes = final_state_pp_set["sim_ctes"]
     params = final_state_pp_set["params"]
+    utils.aplicar_semilla(params)
     voltaje_max_set = final_state_pp_set["voltaje_max_set"]
     tiempo_pp_set = final_state_pp_set["tiempo_pp_set"]
     current = final_state_pp_set["current_final"]
@@ -613,7 +619,7 @@ def SP_set(
     max_vancantes_sp_set = max_vancantes_pp_set + int(ocupacion_max_sp_set * params.num_max_vacantes)
     total_vacantes_sp_set = False
     num_pasos_guardar_estado = 100
-    rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="set")
+    rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="set", results_dir=results_dir)
 
     temperatura_anterior = final_state_pp_set["Temperatura_final"]
 
@@ -627,11 +633,13 @@ def SP_set(
 
     # Defino la matriz para almacenar los datos
     N = len(CF_ranges)
-    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], R_1[Ohm], ..., I_N[A], R_N[Ohm], T_1[K], ..., T_N[K]
+    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], ..., I_N[A], R_1[Ohm], ..., R_N[Ohm], T_1[K], ..., T_N[K]
+    # El orden por bloques debe coincidir con el ensamblado de cada fila:
+    # [t, V, I_total, R_total] + I_fils + R_fils + T_fils
     num_columnas = 4 + 3 * N
     cols = ["t[s]", "V[V]", "I_total[A]", "R_total[Ohm]"]
-    for i in range(1, N + 1):
-        cols += [f"I_{i}[A]", f"R_{i}[Ohm]"]
+    cols += [f"I_{i}[A]" for i in range(1, N + 1)]
+    cols += [f"R_{i}[Ohm]" for i in range(1, N + 1)]
     cols += [f"T_{i}[K]" for i in range(1, N + 1)]
     header_sp_set = ",".join(cols)
 
