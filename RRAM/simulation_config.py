@@ -14,7 +14,7 @@ MATERIAL_DEFAULTS = {
     "cte_red": 0.25e-9,
     "permitividad_relativa_set": 299.6653,
     "permitividad_relativa_reset": 299.9641,
-    "generation_energy": 1.15,
+    "generation_energy": 1.05,
     "recombination_energy": 1.55,
     "pb_metal_insul_set": 0.001,
     "pb_metal_insul_reset": 0.0334,
@@ -65,7 +65,7 @@ THERMAL_DEFAULTS = {
 # ============================================================================
 SIMULATION_DEFAULTS = {
     "device_size_x": 10e-9,  # Ancho entre electrodos, debe corresponder a los dispositivos medidos
-    "device_size_y": 30e-9,
+    "device_size_y": 25e-9,
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
     "num_trampas": 150,
     "total_simulation_time": 10.0,

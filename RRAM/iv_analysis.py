@@ -19,9 +19,8 @@ def simulation_IV(
     roturas_dict: dict,
 ):
     # region Representar datos
-    save_path = figures_path / f"I-V_{num_simulation}"
-    save_path_marcado = figures_path / f"I-V_{num_simulation}_marcado"
-
+    # Los nombres de fichero (I-V_{N}, I-V_marcado_{N}) los construye cada
+    # función de plot a partir de la CARPETA figures_path que le pasamos.
     # Definir nombres base y tipos
     prefixes = ["pp", "sp"]
     stages = ["set", "reset"]
@@ -101,7 +100,7 @@ def simulation_IV(
         i_reset,
         num_simulation - 1,
         titulo_figura="",
-        figures_path=str(save_path),
+        figures_path=str(figures_path),
     )
     Representate.plot_IV_marcado(
         v_set,
@@ -111,6 +110,7 @@ def simulation_IV(
         num_simulation - 1,
         puntos_totales,
         desplazamiento,
+        figures_path=str(figures_path),
     )
 
     return None

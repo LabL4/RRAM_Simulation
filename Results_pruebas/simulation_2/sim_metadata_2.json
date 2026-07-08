@@ -1,0 +1,112 @@
+{
+  "num_simulation": 2,
+  "voltaje_percolacion": 0.6369,
+  "creaciones_dict": {
+    "0": {
+      "filamento": 1,
+      "voltaje": 0.6369,
+      "etapa": "pp_set"
+    },
+    "1": {
+      "filamento": 2,
+      "voltaje": 0.70719,
+      "etapa": "pp_set"
+    },
+    "2": {
+      "filamento": 3,
+      "voltaje": 0.70719,
+      "etapa": "pp_set"
+    }
+  },
+  "roturas_dict": {},
+  "centros_calculados": [
+    16,
+    49,
+    82
+  ],
+  "cf_ranges": [
+    [
+      0,
+      32
+    ],
+    [
+      33,
+      65
+    ],
+    [
+      66,
+      99
+    ]
+  ],
+  "params_dict": {
+    "device_size_x": 1e-08,
+    "device_size_y": 2.5e-08,
+    "atom_size": 2.5e-10,
+    "num_trampas": 150,
+    "total_simulation_time": 10.0,
+    "num_pasos": 10000,
+    "voltaje_final_reset": 1.4,
+    "voltaje_final_set": 1.1,
+    "init_temp": 300.0,
+    "densidad_vacantes": 4.0,
+    "seed": null,
+    "x_size": 40,
+    "y_size": 100,
+    "num_max_vacantes": 3800,
+    "paso_temporal": 0.001,
+    "paso_potencial_set": 0.00011,
+    "paso_potencial_reset": 0.00014
+  },
+  "ctes_dict": {
+    "vibration_frequency": 10000000000000.0,
+    "cte_red": 2.5e-10,
+    "permitividad_relativa_set": 299.6653,
+    "permitividad_relativa_reset": 299.9641,
+    "generation_energy": 1.05,
+    "recombination_energy": 1.55,
+    "pb_metal_insul_set": 0.001,
+    "pb_metal_insul_reset": 0.0334,
+    "recom_enchancement_factor": 3000.0,
+    "long_decaimiento_concentracion": 1e-09,
+    "ohm_resistence_set": 4.3,
+    "ohm_resistence_reset": 4.3,
+    "num_filamentos": 3,
+    "grosor_filamento": [
+      10,
+      3,
+      5
+    ],
+    "gamma": 10.0,
+    "gamma_drift": 10.0,
+    "E_m": 0.6,
+    "I_0_set": 0.0010731,
+    "I_0_reset": 0.002505,
+    "r_termica_no_percola": 10000.0,
+    "conductividad_termica_dielectrico": 2.3,
+    "conductividad_termica_CF": 15.0,
+    "conductividad_termica_aislante": 1e-06,
+    "conductividad_termica_electrodo": 5.0,
+    "Temperatura_electrodo": 300.0,
+    "factor_generar_calor": 5.5e-05,
+    "pendiente_temperatura": -24.7,
+    "ocupacion_max_pp_set": 0.8,
+    "ocupacion_max_sp_set": 0.45,
+    "factor_vecinos_pp_set": 1.0,
+    "factor_libre_pp_set": 1.0,
+    "factor_vecinos_sp_set": 1.0,
+    "factor_libre_sp_set": 0.9,
+    "lim_voltage_percolacion": 1.4,
+    "compliance_voltage": 0.6,
+    "voltaje_gen_oxigeno_pp_1": 1.1,
+    "num_oxigenos_pp_reset_1": 2,
+    "voltaje_gen_oxigeno_pp_2": 1.2,
+    "num_oxigenos_pp_reset_2": 10,
+    "voltaje_gen_oxigeno_sp": -0.2,
+    "num_oxigenos_sp_reset": 5,
+    "centros_filamento": ""
+  },
+  "extra": {
+    "status": "completed",
+    "T_final_pp_set": 835.6069287845147
+  }
+}

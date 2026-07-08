@@ -93,7 +93,7 @@ def PP_set(
 
     # --- TEMPORAL: pausa de generación tras percolar (quitar cuando ya no haga falta) ---
     k_percolacion = None
-    PASOS_PAUSA_GENERACION_POST_PERCOLACION = 1000
+    PASOS_PAUSA_GENERACION_POST_PERCOLACION = 500
     # --- FIN TEMPORAL ---
 
     # AL inicio como la corriente es de tipo poole frenkel, la resitencia ohmica se considera nula
@@ -195,9 +195,12 @@ def PP_set(
             )  # Le quitamos un paso porque se ha superado el voltaje de ruptura
 
             logger.info(f"Voltaje final set {voltaje_max_set} en el tiempo {tiempo_pp_set} ")
-            # Elimino las filas sobrantes del array de datos y las lleno de nans para eliminarlas luego
-            data_pp_set[k - 1 :] = np.nan  # Añadir valores nulos a partir de la fila k
-            data_pp_set = data_pp_set[~np.isnan(data_pp_set).any(axis=1)]  # Eliminar filas con valores nulos
+            # Recorto por índice las filas válidas (0..k-2). Se descuenta un paso
+            # porque en este paso ya se ha superado el voltaje final del set.
+            # NOTA: no se puede filtrar por NaN, porque las filas pre-percolación
+            # llevan NaN legítimo en las columnas R_total/I_fils/R_fils (aún no hay
+            # filamento conductor) y ese filtro borraría toda la rama pp_set.
+            data_pp_set = data_pp_set[: k - 1]
             break
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
@@ -351,13 +354,17 @@ def PP_set(
 
                 # Temperatura por filamento: extraída del mapa FVM ya resuelto, en la fila central de cada filamento
                 perfiles_T_fils = Temperature.extraer_perfiles_filamentos(
-                    matriz_temperaturas=temperatura_anterior, filas_centros=centros_calculados
+                    matriz_temperaturas=temperatura_anterior,
+                    filas_centros=centros_calculados,  # type: ignore
                 )
                 T_fils = [float(np.max(p)) if p is not None else params.init_temp for p in perfiles_T_fils]
 
             else:
                 temperatura = Temperature.Temperature_Joule(
-                    voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola * 5
+                    voltage,
+                    current,
+                    T_0=params.init_temp,
+                    r_termica=sim_ctes.r_termica_no_percola,  # * 5
                 )
                 # Temperatura por filamento neutra: no hay mapa FVM, se replica la temperatura escalar del dispositivo
                 T_fils = [float(temperatura)] * N

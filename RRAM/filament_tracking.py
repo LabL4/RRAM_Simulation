@@ -171,6 +171,11 @@ def actualizar_parametros_por_filamento(
         if filamentos_actuales == num_esperados:
             logger.info("Todos los filamentos creados.")
             all_CFs_created = True
+            # Igual que en el caso de 2 filamentos: al completarse todos los
+            # filamentos hay que calcular las filas intermedias y distancias de
+            # los muros térmicos. Sin esto, PP_set recibe None y NUNCA aplica el
+            # muro térmico cuando hay 3 o más filamentos.
+            filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(CF_centros)
 
     # Logs comunes
     logger.info(f"Filamentos: {filamentos_actuales}/{num_esperados}. Gamma: {sim_ctes.gamma}")

@@ -355,7 +355,7 @@ def plot_IV(
     i_reset,
     num_simulation,
     titulo_figura="I-V Characteristics",
-    figures_path="C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/",
+    figures_path="Results/Figures",
     extension_guardado="png",
 ):
     """
@@ -367,11 +367,13 @@ def plot_IV(
         i_reset (list): List of RESET currents.
         num_simulation (int): Simulation number for saving the figure.
         titulo_figura (str): Title of the figure.
-        figures_path (str): Path to save the figure.
+        figures_path (str): Carpeta donde guardar la figura. Se respeta tal cual
+            se recibe (así el llamador decide la ruta, p.ej. results_dir de
+            pruebas). Se crea si no existe.
         extension_guardado (str): Format to save the figure ('png', 'pdf', 'svg').
     """
 
-    figures_path = os.getcwd() + "/Results/Figures"
+    os.makedirs(figures_path, exist_ok=True)
 
     # Configuración de la figura
     setup_paper_plt(plt, latex=True, scaling=2.5)
@@ -478,9 +480,9 @@ def plot_IV_marcado(
     num_simulation,
     lista_puntos,
     desplazamiento,
+    figures_path="Results/Figures",
     extension_guardado="png",
 ):
-    # figures_path="C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Results/Figures",
     """
     Plots the I-V characteristics of a device.
     Parameters:
@@ -490,10 +492,12 @@ def plot_IV_marcado(
         i_reset (list): List of RESET currents.
         num_simulation (int): Simulation number for saving the figure.
         titulo_figura (str): Title of the figure.
-        figures_path (str): Path to save the figure.
+        figures_path (str): Carpeta donde guardar la figura. Se respeta tal cual
+            se recibe (así el llamador decide la ruta, p.ej. results_dir de
+            pruebas). Se crea si no existe.
     """
 
-    figures_path = os.getcwd() + "/Results/Figures"
+    os.makedirs(figures_path, exist_ok=True)
 
     # Configuración de la figura
     setup_paper_plt(plt, latex=True, scaling=2.5)

@@ -513,7 +513,7 @@ def calcular_perfiles_muro(
         T_filamento_arriba = perfiles_filamentos[i]
 
         # El muro inferior está influenciado por el filamento que tiene debajo (i+1)
-        T_filamento_abajo = perfiles_filamentos[i - 1]
+        T_filamento_abajo = perfiles_filamentos[i + 1]
 
         # print("El perfil de temperatura del filamento superior en la funcion del muro es:", T_filamento_arriba[10:21])
         # print("El perfil de temperatura del filamento inferior en la funcion del muro es:", T_filamento_abajo[10:21])
@@ -603,7 +603,7 @@ def extraer_perfiles_filamentos(matriz_temperaturas: np.ndarray, filas_centros: 
         if fila is None:
             # Añadimos None a la lista para mantener la correspondencia de índices
             perfiles.append(None)
-            logger.info('Advertencia: Se detectó un filamento no formado (None). Perfil omitido.')
+            logger.info("Advertencia: Se detectó un filamento no formado (None). Perfil omitido.")
 
         # Caso B: La fila es un índice válido dentro de la matriz
         elif 0 <= fila < Ny:
