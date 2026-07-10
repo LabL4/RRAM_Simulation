@@ -1,36 +1,46 @@
 {
   "num_simulation": 1,
-  "voltaje_percolacion": 0.62348,
+  "voltaje_percolacion": 0.47146,
   "creaciones_dict": {
     "0": {
-      "filamento": 1,
-      "voltaje": 0.62348,
+      "filamento": 2,
+      "voltaje": 0.47146,
       "etapa": "pp_set"
     },
     "1": {
-      "filamento": 2,
-      "voltaje": 0.8657,
+      "filamento": 3,
+      "voltaje": 0.58047,
+      "etapa": "pp_set"
+    },
+    "2": {
+      "filamento": 1,
+      "voltaje": 0.58597,
       "etapa": "pp_set"
     }
   },
   "roturas_dict": {},
   "centros_calculados": [
-    24,
-    74
+    26,
+    79,
+    132
   ],
   "cf_ranges": [
     [
       0,
-      49
+      52
     ],
     [
-      50,
-      99
+      53,
+      105
+    ],
+    [
+      106,
+      159
     ]
   ],
   "params_dict": {
     "device_size_x": 1e-08,
-    "device_size_y": 2.5e-08,
+    "device_size_y": 4e-08,
     "atom_size": 2.5e-10,
     "num_trampas": 150,
     "total_simulation_time": 10.0,
@@ -41,8 +51,8 @@
     "densidad_vacantes": 4.0,
     "seed": null,
     "x_size": 40,
-    "y_size": 100,
-    "num_max_vacantes": 3800,
+    "y_size": 160,
+    "num_max_vacantes": 6080,
     "paso_temporal": 0.001,
     "paso_potencial_set": 0.00011,
     "paso_potencial_reset": 0.00014
@@ -60,10 +70,11 @@
     "long_decaimiento_concentracion": 1e-09,
     "ohm_resistence_set": 4.3,
     "ohm_resistence_reset": 4.3,
-    "num_filamentos": 2,
+    "num_filamentos": 3,
     "grosor_filamento": [
-      10,
-      3
+      2,
+      3,
+      5
     ],
     "gamma": 10.0,
     "gamma_drift": 10.0,
@@ -96,6 +107,6 @@
   },
   "extra": {
     "status": "completed",
-    "T_final_pp_set": 812.7315436681276
+    "T_final_pp_set": 735.2250415462144
   }
 }

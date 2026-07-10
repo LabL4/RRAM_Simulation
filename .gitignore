@@ -17,3 +17,4 @@ Initial_data/
 logs/
 *.log
 *.npz
+*.svg

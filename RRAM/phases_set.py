@@ -175,7 +175,7 @@ def PP_set(
         voltage = vector_ddp[k]
 
         # Genero el vector campo eléctrico
-        for i in range(0, params.x_size):
+        for i in range(0, actual_state.shape[0]):
             E_field_vector[i] = ElectricField.GapElectricField(
                 potential=voltage,
                 pos_y=i,
@@ -686,7 +686,7 @@ def SP_set(
         voltage = vector_ddp[k]
 
         # Genero el vector campo eléctrico
-        for i in range(0, params.x_size):
+        for i in range(0, actual_state.shape[0]):
             E_field_vector[i] = ElectricField.GapElectricField(
                 voltage, i, actual_state, device_size_x=params.device_size_x, grid_size=params.atom_size
             )
