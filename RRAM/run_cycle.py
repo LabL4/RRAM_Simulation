@@ -70,6 +70,30 @@ def _resolve_simulation_path(results_dir: Path | str, n_save: int) -> Path:
     return Path(results_dir) / f"simulation_{n_save}"
 
 
+def _temperaturas_max_por_fase(states: SimulationStates) -> dict:
+    """
+    Recopila la temperatura máxima de cada filamento en cada fase ejecutada.
+
+    Cada fase acumula su propio `T_max_fils` (pico sobre todos sus pasos, contando
+    solo los que resuelven el FVM). Aquí se juntan las 4 en la forma que acaba en
+    la metadata::
+
+        {"pp_set": {"T_1": 735.2, "T_2": 690.1}, "sp_set": {...}}
+
+    Las fases no ejecutadas no aparecen. Un `None` (fase que nunca resolvió el
+    FVM para ese filamento) se guarda como `null`.
+    """
+    temperaturas_max: dict = {}
+    for fase in PHASE_ORDER:
+        T_max_fils = (getattr(states, fase) or {}).get("T_max_fils")
+        if T_max_fils is None:
+            continue
+        temperaturas_max[fase] = {
+            f"T_{i}": (float(t) if t is not None else None) for i, t in enumerate(T_max_fils, start=1)
+        }
+    return temperaturas_max
+
+
 def _save_partial_metadata(
     cfg: SimulationConfig,
     n_save: int,
@@ -77,8 +101,17 @@ def _save_partial_metadata(
     results_dir: Path | str,
     status: str,
     error: Optional[str] = None,
+    usar_muro: bool = True,
+    start_from: Optional[str] = None,
+    stop_at: Optional[str] = None,
 ) -> None:
-    """Persiste metadata con la mayor cantidad de datos disponibles."""
+    """Persiste metadata con la mayor cantidad de datos disponibles.
+
+    Los flags que cambian la física de la corrida (`usar_muro`, `seed`) y el
+    tramo del ciclo realmente ejecutado (`start_from`, `stop_at`) se guardan en
+    `extra`: sin ellos no hay forma de saber a posteriori con qué modelo se
+    generó una carpeta de resultados.
+    """
     pp_set = states.pp_set or {}
     sp_set = states.sp_set or {}
     sp_reset = states.sp_reset or {}
@@ -101,6 +134,16 @@ def _save_partial_metadata(
         ctes_dict=serialize_dataclass(cfg.sim_ctes),
         extra={
             "status": status,
+            # Tramo del ciclo realmente ejecutado. Se guardan las fases efectivas,
+            # no los argumentos crudos: `--start-from` sin valor significa pp_set y
+            # `--stop-at` sin valor significa sp_reset.
+            "start_from": start_from or PHASE_ORDER[0],
+            "stop_at": stop_at or PHASE_ORDER[-1],
+            # Flags que cambian la física de la corrida.
+            "muro_termico": bool(usar_muro),
+            "seed": cfg.params.seed,
+            # Pico de temperatura de cada filamento, por fase.
+            "temperaturas_max": _temperaturas_max_por_fase(states),
             **({"error": error} if error else {}),
             **({"vecindad_inicial": vecindad_inicial} if vecindad_inicial is not None else {}),
         },
@@ -216,6 +259,7 @@ def run_cycle(
                 cfg, n_save, states, results_dir,
                 status=f"failed_at_{nombre}",
                 error=f"{type(e).__name__}: {e}",
+                usar_muro=usar_muro, start_from=start_from, stop_at=stop_at,
             )
             raise
 
@@ -228,5 +272,8 @@ def run_cycle(
     )
 
     # Todo OK → metadata completa
-    _save_partial_metadata(cfg, n_save, states, results_dir, status="completed")
+    _save_partial_metadata(
+        cfg, n_save, states, results_dir, status="completed",
+        usar_muro=usar_muro, start_from=start_from, stop_at=stop_at,
+    )
     return states

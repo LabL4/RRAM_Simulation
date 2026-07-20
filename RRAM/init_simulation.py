@@ -67,7 +67,19 @@ class SimulationConfig:
 
 def build_initial_states(
     init_data_dir: Path | str = "Init_data",
+    seed: Optional[int] = None,
 ) -> int:
+    """
+    Pre-genera `init_state_{i}.npz` para todas las simulaciones del CSV.
+
+    Args:
+        init_data_dir: Carpeta con los CSVs, donde se escriben los `.npz`.
+        seed: Si se especifica, cada simulación `i` siembra np.random con
+            `seed + i` justo antes de sortear sus trampas, de forma que el
+            estado inicial sea reproducible entre corridas sin que todas las
+            simulaciones arranquen del mismo estado (el ensemble se conserva).
+            None (defecto) = aleatorio real, comportamiento histórico.
+    """
     init_data_dir = Path(init_data_dir)
     archivo_params = init_data_dir / "simulation_parameters.csv"
     if not archivo_params.is_file():
@@ -84,6 +96,12 @@ def build_initial_states(
     logger.info(f"Construyendo estados iniciales para {num_simulations} simulaciones...")
 
     for i, row in df_params.iterrows():
+        # Semilla por simulación: `seed + i` mantiene cada init_state distinto
+        # entre sims pero idéntico corrida a corrida. Sin seed no se toca
+        # np.random (aleatorio real).
+        if seed is not None:
+            np.random.seed(seed + int(i))
+
         eje_x = int(math.ceil(row["device_size_y"] / row["atom_size"]))
         eje_y = int(math.ceil(row["device_size_x"] / row["atom_size"]))
         num_trampas = int(row["num_trampas"])
@@ -132,7 +150,8 @@ def build_initial_states(
         out = init_data_dir / f"init_state_{i}.npz"
         np.savez_compressed(out, actual_state=init_state)
 
-    logger.info(f"{num_simulations} estados iniciales generados en {init_data_dir}.")
+    origen = f"seed={seed} (por sim: seed+i)" if seed is not None else "aleatorio real"
+    logger.info(f"{num_simulations} estados iniciales generados en {init_data_dir} · {origen}.")
     return num_simulations
 
 

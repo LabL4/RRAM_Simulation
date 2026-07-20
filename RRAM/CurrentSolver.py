@@ -217,40 +217,63 @@ def Eliminar_filamentos_incompletos(grid_limpio, filamentos_ranges, percola_bool
     return CF_matrix
 
 
+def resistencias_por_columna(CF_matrix, ohm_resistence) -> np.ndarray:
+    """
+    Calcula la resistencia equivalente de CADA columna de una matriz de filamento.
+
+    Las celdas de una misma columna están en paralelo, por lo que la resistencia de
+    la columna 'j' con N celdas es R_col = ohm_resistence / N.
+
+    Esta es la FUENTE ÚNICA del modelo de resistencia local. La consumen:
+      - `calcular_resistencia`      (rama eléctrica): suma el vector -> R del bloque.
+      - `Temperature.calculate_heat_source` (rama térmica): necesita la caída de
+        tensión por columna (delta_V_j = I_filamento * R_col_j) para repartir el calor.
+
+    Devolver el vector en vez de solo la suma evita que ambas ramas implementen el
+    mismo modelo por separado y se desincronicen.
+
+    Args:
+        CF_matrix (np.ndarray): Matriz (o bloque de filas) donde 1 indica filamento.
+        ohm_resistence (float): Resistencia óhmica de una celda [Ohm].
+
+    Returns:
+        np.ndarray: Vector de longitud Nx con la resistencia de cada columna [Ohm].
+            NaN en las columnas vacías (huecos), para que cada consumidor decida
+            qué hacer con ellas sin re-implementar la comprobación.
+    """
+    # Nº de celdas de filamento en cada columna (bool o int -> float para dividir)
+    n_por_columna = np.asarray(CF_matrix).sum(axis=0).astype(float)
+
+    # NaN por defecto: solo se rellenan las columnas que tienen al menos una celda
+    R_cols = np.full(n_por_columna.shape, np.nan, dtype=float)
+    np.divide(ohm_resistence, n_por_columna, out=R_cols, where=n_por_columna > 0)
+
+    return R_cols
+
+
 def calcular_resistencia(CF_matrix, ohm_resistence, mostrar_calculo: bool = False) -> float:
     """
     Calcula la resistencia total de una matriz de formación de filamentos conductores (CF_matrix).
     Este método asume que cada columna de la matriz representa un conjunto de resistencias en paralelo.
     La resistencia total se calcula sumando las resistencias paralelas de cada columna.
     """
-    total_resistance = 0.0
-    Ny, Nx = CF_matrix.shape
+    R_cols = resistencias_por_columna(CF_matrix, ohm_resistence)
 
-    # Recorremos todas las columnas (desde 0 hasta Nx-1)
-    # Si intencionalmente querías saltarte la primera y última columna (ej. electrodos),
-    # entonces usa: for j in range(1, Nx - 1):
-    for j in range(Nx):
-        # Obtenemos la columna 'j' entera y sumamos sus valores
-        N_total_columna = np.sum(CF_matrix[:, j])
+    if mostrar_calculo:
+        n_por_columna = np.asarray(CF_matrix).sum(axis=0)
+        acumulada = 0.0
+        for j, R_col in enumerate(R_cols):
+            if not np.isfinite(R_col):
+                continue
+            acumulada += R_col
+            logger.info(
+                f"Hay {n_por_columna[j]} elementos en la columna {j} y su resistencia es: {R_col:.4f} ohmios \n Resistencia total acumulada: {acumulada:.4f} ohmios"
+            )
 
-        if N_total_columna == 0:
-            # Si una columna entera no tiene ningún '1', significa que hay un hueco
-            # en el filamento. En un circuito en serie, un hueco = resistencia infinita.
-            # Al hacer 'continue', básicamente le estás diciendo que la resistencia de
-            # esa columna es 0 ohmios, lo cual equivale a un cortocircuito perfecto.
-            # esto no deberia pasar porque se usa cuando percola, pero lo dejo por si acaso
-            continue
-
-        # R equivalente de la columna (N resistencias en paralelo)
-        R_col = ohm_resistence / N_total_columna
-
-        # Se suma la resistencia paralela a la resistencia total (columnas en serie)
-        total_resistance += R_col
-
-        if mostrar_calculo:
-            logger.info(f"Hay {N_total_columna} elementos en la columna {j} y su resistencia es: {R_col:.4f} ohmios \n Resistencia total acumulada: {total_resistance:.4f} ohmios")
-
-    return total_resistance
+    # nansum ignora las columnas vacías, reproduciendo exactamente el 'continue' previo:
+    # un hueco aporta 0 ohmios. No debería ocurrir tras Eliminar_filamentos_incompletos,
+    # pero se mantiene el comportamiento histórico para no alterar la rama eléctrica.
+    return float(np.nansum(R_cols))
 
 
 def old_calcular_resistencia(CF_matrix, ohm_resistence):

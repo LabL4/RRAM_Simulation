@@ -93,7 +93,7 @@ def PP_set(
 
     # --- TEMPORAL: pausa de generación tras percolar (quitar cuando ya no haga falta) ---
     k_percolacion = None
-    PASOS_PAUSA_GENERACION_POST_PERCOLACION = 500
+    PASOS_PAUSA_GENERACION_POST_PERCOLACION = 0
     # --- FIN TEMPORAL ---
 
     # AL inicio como la corriente es de tipo poole frenkel, la resitencia ohmica se considera nula
@@ -155,6 +155,11 @@ def PP_set(
     mis_perfiles_extraidos = None
 
     logger.info(f"El valor de gamma es: {sim_ctes.gamma} ")
+
+    # Máximo histórico de temperatura de cada filamento en esta fase. Se acumula
+    # solo en los pasos que resuelven el FVM (ver utils.acumular_T_max_filamentos)
+    # y acaba en la metadata como extra["temperaturas_max"]["pp_set"].
+    T_max_fils: List[float | None] = [None] * N
 
     logger.info(f"Simulacion {num_simulation} - Primera parte del set")
     all_CFs_created = False
@@ -285,12 +290,14 @@ def PP_set(
                 materials_map = Temperature.crear_matriz_materiales(cf_clean_matrix)
 
                 # Cáculo de las fuentes de calor (el filamento es el que emite calor, el resto no)
+                # Cada filamento disipa según SU propia corriente I_fils[f]
                 Q_source_map = Temperature.calculate_heat_source(
                     types_map=materials_map,
                     atom_size=params.atom_size,
-                    I_total=current,
                     R_cell=sim_ctes.ohm_resistence_set,
                     factor_generar_calor=sim_ctes.factor_generar_calor,
+                    CF_ranges=CF_ranges,
+                    I_fils=I_fils,
                 )
 
                 # Compruebo si temperatura es un float, si es así se lanza una excepción porque no se puede extraer el perfil, si no es así se asume que es una matriz y se lanza la función de extracción
@@ -317,8 +324,10 @@ def PP_set(
                         T_ambient=params.init_temp,
                     )
 
+                    # matriz_molde = cf_clean_matrix: misma matriz que genera materials_map
+                    # y Q_source_map, para que la máscara del muro sea coherente con el solver
                     matriz_temperaturas_fijas = Temperature.colocar_muro_termico(
-                        matriz_molde=actual_state_clean_CF,
+                        matriz_molde=cf_clean_matrix,
                         filas_intermedias=filas_intermedias,
                         perfiles_muros_calculados=perfiles_muros_calculados,
                     )
@@ -358,6 +367,7 @@ def PP_set(
                     filas_centros=centros_calculados,  # type: ignore
                 )
                 T_fils = [float(np.max(p)) if p is not None else params.init_temp for p in perfiles_T_fils]
+                T_max_fils = utils.acumular_T_max_filamentos(T_max_fils, T_fils)
 
             else:
                 temperatura = Temperature.Temperature_Joule(
@@ -366,10 +376,18 @@ def PP_set(
                     T_0=params.init_temp,
                     r_termica=sim_ctes.r_termica_no_percola,  # * 5
                 )
-                # Temperatura por filamento neutra: no hay mapa FVM, se replica la temperatura escalar del dispositivo
-                T_fils = [float(temperatura)] * N
+                # Temperatura por filamento: aún no hay mapa FVM (faltan filamentos por
+                # formarse), pero sí hay I y R individuales, así que cada filamento tiene
+                # su propia T = T_0 + I_f^2 * R_f * r_termica en lugar de replicar la escalar.
+                T_fils = Temperature.Temperature_Joule_filamentos(
+                    T_0=params.init_temp,
+                    I_fils=I_fils,
+                    R_fils=R_fils,
+                    r_termica=sim_ctes.r_termica_no_percola,
+                )
                 # Extiendo el valor para formar una matriz del mismo tamaño que el estado, para que no de error al usarlo en la función de generación si no ha percolado
-                temperatura = np.full_like(actual_state, temperatura)
+                # dtype=float obligatorio: actual_state es int64 y sin él la temperatura se trunca a entero
+                temperatura = np.full_like(actual_state, temperatura, dtype=float)
 
         else:
             sistema_percola = False
@@ -500,8 +518,7 @@ def PP_set(
             matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
         )
 
-    # Muestro el valor de temperatura más alto alcanzado en la simulación
-    logger.info(f"\nLa temperatura máxima alcanzada en la simulación ha sido de: {round(np.max(temperatura), 4)} K")
+    logger.info(f"Temperatura máxima por filamento en pp_set: {T_max_fils} K")
 
     # Si no se fomran los flamentos esperados se decarta la simulación
     if filamentos_actuales < len(CF_ranges):
@@ -553,6 +570,7 @@ def PP_set(
         "intensidad_final": current,
         "CF_centros": CF_centros,
         "creaciones_dict": creaciones_dict,
+        "T_max_fils": T_max_fils,
     }
 
     return final_state_pp_set
@@ -651,6 +669,9 @@ def SP_set(
     header_sp_set = ",".join(cols)
 
     data_sp_set = np.zeros((k_max, num_columnas), dtype=np.float64)
+
+    # Máximo histórico de temperatura de cada filamento en esta fase (solo pasos FVM).
+    T_max_fils: List[float | None] = [None] * N
 
     filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(CF_centros)
 
@@ -755,12 +776,14 @@ def SP_set(
             # El sistema percola por lo que resuelvo la ecuación del calor. Primero se obtiene el mapa de materiales
             materials_map = Temperature.crear_matriz_materiales(cf_clean_matrix)
             # Cáculo de las fuentes de calor (el filamento es el que emite calor, el resto no)
+            # Cada filamento disipa según SU propia corriente I_fils[f]
             Q_source_map = Temperature.calculate_heat_source(
                 types_map=materials_map,
                 atom_size=params.atom_size,
-                I_total=current,
                 R_cell=sim_ctes.ohm_resistence_set,
                 factor_generar_calor=sim_ctes.factor_generar_calor,
+                CF_ranges=CF_ranges,
+                I_fils=I_fils,
             )
 
             # 4. LLAMAMOS A LA FUNCIÓN DE EXTRACCIÓN
@@ -784,8 +807,10 @@ def SP_set(
                     atom_size=params.atom_size,
                     T_ambient=params.init_temp,
                 )
+                # matriz_molde = cf_clean_matrix: misma matriz que genera materials_map
+                # y Q_source_map, para que la máscara del muro sea coherente con el solver
                 matriz_temperaturas_fijas = Temperature.colocar_muro_termico(
-                    matriz_molde=actual_state_clean_CF,
+                    matriz_molde=cf_clean_matrix,
                     filas_intermedias=filas_intermedias,
                     perfiles_muros_calculados=perfiles_muros_calculados,
                 )
@@ -820,6 +845,7 @@ def SP_set(
                 matriz_temperaturas=temperatura_anterior, filas_centros=CF_centros
             )
             T_fils = [float(np.max(p)) if p is not None else params.init_temp for p in perfiles_T_fils]
+            T_max_fils = utils.acumular_T_max_filamentos(T_max_fils, T_fils)
 
             if k % num_pasos_guardar_estado == 0:
                 if "matriz_temperaturas_fijas" in locals():
@@ -917,10 +943,12 @@ def SP_set(
         "percola": sistema_percola,
         "centros_calculados": CF_centros,
         "tiempo_sp_set": tiempo_sp_set,
+        "T_max_fils": T_max_fils,
     }
 
     np.savez(rutas["simulation_path"] / f"Final_state_sp_set_{num_simulation}.npz", actual_state)
 
+    logger.info(f"Temperatura máxima por filamento en sp_set: {T_max_fils} K")
     logger.info("Simulación del set finalizada correctamente.")
 
     return final_state_sp_set

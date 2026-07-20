@@ -98,48 +98,90 @@ def crear_matriz_materiales(matriz_filamentos):
 
 
 def calculate_heat_source(
-    types_map: np.ndarray, atom_size: float, I_total: float, R_cell: float, factor_generar_calor: float
+    types_map: np.ndarray,
+    atom_size: float,
+    R_cell: float,
+    factor_generar_calor: float,
+    CF_ranges: list,
+    I_fils: list,
 ) -> np.ndarray:
     """
-    Calcula el mapa de calor Q [W/m^3] usando aproximación resistiva por columnas.
-    Recibe la resistencia de celda y deduce la conductividad internamente para garantizar consistencia.
+    Calcula el mapa de calor Q [W/m^3] resolviendo CADA FILAMENTO POR SEPARADO.
+
+    Cada filamento ocupa una banda de filas (`CF_ranges`) y disipa el calor que le
+    corresponde por SU propia corriente `I_fils[f]`, no por la corriente total del
+    dispositivo. Para una columna 'j' del filamento 'f':
+
+        R_col   = R_cell / (nº de celdas del filamento f en esa columna)
+        delta_V = I_f * R_col           <- caída de tensión en la columna
+        Q       = sigma * (delta_V / h)^2
+
+    `delta_V` es la magnitud intermedia clave: la fórmula sigue siendo válida cuando
+    la conductividad pase a depender de la temperatura; solo cambiará de dónde salen
+    `R_col` y `sigma`.
+
+    La resistencia por columna se recalcula aquí con `CurrentSolver.resistencias_por_columna`,
+    la misma función que usa la rama eléctrica para obtener `I_fils`. Ambas ramas comparten
+    modelo de resistencia, por lo que no pueden desincronizarse.
 
     Args:
-        types_map (np.ndarray): Matriz extendida con electrodos.
+        types_map (np.ndarray): Matriz extendida con electrodos (Nx incluye 2 columnas extra).
         atom_size (float): Tamaño de celda 'h' [m].
-        I_total (float): Corriente total [A].
         R_cell (float): Resistencia óhmica de un nodo [Ohm].
+        factor_generar_calor (float): Factor de calibración del calor generado.
+        CF_ranges (list): Bandas de filas (fila_min, fila_max) de cada filamento.
+        I_fils (list): Corriente de cada filamento [A]. 0.0 / NaN si no está formado.
+
+    Returns:
+        np.ndarray: Mapa de calor Q [W/m^3] con la misma forma que `types_map`.
     """
+    # Import local para dejar explícito que el modelo de resistencia vive en CurrentSolver
+    from . import CurrentSolver
+
     Ny, Nx = types_map.shape
     Q_map_global = np.zeros((Ny, Nx))
 
-    # 1. Calculamos sigma localmente (Coste despreciable: 1 división)
-    # Garantizamos que sigma y R son coherentes siempre.
+    # sigma coherente con R_cell por construcción (1 división, coste despreciable).
+    # PASO 2 (conductividad dependiente de T): pasará a ser un mapa sigma_local[i, j].
     sigma_material = 1.0 / (R_cell * atom_size)
 
-    # 2. Iteramos sobre columnas internas que es donde se encuentra el espacio de simulación real (quitando electrodos)
-    for j in range(1, Nx - 1):
-        column_data = types_map[:, j]
-        fil_indices = np.where(column_data == 1)[0]
-        N_total_columna = len(fil_indices)
+    # Iteramos por filamento. CF_ranges particiona todas las filas sin huecos ni
+    # solapes, así que cada celda de filamento recibe Q exactamente una vez.
+    for f, (fila_min, fila_max) in enumerate(CF_ranges):
+        I_f = I_fils[f]
 
-        if N_total_columna == 0:
+        # Filamento no formado o sin corriente: no genera calor
+        if not np.isfinite(I_f) or I_f == 0.0:
             continue
 
-        # R equivalente de la columna (N resistencias en paralelo)
-        R_col = R_cell / N_total_columna
+        # Bloque interior del filamento, sin las columnas de electrodo.
+        # types_map vale 1 exactamente en las mismas celdas que cf_clean_matrix
+        # (crear_matriz_materiales solo reetiqueta aire -> aislante), por lo que
+        # este bloque es idéntico al que usa la rama eléctrica.
+        bloque = types_map[fila_min : fila_max + 1, 1:-1] == 1
 
-        # Caída de tensión local (Aproximación: I_total pasa por esta columna)
-        delta_V_local = I_total * R_col
+        # PASO 2: aquí entrará el mapa de resistencias locales R_local(T)
+        R_cols = CurrentSolver.resistencias_por_columna(bloque, R_cell)
 
-        # Campo eléctrico local: E = V / h
-        E_local = delta_V_local / atom_size
+        for jj, R_col in enumerate(R_cols):
+            # Columna vacía (hueco en el filamento): no disipa
+            if not np.isfinite(R_col):
+                continue
 
-        # Calor Joule: Q = sigma * E^2
-        Q_val_local = sigma_material * (E_local**2)
+            # Índices en la matriz extendida: +fila_min en filas, +1 en columnas
+            fil_indices = np.where(bloque[:, jj])[0] + fila_min
+            j = jj + 1
 
-        # Factor de escala para convertir a W/m^3: Q_local [W/m^3] = sigma * (V/h)^2
-        Q_map_global[fil_indices, j] = Q_val_local * factor_generar_calor
+            # Caída de tensión en esta columna del filamento f
+            delta_V_local = I_f * R_col
+
+            # Campo eléctrico local: E = V / h
+            E_local = delta_V_local / atom_size
+
+            # Calor Joule: Q = sigma * E^2
+            Q_val_local = sigma_material * (E_local**2)
+
+            Q_map_global[fil_indices, j] = Q_val_local * factor_generar_calor
 
     return Q_map_global
 
@@ -285,19 +327,6 @@ def solve_thermal_state(
     for i in range(Ny):
         for j in range(Nx):
             n = i * Nx + j  # Índice lineal actual
-
-            # ==========================================================
-            # --- NUEVO: CONDICIÓN DIRICHLET POR MURO TÉRMICO ---
-            # Si nos han pasado la matriz de muros y esta celda tiene un valor > 0
-            # ==========================================================
-            if matriz_muros is not None and matriz_muros[i, j] > 0.0:
-                data.append(1.0)  # Coeficiente diagonal = 1
-                rows_idx.append(n)
-                cols_idx.append(n)
-                b[n] = matriz_muros[i, j]  # Temperatura fijada al perfil del muro
-                continue  # Saltamos al siguiente píxel
-            # ==========================================================
-
             mat_id = types_map[i, j]
 
             # --- CONDICIÓN DIRICHLET (Temperatura Fija - Electrodos) ---
@@ -307,6 +336,20 @@ def solve_thermal_state(
                 cols_idx.append(n)
                 b[n] = T_ambient
                 continue
+
+            # ==========================================================
+            # --- CONDICIÓN DIRICHLET POR MURO TÉRMICO ---
+            # Solo se aplica sobre celdas de óxido (mat_id == 0): el muro nunca
+            # debe pisar una celda de filamento (fuente de calor) ni un electrodo,
+            # aunque la matriz de muros venga desalineada con types_map.
+            # ==========================================================
+            if matriz_muros is not None and matriz_muros[i, j] > 0.0 and mat_id == 0:
+                data.append(1.0)  # Coeficiente diagonal = 1
+                rows_idx.append(n)
+                cols_idx.append(n)
+                b[n] = matriz_muros[i, j]  # Temperatura fijada al perfil del muro
+                continue  # Saltamos al siguiente píxel
+            # ==========================================================
 
             # --- CONDICIÓN NEUMANN / ECUACIÓN DEL CALOR ---
             k_center = thermal_props[mat_id]["k"]
@@ -469,8 +512,11 @@ def calcular_filas_intermedias(centros: list) -> tuple[list, list]:
 
         # Calculamos cuántas casillas hay de diferencia usando valor absoluto (abs)
         # y lo multiplicamos por el tamaño físico de la celda (atom_size)
+        # NOTA: el muro superior se coloca en fila_media, pero el muro inferior se
+        # coloca en fila_media + 1 (ver colocar_muro_termico), por lo que su
+        # distancia al centro del filamento inferior es una casilla menor.
         distancia_actual = abs(fila_media - centro_actual)
-        distancia_siguiente = abs(centro_siguiente - fila_media)
+        distancia_siguiente = abs(centro_siguiente - (fila_media + 1))
 
         # Guardamos ambas distancias en la lista
         distancias.append((distancia_actual, distancia_siguiente))

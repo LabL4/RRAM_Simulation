@@ -43,6 +43,17 @@ def _build_parser() -> argparse.ArgumentParser:
     # init
     p_init = sub.add_parser("init", help="Pre-genera estados iniciales en Init_data/")
     p_init.add_argument("--init-data-dir", default="Init_data")
+    p_init.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help=(
+            "Siembra la generación del estado inicial de cada simulación i con "
+            "seed+i, para que Init_data sea reproducible entre corridas "
+            "(distinto por sim, idéntico corrida a corrida). "
+            "Por defecto: aleatorio real (sin fijar)."
+        ),
+    )
 
     # exec
     p_exec = sub.add_parser("exec", help="Ejecuta el ciclo SET → RESET.")
@@ -134,7 +145,7 @@ def _build_parser() -> argparse.ArgumentParser:
 def _cmd_init(args) -> int:
 
     setup_logging(num_simulation=None, to_console=True)
-    build_initial_states(init_data_dir=args.init_data_dir)
+    build_initial_states(init_data_dir=args.init_data_dir, seed=args.seed)
     return 0
 
 
@@ -186,7 +197,7 @@ def _cmd_all(args) -> int:
     init_state_path = Path(args.init_data_dir) / f"init_state_{args.num_simulation}.npz"
     if not init_state_path.is_file():
         logger.info(f"init_state ausente ({init_state_path}); generando todos los iniciales.")
-        build_initial_states(init_data_dir=args.init_data_dir)
+        build_initial_states(init_data_dir=args.init_data_dir, seed=args.seed)
     else:
         logger.info(f"init_state ya existe ({init_state_path}); saltando init.")
 

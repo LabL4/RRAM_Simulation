@@ -22,6 +22,22 @@ def aplicar_semilla(params) -> None:
         np.random.seed(params.seed)
 
 
+def acumular_T_max_filamentos(acumulado: List[Optional[float]], T_fils: List[float]) -> List[Optional[float]]:
+    """
+    Acumula el máximo histórico de temperatura de cada filamento a lo largo de una fase.
+
+    Se llama SOLO desde las ramas que resuelven el mapa térmico FVM, es decir,
+    cuando `T_fils` es la temperatura real de cada filamento extraída de su fila
+    central. Los pasos sin filamento (`T_fils` = temperatura de Joule del
+    dispositivo replicada N veces) no cuentan: no son la temperatura de ningún
+    filamento porque el filamento aún no existe.
+
+    Un `None` en el acumulado significa que esa fase nunca llegó a resolver el
+    FVM para ese filamento.
+    """
+    return [nuevo if maximo is None else max(maximo, nuevo) for maximo, nuevo in zip(acumulado, T_fils)]
+
+
 def generar_configuracion_filamentos(
     eje_x: int,
     eje_y: int,

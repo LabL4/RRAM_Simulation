@@ -85,6 +85,9 @@ def PP_reset(
 
     data_pp_reset = np.zeros((params.num_pasos + 1, num_columnas), dtype=np.float64)
 
+    # Máximo histórico de temperatura de cada filamento en esta fase (solo pasos FVM).
+    T_max_fils: List[float | None] = [None] * N
+
     # CUIDADO Configuración de umbrales, tiene q estar ordenado de mayor a menor!!
     oxygen_config = {
         float(sim_ctes.voltaje_gen_oxigeno_pp_2): int(sim_ctes.num_oxigenos_pp_reset_2),
@@ -181,12 +184,14 @@ def PP_reset(
                 )
 
             materials_map = Temperature.crear_matriz_materiales(cf_clean_matrix)
+            # Cada filamento disipa según SU propia corriente I_fils[f]
             Q_source_map = Temperature.calculate_heat_source(
                 types_map=materials_map,
                 atom_size=params.atom_size,
-                I_total=current,
                 R_cell=sim_ctes.ohm_resistence_reset,
                 factor_generar_calor=sim_ctes.factor_generar_calor,
+                CF_ranges=CF_ranges,
+                I_fils=I_fils,
             )
 
             # El muro solo aplica cuando TODOS los filamentos están intactos y hay ≥2
@@ -241,6 +246,7 @@ def PP_reset(
                 matriz_temperaturas=temperatura_anterior, filas_centros=CF_centros
             )
             T_fils = [float(np.max(p)) if p is not None else params.init_temp for p in perfiles_T_fils]
+            T_max_fils = utils.acumular_T_max_filamentos(T_max_fils, T_fils)
 
         else:
             percola = False
@@ -353,7 +359,10 @@ def PP_reset(
         "roturas_dict": roturas_dict,
         "temperatura_final": temperatura,
         "centros_calculados": CF_centros,
+        "T_max_fils": T_max_fils,
     }
+
+    logger.info(f"Temperatura máxima por filamento en pp_reset: {T_max_fils} K")
 
     return final_state_pp_reset
 
@@ -411,6 +420,9 @@ def SP_reset(
 
     data_sp_reset = np.zeros((params.num_pasos, num_columnas), dtype=np.float64)
     resistencia_vector = np.zeros((params.num_pasos, 3), dtype=np.float64)
+
+    # Máximo histórico de temperatura de cada filamento en esta fase (solo pasos FVM).
+    T_max_fils: List[float | None] = [None] * N
 
     # configuración de generación de oxígeno, si el voltaje supera el umbral se generan el número de oxígenos indicados, si hay varios umbrales se comprueba de mayor a menor y se asigna el número de oxígenos correspondiente al primer umbral que se supere
     oxygen_config = {float(sim_ctes.voltaje_gen_oxigeno_sp): int(sim_ctes.num_oxigenos_sp_reset)}
@@ -498,12 +510,14 @@ def SP_reset(
             materials_map = Temperature.crear_matriz_materiales(cf_clean_matrix)
 
             # Cáculo de las fuentes de calor (el filamento)
+            # Cada filamento disipa según SU propia corriente I_fils[f]
             Q_source_map = Temperature.calculate_heat_source(
                 types_map=materials_map,
                 atom_size=params.atom_size,
-                I_total=current,
                 R_cell=sim_ctes.ohm_resistence_reset,
                 factor_generar_calor=sim_ctes.factor_generar_calor,
+                CF_ranges=CF_ranges,
+                I_fils=I_fils,
             )
 
             # Compruebo si temperatura es un float, si es así se lanza una excepción porque no se puede extraer el perfil, si no es así se asume que es una matriz y se lanza la función de extracción
@@ -534,6 +548,7 @@ def SP_reset(
                 matriz_temperaturas=temperatura_anterior, filas_centros=centros_calculados
             )
             T_fils = [float(np.max(p)) if p is not None else params.init_temp for p in perfiles_T_fils]
+            T_max_fils = utils.acumular_T_max_filamentos(T_max_fils, T_fils)
 
         else:
             percola = False
@@ -647,6 +662,9 @@ def SP_reset(
         "voltage_CF_destruido": voltage_CF_destruido,
         "CF_destruido": CF_destruido,
         "roturas_dict": roturas_dict,
+        "T_max_fils": T_max_fils,
     }
+
+    logger.info(f"Temperatura máxima por filamento en sp_reset: {T_max_fils} K")
 
     return final_state_sp_reset

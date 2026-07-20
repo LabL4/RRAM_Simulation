@@ -56,7 +56,7 @@ THERMAL_DEFAULTS = {
     "conductividad_termica_electrodo": 5.0,
     "Temperatura_electrodo": 300,
     "factor_generar_calor": 5.5e-5,  # 6e-5,
-    "pendiente_temperatura": -24.7,
+    "pendiente_temperatura": -28,  # -24.7,
 }
 
 
