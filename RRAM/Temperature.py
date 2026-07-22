@@ -700,13 +700,40 @@ def Temperature_Joule_filamentos(
     I_fils: list[float],
     R_fils: list[float],
     r_termica: float,
+    T_fondo: Optional[float] = None,
 ) -> list[float]:
     """
-    Calcula el incremento de temperatura por efecto Joule de cada filamento por separado,
+    Calcula la temperatura de cada filamento por efecto Joule por separado,
     a partir de su corriente y resistencia individuales.
+
+    - Filamento FORMADO (R_i finita): T_i = T_0 + I_i^2 * R_i * r_termica.
+      Disipa según su propia potencia.
+    - Filamento NO FORMADO (R_i = inf o NaN): T_i = T_fondo.
+      No aporta disipación propia, pero está inmerso en un dispositivo que ya se
+      está calentando, así que su temperatura es la del sistema, NO la ambiente.
+      Sin este suelo, un filamento sin formar caería a T_0 de golpe en cuanto otro
+      filamento percola (la rama óhmica pasa a devolver R_i = inf para él).
+
+    Args:
+        T_0 (float): Temperatura de referencia de los filamentos formados [K].
+        I_fils (list[float]): Corriente de cada filamento [A].
+        R_fils (list[float]): Resistencia de cada filamento [Ohm]. inf/NaN si no está formado.
+        r_termica (float): Resistencia térmica [K/W].
+        T_fondo (float | None): Temperatura del dispositivo para los filamentos no
+            formados, típicamente la Joule escalar calculada con la corriente total.
+            Si es None se usa `T_0` (comportamiento previo).
+
+    Returns:
+        list[float]: Temperatura de cada filamento [K].
     """
+    if T_fondo is None:
+        T_fondo = T_0
+
     T_fils = []
     for I_i, R_i in zip(I_fils, R_fils):
-        P_i = 0.0 if (R_i == np.inf or np.isnan(R_i)) else I_i**2 * R_i
-        T_fils.append(T_0 + P_i * r_termica)
+        if R_i == np.inf or np.isnan(R_i):
+            # No formado: se queda a la temperatura del sistema
+            T_fils.append(float(T_fondo))
+        else:
+            T_fils.append(T_0 + I_i**2 * R_i * r_termica)
     return T_fils

@@ -166,7 +166,7 @@ def actualizar_parametros_por_filamento(
     else:
         nuevos_formados = filamentos_actuales - filamentos_previos
         for _ in range(nuevos_formados):
-            sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma - 1)
+            sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 1.2)
 
         if filamentos_actuales == num_esperados:
             logger.info("Todos los filamentos creados.")

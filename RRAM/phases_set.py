@@ -379,11 +379,15 @@ def PP_set(
                 # Temperatura por filamento: aún no hay mapa FVM (faltan filamentos por
                 # formarse), pero sí hay I y R individuales, así que cada filamento tiene
                 # su propia T = T_0 + I_f^2 * R_f * r_termica en lugar de replicar la escalar.
+                # Los filamentos aún NO formados se quedan a `temperatura` (la Joule escalar
+                # del dispositivo con la corriente total), no a init_temp: están inmersos en
+                # un dispositivo que ya se calienta.
                 T_fils = Temperature.Temperature_Joule_filamentos(
                     T_0=params.init_temp,
                     I_fils=I_fils,
                     R_fils=R_fils,
                     r_termica=sim_ctes.r_termica_no_percola,
+                    T_fondo=float(temperatura),
                 )
                 # Extiendo el valor para formar una matriz del mismo tamaño que el estado, para que no de error al usarlo en la función de generación si no ha percolado
                 # dtype=float obligatorio: actual_state es int64 y sin él la temperatura se trunca a entero
@@ -405,7 +409,6 @@ def PP_set(
             R_fils = [np.nan] * N
             T_fils = [temperatura] * N
 
-            # TODO Confirmar que la corriente es por device_size_y
             # simple_field = ElectricField.SimpleElectricField(voltage, params.device_size)
             # Si no ha percolado uso la corriente de Poole-Frenkel
             if not total_vacantes_pp_set:

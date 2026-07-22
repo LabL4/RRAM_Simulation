@@ -14,7 +14,7 @@ MATERIAL_DEFAULTS = {
     "cte_red": 0.25e-9,
     "permitividad_relativa_set": 299.6653,
     "permitividad_relativa_reset": 299.9641,
-    "generation_energy": 1.05,
+    "generation_energy": 1.02,
     "recombination_energy": 1.55,
     "pb_metal_insul_set": 0.001,
     "pb_metal_insul_reset": 0.0334,
@@ -49,7 +49,7 @@ ELECTRICAL_DEFAULTS = {
 # ============================================================================
 THERMAL_DEFAULTS = {
     "init_temp": 300.0,
-    "r_termica_no_percola": 10000.0,
+    "r_termica_no_percola": 8000,  # 10000.0,
     "conductividad_termica_dielectrico": 2.3,
     "conductividad_termica_CF": 15.0,
     "conductividad_termica_aislante": 0.000001,
