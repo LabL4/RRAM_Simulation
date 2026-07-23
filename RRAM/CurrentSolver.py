@@ -217,6 +217,59 @@ def Eliminar_filamentos_incompletos(grid_limpio, filamentos_ranges, percola_bool
     return CF_matrix
 
 
+def resistencia_celda(
+    temperatura,
+    sigma_0: float,
+    alpha_T: float,
+    T_0: float,
+    atom_size: float,
+):
+    """
+    CAMBIAR ESTA FUNCION PARA QUE GENERE UN MAPA DE RESISTENCIA QUE SEA LA VARIABLE QUE USARÁ EL RESTO DE FUNCIONES
+
+    Resistencia de UNA celda de filamento en función de su temperatura.
+
+    Es el inicio de resistencia dependiente de la temperatura: dada la
+    temperatura local de cada celda, devuelve su resistencia. La usará
+    `resistencias_por_columna` para combinar en paralelo celdas con resistencias
+    distintas (media armónica) en lugar de asumir que todas valen lo mismo.
+
+    Modelo de conductividad (dato de partida):
+
+        sigma(T) = sigma_0 / (1 + alpha_T * (T - T_0))
+
+    La cadena eléctrica del código trabaja en resistencia de celda, relacionada con
+    la conductividad por sigma = 1 / (R * atom_size). Invirtiendo:
+
+        R(T) = 1 / (sigma(T) * atom_size)
+             = (1 + alpha_T * (T - T_0)) / (sigma_0 * atom_size)
+
+    En T = T_0 se recupera R_ref = 1 / (sigma_0 * atom_size), que es la resistencia de
+    celda de referencia (el papel que hoy juega `ohm_resistence`). Para que la rama
+    térmica sea coherente con la baseline eléctrica, sigma_0 debe cumplir
+    sigma_0 = 1 / (ohm_resistence * atom_size); esa coherencia se fijará en el cableado.
+
+    Args:
+        temperatura: Temperatura de la celda [K]. Escalar o np.ndarray; la operación
+            es vectorizada y devuelve la misma forma que la entrada.
+        sigma_0 (float): Conductividad de referencia a T_0 [S/m].
+        alpha_T (float): Coeficiente térmico [1/K]. Con alpha_T > 0 la conductividad
+            baja al calentar y la resistencia sube.
+        T_0 (float): Temperatura de referencia [K] (init_temp del dispositivo).
+        atom_size (float): Tamaño de celda 'h' [m], factor geométrico sigma <-> R.
+
+    Returns:
+        Resistencia de la celda [Ohm], misma forma que `temperatura`.
+
+    Nota de dominio: en el régimen físico esperado (T >= T_0, alpha_T > 0) el
+    denominador 1 + alpha_T*(T - T_0) >= 1, por lo que R es siempre positiva y
+    creciente con T. Fuera de ese régimen (p. ej. alpha_T*(T - T_0) <= -1) la
+    expresión se indefine; la salvaguarda se añadirá al cerrar el lazo autoconsistente.
+    """
+    sigma_T = sigma_0 / (1.0 + alpha_T * (temperatura - T_0))
+    return 1.0 / (sigma_T * atom_size)
+
+
 def resistencias_por_columna(CF_matrix, ohm_resistence) -> np.ndarray:
     """
     Calcula la resistencia equivalente de CADA columna de una matriz de filamento.
