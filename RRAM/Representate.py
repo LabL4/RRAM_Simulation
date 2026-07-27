@@ -635,10 +635,10 @@ def plot_thermal_state(T_map, types_map, voltage, num_levels=10, atom_size: floa
         # Continúa pero sin isotermas (ver abajo)
 
     # 2. Aplicar los estilos globales ANTES de crear la figura
-    setup_paper_plt(plt, latex=True, scaling=2.5)
+    setup_paper_plt(plt, latex=True, scaling=2)
 
     # 3. Crear la figura y los ejes
-    fig, ax = plt.subplots(figsize=(16, 12))
+    fig, ax = plt.subplots(figsize=(16, 14))
 
     # 4. Aplicar configuración de estilo específica para los ejes
     config_ax_state(ax)

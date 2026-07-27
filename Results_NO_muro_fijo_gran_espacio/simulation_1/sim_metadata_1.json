@@ -1,46 +1,36 @@
 {
   "num_simulation": 1,
-  "voltaje_percolacion": 0.47245000000000004,
+  "voltaje_percolacion": 0.41844000000000003,
   "creaciones_dict": {
     "0": {
-      "filamento": 2,
-      "voltaje": 0.47245000000000004,
+      "filamento": 1,
+      "voltaje": 0.41844000000000003,
       "etapa": "pp_set"
     },
     "1": {
-      "filamento": 3,
-      "voltaje": 0.53394,
-      "etapa": "pp_set"
-    },
-    "2": {
-      "filamento": 1,
-      "voltaje": 0.55528,
+      "filamento": 2,
+      "voltaje": 0.95359,
       "etapa": "pp_set"
     }
   },
   "roturas_dict": {},
   "centros_calculados": [
-    26,
-    79,
-    132
+    59,
+    179
   ],
   "cf_ranges": [
     [
       0,
-      52
+      119
     ],
     [
-      53,
-      105
-    ],
-    [
-      106,
-      159
+      120,
+      239
     ]
   ],
   "params_dict": {
     "device_size_x": 1e-08,
-    "device_size_y": 4e-08,
+    "device_size_y": 6e-08,
     "atom_size": 2.5e-10,
     "num_trampas": 150,
     "total_simulation_time": 10.0,
@@ -51,8 +41,8 @@
     "densidad_vacantes": 4.0,
     "seed": 42,
     "x_size": 40,
-    "y_size": 160,
-    "num_max_vacantes": 6080,
+    "y_size": 240,
+    "num_max_vacantes": 9120,
     "paso_temporal": 0.001,
     "paso_potencial_set": 0.00011,
     "paso_potencial_reset": 0.00014
@@ -70,11 +60,10 @@
     "long_decaimiento_concentracion": 1e-09,
     "ohm_resistence_set": 4.3,
     "ohm_resistence_reset": 4.3,
-    "num_filamentos": 3,
+    "num_filamentos": 2,
     "grosor_filamento": [
       2,
-      3,
-      4
+      3
     ],
     "gamma": 10.0,
     "gamma_drift": 10.0,
@@ -109,15 +98,14 @@
     "status": "completed",
     "start_from": "pp_set",
     "stop_at": "pp_set",
-    "muro_termico": true,
+    "muro_termico": false,
     "seed": 42,
     "temperaturas_max": {
       "pp_set": {
-        "T_1": 620.2045401703283,
-        "T_2": 674.9441752462265,
-        "T_3": 710.7750471476504
+        "T_1": 611.4298924791923,
+        "T_2": 661.9592323030862
       }
     },
-    "T_final_pp_set": 706.6133049823729
+    "T_final_pp_set": 658.4203694505494
   }
 }

@@ -114,7 +114,7 @@ def _build_parser() -> argparse.ArgumentParser:
         default=None,
         help=(
             "Fija la semilla de numpy.random al inicio de cada fase (PP_set, SP_set, "
-            "PP_reset, SP_reset) para que la corrida sea exactamente reproducible. "
+            "PP_reset, SP_reset) para que la ejecucion sea exactamente reproducible. "
             "Por defecto: aleatorio real (sin fijar)."
         ),
     )
@@ -136,7 +136,7 @@ def _build_parser() -> argparse.ArgumentParser:
         choices=["pp_set", "sp_set", "pp_reset", "sp_reset"],
         default=None,
         metavar="FASE",
-        help="Fase en la que terminar el ciclo, inclusive (pp_set | sp_set | pp_reset | sp_reset).",
+        help="Fase en la que terminar la simulacion, inclusive (pp_set | sp_set | pp_reset | sp_reset).",
     )
 
     return p

@@ -147,11 +147,16 @@ def PP_set(
     probabilidad_matrix = None
     matriz_para_plot_muro = None
 
-    # `filas_intermedias` y `dist_casillas` solo se calculan cuando hay >=2
-    # filamentos (muros térmicos entre filamentos). Para 1 filamento se
-    # quedan en None y el bloque de muros térmicos se salta.
-    filas_intermedias = None
-    dist_casillas = None
+    # IDEA B (muros estáticos): las filas de los muros dependen SOLO de la geometría
+    # esperada (CF_centros, fija) y son deterministas, así que se calculan ya en el
+    # init. Así el muro puede colocarse en cuanto el FVM entra con el PRIMER filamento
+    # (any(exist_cf)), sin esperar a all_CFs_created. Con 1 filamento no hay interfaces:
+    # se quedan en None y el bloque de muros térmicos se salta (comportamiento previo).
+    if len(CF_ranges) >= 2:
+        filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(CF_centros)  # type: ignore
+    else:
+        filas_intermedias = None
+        dist_casillas = None
     mis_perfiles_extraidos = None
 
     logger.info(f"El valor de gamma es: {sim_ctes.gamma} ")
@@ -285,8 +290,13 @@ def PP_set(
                     actual_state=actual_state,
                 )
 
-            if all_CFs_created:
-                # El sistema percola por lo que resuelvo la ecuación del calor. Primero se obtiene el mapa de materiales
+            if any(exist_cf):
+                # En cuanto percola el PRIMER filamento (>=1 banda completa) resuelvo el
+                # FVM, en lugar de esperar a que estén todos (all_CFs_created).
+                # IDEA B: el muro térmico (estático, sobre CF_centros) ya se activa en esta
+                # ventana parcial, porque filas_intermedias/dist_casillas se calcularon en el
+                # init. Con 1 filamento esperado siguen a None y se resuelve sin muro.
+                # Primero se obtiene el mapa de materiales
                 materials_map = Temperature.crear_matriz_materiales(cf_clean_matrix)
 
                 # Cáculo de las fuentes de calor (el filamento es el que emite calor, el resto no)
