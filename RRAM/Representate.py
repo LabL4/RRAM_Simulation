@@ -1068,6 +1068,129 @@ def plot_muro_termico(
     return None
 
 
+def plot_mapa_resistencias(
+    mapa_resistencias: np.ndarray,
+    actual_state: np.ndarray,
+    filename: str,
+    titulo: str = "Filament Cell Resistance Map",
+    atom_size: float = 0.25e-09,
+) -> None:
+    """
+    Dibuja el dispositivo en 2D mostrando la RESISTENCIA de cada celda del filamento.
+
+    Análogo eléctrico de `plot_muro_termico`: fondo con las vacantes en gris claro,
+    encima el mapa de resistencias en color y los electrodos a los lados.
+
+    Las celdas que no son filamento llevan `inf` en el mapa (ver
+    `CurrentSolver.mapa_resistencias`) y se enmascaran, de modo que solo se colorea
+    el filamento conductor. Con `alpha_T` distinto de cero el color revela dónde el
+    filamento está más caliente y por tanto es más resistivo.
+
+    Args:
+        mapa_resistencias (np.ndarray): Mapa de resistencias por celda [Ohm], marco
+            interior (sin columnas de electrodo), con `inf` fuera del filamento.
+        actual_state (np.ndarray): Estado del dispositivo, para la marca de agua.
+        filename (str): Ruta del archivo de salida.
+        titulo (str): Título de la figura.
+        atom_size (float): Tamaño de celda [m].
+    """
+    # 1. Aplicar estilos estándar
+    setup_paper_plt(plt, latex=True, scaling=2.5)
+    fig, ax = plt.subplots(figsize=(12, 9))
+    config_ax_state(ax)
+
+    # 1. CÁLCULO DE DIMENSIONES (Crecimiento en X, Clasificación en Y)
+    device_size_y, device_size_x = mapa_resistencias.shape
+
+    size_x_nm = device_size_x * atom_size * 1e9  # Convertir a nm ya que siempre se representa en nm
+    size_y_nm = device_size_y * atom_size * 1e9  # Convertir a nm ya que siempre se representa en nm
+
+    # ==========================================================
+    # 2. CAPA DE FONDO: Estado del dispositivo (vacantes)
+    # ==========================================================
+    if actual_state is not None and actual_state.ndim == 2 and actual_state.shape == mapa_resistencias.shape:
+        ax.imshow(
+            actual_state,
+            cmap="Greys",
+            origin="lower",
+            alpha=0.25,
+            extent=(0, size_x_nm, 0, size_y_nm),
+            aspect="equal",
+            zorder=2,
+        )
+
+    # ==========================================================
+    # 3. CAPA DE RESISTENCIAS: solo las celdas de filamento
+    # ==========================================================
+    # Las celdas sin filamento llevan inf: se enmascaran para dejarlas transparentes
+    resistencias_visibles = np.ma.masked_where(~np.isfinite(mapa_resistencias), mapa_resistencias)
+
+    im_resistencias = ax.imshow(
+        resistencias_visibles,
+        cmap="cividis",
+        origin="lower",
+        extent=(0, size_x_nm, 0, size_y_nm),
+        aspect="equal",
+        zorder=3,
+    )
+
+    cbar = fig.colorbar(im_resistencias, ax=ax, fraction=0.046, pad=0.04)
+    cbar.set_label(r"Cell resistance (\si{\ohm})")
+
+    # ==========================================================
+    # 4. ELECTRODOS (Estilo RepresentateState)
+    # ==========================================================
+    electrode_width = 0.2
+    y_start = 0
+    electrode_height = size_y_nm
+
+    left_electrode = patches.Rectangle(
+        (-electrode_width, y_start), electrode_width, electrode_height, color="gray", zorder=1
+    )
+    right_electrode = patches.Rectangle((size_x_nm, y_start), electrode_width, electrode_height, color="gray", zorder=1)
+
+    ax.add_patch(left_electrode)
+    ax.add_patch(right_electrode)
+
+    # ==========================================================
+    # 5. CONFIGURACIÓN DE EJES Y ESTÉTICA
+    # ==========================================================
+    ax.set_aspect("equal")
+
+    ax.set_xlim(-electrode_width, size_x_nm + electrode_width)
+    margen_y = 0.05
+    ax.set_ylim(-margen_y, size_y_nm + margen_y)
+
+    # Ticks dinámicos. Con aspect="equal" un dispositivo estrecho y alto deja el eje X
+    # muy comprimido, así que el paso se elige para no superar ~5 marcas por eje.
+    def _paso_ticks(longitud_nm: float, max_marcas: int = 5) -> int:
+        for paso in (1, 2, 5, 10, 20, 50):
+            if longitud_nm / paso <= max_marcas:
+                return paso
+        return 100
+
+    # El eje X es el corto (ancho del dieléctrico): pocas marcas para que no se solapen
+    ax.set_xticks(np.arange(0, size_x_nm + 1, _paso_ticks(size_x_nm, max_marcas=3)))
+    ax.set_yticks(np.arange(0, size_y_nm + 1, _paso_ticks(size_y_nm, max_marcas=8)))
+
+    ax.set_xlabel(r"Dielectric length (\si{\nano\meter})")
+    ax.set_ylabel(r"Ti electrode (\si{\nano\meter})")
+    ax.set_title(titulo, pad=20)
+
+    plt.subplots_adjust(top=0.85)
+
+    # ==========================================================
+    # 6. GUARDADO DE ARCHIVO
+    # ==========================================================
+    if filename:
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        plt.savefig(filename, bbox_inches="tight", dpi=300)
+
+    plt.close(fig)
+
+    return None
+
+
 def plot_thermal_state_muro(
     T_map,
     types_map,

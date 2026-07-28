@@ -45,11 +45,19 @@ TIPO_SUBCARPETA: dict[str, str] = {
     "probability": "probability",
     "muro": "muro_termico",
     "clean_state": "clean_state",
+    "resistencia": "resistencia",
 }
 
-PlotType = Literal["state", "thermal", "probability", "muro", "clean_state"]
+PlotType = Literal["state", "thermal", "probability", "muro", "clean_state", "resistencia"]
 
-TODOS_PLOT_TYPES: tuple[PlotType, ...] = ("state", "thermal", "probability", "muro", "clean_state")
+TODOS_PLOT_TYPES: tuple[PlotType, ...] = (
+    "state",
+    "thermal",
+    "probability",
+    "muro",
+    "clean_state",
+    "resistencia",
+)
 
 
 def plot_results(
@@ -235,6 +243,7 @@ def plot_estados(
         - ``"probability"``  → ``probability/``
         - ``"muro"``         → ``muro_termico/``
         - ``"clean_state"``  → ``clean_state/``
+        - ``"resistencia"``  → ``resistencia/``
 
     La temperatura (``"thermal"``) se trata exactamente igual que el resto de
     tipos: se activa incluyéndola en ``plot_types``. De forma independiente,
@@ -256,7 +265,13 @@ def plot_estados(
     Returns:
         ``{num_sim: {"T_final_pp_set": float, ...}}``
     """
-    from .Representate import RepresentateState, plot_thermal_state, RepresentateHeatmap, plot_muro_termico
+    from .Representate import (
+        RepresentateState,
+        plot_thermal_state,
+        RepresentateHeatmap,
+        plot_muro_termico,
+        plot_mapa_resistencias,
+    )
     from dataclasses import replace as dc_replace
 
     # Validar y normalizar plot_types
@@ -338,6 +353,7 @@ def plot_estados(
                     necesita_prob = "probability" in tipos_activos
                     necesita_muro = "muro" in tipos_activos
                     necesita_clean = "clean_state" in tipos_activos
+                    necesita_resistencia = "resistencia" in tipos_activos
 
                     actual_state: np.ndarray = (
                         datos["actual_state"]
@@ -363,6 +379,14 @@ def plot_estados(
                         datos["matriz_para_plot_muro"]
                         if (necesita_muro and "matriz_para_plot_muro" in claves_disponibles)
                         else np.zeros_like(actual_state, dtype=np.float64)
+                    )
+                    # Fallback todo-inf: "sin datos de resistencia". Debe fallar la
+                    # comprobación de la rama (np.any(np.isfinite(...)) -> False), por eso
+                    # NO puede ser un array de ceros: 0.0 es finito y se colaría.
+                    resistencia_matrix: np.ndarray = (
+                        datos["mapa_resistencias"]
+                        if (necesita_resistencia and "mapa_resistencias" in claves_disponibles)
+                        else np.full((1, 1), np.inf, dtype=np.float64)
                     )
 
                     # Voltaje en este paso
@@ -419,6 +443,19 @@ def plot_estados(
                                 matriz_molde=actual_state,
                                 filename=str(out_path),
                                 titulo=rf"Thermal Wall — $V_{{RRAM}}$ = {voltaje_r} V",
+                                atom_size=atom_size,
+                            )
+
+                        elif pt == "resistencia":
+                            # Sin filamento (o npz antiguo sin la clave) no hay nada que pintar
+                            if resistencia_matrix.ndim < 2 or not np.any(np.isfinite(resistencia_matrix)):
+                                logger.debug(f"Paso {paso} fase {fase}: sin mapa de resistencias. Salto.")
+                                continue
+                            plot_mapa_resistencias(
+                                mapa_resistencias=resistencia_matrix,
+                                actual_state=actual_state,
+                                filename=str(out_path),
+                                titulo=rf"Cell Resistance — $V_{{RRAM}}$ = {voltaje_r} V",
                                 atom_size=atom_size,
                             )
 
