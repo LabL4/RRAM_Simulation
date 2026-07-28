@@ -276,10 +276,22 @@ def PP_set(
 
             cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf, actual_state)
 
+            # Mapa de resistencias por celda: combina la geometría del filamento con la
+            # temperatura del paso anterior. Es la entrada única de las ramas eléctrica
+            # (corriente) y térmica (calor), de modo que no pueden desincronizarse.
+            R_local = CurrentSolver.mapa_resistencias(
+                cf_matrix=cf_clean_matrix,
+                temperatura=temperatura_anterior,
+                sigma_0=sim_ctes.sigma_0,
+                alpha_T=sim_ctes.alpha_T,
+                T_0=params.init_temp,
+                atom_size=params.atom_size,
+            )
+
             # Si ha percolado uso la corriente de Ohm
             try:
                 current, R_total, I_fils, R_fils = CurrentSolver.OmhCurrent_filamentos(
-                    voltage, cf_clean_matrix, CF_ranges, ohm_resistence=sim_ctes.ohm_resistence_set
+                    voltage, R_local, CF_ranges
                 )
                 resistencia = R_total
             except ZeroDivisionError:
@@ -302,9 +314,8 @@ def PP_set(
                 # Cáculo de las fuentes de calor (el filamento es el que emite calor, el resto no)
                 # Cada filamento disipa según SU propia corriente I_fils[f]
                 Q_source_map = Temperature.calculate_heat_source(
-                    types_map=materials_map,
                     atom_size=params.atom_size,
-                    R_cell=sim_ctes.ohm_resistence_set,
+                    R_local=R_local,
                     factor_generar_calor=sim_ctes.factor_generar_calor,
                     CF_ranges=CF_ranges,
                     I_fils=I_fils,
@@ -514,6 +525,7 @@ def PP_set(
                 temperatura=locals().get("temperatura"),
                 probabilidad_matrix=locals().get("probabilidad_matrix"),
                 matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
+                mapa_resistencias=locals().get("R_local"),
             )
         # endregion
 
@@ -529,6 +541,7 @@ def PP_set(
             temperatura=locals().get("temperatura"),
             probabilidad_matrix=locals().get("probabilidad_matrix"),
             matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
+            mapa_resistencias=locals().get("R_local"),
         )
 
     logger.info(f"Temperatura máxima por filamento en pp_set: {T_max_fils} K")
@@ -773,10 +786,21 @@ def SP_set(
             #     )
             # endregion
 
+            # Mapa de resistencias por celda (geometría + temperatura del paso anterior).
+            # Entrada única de las ramas eléctrica y térmica.
+            R_local = CurrentSolver.mapa_resistencias(
+                cf_matrix=cf_clean_matrix,
+                temperatura=temperatura_anterior,
+                sigma_0=sim_ctes.sigma_0,
+                alpha_T=sim_ctes.alpha_T,
+                T_0=params.init_temp,
+                atom_size=params.atom_size,
+            )
+
             # Si ha percolado uso la corriente de Ohm
             try:
                 current, R_total, I_fils, R_fils = CurrentSolver.OmhCurrent_filamentos(
-                    voltage, cf_clean_matrix, CF_ranges, ohm_resistence=sim_ctes.ohm_resistence_set
+                    voltage, R_local, CF_ranges
                 )
             except ZeroDivisionError:
                 raise exceptions.NullResistanceException(
@@ -791,9 +815,8 @@ def SP_set(
             # Cáculo de las fuentes de calor (el filamento es el que emite calor, el resto no)
             # Cada filamento disipa según SU propia corriente I_fils[f]
             Q_source_map = Temperature.calculate_heat_source(
-                types_map=materials_map,
                 atom_size=params.atom_size,
-                R_cell=sim_ctes.ohm_resistence_set,
+                R_local=R_local,
                 factor_generar_calor=sim_ctes.factor_generar_calor,
                 CF_ranges=CF_ranges,
                 I_fils=I_fils,
@@ -877,6 +900,7 @@ def SP_set(
                     cf_clean_matrix=locals().get("cf_clean_matrix"),  # Si no existe, devuelve None
                     temperatura=locals().get("temperatura"),
                     matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
+                    mapa_resistencias=locals().get("R_local"),
                 )
 
         else:
@@ -938,6 +962,7 @@ def SP_set(
             cf_clean_matrix=locals().get("cf_clean_matrix"),
             temperatura=locals().get("temperatura"),
             matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
+            mapa_resistencias=locals().get("R_local"),
         )
 
     # Guardo los datos de la simulación

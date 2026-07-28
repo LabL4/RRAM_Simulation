@@ -17,10 +17,6 @@ class SimulationConstants:
     pb_metal_insul_reset: float
     recom_enchancement_factor: float
     long_decaimiento_concentracion: float
-    # TRANSITORIO: ohm_resistence_set/reset serán sustituidas por sigma_0 + alpha_T
-    # cuando los consumidores pasen a usar el mapa de resistencias por celda.
-    ohm_resistence_set: float
-    ohm_resistence_reset: float
     # Conductividad eléctrica del filamento dependiente de la temperatura:
     #     sigma(T) = sigma_0 / (1 + alpha_T * (T - T_0))
     # con T_0 = params.init_temp. Equivale a R(T) = R_ref * (1 + alpha_T * (T - T_0)),
@@ -132,17 +128,6 @@ class SimulationConstants:
         # gamma no tiene distinción de set/reset en los atributos originales,
         # por lo que este se queda igual, pero asegurándonos de que la variable exista.
         return replace(self, gamma=nuevo_valor_gamma)
-
-    def update_ohm_resistence(self, nuevo_valor: float, fase: str = "set"):
-        """Actualiza la resistencia óhmica dependiendo de la fase ('set' o 'reset')."""
-        if fase not in ["set", "reset"]:
-            raise ValueError("El parámetro 'fase' debe ser 'set' o 'reset'.")
-
-        # Construimos el nombre exacto del atributo: "ohm_resistence_set" o "ohm_resistence_reset"
-        atributo = f"ohm_resistence_{fase}"
-
-        # Usamos un diccionario para pasar el argumento dinámicamente a replace()
-        return replace(self, **{atributo: nuevo_valor})
 
     def update_I_0(self, nuevo_I_0: float, fase: str = "set"):
         """Actualiza la corriente de referencia I_0 dependiendo de la fase ('set' o 'reset')."""

@@ -288,14 +288,20 @@ def mapa_resistencias(
     return np.where(cf_matrix == 1, R_celda, np.inf)
 
 
-def resistencias_por_columna(CF_matrix, ohm_resistence) -> np.ndarray:
+def resistencias_por_columna(R_local: np.ndarray) -> np.ndarray:
     """
-    Calcula la resistencia equivalente de CADA columna de una matriz de filamento.
+    Calcula la resistencia equivalente de CADA columna a partir del mapa de
+    resistencias por celda.
 
-    Las celdas de una misma columna están en paralelo, por lo que la resistencia de
-    la columna 'j' con N celdas es R_col = ohm_resistence / N.
+    Las celdas de una misma columna están en paralelo, así que se combinan sumando
+    conductancias (media armónica):
 
-    Esta es la FUENTE ÚNICA del modelo de resistencia local. La consumen:
+        R_col_j = 1 / sum_i ( 1 / R_local[i, j] )
+
+    Las celdas de óxido llevan `inf` (ver `mapa_resistencias`), y como 1/inf = 0 se
+    excluyen SOLAS del sumatorio: no hace falta enmascarar la geometría.
+
+    Esta es la FUENTE ÚNICA del modelo de resistencia. La consumen:
       - `calcular_resistencia`      (rama eléctrica): suma el vector -> R del bloque.
       - `Temperature.calculate_heat_source` (rama térmica): necesita la caída de
         tensión por columna (delta_V_j = I_filamento * R_col_j) para repartir el calor.
@@ -304,47 +310,52 @@ def resistencias_por_columna(CF_matrix, ohm_resistence) -> np.ndarray:
     mismo modelo por separado y se desincronicen.
 
     Args:
-        CF_matrix (np.ndarray): Matriz (o bloque de filas) donde 1 indica filamento.
-        ohm_resistence (float): Resistencia óhmica de una celda [Ohm].
+        R_local (np.ndarray): Mapa de resistencias por celda [Ohm] (o un bloque de
+            filas del mismo), con `inf` donde no hay filamento.
 
     Returns:
         np.ndarray: Vector de longitud Nx con la resistencia de cada columna [Ohm].
-            NaN en las columnas vacías (huecos), para que cada consumidor decida
-            qué hacer con ellas sin re-implementar la comprobación.
+            `inf` en las columnas sin ninguna celda de filamento (circuito abierto).
     """
-    # Nº de celdas de filamento en cada columna (bool o int -> float para dividir)
-    n_por_columna = np.asarray(CF_matrix).sum(axis=0).astype(float)
+    # Conductancia total de cada columna. 1/inf = 0 -> el óxido no aporta.
+    conductancias = np.sum(1.0 / np.asarray(R_local, dtype=float), axis=0)
 
-    # NaN por defecto: solo se rellenan las columnas que tienen al menos una celda
-    R_cols = np.full(n_por_columna.shape, np.nan, dtype=float)
-    np.divide(ohm_resistence, n_por_columna, out=R_cols, where=n_por_columna > 0)
+    # inf por defecto: solo se invierten las columnas con conductancia > 0.
+    # Una columna sin filamento tiene conductancia 0 -> R_col = inf (circuito abierto).
+    R_cols = np.full(conductancias.shape, np.inf, dtype=float)
+    np.divide(1.0, conductancias, out=R_cols, where=conductancias > 0)
 
     return R_cols
 
 
-def calcular_resistencia(CF_matrix, ohm_resistence, mostrar_calculo: bool = False) -> float:
+def calcular_resistencia(R_local: np.ndarray, mostrar_calculo: bool = False) -> float:
     """
-    Calcula la resistencia total de una matriz de formación de filamentos conductores (CF_matrix).
-    Este método asume que cada columna de la matriz representa un conjunto de resistencias en paralelo.
-    La resistencia total se calcula sumando las resistencias paralelas de cada columna.
+    Calcula la resistencia total de un bloque a partir del mapa de resistencias por
+    celda: las columnas están en serie, así que se suman sus resistencias.
+
+    Args:
+        R_local (np.ndarray): Mapa de resistencias por celda [Ohm], `inf` fuera del filamento.
+        mostrar_calculo (bool): Si True, registra el detalle columna a columna.
+
+    Returns:
+        float: Resistencia total del bloque [Ohm]. `inf` si alguna columna está vacía
+            (un hueco en el filamento es un circuito abierto).
     """
-    R_cols = resistencias_por_columna(CF_matrix, ohm_resistence)
+    R_cols = resistencias_por_columna(R_local)
 
     if mostrar_calculo:
-        n_por_columna = np.asarray(CF_matrix).sum(axis=0)
         acumulada = 0.0
         for j, R_col in enumerate(R_cols):
             if not np.isfinite(R_col):
+                logger.info(f"La columna {j} no tiene filamento: circuito abierto")
                 continue
             acumulada += R_col
             logger.info(
-                f"Hay {n_por_columna[j]} elementos en la columna {j} y su resistencia es: {R_col:.4f} ohmios \n Resistencia total acumulada: {acumulada:.4f} ohmios"
+                f"La resistencia de la columna {j} es: {R_col:.4f} ohmios \n Resistencia total acumulada: {acumulada:.4f} ohmios"
             )
 
-    # nansum ignora las columnas vacías, reproduciendo exactamente el 'continue' previo:
-    # un hueco aporta 0 ohmios. No debería ocurrir tras Eliminar_filamentos_incompletos,
-    # pero se mantiene el comportamiento histórico para no alterar la rama eléctrica.
-    return float(np.nansum(R_cols))
+    # Columnas en serie. Si alguna es inf, el bloque entero es un circuito abierto.
+    return float(np.sum(R_cols))
 
 
 # En RRAM/CurrentSolver.py
@@ -442,21 +453,29 @@ def limitar_grosor_filamentos(
 
 
 def calcular_resistencia_por_filamento(
-    CF_matrix: np.ndarray,
+    R_local: np.ndarray,
     CF_ranges: list[tuple[int, int]],
-    ohm_resistence: float,
 ) -> list[float]:
     """
     Calcula la resistencia de cada filamento por separado, aplicando `calcular_resistencia`
     solo sobre el bloque de filas que le corresponde a cada uno según `CF_ranges`.
+
+    Args:
+        R_local (np.ndarray): Mapa de resistencias por celda [Ohm], `inf` fuera del filamento.
+        CF_ranges (list): Bandas de filas (fila_min, fila_max) de cada filamento.
+
+    Returns:
+        list[float]: Resistencia de cada filamento [Ohm]. `inf` si no está formado.
     """
     resistencias = []
     for fila_min, fila_max in CF_ranges:
-        sub = CF_matrix[fila_min : fila_max + 1, :]
-        if sub.sum() == 0:
+        sub = R_local[fila_min : fila_max + 1, :]
+        # Guarda defensiva: una banda sin ninguna celda de filamento ya daría inf por
+        # aritmética (todas las columnas a conductancia 0), pero se explicita.
+        if not np.any(np.isfinite(sub)):
             resistencias.append(np.inf)
         else:
-            resistencias.append(calcular_resistencia(sub, ohm_resistence))
+            resistencias.append(calcular_resistencia(sub))
     return resistencias
 
 
@@ -472,15 +491,23 @@ def calcular_resistencia_paralelo(resistencias_fils: list[float]) -> float:
 
 def OmhCurrent_filamentos(
     potential: float,
-    cf_clean_matrix: np.ndarray,
+    R_local: np.ndarray,
     CF_ranges: list[tuple[int, int]],
-    ohm_resistence: float,
 ) -> tuple[float, float, list[float], list[float]]:
     """
     Calcula la corriente y resistencia total del dispositivo (filamentos en paralelo)
     junto con la corriente y resistencia de cada filamento individual.
+
+    Args:
+        potential (float): Tensión aplicada [V].
+        R_local (np.ndarray): Mapa de resistencias por celda [Ohm] (ver `mapa_resistencias`).
+        CF_ranges (list): Bandas de filas de cada filamento.
+
+    Returns:
+        (I_total, R_total, I_fils, R_fils). Un filamento no formado tiene R = inf e
+        I = 0: no aporta conductancia, es una rama abierta.
     """
-    R_fils = calcular_resistencia_por_filamento(cf_clean_matrix, CF_ranges, ohm_resistence)
+    R_fils = calcular_resistencia_por_filamento(R_local, CF_ranges)
     R_total = calcular_resistencia_paralelo(R_fils)
     I_fils = [potential / r if r != np.inf else 0.0 for r in R_fils]
     I_total = potential / R_total

@@ -20,11 +20,9 @@ MATERIAL_DEFAULTS = {
     "pb_metal_insul_reset": 0.0334,
     "recom_enchancement_factor": 3e3,
     "long_decaimiento_concentracion": 1e-9,
-    "ohm_resistence_set": 4.3,
-    "ohm_resistence_reset": 4.3,
     # sigma(T) = sigma_0 / (1 + alpha_T * (T - T_0)).
-    # sigma_0 = 1 / (ohm_resistence * atom_size) = 1 / (4.3 * 0.25e-9): a T_0 reproduce
-    # exactamente R = 4.3 Ohm, la resistencia de celda usada hasta ahora.
+    # sigma_0 = 1 / (R_ref * atom_size) = 1 / (4.3 * 0.25e-9): a T_0 reproduce
+    # exactamente R = 4.3 Ohm, la resistencia de celda usada históricamente.
     "sigma_0": 930232558.1395348,
     "alpha_T": 2e-3,
     "num_filamentos": 2,
@@ -215,8 +213,6 @@ class ConfigManager:
             "pb_metal_insul_reset",
             "recom_enchancement_factor",
             "long_decaimiento_concentracion",
-            "ohm_resistence_set",
-            "ohm_resistence_reset",
             "sigma_0",
             "alpha_T",
             "num_filamentos",
