@@ -216,6 +216,78 @@ def Eliminar_filamentos_incompletos(grid_limpio, filamentos_ranges, percola_bool
     return CF_matrix
 
 
+def mapa_resistencias(
+    cf_matrix: np.ndarray,
+    temperatura,
+    sigma_0: float,
+    alpha_T: float,
+    T_0: float,
+    atom_size: float,
+) -> np.ndarray:
+    """
+    Construye el MAPA DE RESISTENCIAS por celda a partir de la geometría del
+    filamento y del mapa de temperaturas.
+
+    Es el análogo eléctrico de `Temperature.crear_matriz_materiales`: combina
+    geometría y estado local en una única matriz que el resto de funciones
+    consume sin saber cómo se ha construido.
+
+    Modelo de conductividad dependiente de la temperatura:
+
+        sigma(T) = sigma_0 / (1 + alpha_T * (T - T_0))
+
+    La cadena eléctrica trabaja en resistencia de celda, ligada a la conductividad
+    por sigma = 1 / (R * atom_size). Invirtiendo:
+
+        R(T) = 1 / (sigma(T) * atom_size)
+             = (1 + alpha_T * (T - T_0)) / (sigma_0 * atom_size)
+
+    En T = T_0 queda R = 1 / (sigma_0 * atom_size), la resistencia de celda de
+    referencia. Con alpha_T = 0 el mapa es uniforme y reproduce el modelo de
+    resistencia constante previo.
+
+    Esta es la ÚNICA función del código que conoce el modelo sigma(T): cambiarlo
+    (Arrhenius, dependencia con el campo, ...) es tocar solo aquí.
+
+    Convenio de celdas sin filamento
+    --------------------------------
+    Las celdas de óxido reciben `np.inf`, es decir conductancia CERO. Así se
+    excluyen SOLAS de la aritmética aguas abajo, sin necesidad de enmascarar:
+
+      - Combinación en paralelo (columna):  1/inf = 0, no aporta conductancia.
+      - Calor Joule:                        Q = delta_V^2 / (inf * h^3) = 0.
+
+    Además hace el mapa autodescriptivo: `np.isfinite(R_local)` devuelve la
+    geometría del filamento.
+
+    Args:
+        cf_matrix (np.ndarray): Matriz (Ny, Nx) donde 1 indica celda de filamento.
+            Marco INTERIOR, sin las columnas de electrodo.
+        temperatura: Temperatura de cada celda [K]. Matriz de la misma forma que
+            `cf_matrix` (típicamente `temperatura_anterior`, ya recortada) o escalar
+            (primer paso percolante, cuando aún no hay mapa FVM).
+        sigma_0 (float): Conductividad de referencia a T_0 [S/m].
+        alpha_T (float): Coeficiente térmico de resistencia [1/K]. Con alpha_T > 0
+            la resistencia sube al calentar (realimentación negativa).
+        T_0 (float): Temperatura de referencia [K] (`params.init_temp`).
+        atom_size (float): Tamaño de celda 'h' [m], factor geométrico sigma <-> R.
+
+    Returns:
+        np.ndarray: Mapa de resistencias (Ny, Nx) [Ohm]. Finito en las celdas de
+            filamento, `inf` en el resto.
+
+    Nota de dominio: la expresión se indefine si alpha_T * (T - T_0) <= -1. En el
+    régimen físico esperado (T >= T_0, alpha_T > 0) el denominador es siempre >= 1.
+    """
+    cf_matrix = np.asarray(cf_matrix)
+
+    # R(T) = (1 + alpha_T * (T - T_0)) / (sigma_0 * h). Se evalúa en toda la matriz
+    # (coste despreciable) y np.where se queda solo con las celdas de filamento.
+    R_celda = (1.0 + alpha_T * (np.asarray(temperatura, dtype=float) - T_0)) / (sigma_0 * atom_size)
+
+    return np.where(cf_matrix == 1, R_celda, np.inf)
+
+
 def resistencias_por_columna(CF_matrix, ohm_resistence) -> np.ndarray:
     """
     Calcula la resistencia equivalente de CADA columna de una matriz de filamento.
