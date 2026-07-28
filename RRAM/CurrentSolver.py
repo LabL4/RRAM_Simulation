@@ -1,4 +1,3 @@
-from numpy.typing import NDArray
 import networkx as nx
 import numpy as np
 import math
@@ -274,57 +273,6 @@ def calcular_resistencia(CF_matrix, ohm_resistence, mostrar_calculo: bool = Fals
     # un hueco aporta 0 ohmios. No debería ocurrir tras Eliminar_filamentos_incompletos,
     # pero se mantiene el comportamiento histórico para no alterar la rama eléctrica.
     return float(np.nansum(R_cols))
-
-
-def old_calcular_resistencia(CF_matrix, ohm_resistence):
-    """
-    Calcula la resistencia total de una matriz de formación de filamentos conductores (CF_matrix).
-    Este método asume que cada columna de la matriz representa un conjunto de resistencias en paralelo.
-    La resistencia total se calcula sumando las resistencias paralelas de cada columna.
-    Args:
-        CF_matrix (numpy.ndarray): Matriz donde cada elemento representa la presencia (1) o ausencia (0)
-                                    de un filamento conductor.
-        ohm_resistence (float, optional): Resistencia en ohmios asociada a cada filamento conductor.
-    Returns:
-        float: Resistencia total calculada a partir de la matriz CF_matrix.
-    """
-    total_resistance = 0.0
-    Ny, Nx = CF_matrix.shape
-    for j in range(1, Nx - 1):
-        fil_indices = np.where(CF_matrix == 1)[0]
-        N_total_columna = len(fil_indices)
-
-        if N_total_columna == 0:
-            continue
-
-        # R equivalente de la columna (N resistencias en paralelo)
-        R_col = ohm_resistence / N_total_columna
-
-        # Se suma la resistencia paralela a la resistencia total
-        total_resistance += R_col
-    return total_resistance
-
-
-def OmhCurrent(potential: float, resistance_matrix: NDArray, ohm_resistence: float) -> tuple[float, float]:
-    """
-    Calculates the Ohmic current based on the given parameters.
-
-    Parameters:
-    - potential (float): The voltage difference across the circuit.
-    - resistance_matrix (np.array): The matrix representing the conductive filaments.
-    - ohm_resistence (float): The resistance value of a single cell.
-
-    Returns:
-    - tuple[float, float]: A tuple containing the calculated Ohmic current and the total resistance.
-    """
-
-    # Se calcula la resistencia total usando el valor explícito que se le pasa
-    total_resistance = calcular_resistencia(resistance_matrix, ohm_resistence)
-
-    # Se calcula la corriente de Ohm (I = V/R)
-    intensidad_ohmica = potential / total_resistance
-
-    return intensidad_ohmica, total_resistance
 
 
 # En RRAM/CurrentSolver.py

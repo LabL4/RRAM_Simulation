@@ -17,8 +17,16 @@ class SimulationConstants:
     pb_metal_insul_reset: float
     recom_enchancement_factor: float
     long_decaimiento_concentracion: float
+    # TRANSITORIO: ohm_resistence_set/reset serán sustituidas por sigma_0 + alpha_T
+    # cuando los consumidores pasen a usar el mapa de resistencias por celda.
     ohm_resistence_set: float
     ohm_resistence_reset: float
+    # Conductividad eléctrica del filamento dependiente de la temperatura:
+    #     sigma(T) = sigma_0 / (1 + alpha_T * (T - T_0))
+    # con T_0 = params.init_temp. Equivale a R(T) = R_ref * (1 + alpha_T * (T - T_0)),
+    # donde R_ref = 1 / (sigma_0 * atom_size) es la resistencia de celda a T_0.
+    sigma_0: float  # Conductividad de referencia a T_0 [S/m]
+    alpha_T: float  # Coeficiente térmico de resistencia (TCR) [1/K]
     num_filamentos: int
     grosor_filamento: int
     gamma: float
