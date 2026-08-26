@@ -100,8 +100,13 @@ class FilamentosNoFormadosException(Exception):
 
         # Generar representación visual
 
-        # Guardar estado
-        np.save(self.filename, self.actual_state)
+        # Guardar estado. OJO: `np.save` (formato .npy de un único array) añade
+        # SIEMPRE la extensión ".npy" salvo que el nombre ya termine en ".npy" —
+        # como aquí termina en ".npz", el resultado real en disco era
+        # "..._not_all_CF_formed.npz.npy", no el ".npz" que dice `self.filename`.
+        # `np.savez` sí respeta ".npz" tal cual (o la añade si falta), así que es
+        # la función correcta para un nombre con esa extensión.
+        np.savez(self.filename, actual_state=self.actual_state)
 
         super().__init__(f"Se esperaba que se formaran {CF_esperados} CF, y se han formado {CF_formados} CF.")
 

@@ -398,19 +398,17 @@ def plot_IV(
     axes.get_yaxis().set_major_formatter(ticker.FormatStrFormatter("$10^{%d}$"))
 
     # Esto imprime las etiquetas en forma 10⁻⁷, 10⁻⁶, etc.
-    # axes.set_yticklabels(
-    #     [
-    #         r"$10^{-9}$",
-    #         r"$10^{-8}$",
-    #         r"$10^{-7}$",
-    #         r"$10^{-6}$",
-    #         r"$10^{-5}$",
-    #         r"$10^{-4}$",
-    #         r"$10^{-3}$",
-    #         r"$10^{-2}$",
-    #         r"$10^{-1}$",
-    #     ]
-    # )
+    axes.set_yticklabels(
+        [
+            r"$10^{-7}$",
+            r"$10^{-6}$",
+            r"$10^{-5}$",
+            r"$10^{-4}$",
+            r"$10^{-3}$",
+            r"$10^{-2}$",
+            r"$10^{-1}$",
+        ]
+    )
 
     # Represento una línea para el set y otra para el reset
     axes.plot(v_set, i_set, color="red", linewidth=4, label="Simulation")
@@ -422,9 +420,6 @@ def plot_IV(
 
     ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt"
     ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt"
-
-    # ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Medidas_Eduardo/D_Set_1_Run35.txt"
-    # ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Medidas_Eduardo/D_Reset_1_Run35.txt"
 
     # Cargar datos experimentales
     data_set = np.loadtxt(ruta_archivo_set, skiprows=1)

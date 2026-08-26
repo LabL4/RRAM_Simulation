@@ -154,7 +154,7 @@ def actualizar_parametros_por_filamento(
     elif num_esperados == 2:
         if filamentos_actuales == 1:
             logger.info("Se ha formado el primer filamento de dos.")
-            sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 3)
+            sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 1)
 
         elif filamentos_actuales == 2:
             logger.info("Se ha formado el segundo filamento de dos.")

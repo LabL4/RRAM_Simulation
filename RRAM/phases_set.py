@@ -87,7 +87,7 @@ def PP_set(
 
     sistema_percola = False
     total_vacantes_pp_set = False
-    num_pasos_guardar_estado = 50
+    num_pasos_guardar_estado = 200
     cf_clean_matrix = None
     voltaje_percolacion = params.voltaje_final_set
 
@@ -290,9 +290,7 @@ def PP_set(
 
             # Si ha percolado uso la corriente de Ohm
             try:
-                current, R_total, I_fils, R_fils = CurrentSolver.OmhCurrent_filamentos(
-                    voltage, R_local, CF_ranges
-                )
+                current, R_total, I_fils, R_fils = CurrentSolver.OmhCurrent_filamentos(voltage, R_local, CF_ranges)
                 resistencia = R_total
             except ZeroDivisionError:
                 raise exceptions.NullResistanceException(
@@ -669,7 +667,7 @@ def SP_set(
     ocupacion_max_sp_set = 0 + 0  # 0.35
     max_vancantes_sp_set = max_vancantes_pp_set + int(ocupacion_max_sp_set * params.num_max_vacantes)
     total_vacantes_sp_set = False
-    num_pasos_guardar_estado = 100
+    num_pasos_guardar_estado = 200
     rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="set", results_dir=results_dir)
 
     temperatura_anterior = final_state_pp_set["Temperatura_final"]
@@ -799,9 +797,7 @@ def SP_set(
 
             # Si ha percolado uso la corriente de Ohm
             try:
-                current, R_total, I_fils, R_fils = CurrentSolver.OmhCurrent_filamentos(
-                    voltage, R_local, CF_ranges
-                )
+                current, R_total, I_fils, R_fils = CurrentSolver.OmhCurrent_filamentos(voltage, R_local, CF_ranges)
             except ZeroDivisionError:
                 raise exceptions.NullResistanceException(
                     simulation_path=rutas["simulation_path"],

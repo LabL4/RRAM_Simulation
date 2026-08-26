@@ -2,16 +2,18 @@
 Entry point del paquete RRAM.
 
 Subcomandos:
-    init        Pre-genera Init_data/init_state_*.npz para todas las simulaciones.
-    exec        Ejecuta el ciclo SET → RESET de una simulación concreta.
-    plot        Replotea una simulación leyendo del disco (no re-ejecuta).
-    all         init (si falta) → exec → plot. Comportamiento histórico.
+    init         Pre-genera Init_data/init_state_*.npz para todas las simulaciones.
+    exec         Ejecuta el ciclo SET → RESET de una simulación concreta.
+    plot         Replotea la curva I-V sin marcar (I-V_{N}.png) leyendo del disco.
+    plot_marcado Replotea la curva I-V con puntos a-g marcados (I-V_marcado_{N}.png).
+    all          init (si falta) → exec → plot + plot_marcado. Comportamiento histórico.
 
 Uso:
     python -m RRAM init
-    python -m RRAM exec  <num_simulation>
-    python -m RRAM plot  <num_simulation>
-    python -m RRAM all   <num_simulation> [--guardar-datos]
+    python -m RRAM exec          <num_simulation>
+    python -m RRAM plot          <num_simulation>
+    python -m RRAM plot_marcado  <num_simulation>
+    python -m RRAM all           <num_simulation> [--guardar-datos]
 
 Variables de entorno:
     RRAM_LOG_LEVEL=DEBUG|INFO|WARNING|ERROR  (default INFO)
@@ -29,7 +31,7 @@ matplotlib.use("Agg")
 
 from .init_simulation import build_initial_states, load_simulation_config
 from .logging_config import setup_logging
-from .plot_results import plot_results
+from .plot_results import plot_results, plot_results_marcado
 from .run_cycle import run_cycle
 
 
@@ -94,13 +96,20 @@ def _build_parser() -> argparse.ArgumentParser:
         "--no-muro",
         action="store_true",
         default=False,
-        help="Desactiva el muro térmico en las fases de reset (pasa matriz_muros=None al solver).",
+        help="Desactiva el muro térmico en todas las fases del ciclo, SET y RESET (pasa matriz_muros=None al solver).",
     )
 
     # plot
-    p_plot = sub.add_parser("plot", help="Replotea una simulación previamente ejecutada.")
+    p_plot = sub.add_parser("plot", help="Replotea la curva I-V sin marcar (I-V_{N}.png).")
     p_plot.add_argument("num_simulation", type=int, help="Índice usado al ejecutar (offset +1).")
     p_plot.add_argument("--results-dir", default="Results")
+
+    # plot_marcado
+    p_plot_marcado = sub.add_parser(
+        "plot_marcado", help="Replotea la curva I-V con puntos a-g marcados (I-V_marcado_{N}.png)."
+    )
+    p_plot_marcado.add_argument("num_simulation", type=int, help="Índice usado al ejecutar (offset +1).")
+    p_plot_marcado.add_argument("--results-dir", default="Results")
 
     # all (compat con el flujo histórico)
     p_all = sub.add_parser("all", help="init (si falta) + exec + plot.")
@@ -187,6 +196,20 @@ def _cmd_plot(args) -> int:
         return 1
 
 
+def _cmd_plot_marcado(args) -> int:
+    setup_logging(num_simulation=args.num_simulation, file_mode="a")
+    log = logging.getLogger("RRAM.__main__")
+    try:
+        plot_results_marcado(num_simulation=args.num_simulation, results_dir=args.results_dir)
+        return 0
+    except FileNotFoundError as e:
+        log.error(f"plot_marcado sim={args.num_simulation}: {e}")
+        return 2
+    except Exception as e:
+        log.exception(f"plot_marcado sim={args.num_simulation} abortado: {e}")
+        return 1
+
+
 def _cmd_all(args) -> int:
     setup_logging(num_simulation=args.num_simulation + 1)
     logger = logging.getLogger("RRAM.__main__")
@@ -220,9 +243,14 @@ def _cmd_all(args) -> int:
         logger.exception(f"all/exec sim={args.num_simulation + 1} abortado: {e}")
         return 1
 
-    # 3. Plot (solo si exec terminó bien)
+    # 3. Plot (solo si exec terminó bien) — genera las dos figuras, como antes
+    #    de dividir `plot`/`plot_marcado` en subcomandos separados.
     try:
         plot_results(
+            num_simulation=args.num_simulation + 1,
+            results_dir=args.results_dir,
+        )
+        plot_results_marcado(
             num_simulation=args.num_simulation + 1,
             results_dir=args.results_dir,
         )
@@ -238,6 +266,7 @@ def main(argv: list[str] | None = None) -> int:
         "init": _cmd_init,
         "exec": _cmd_exec,
         "plot": _cmd_plot,
+        "plot_marcado": _cmd_plot_marcado,
         "all": _cmd_all,
     }
     return dispatch[args.command](args)

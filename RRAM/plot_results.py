@@ -7,11 +7,12 @@ sesión: replotear es independiente de la ejecución.
 
 Uso programático:
 
-    from RRAM.plot_results import plot_results, plot_estados
-    plot_results(num_simulation=3)
+    from RRAM.plot_results import plot_results, plot_results_marcado, plot_estados
+    plot_results(num_simulation=3)          # I-V_3.png (curva sin marcar)
+    plot_results_marcado(num_simulation=3)  # I-V_marcado_3.png (curva + puntos a-g)
     plot_estados(plot_type="state", phases=["pp_set", "sp_set"])
 
-O vía CLI: `python -m RRAM plot 3`.
+O vía CLI: `python -m RRAM plot 3` / `python -m RRAM plot_marcado 3`.
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ import numpy as np
 
 from .persistence import load_metadata, save_metadata
 from .run_cycle import DESPLAZAMIENTO_IV_DEFAULT
-from .iv_analysis import simulation_IV
+from .iv_analysis import INTENSIDAD_MINIMA_DEFAULT, simulation_IV
 
 logger = logging.getLogger(__name__)
 
@@ -60,15 +61,79 @@ TODOS_PLOT_TYPES: tuple[PlotType, ...] = (
 )
 
 
+def _plot_results_impl(
+    num_simulation: int,
+    results_dir: Path | str,
+    figures_dir: Optional[Path | str],
+    desplazamiento: Optional[dict],
+    skip_failed: bool,
+    marcado: bool,
+    intensidad_minima: float,
+) -> bool:
+    """Implementación compartida de `plot_results` / `plot_results_marcado`."""
+    results_dir = Path(results_dir)
+    simulation_path = results_dir / f"simulation_{num_simulation}"
+
+    meta = load_metadata(simulation_path, num_simulation=num_simulation)
+
+    status = (meta.extra or {}).get("status", "unknown")
+    error_msg = (meta.extra or {}).get("error")
+
+    if status != "completed":
+        logger.warning(
+            f"Sim {num_simulation} no completada (status={status!r}); causa: "
+            f"{error_msg or 'sin info'}. Se representan los datos disponibles en disco."
+        )
+
+    # ----- Guard: solo saltar si no hay ningún dato de ninguna fase -----
+    fases_con_datos = [
+        fase for fase in TODAS_FASES if (simulation_path / f"Data_{fase}_{num_simulation}.npz").is_file()
+    ]
+    if skip_failed and not fases_con_datos:
+        logger.warning(f"Sim {num_simulation}: no hay ningún Data_*.npz en {simulation_path}. Salto plot.")
+        return False
+
+    # Las figuras viven dentro de la propia carpeta de simulación.
+    if figures_dir is None:
+        figures_dir = simulation_path / "Figures"
+    figures_dir = Path(figures_dir)
+    figures_dir.mkdir(parents=True, exist_ok=True)
+
+    desp = desplazamiento or DESPLAZAMIENTO_IV_DEFAULT
+
+    logger.info(
+        f"Replot({'marcado' if marcado else 'sin marcar'}) · sim={num_simulation} · status={status} · "
+        f"V_perco={meta.voltaje_percolacion:.4f}V · "
+        f"creaciones={len(meta.creaciones_dict)} · roturas={len(meta.roturas_dict)} · "
+        f"fases_con_datos={fases_con_datos} · intensidad_minima={intensidad_minima:.1e}"
+    )
+
+    simulation_IV(
+        num_simulation=num_simulation,
+        figures_path=figures_dir,
+        simulation_path=simulation_path,
+        desplazamiento=desp,
+        voltaje_percolacion=meta.voltaje_percolacion,
+        roturas_dict=meta.roturas_dict,
+        marcado=marcado,
+        intensidad_minima=intensidad_minima,
+    )
+    return True
+
+
 def plot_results(
     num_simulation: int,
     results_dir: Path | str = "Results",
     figures_dir: Optional[Path | str] = None,
     desplazamiento: Optional[dict] = None,
     skip_failed: bool = True,
+    intensidad_minima: float = INTENSIDAD_MINIMA_DEFAULT,
 ) -> bool:
     """
-    Genera las figuras I-V de una simulación leyendo todo del disco.
+    Genera `I-V_{N}.png` (curva sin marcar) de una simulación leyendo todo del
+    disco. Para la curva con puntos a-g marcados, usa `plot_results_marcado`
+    (antes ambas figuras salían de una sola llamada; ahora cada una tiene su
+    propia función/subcomando CLI: `plot` vs `plot_marcado`).
 
     Args:
         num_simulation: Índice usado al ejecutar (offset +1 del run_cycle: el
@@ -80,69 +145,58 @@ def plot_results(
         desplazamiento: Anotaciones de la curva I-V. Si se omite, se usa el
             default de `run_cycle.DESPLAZAMIENTO_IV_DEFAULT` (no se persiste
             en metadata: es preferencia de plot, no estado de simulación).
-        skip_failed: Si True (default) y la metadata indica que la simulación
-            no completó (`status != "completed"`) o no hay roturas, se loguea
-            una advertencia y se devuelve False sin intentar dibujar — evita
-            el `KeyError: 0` de `simulation_IV` cuando faltan datos del reset.
+        skip_failed: Si True (default), no dibuja nada cuando no hay ningún
+            `Data_*.npz` en disco (nada que representar). Ya NO exige que la
+            simulación esté `completed`: `simulation_IV` dibuja la curva con
+            las fases que sí tengan datos.
+        intensidad_minima: Umbral absoluto de intensidad (A, default 1e-7).
+            Cualquier punto con |I| por debajo se descarta antes de dibujar
+            (ruido de fondo cerca de I=0 en la escala log).
 
     Returns:
-        True si se generaron figuras; False si la simulación se saltó.
+        True si se generó la figura; False si la simulación se saltó.
 
     Raises:
         FileNotFoundError: Si no se encuentra `sim_metadata_{N}.json`.
     """
-    results_dir = Path(results_dir)
-    simulation_path = results_dir / f"simulation_{num_simulation}"
-
-    meta = load_metadata(simulation_path, num_simulation=num_simulation)
-
-    status = (meta.extra or {}).get("status", "unknown")
-    error_msg = (meta.extra or {}).get("error")
-
-    # ----- Guard: solo replotear sims completas con roturas registradas -----
-    if skip_failed:
-        if status != "completed":
-            logger.warning(
-                f"Sim {num_simulation} no completada (status={status!r}). Salto plot. Causa: {error_msg or 'sin info'}"
-            )
-            return False
-        if not meta.roturas_dict:
-            logger.warning(
-                f"Sim {num_simulation} sin roturas registradas; el plot I-V "
-                f"requiere al menos rotura 0. Salto plot. "
-                f"Probablemente la fase de reset no llegó a destruir filamentos."
-            )
-            return False
-        if 0 not in meta.roturas_dict:
-            logger.warning(
-                f"Sim {num_simulation}: roturas_dict no contiene la clave 0 "
-                f"(claves: {list(meta.roturas_dict.keys())}). Salto plot."
-            )
-            return False
-
-    # Las figuras viven dentro de la propia carpeta de simulación.
-    if figures_dir is None:
-        figures_dir = simulation_path / "Figures"
-    figures_dir = Path(figures_dir)
-    figures_dir.mkdir(parents=True, exist_ok=True)
-
-    desp = desplazamiento or DESPLAZAMIENTO_IV_DEFAULT
-
-    logger.info(
-        f"Replot · sim={num_simulation} · status={status} · "
-        f"V_perco={meta.voltaje_percolacion:.4f}V · "
-        f"creaciones={len(meta.creaciones_dict)} · roturas={len(meta.roturas_dict)}"
-    )
-
-    simulation_IV(
+    return _plot_results_impl(
         num_simulation=num_simulation,
-        figures_path=figures_dir,
-        simulation_path=simulation_path,
-        desplazamiento=desp,
-        voltaje_percolacion=meta.voltaje_percolacion,
-        roturas_dict=meta.roturas_dict,
+        results_dir=results_dir,
+        figures_dir=figures_dir,
+        desplazamiento=desplazamiento,
+        skip_failed=skip_failed,
+        marcado=False,
+        intensidad_minima=intensidad_minima,
     )
-    return True
+
+
+def plot_results_marcado(
+    num_simulation: int,
+    results_dir: Path | str = "Results",
+    figures_dir: Optional[Path | str] = None,
+    desplazamiento: Optional[dict] = None,
+    skip_failed: bool = True,
+    intensidad_minima: float = INTENSIDAD_MINIMA_DEFAULT,
+) -> bool:
+    """
+    Genera `I-V_marcado_{N}.png` (curva + puntos a-g) de una simulación
+    leyendo todo del disco. Ver `plot_results` para el resto de argumentos y
+    para la curva sin marcar.
+
+    Si ningún punto marcado es calculable (p.ej. no hay datos de ninguna de
+    las fases pp_set/pp_reset/sp_reset), se loguea un warning y no se genera
+    figura, aunque la función devuelve True (la simulación no se "saltó": sí
+    se intentó representar, solo que no había nada que marcar).
+    """
+    return _plot_results_impl(
+        num_simulation=num_simulation,
+        results_dir=results_dir,
+        figures_dir=figures_dir,
+        desplazamiento=desplazamiento,
+        skip_failed=skip_failed,
+        marcado=True,
+        intensidad_minima=intensidad_minima,
+    )
 
 
 # ---------------------------------------------------------------------------

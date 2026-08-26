@@ -12,11 +12,11 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 MATERIAL_DEFAULTS = {
     "cte_red": 0.25e-9,
-    "permitividad_relativa_set": 299.6653,
+    "permitividad_relativa_set": 299.977,
     "permitividad_relativa_reset": 299.9641,
     "generation_energy": 1.02,
     "recombination_energy": 1.55,
-    "pb_metal_insul_set": 0.001,
+    "pb_metal_insul_set": 0.0026,
     "pb_metal_insul_reset": 0.0334,
     "recom_enchancement_factor": 3e3,
     "long_decaimiento_concentracion": 1e-9,
@@ -43,7 +43,7 @@ PHYSICAL_CONSTANTS = {
 # PARÁMETROS ELÉCTRICOS
 # ============================================================================
 ELECTRICAL_DEFAULTS = {
-    "I_0_set": 0.0010731,
+    "I_0_set": 2.9806e-04,
     "I_0_reset": 0.002505,
 }
 
@@ -68,7 +68,7 @@ THERMAL_DEFAULTS = {
 # ============================================================================
 SIMULATION_DEFAULTS = {
     "device_size_x": 10e-9,  # Ancho entre electrodos, debe corresponder a los dispositivos medidos
-    "device_size_y": 40e-9,
+    "device_size_y": 35e-9,
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
     "num_trampas": 150,
     "total_simulation_time": 10.0,

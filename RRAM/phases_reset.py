@@ -23,7 +23,7 @@ def PP_reset(
     final_state_sp_set: dict,
     num_simulation: int,
     CF_ranges: List[tuple],
-    num_pasos_guardar_estado: int = 50,  # Antes era cada 2000
+    num_pasos_guardar_estado: int = 200,  # Antes era cada 2000
     usar_muro: bool = True,
     results_dir: str = "Results",
 ):
@@ -183,9 +183,7 @@ def PP_reset(
             )
 
             try:
-                current, R_total, I_fils, R_fils = CurrentSolver.OmhCurrent_filamentos(
-                    voltage, R_local, CF_ranges
-                )
+                current, R_total, I_fils, R_fils = CurrentSolver.OmhCurrent_filamentos(voltage, R_local, CF_ranges)
             except ZeroDivisionError:
                 raise exceptions.NullResistanceException(
                     simulation_path=rutas["simulation_path"],
@@ -383,7 +381,7 @@ def SP_reset(
     final_state_pp_reset: dict,
     num_simulation: int,
     CF_ranges: List[tuple],
-    num_pasos_guardar_estado: int = 50,
+    num_pasos_guardar_estado: int = 200,
     results_dir: str = "Results",
 ):
     params = final_state_pp_reset["params"]
@@ -517,9 +515,7 @@ def SP_reset(
 
             # Si ha percolado uso la corriente de Ohm
             try:
-                current, R_total, I_fils, R_fils = CurrentSolver.OmhCurrent_filamentos(
-                    voltage, R_local, CF_ranges
-                )
+                current, R_total, I_fils, R_fils = CurrentSolver.OmhCurrent_filamentos(voltage, R_local, CF_ranges)
                 resistencia = R_total
             except ZeroDivisionError:
                 raise exceptions.NullResistanceException(

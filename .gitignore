@@ -18,3 +18,9 @@ logs/
 *.log
 *.npz
 *.svg
+*.md
+*.tex
+evitar_*
+Ajuste_*
+Results_*
+Obtener_*
