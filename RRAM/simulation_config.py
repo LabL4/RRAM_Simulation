@@ -13,20 +13,20 @@ logger = logging.getLogger(__name__)
 MATERIAL_DEFAULTS = {
     "cte_red": 0.25e-9,
     "permitividad_relativa_set": 299.977,
-    "permitividad_relativa_reset": 299.9641,
-    "generation_energy": 1.02,
+    "permitividad_relativa_reset": 399.998,
+    "generation_energy": 1.04,
     "recombination_energy": 1.55,
     "pb_metal_insul_set": 0.0026,
-    "pb_metal_insul_reset": 0.0334,
+    "pb_metal_insul_reset": 0.0307,
     "recom_enchancement_factor": 3e3,
     "long_decaimiento_concentracion": 1e-9,
     # sigma(T) = sigma_0 / (1 + alpha_T * (T - T_0)).
     # sigma_0 = 1 / (R_ref * atom_size) = 1 / (4.3 * 0.25e-9): a T_0 reproduce
     # exactamente R = 4.3 Ohm, la resistencia de celda usada históricamente.
-    "sigma_0": 930232558.1395348,
+    "sigma_0": 4.3e8,  # 930232558.1395348,
     "alpha_T": 2e-3,
     "num_filamentos": 2,
-    "grosor_filamento": [0, 1],
+    "grosor_filamento": [1, 3],
 }
 
 # ============================================================================
@@ -44,7 +44,7 @@ PHYSICAL_CONSTANTS = {
 # ============================================================================
 ELECTRICAL_DEFAULTS = {
     "I_0_set": 2.9806e-04,
-    "I_0_reset": 0.002505,
+    "I_0_reset": 7.2588e-04,
 }
 
 # ============================================================================
@@ -58,7 +58,7 @@ THERMAL_DEFAULTS = {
     "conductividad_termica_aislante": 0.000001,
     "conductividad_termica_electrodo": 5.0,
     "Temperatura_electrodo": 300,
-    "factor_generar_calor": 5.5e-5,  # 6e-5,
+    "factor_generar_calor": 6e-5,  # 5.5e-5,
     "pendiente_temperatura": -28,  # -24.7,
 }
 
@@ -93,9 +93,9 @@ SET_RESET_DEFAULTS = {
     "lim_voltage_percolacion": 1.4,
     "compliance_voltage": 0.6,
     "voltaje_gen_oxigeno_pp_1": 1.1,
-    "num_oxigenos_pp_reset_1": 2,
-    "voltaje_gen_oxigeno_pp_2": 1.2,
-    "num_oxigenos_pp_reset_2": 10,
+    "num_oxigenos_pp_reset_1": 7,  # 2
+    "voltaje_gen_oxigeno_pp_2": 1.15,
+    "num_oxigenos_pp_reset_2": 4,  # 10
     "voltaje_gen_oxigeno_sp": -0.2,
     "num_oxigenos_sp_reset": 5,
 }

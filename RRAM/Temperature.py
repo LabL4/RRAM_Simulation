@@ -169,125 +169,15 @@ def calculate_heat_source(
 
             # Q = delta_V^2 / (R_celda * h^3). Las celdas de óxido llevan R = inf,
             # así que reciben Q = 0 automáticamente: no hace falta enmascarar.
+            # se emplea h^3 porque se asume en la aprte térmica una lámina de altura atom_size para que todo cuadre con el solve_thermal_state
+            # t el solber de temperatura está calibrado para distancia z = 1.
             Q_columna = (delta_V_local**2) / (bloque_R[:, jj] * atom_size**3)
 
             # +1 en columnas para saltar el electrodo izquierdo del marco extendido
+            # Q_map_global[fila_min : fila_max + 1, jj + 1] = Q_columna
             Q_map_global[fila_min : fila_max + 1, jj + 1] = Q_columna * factor_generar_calor
 
     return Q_map_global
-
-
-# def solve_thermal_state(
-#     types_map: np.ndarray, Q_map: np.ndarray, thermal_props: dict, atom_size: float, T_ambient: float
-# ) -> np.ndarray:
-#     """
-#     Ensambla y resuelve la ecuación del calor en estado estacionario (FVM).
-
-#     Matemática:
-#         Sum(Flux_vecinos) + Source = 0
-#         Flux_vecino = k_eff * (T_vecino - T_centro) * (Area / Distancia)
-
-#     Args:
-#         types_map (np.ndarray): Matriz de materiales extendida.
-#         Q_map (np.ndarray): Matriz de calor Joule [W/m^3].
-#         thermal_props (dict): Diccionario {ID: {'k': valor}}.
-#         atom_size (float): Tamaño de la celda [m].
-#         T_ambient (float): Temperatura fija para condiciones Dirichlet [K].
-
-#     Returns:
-#         np.ndarray: Mapa de temperaturas completo [K].
-#     """
-#     Ny, Nx = types_map.shape
-#     N = Ny * Nx  # Número total de incógnitas
-
-#     # Listas para formato COO (Sparse Matrix)
-#     data = []
-#     rows_idx = []
-#     cols_idx = []
-#     b = np.zeros(N)
-
-#     # Volumen de la celda de control (asumiendo espesor unitario dz=1 o cancelándose)
-#     # En 2D estacionario: Balance de Calor [W] -> Q [W/m^3] * Volumen [m^3]
-#     # Si asumimos 2D puro, trabajamos por unidad de profundidad.
-#     cell_volume = atom_size * atom_size
-
-#     for i in range(Ny):
-#         for j in range(Nx):
-#             n = i * Nx + j  # Índice lineal actual
-#             mat_id = types_map[i, j]
-
-#             # --- CONDICIÓN DIRICHLET (Temperatura Fija) ---
-#             # Si es Electrodo (ID 3), fijamos T = T_ambient
-#             if mat_id == 3:
-#                 data.append(1.0)
-#                 rows_idx.append(n)
-#                 cols_idx.append(n)
-#                 b[n] = T_ambient
-#                 continue
-
-#             # --- CONDICIÓN NEUMANN / ECUACIÓN DEL CALOR ---
-#             # Para materiales 0 (Oxido), 1 (Filamento) o 2 (Aislante)
-#             # Nota: Si es ID 2 (Aislante), su k es muy baja (~0 PERO NO 0), por lo que
-#             # naturalmente se comportará como adiabático con sus vecinos.
-
-#             k_center = thermal_props[mat_id]["k"]
-#             diag_sum = 0.0
-
-#             # Lista de vecinos (Arriba, Abajo, Izquierda, Derecha)
-#             vecinos = []
-#             if i > 0:
-#                 vecinos.append(((i - 1, j), (i - 1) * Nx + j))  # Arriba
-#             if i < Ny - 1:
-#                 vecinos.append(((i + 1, j), (i + 1) * Nx + j))  # Abajo
-#             if j > 0:
-#                 vecinos.append(((i, j - 1), i * Nx + (j - 1)))  # Izquierda
-#             if j < Nx - 1:
-#                 vecinos.append(((i, j + 1), i * Nx + (j + 1)))  # Derecha
-
-#             for (vec_i, vec_j), vec_n in vecinos:
-#                 mat_vec = types_map[vec_i, vec_j]
-#                 k_vec = thermal_props[mat_vec]["k"]
-
-#                 # Conductividad Efectiva en la interfaz (Media Armónica)
-#                 # k_eff = 2 * k1 * k2 / (k1 + k2)
-#                 # Evitamos división por cero si ambos son aislantes perfectos
-#                 denom = k_center + k_vec
-#                 if denom == 0:
-#                     k_eff = 0.0
-#                 else:
-#                     k_eff = (2 * k_center * k_vec) / denom
-
-#                 # Aporte a la matriz A (Término del vecino pasa restando al lado izq)
-#                 # Flux = k_eff * (T_vec - T_cen). En eq: ... - k_eff * T_vec ...
-#                 data.append(-k_eff)
-#                 rows_idx.append(n)
-#                 cols_idx.append(vec_n)
-
-#                 # Aporte a la diagonal (Suma de coeficientes)
-#                 diag_sum += k_eff
-
-#             # Elemento diagonal principal (Coeficiente de T_center)
-#             data.append(diag_sum)
-#             rows_idx.append(n)
-#             cols_idx.append(n)
-
-#             # Término fuente (Calor Joule)
-#             # Ecuación: Divergencia(Flux) = Q
-#             # Discretizada: Sum(k_eff*(T_cen - T_vec)) = Q * Volumen
-#             b[n] = Q_map[i, j] * cell_volume
-
-#     # --- RESOLUCIÓN DEL SISTEMA ---
-#     # Construir matriz dispersa
-#     A_mat = coo_matrix((data, (rows_idx, cols_idx)), shape=(N, N))
-#     A_csr = A_mat.tocsr()
-
-#     # Resolver Ax = b
-#     T_vec = spsolve(A_csr, b)
-
-#     # Reconvertir vector 1D a matriz 2D
-#     T_final = T_vec.reshape((Ny, Nx))
-
-#     return np.asarray(T_final)
 
 
 def solve_thermal_state(

@@ -23,7 +23,7 @@ def PP_reset(
     final_state_sp_set: dict,
     num_simulation: int,
     CF_ranges: List[tuple],
-    num_pasos_guardar_estado: int = 200,  # Antes era cada 2000
+    num_pasos_guardar_estado: int = 50,  # Antes era cada 2000
     usar_muro: bool = True,
     results_dir: str = "Results",
 ):
@@ -123,6 +123,11 @@ def PP_reset(
     roturas_dict = {}
     current = 0.0  # inicialización para T_joule en k=0
 
+    # Al romperse el PRIMER filamento (el que sea) se reduce recombination_energy
+    # para cambiar la dinámica de disolución. Factor ajustado manualmente.
+    factor_recombinacion = 1.03
+    recombinacion_actualizada = False
+
     logger.info(f"Simulacion {num_simulation} - primera parte del reset")
 
     # Ciclo para la primera parte del reset
@@ -148,6 +153,7 @@ def PP_reset(
         exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(CF_ranges))
 
         if any(~CF_destruido):  # mientras haya alguno sin romper
+            destruidos_antes = int(np.sum(CF_destruido))
             procesar_filamentos_destruidos(
                 imagen_path=rutas["figures_path"],
                 data_save_path=rutas["data_simulation_path"],
@@ -160,6 +166,10 @@ def PP_reset(
                 roturas_dict=roturas_dict,
                 etapa="pp",
             )
+
+            if not recombinacion_actualizada and int(np.sum(CF_destruido)) > destruidos_antes:
+                sim_ctes = sim_ctes.update_recombination_energy(sim_ctes.recombination_energy * factor_recombinacion)
+                recombinacion_actualizada = True
 
         # Temperatura Joule como semilla escalar (barato, siempre disponible).
         # Usa el current del paso anterior: en k=0 current=0 → T_joule=init_temp.
@@ -278,6 +288,13 @@ def PP_reset(
             R_fils = [np.nan] * N
             T_fils = [temperatura] * N
 
+        # FIX: `temperatura` puede ser la matriz FVM con columnas de electrodo (140,42) o el
+        # escalar de Temperature_Joule. Recombine_opt indexa con coordenadas de actual_state
+        # (espacio real, sin electrodos), así que si es matriz hay que recortar columnas 0 y -1
+        # (electrodos) antes de pasarla; si no, se desalinea una columna y la columna real 0
+        # lee el electrodo fijo en vez de su propia temperatura.
+        temperatura_para_recombinacion = temperatura[:, 1:-1] if isinstance(temperatura, np.ndarray) else temperatura
+
         # Actualizo el estado del sistema con la recombinación
         actual_state, oxygen_state = update_state_recombinate(
             voltage=voltage,
@@ -287,7 +304,7 @@ def PP_reset(
             params=params,
             actual_state=actual_state,
             oxygen_state=oxygen_state,
-            temperatura=temperatura,
+            temperatura=temperatura_para_recombinacion,
             velocity_thresholds=velocity_thresholds,
         )
 
@@ -381,7 +398,7 @@ def SP_reset(
     final_state_pp_reset: dict,
     num_simulation: int,
     CF_ranges: List[tuple],
-    num_pasos_guardar_estado: int = 200,
+    num_pasos_guardar_estado: int = 50,
     results_dir: str = "Results",
 ):
     params = final_state_pp_reset["params"]
@@ -598,6 +615,13 @@ def SP_reset(
             R_fils = [np.nan] * N
             T_fils = [temperatura] * N
 
+        # FIX: `temperatura` puede ser la matriz FVM con columnas de electrodo (140,42) o el
+        # escalar de Temperature_Joule. Recombine_opt indexa con coordenadas de actual_state
+        # (espacio real, sin electrodos), así que si es matriz hay que recortar columnas 0 y -1
+        # (electrodos) antes de pasarla; si no, se desalinea una columna y la columna real 0
+        # lee el electrodo fijo en vez de su propia temperatura.
+        temperatura_para_recombinacion = temperatura[:, 1:-1] if isinstance(temperatura, np.ndarray) else temperatura
+
         # Actualizo el estado del sistema con la recombinación
         actual_state, oxygen_state = update_state_recombinate(
             voltage=voltage,
@@ -607,7 +631,7 @@ def SP_reset(
             params=params,
             actual_state=actual_state,
             oxygen_state=oxygen_state,
-            temperatura=temperatura,
+            temperatura=temperatura_para_recombinacion,
             velocity_thresholds=velocity_thresholds,
         )
 

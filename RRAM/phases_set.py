@@ -87,7 +87,7 @@ def PP_set(
 
     sistema_percola = False
     total_vacantes_pp_set = False
-    num_pasos_guardar_estado = 200
+    num_pasos_guardar_estado = 50
     cf_clean_matrix = None
     voltaje_percolacion = params.voltaje_final_set
 
@@ -95,6 +95,12 @@ def PP_set(
     k_percolacion = None
     PASOS_PAUSA_GENERACION_POST_PERCOLACION = 0
     # --- FIN TEMPORAL ---
+
+    # Voltaje a partir del cual, una vez percolado el sistema, se reduce gamma para
+    # frenar la dinámica de crecimiento del filamento. Se ajusta manualmente.
+    V_crecimiento = 0.85
+    factor_crecimiento = 1.65
+    gamma_actualizada = False
 
     # AL inicio como la corriente es de tipo poole frenkel, la resitencia ohmica se considera nula
     resistencia = 0.0
@@ -273,6 +279,10 @@ def PP_set(
 
                 # Actualizamos el historial para que no vuelva a entrar en iteraciones futuras
                 filamentos_previos = filamentos_actuales
+
+            if sistema_percola and voltage >= V_crecimiento and not gamma_actualizada:
+                sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma * factor_crecimiento)
+                gamma_actualizada = True
 
             cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf, actual_state)
 
@@ -667,7 +677,7 @@ def SP_set(
     ocupacion_max_sp_set = 0 + 0  # 0.35
     max_vancantes_sp_set = max_vancantes_pp_set + int(ocupacion_max_sp_set * params.num_max_vacantes)
     total_vacantes_sp_set = False
-    num_pasos_guardar_estado = 200
+    num_pasos_guardar_estado = 50
     rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="set", results_dir=results_dir)
 
     temperatura_anterior = final_state_pp_set["Temperatura_final"]
