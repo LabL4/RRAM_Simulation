@@ -108,7 +108,7 @@ print("\n[2/3] Grosor uniforme: invariante de potencia + Q == fórmula anterior"
 cf_u = construir([lambda j: 5, lambda j: 7, lambda j: 9])
 R_u = mapa(cf_u)
 R_fils, R_tot, I_tot, I_fils = electrica(R_u)
-Q_new = Temperature.calculate_heat_source(H, R_u, FACTOR, RANGES, I_fils)
+Q_new = Temperature.calculate_heat_source(H, H, R_u, FACTOR, RANGES, I_fils)
 Q_ref = q_referencia(cf_u, I_fils)
 
 P_num = Q_new.sum() * H * H
@@ -124,7 +124,7 @@ print("\n[4] Grosor anticorrelado: el reparto sigue a I_f^2*R_f")
 cf_n = construir([lambda j: 10 if j < 20 else 2, lambda j: 6, lambda j: 2 if j < 20 else 10])
 R_n = mapa(cf_n)
 R_fils, R_tot, I_tot, I_fils = electrica(R_n)
-Q_new = Temperature.calculate_heat_source(H, R_n, FACTOR, RANGES, I_fils)
+Q_new = Temperature.calculate_heat_source(H, H, R_n, FACTOR, RANGES, I_fils)
 check("invariante de potencia total", np.isclose(Q_new.sum() * H * H, V * I_tot * FACTOR / H, rtol=1e-10))
 
 tot_true = sum(I_fils[i] ** 2 * R_fils[i] for i in range(3))
@@ -151,7 +151,7 @@ R_roto = mapa(np.where(np.isin(np.arange(Ny)[:, None], np.arange(53, 106)), 0, c
 R_f2, _, _, I_f2 = electrica(R_roto)
 check("banda vacía -> R_fil = inf", R_f2[1] == np.inf, f"R_fils={[f'{r:.1f}' if np.isfinite(r) else 'inf' for r in R_f2]}")
 check("banda vacía -> I_fil = 0", I_f2[1] == 0.0)
-Q_roto = Temperature.calculate_heat_source(H, R_roto, FACTOR, RANGES, I_f2)
+Q_roto = Temperature.calculate_heat_source(H, H, R_roto, FACTOR, RANGES, I_f2)
 check("banda vacía no genera calor", Q_roto[53:106].sum() == 0.0)
 
 
@@ -161,7 +161,7 @@ T_map = np.full((Ny, Nx), T_0)
 T_map[CENTROS[0] - 2 : CENTROS[0] + 1, :] = 700.0  # media banda caliente
 R_t = mapa(cf_u, T_map, alpha_T=2e-3)
 R_fils_t, _, _, I_fils_t = electrica(R_t)
-Q_t = Temperature.calculate_heat_source(H, R_t, FACTOR, RANGES, I_fils_t)
+Q_t = Temperature.calculate_heat_source(H, H, R_t, FACTOR, RANGES, I_fils_t)
 
 fila_cal, fila_fria = CENTROS[0] - 1, CENTROS[0] + 1
 print(f"       R: caliente={R_t[fila_cal, 5]:.3f} Ohm  fría={R_t[fila_fria, 5]:.3f} Ohm")

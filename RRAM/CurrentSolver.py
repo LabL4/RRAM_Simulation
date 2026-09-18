@@ -222,7 +222,7 @@ def mapa_resistencias(
     sigma_0: float,
     alpha_T: float,
     T_0: float,
-    atom_size: float,
+    delta_z_r: float,
 ) -> np.ndarray:
     """
     Construye el MAPA DE RESISTENCIAS por celda a partir de la geometría del
@@ -236,13 +236,15 @@ def mapa_resistencias(
 
         sigma(T) = sigma_0 / (1 + alpha_T * (T - T_0))
 
-    La cadena eléctrica trabaja en resistencia de celda, ligada a la conductividad
-    por sigma = 1 / (R * atom_size). Invirtiendo:
+    La celda es un prisma Delta_x_R x Delta_y_R x Delta_z_R, con Delta_x_R =
+    Delta_y_R = atom_size (paso de red) siempre, así que su cociente vale 1 y
+    desaparece de la fórmula; Delta_z_R = delta_z_r es un espesor INDEPENDIENTE
+    del paso de red, no necesariamente igual a `atom_size`:
 
-        R(T) = 1 / (sigma(T) * atom_size)
-             = (1 + alpha_T * (T - T_0)) / (sigma_0 * atom_size)
+        R(T) = rho(T) * Delta_x_R / (Delta_y_R * Delta_z_R) = rho(T) / delta_z_r
+             = (1 + alpha_T * (T - T_0)) / (sigma_0 * delta_z_r)
 
-    En T = T_0 queda R = 1 / (sigma_0 * atom_size), la resistencia de celda de
+    En T = T_0 queda R = 1 / (sigma_0 * delta_z_r), la resistencia de celda de
     referencia. Con alpha_T = 0 el mapa es uniforme y reproduce el modelo de
     resistencia constante previo.
 
@@ -255,7 +257,7 @@ def mapa_resistencias(
     excluyen SOLAS de la aritmética aguas abajo, sin necesidad de enmascarar:
 
       - Combinación en paralelo (columna):  1/inf = 0, no aporta conductancia.
-      - Calor Joule:                        Q = delta_V^2 / (inf * h^3) = 0.
+      - Calor Joule:                        Q = delta_V^2 / (inf * atom_size**2 * delta_z_r) = 0.
 
     Además hace el mapa autodescriptivo: `np.isfinite(R_local)` devuelve la
     geometría del filamento.
@@ -270,7 +272,9 @@ def mapa_resistencias(
         alpha_T (float): Coeficiente térmico de resistencia [1/K]. Con alpha_T > 0
             la resistencia sube al calentar (realimentación negativa).
         T_0 (float): Temperatura de referencia [K] (`params.init_temp`).
-        atom_size (float): Tamaño de celda 'h' [m], factor geométrico sigma <-> R.
+        delta_z_r (float): Espesor Delta_z_R de la celda en la dirección fuera de
+            plano [m], factor geométrico sigma <-> R. Independiente del paso de
+            red `atom_size` y del espesor que asuma el solver térmico.
 
     Returns:
         np.ndarray: Mapa de resistencias (Ny, Nx) [Ohm]. Finito en las celdas de
@@ -281,9 +285,9 @@ def mapa_resistencias(
     """
     cf_matrix = np.asarray(cf_matrix)
 
-    # R(T) = (1 + alpha_T * (T - T_0)) / (sigma_0 * h). Se evalúa en toda la matriz
-    # (coste despreciable) y np.where se queda solo con las celdas de filamento.
-    R_celda = (1.0 + alpha_T * (np.asarray(temperatura, dtype=float) - T_0)) / (sigma_0 * atom_size)
+    # R(T) = (1 + alpha_T * (T - T_0)) / (sigma_0 * delta_z_r). Se evalúa en toda
+    # la matriz (coste despreciable) y np.where se queda solo con las celdas de filamento.
+    R_celda = (1.0 + alpha_T * (np.asarray(temperatura, dtype=float) - T_0)) / (sigma_0 * delta_z_r)
 
     return np.where(cf_matrix == 1, R_celda, np.inf)
 

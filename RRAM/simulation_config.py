@@ -21,10 +21,14 @@ MATERIAL_DEFAULTS = {
     "recom_enchancement_factor": 3e3,
     "long_decaimiento_concentracion": 1e-9,
     # sigma(T) = sigma_0 / (1 + alpha_T * (T - T_0)).
-    # sigma_0 = 1 / (R_ref * atom_size) = 1 / (4.3 * 0.25e-9): a T_0 reproduce
+    # sigma_0 = 1 / (R_ref * delta_z_r) = 1 / (4.3 * 0.25e-9): a T_0 reproduce
     # exactamente R = 4.3 Ohm, la resistencia de celda usada históricamente.
     "sigma_0": 4.3e8,  # 930232558.1395348,
     "alpha_T": 2e-3,
+    # Espesor Delta z de la rama eléctrica/resistencia (R = rho/delta_z_r), independiente
+    # de atom_size (paso de red en el plano) y del Delta z del solver térmico. Por
+    # defecto igual a atom_size para reproducir exactamente el comportamiento histórico.
+    "delta_z_r": 0.25e-9,
     "num_filamentos": 2,
     "grosor_filamento": [1, 3],
 }
@@ -215,6 +219,7 @@ class ConfigManager:
             "long_decaimiento_concentracion",
             "sigma_0",
             "alpha_T",
+            "delta_z_r",
             "num_filamentos",
             "grosor_filamento",
             "vibration_frequency",

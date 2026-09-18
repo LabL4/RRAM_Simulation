@@ -99,6 +99,7 @@ def crear_matriz_materiales(matriz_filamentos):
 
 def calculate_heat_source(
     atom_size: float,
+    delta_z_r: float,
     R_local: np.ndarray,
     factor_generar_calor: float,
     CF_ranges: list,
@@ -111,21 +112,28 @@ def calculate_heat_source(
     corresponde por SU propia corriente `I_fils[f]`, no por la corriente total del
     dispositivo. Para una columna 'j' del filamento 'f':
 
-        R_col   = 1 / sum_i (1 / R_local[i, j])   <- celdas de la columna en paralelo
-        delta_V = I_f * R_col                     <- caída de tensión en la columna
-        Q[i, j] = delta_V^2 / (R_local[i, j] * h^3)
+        R_col   = 1 / sum_i (1 / R_local[i, j])              <- celdas de la columna en paralelo
+        delta_V = I_f * R_col                                <- caída de tensión en la columna
+        Q[i, j] = delta_V^2 / (R_local[i, j] * atom_size**2 * delta_z_r)
 
     La última expresión es la potencia disipada por la celda (delta_V^2 / R) dividida
-    por su volumen (h^3), es decir densidad de potencia. Todas las celdas de una columna
-    comparten `delta_V` (están en paralelo) pero pueden tener resistencias distintas, de
-    modo que cada una disipa según la suya.
+    por su volumen (atom_size**2 * delta_z_r), es decir densidad de potencia. Ese volumen
+    es el de la MISMA celda Delta_x_R x Delta_y_R x Delta_z_R que usa
+    `CurrentSolver.mapa_resistencias` para R_local (Delta_x_R = Delta_y_R = atom_size,
+    Delta_z_R = delta_z_r): esta función es parte de la rama eléctrica, no de la térmica,
+    y `delta_z_r` es independiente del espesor que asuma `solve_thermal_state` (que no lo
+    usa ni lo necesita: el balance del FVM es invariante frente a su propio espesor).
+    Todas las celdas de una columna comparten `delta_V` (están en paralelo) pero pueden
+    tener resistencias distintas, de modo que cada una disipa según la suya.
 
     La resistencia por columna se recalcula aquí con `CurrentSolver.resistencias_por_columna`,
     la misma función que usa la rama eléctrica para obtener `I_fils`. Ambas ramas comparten
     modelo de resistencia, por lo que no pueden desincronizarse.
 
     Args:
-        atom_size (float): Tamaño de celda 'h' [m].
+        atom_size (float): Tamaño de celda 'h' [m] (Delta_x_R = Delta_y_R).
+        delta_z_r (float): Espesor Delta_z_R de la celda [m], el mismo que usa
+            `CurrentSolver.mapa_resistencias` para calcular `R_local`.
         R_local (np.ndarray): Mapa de resistencias por celda (Ny, Nx_interior) [Ohm],
             con `inf` fuera del filamento (ver `CurrentSolver.mapa_resistencias`).
         factor_generar_calor (float): Factor de calibración del calor generado.
@@ -167,11 +175,12 @@ def calculate_heat_source(
             # Caída de tensión en esta columna del filamento f
             delta_V_local = I_f * R_col
 
-            # Q = delta_V^2 / (R_celda * h^3). Las celdas de óxido llevan R = inf,
-            # así que reciben Q = 0 automáticamente: no hace falta enmascarar.
-            # se emplea h^3 porque se asume en la aprte térmica una lámina de altura atom_size para que todo cuadre con el solve_thermal_state
-            # t el solber de temperatura está calibrado para distancia z = 1.
-            Q_columna = (delta_V_local**2) / (bloque_R[:, jj] * atom_size**3)
+            # Q = delta_V^2 / (R_celda * atom_size**2 * delta_z_r). Las celdas de óxido
+            # llevan R = inf, así que reciben Q = 0 automáticamente: no hace falta
+            # enmascarar. El volumen atom_size**2 * delta_z_r es el de la celda de la
+            # RAMA ELÉCTRICA (misma Delta_z_R que mapa_resistencias); no tiene relación
+            # con el espesor que asuma solve_thermal_state, que es independiente.
+            Q_columna = (delta_V_local**2) / (bloque_R[:, jj] * atom_size**2 * delta_z_r)
 
             # +1 en columnas para saltar el electrodo izquierdo del marco extendido
             # Q_map_global[fila_min : fila_max + 1, jj + 1] = Q_columna
