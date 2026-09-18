@@ -295,7 +295,7 @@ def PP_set(
                 sigma_0=sim_ctes.sigma_0,
                 alpha_T=sim_ctes.alpha_T,
                 T_0=params.init_temp,
-                atom_size=params.atom_size,
+                delta_z_r=sim_ctes.delta_z_r,
             )
 
             # Si ha percolado uso la corriente de Ohm
@@ -323,6 +323,7 @@ def PP_set(
                 # Cada filamento disipa según SU propia corriente I_fils[f]
                 Q_source_map = Temperature.calculate_heat_source(
                     atom_size=params.atom_size,
+                    delta_z_r=sim_ctes.delta_z_r,
                     R_local=R_local,
                     factor_generar_calor=sim_ctes.factor_generar_calor,
                     CF_ranges=CF_ranges,
@@ -802,7 +803,7 @@ def SP_set(
                 sigma_0=sim_ctes.sigma_0,
                 alpha_T=sim_ctes.alpha_T,
                 T_0=params.init_temp,
-                atom_size=params.atom_size,
+                delta_z_r=sim_ctes.delta_z_r,
             )
 
             # Si ha percolado uso la corriente de Ohm
@@ -822,6 +823,7 @@ def SP_set(
             # Cada filamento disipa según SU propia corriente I_fils[f]
             Q_source_map = Temperature.calculate_heat_source(
                 atom_size=params.atom_size,
+                delta_z_r=sim_ctes.delta_z_r,
                 R_local=R_local,
                 factor_generar_calor=sim_ctes.factor_generar_calor,
                 CF_ranges=CF_ranges,

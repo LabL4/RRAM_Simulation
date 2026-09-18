@@ -20,9 +20,13 @@ class SimulationConstants:
     # Conductividad eléctrica del filamento dependiente de la temperatura:
     #     sigma(T) = sigma_0 / (1 + alpha_T * (T - T_0))
     # con T_0 = params.init_temp. Equivale a R(T) = R_ref * (1 + alpha_T * (T - T_0)),
-    # donde R_ref = 1 / (sigma_0 * atom_size) es la resistencia de celda a T_0.
+    # donde R_ref = 1 / (sigma_0 * delta_z_r) es la resistencia de celda a T_0.
     sigma_0: float  # Conductividad de referencia a T_0 [S/m]
     alpha_T: float  # Coeficiente térmico de resistencia (TCR) [1/K]
+    # Espesor fuera de plano (Delta z) de la rama eléctrica/resistencia: R = rho/delta_z_r
+    # y el volumen de celda que usa calculate_heat_source es atom_size**2 * delta_z_r.
+    # Independiente del espesor que asuma el solver termico (Delta z_T), que no lo usa.
+    delta_z_r: float  # Espesor Delta z de la resistencia [m]
     num_filamentos: int
     grosor_filamento: int
     gamma: float
