@@ -22,6 +22,7 @@ from .filament_tracking import (
 )
 from .parameters import SimulationParameters
 from .state_updates import update_state_generation
+from .voltage_controller import Medidas, VoltageController
 import logging
 
 logger = logging.getLogger(__name__)
@@ -120,8 +121,19 @@ def PP_set(
     temperatura = params.init_temp
     current = 0.0
     E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
-    vector_ddp = np.arange(0.000, params.voltaje_final_reset + params.paso_potencial_set, params.paso_potencial_set)
+
+    # Controlador de la forma de onda: sustituye al antiguo vector_ddp rígido.
+    # Sin waveform_pp_set en el CSV es una rampa legacy idéntica a np.arange.
+    controller = VoltageController(
+        segmentos=getattr(sim_ctes, "waveform_pp_set", None),
+        paso_potencial=params.paso_potencial_set,
+        v_inicial=0.0,
+        sentido=+1,
+    )
+    voltage_anterior = 0.0
     logger.info(f"El paso de potencial para la parte de set es: {params.paso_potencial_set} ")
+    if not controller.legacy:
+        logger.info(f"Forma de onda de PP_set: {controller.segmentos}")
 
     centros_calculados = CF_centros
 
@@ -180,15 +192,26 @@ def PP_set(
 
         if total_vacantes > int(params.num_max_vacantes):
             # Si se llena el 90 del espacio de la matriz salto a otra simulación. Ponerlo aqui puede dar el problema de que nada mas empezar esté lleno y de error, pero eso NO debe pasar asi q no me preocupa.
-            raise exceptions.MaxVacantesException(k=k - 1, voltage=vector_ddp[k - 1])
+            raise exceptions.MaxVacantesException(k=k - 1, voltage=voltage_anterior)
         else:
             # Verifica si el sistema ha percolado
             if (k == params.num_pasos - 1) and (not sistema_percola):
                 raise exceptions.NoPercolationException()
 
-        # Actualizo el tiempo de simulación y el voltaje
+        # Actualizo el tiempo de simulación y el voltaje. El controlador decide
+        # con las medidas del paso ANTERIOR (mismo convenio que la temperatura).
         simulation_time = params.paso_temporal * k
-        voltage = vector_ddp[k]
+        voltage = controller.next(
+            Medidas(
+                I_total=float(current),
+                V_anterior=voltage_anterior,
+                n_vacantes=int(total_vacantes),
+                n_filamentos=int(np.sum(CF_creado)),
+                percola=sistema_percola,
+                k=k,
+            )
+        )
+        voltage_anterior = voltage
 
         # Genero el vector campo eléctrico
         for i in range(0, actual_state.shape[0]):
@@ -200,12 +223,20 @@ def PP_set(
                 grid_size=params.atom_size,
             )
 
-        # Verifica si el sistema ha percolado
-        if voltage >= params.voltaje_final_set:
+        # Fin de fase: en rampa, al alcanzar el voltaje final (comportamiento
+        # histórico); en cualquier modo, si la forma de onda se ha agotado
+        # (p.ej. segmento 'constante' con 'pasos' consumidos) o se agota el
+        # presupuesto de pasos de la fase (k == num_pasos, donde la rampa
+        # legacy cruza exactamente voltaje_final_set: mismo k de salida).
+        if (
+            (controller.en_rampa() and voltage >= params.voltaje_final_set)
+            or controller.terminado
+            or k == params.num_pasos
+        ):
             if not sistema_percola:
                 raise exceptions.NoPercolationException()
 
-            voltaje_max_set = vector_ddp[k]
+            voltaje_max_set = voltage
             tiempo_pp_set = params.paso_temporal * (
                 k - 1
             )  # Le quitamos un paso porque se ha superado el voltaje de ruptura
@@ -606,6 +637,9 @@ def PP_set(
         "CF_centros": CF_centros,
         "creaciones_dict": creaciones_dict,
         "T_max_fils": T_max_fils,
+        # Estado final de la forma de onda (segmento, transiciones disparadas):
+        # JSON-serializable, viaja a phase_state_*.json y a la metadata.
+        "waveform_estado": controller.estado(),
     }
 
     return final_state_pp_set

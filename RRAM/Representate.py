@@ -1353,3 +1353,70 @@ def plot_perfil_temperatura(
     plt.close(fig)
 
     return None
+
+
+def plot_Vt_It(
+    t: np.ndarray,
+    v: np.ndarray,
+    i: np.ndarray,
+    filename: str,
+    transiciones: list | None = None,
+    titulo: str = "",
+    usar_latex: bool = False,
+):
+    """
+    Dibuja V(t) e |I|(t) en dos paneles apilados con eje temporal común, para
+    validar formas de onda no lineales (p.ej. rampa + tramo constante por
+    compliance de corriente).
+
+    Args:
+        t: Vector de tiempos [s] (columna 0 de datos_sim).
+        v: Vector de voltajes aplicados [V] (columna 1 de datos_sim).
+        i: Vector de corrientes [A] (columna 2 de datos_sim).
+        filename: Ruta completa del archivo de salida (con extensión).
+        transiciones: Lista de dicts del waveform_estado de la metadata
+            ({"k": paso, "V": voltaje, "condicion": nombre}); cada una se marca
+            con una línea vertical discontinua en su tiempo t[k].
+        titulo: Título global de la figura.
+        usar_latex: Renderizado LaTeX de los textos (False por defecto: esta es
+            una figura de diagnóstico, no de paper).
+    """
+    setup_paper_plt(plt, latex=usar_latex, scaling=1.5)
+
+    fig, (ax_v, ax_i) = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
+    config_ax(ax_v)
+    config_ax(ax_i)
+
+    ax_v.plot(t, v, color="tab:blue", linewidth=2)
+    ax_v.set_ylabel("Voltage (V)")
+    if titulo:
+        ax_v.set_title(titulo, pad=15)
+
+    ax_i.plot(t, np.abs(i), color="tab:red", linewidth=2)
+    ax_i.set_yscale("log")
+    ax_i.set_ylabel("|Current| (A)")
+    ax_i.set_xlabel("Time (s)")
+
+    # Marcar las transiciones de la forma de onda (si las hay)
+    for trans in transiciones or []:
+        k = int(trans.get("k", -1))
+        if not (0 <= k < len(t)):
+            continue
+        etiqueta = f"{trans.get('condicion', '?')} (V={trans.get('V', float('nan')):.3f})"
+        for ax in (ax_v, ax_i):
+            ax.axvline(t[k], color="gray", linestyle="--", linewidth=1.5)
+        ax_v.annotate(
+            etiqueta,
+            xy=(t[k], v[k] if k < len(v) else 0),
+            xytext=(5, 5),
+            textcoords="offset points",
+            fontsize=9,
+            color="gray",
+        )
+
+    plt.tight_layout()
+    os.makedirs(os.path.dirname(str(filename)) or ".", exist_ok=True)
+    fig.savefig(str(filename), dpi=300, bbox_inches="tight")
+    plt.close(fig)
+
+    return None

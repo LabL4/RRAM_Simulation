@@ -118,7 +118,43 @@ def _plot_results_impl(
         marcado=marcado,
         intensidad_minima=intensidad_minima,
     )
+
+    # Con forma de onda no legacy en PP_set, genera además la figura V-t / I-t
+    # con las transiciones marcadas (solo en el plot sin marcar, para no
+    # duplicarla cuando `all` lanza plot + plot_marcado).
+    if not marcado:
+        _plot_waveform_pp_set(meta, simulation_path, figures_dir, num_simulation)
+
     return True
+
+
+def _plot_waveform_pp_set(meta, simulation_path: Path, figures_dir: Path, num_simulation: int) -> None:
+    """Dibuja V-t/I-t de pp_set si la metadata registra una forma de onda no legacy."""
+    estado = (meta.extra or {}).get("waveform_estado_pp_set")
+    if not estado or estado.get("legacy", False):
+        return
+
+    data_file = simulation_path / f"Data_pp_set_{num_simulation}.npz"
+    if not data_file.is_file():
+        logger.warning(f"waveform_estado presente pero falta {data_file.name}; se omite V-t/I-t.")
+        return
+
+    d = np.load(data_file)
+    datos = d["datos_sim"]
+    d.close()
+
+    from .Representate import plot_Vt_It
+
+    out = figures_dir / f"V-t_I-t_pp_set_{num_simulation}.png"
+    plot_Vt_It(
+        t=datos[:, 0],
+        v=datos[:, 1],
+        i=datos[:, 2],
+        filename=str(out),
+        transiciones=estado.get("transiciones", []),
+        titulo=f"PP set waveform - sim {num_simulation}",
+    )
+    logger.info(f"Figura V-t/I-t de pp_set guardada en {out}")
 
 
 def plot_results(

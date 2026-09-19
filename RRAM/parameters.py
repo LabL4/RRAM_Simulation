@@ -12,7 +12,14 @@ class SimulationParameters:
     device_size_y: float
     atom_size: float
     num_trampas: int
-    total_simulation_time: float
+    # Paso temporal [s]. Es ENTRADA del CSV, no un valor derivado: `dt` aparece
+    # dentro de la física (probabilidad de generación en Generation.py, de
+    # recombinación y desplazamiento de iones en Recombination.py), así que si se
+    # derivase de `num_pasos` cualquier cambio del número de pasos movería `dt` en
+    # silencio y perturbaría la calibración del modelo. Fijándolo aquí, `num_pasos`
+    # solo gobierna el paso de potencial y el presupuesto de pasos de cada fase.
+    # CUIDADO: cambiar su valor SÍ invalida la calibración (ver MANUAL_FORMAS_DE_ONDA.md).
+    paso_temporal: float
     num_pasos: int
     voltaje_final_reset: float
     voltaje_final_set: float
@@ -28,7 +35,11 @@ class SimulationParameters:
     x_size: int = field(init=False)
     y_size: int = field(init=False)
     num_max_vacantes: int = field(init=False)
-    paso_temporal: float = field(init=False)
+    # Duración NOMINAL de una fase [s] = num_pasos * paso_temporal. Es un valor
+    # derivado e informativo: la duración REAL de una fase es
+    # (pasos ejecutados) * paso_temporal, que con formas de onda puede ser menor
+    # (la fase termina antes) o mayor (mesetas que extienden el presupuesto).
+    total_simulation_time: float = field(init=False)
     paso_potencial_set: float = field(init=False)
     paso_potencial_reset: float = field(init=False)
 
@@ -36,7 +47,7 @@ class SimulationParameters:
         self.x_size = int(np.ceil(self.device_size_x / self.atom_size))  # Número de "casillas" en la dimensión x
         self.y_size = int(np.ceil(self.device_size_y / self.atom_size))  # Número de "casillas" en la dimensión y
         self.num_max_vacantes = int(0.95 * (self.x_size * self.y_size))  # 95% de la matriz puede llenarse de vacantes
-        self.paso_temporal = self.total_simulation_time / self.num_pasos  # Paso temporal en segundos
+        self.total_simulation_time = self.num_pasos * self.paso_temporal  # Duración nominal en segundos
         self.paso_potencial_set = self.voltaje_final_set / self.num_pasos  # Paso de voltaje para la parte de set
         self.paso_potencial_reset = self.voltaje_final_reset / self.num_pasos  # Paso de voltaje para la parte de reset
 
@@ -62,6 +73,10 @@ class SimulationParameters:
                 kwargs["seed"] = int(raw) if raw not in (None, "") else None
                 continue
             if k not in d:
-                raise KeyError(f"La clave '{k}' no existe en el diccionario")
+                raise KeyError(
+                    f"Falta la columna '{k}' en simulation_parameters.csv. "
+                    f"Si es un CSV generado antes de que '{k}' fuese obligatorio, "
+                    f"regenéralo desde el notebook con ConfigManager.export_to_init_data()."
+                )
             kwargs[k] = field_types[k](d[k])
         return SimulationParameters(**kwargs)

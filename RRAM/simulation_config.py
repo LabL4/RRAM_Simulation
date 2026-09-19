@@ -75,7 +75,10 @@ SIMULATION_DEFAULTS = {
     "device_size_y": 35e-9,
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
     "num_trampas": 150,
-    "total_simulation_time": 10.0,
+    # Paso temporal [s]. ENTRADA obligatoria (antes se derivaba de
+    # total_simulation_time / num_pasos, que con este valor daba 10.0/10000 = 1e-3).
+    # Cambiarlo altera la física calibrada: ver MANUAL_FORMAS_DE_ONDA.md.
+    "paso_temporal": 1e-3,
     "num_pasos": 10000,
     "voltaje_final": 1.1,
     "voltaje_final_set": 1.1,
@@ -95,7 +98,9 @@ SET_RESET_DEFAULTS = {
     "factor_vecinos_sp_set": 1.0,
     "factor_libre_sp_set": 0.9,
     "lim_voltage_percolacion": 1.4,
-    "compliance_voltage": 0.6,
+    # Forma de onda de PP_set (ver RRAM.voltage_controller). None = rampa legacy.
+    # Ejemplo compliance: "[('rampa', {'hasta_I': 1e-4}), ('constante', {})]"
+    "waveform_pp_set": None,
     "voltaje_gen_oxigeno_pp_1": 1.1,
     "num_oxigenos_pp_reset_1": 7,  # 2
     "voltaje_gen_oxigeno_pp_2": 1.15,
@@ -197,7 +202,7 @@ class ConfigManager:
             "device_size_y",
             "atom_size",
             "num_trampas",
-            "total_simulation_time",
+            "paso_temporal",
             "num_pasos",
             "voltaje_final",
             "voltaje_final_set",
@@ -243,7 +248,7 @@ class ConfigManager:
             "factor_vecinos_sp_set",
             "factor_libre_sp_set",
             "lim_voltage_percolacion",
-            "compliance_voltage",
+            "waveform_pp_set",
             "voltaje_gen_oxigeno_pp_1",
             "num_oxigenos_pp_reset_1",
             "voltaje_gen_oxigeno_pp_2",

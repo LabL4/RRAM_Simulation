@@ -144,6 +144,18 @@ def _save_partial_metadata(
             "seed": cfg.params.seed,
             # Pico de temperatura de cada filamento, por fase.
             "temperaturas_max": _temperaturas_max_por_fase(states),
+            # Forma de onda de PP_set: config y transiciones disparadas. Cambia
+            # la física de la corrida, así que se persiste como muro_termico/seed.
+            **(
+                {"waveform_pp_set": cfg.sim_ctes.waveform_pp_set}
+                if getattr(cfg.sim_ctes, "waveform_pp_set", None) is not None
+                else {}
+            ),
+            **(
+                {"waveform_estado_pp_set": pp_set.get("waveform_estado")}
+                if pp_set.get("waveform_estado") is not None
+                else {}
+            ),
             **({"error": error} if error else {}),
             **({"vecindad_inicial": vecindad_inicial} if vecindad_inicial is not None else {}),
         },

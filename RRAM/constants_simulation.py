@@ -49,7 +49,6 @@ class SimulationConstants:
     factor_vecinos_sp_set: float
     factor_libre_sp_set: float
     lim_voltage_percolacion: float
-    compliance_voltage: float
     voltaje_gen_oxigeno_pp_1: float
     num_oxigenos_pp_reset_1: int
     voltaje_gen_oxigeno_pp_2: float
@@ -57,6 +56,10 @@ class SimulationConstants:
     voltaje_gen_oxigeno_sp: float
     num_oxigenos_sp_reset: int
     centros_filamento: Optional[List[int]] = None  # ← nuevo
+    # Forma de onda de voltaje de PP_set: lista de segmentos (modo, opciones)
+    # que interpreta RRAM.voltage_controller. None = rampa legacy (comportamiento
+    # histórico exacto). Viaja por el CSV como string "[('rampa', {...}), ...]".
+    waveform_pp_set: Optional[list] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SimulationConstants":
@@ -78,13 +81,21 @@ class SimulationConstants:
 
         for key, value in data.items():
             if key not in type_hints:
-                parsed_data[key] = value
+                # Clave desconocida (p.ej. columna de un CSV antiguo, como la
+                # extinta compliance_voltage): se ignora en vez de reventar el
+                # constructor del dataclass con un TypeError.
                 continue
 
             expected_type = type_hints[key]
 
             if isinstance(value, str):
                 value_stripped = value.strip()
+
+                # Celda vacía o "None" del CSV → None (campos opcionales como
+                # waveform_pp_set o centros_filamento sin valor).
+                if value_stripped in ("", "None", "none", "nan"):
+                    parsed_data[key] = None
+                    continue
 
                 # Detectar si el string representa una lista
                 if value_stripped.startswith("[") and value_stripped.endswith("]"):
