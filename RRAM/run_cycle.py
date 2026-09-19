@@ -146,16 +146,16 @@ def _save_partial_metadata(
             "temperaturas_max": _temperaturas_max_por_fase(states),
             # Forma de onda de PP_set: config y transiciones disparadas. Cambia
             # la física de la corrida, así que se persiste como muro_termico/seed.
-            **(
-                {"waveform_pp_set": cfg.sim_ctes.waveform_pp_set}
-                if getattr(cfg.sim_ctes, "waveform_pp_set", None) is not None
-                else {}
-            ),
-            **(
-                {"waveform_estado_pp_set": pp_set.get("waveform_estado")}
-                if pp_set.get("waveform_estado") is not None
-                else {}
-            ),
+            **{
+                f"waveform_{fase}": getattr(cfg.sim_ctes, f"waveform_{fase}")
+                for fase in PHASE_ORDER
+                if getattr(cfg.sim_ctes, f"waveform_{fase}", None) is not None
+            },
+            **{
+                f"waveform_estado_{fase}": (getattr(states, fase) or {}).get("waveform_estado")
+                for fase in PHASE_ORDER
+                if (getattr(states, fase) or {}).get("waveform_estado") is not None
+            },
             **({"error": error} if error else {}),
             **({"vecindad_inicial": vecindad_inicial} if vecindad_inicial is not None else {}),
         },

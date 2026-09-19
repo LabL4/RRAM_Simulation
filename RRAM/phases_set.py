@@ -1081,6 +1081,7 @@ def SP_set(
         "centros_calculados": CF_centros,
         "tiempo_sp_set": tiempo_sp_set,
         "T_max_fils": T_max_fils,
+        "waveform_estado": controller.estado(),
     }
 
     np.savez(rutas["simulation_path"] / f"Final_state_sp_set_{num_simulation}.npz", actual_state)

@@ -178,7 +178,13 @@ class VoltageController:
         """
         if self.v_objetivo is None:
             return False
-        return self.sentido * (V - self.v_objetivo) >= 0
+        # Tolerancia para absorber el error de coma flotante acumulado por la rampa:
+        # tras cientos de pasos, un objetivo de 0 V se alcanza como -1e-17 y una
+        # comparación estricta daría False, haciendo que la rampa se pasase un paso
+        # del objetivo. La tolerancia es millonésimas de paso, así que nunca puede
+        # adelantar una decisión real.
+        tol = abs(self.paso_potencial) * 1e-6
+        return self.sentido * (V - self.v_objetivo) >= -tol
 
     def presupuesto(self) -> int:
         """

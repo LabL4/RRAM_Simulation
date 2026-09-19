@@ -14,6 +14,7 @@ from . import (
 )
 from .filament_tracking import procesar_filamentos_destruidos
 from .state_updates import update_state_recombinate
+from .voltage_controller import Medidas, VoltageController
 import logging
 
 logger = logging.getLogger(__name__)
@@ -83,7 +84,8 @@ def PP_reset(
     cols += [f"T_{i}[K]" for i in range(1, N + 1)]
     header_pp_reset = ",".join(cols)
 
-    data_pp_reset = np.zeros((params.num_pasos + 1, num_columnas), dtype=np.float64)
+    # (data_pp_reset se reserva más abajo, cuando el controlador ya ha calculado
+    #  el presupuesto de pasos de la fase.)
 
     # Máximo histórico de temperatura de cada filamento en esta fase (solo pasos FVM).
     T_max_fils: List[float | None] = [None] * N
@@ -112,16 +114,37 @@ def PP_reset(
     voltage_CF_destruido = np.full(len(CF_ranges), 0.0)
 
     E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
-    vector_ddp = np.arange(
-        -0,
-        -(params.voltaje_final_reset + params.paso_potencial_reset),
-        -params.paso_potencial_reset,
+
+    # Controlador de la bajada del RESET: arranca un paso por debajo de 0 V (SP_set
+    # ya dejó su fila en 0 V; repetirla duplicaría el paso por cero del ciclo) y baja
+    # hasta -voltaje_final_reset. El presupuesto sale de su propia excursión más las
+    # mesetas que declare su forma de onda.
+    v_inicial_ppr = -params.paso_potencial_reset
+    controller = VoltageController(
+        segmentos=getattr(sim_ctes, "waveform_pp_reset", None),
+        paso_potencial=params.paso_potencial_reset,
+        v_inicial=v_inicial_ppr,
+        sentido=-1,
+        v_objetivo=-params.voltaje_final_reset,
     )
+    presupuesto = controller.presupuesto()
+    voltage_anterior = v_inicial_ppr
+    n_filas = 0
     logger.info(f"El paso de potencial para la parte de set es: {params.paso_potencial_reset} ")
+    logger.info(f"Presupuesto de pasos de PP_reset: {presupuesto}")
+    if not controller.legacy:
+        logger.info(f"Forma de onda de PP_reset: {controller.segmentos}")
+
+    # El presupuesto es una COTA SUPERIOR: se reservan presupuesto+1 filas y al final
+    # se recortan las no usadas si la forma de onda terminó antes.
+    data_pp_reset = np.zeros((presupuesto + 1, num_columnas), dtype=np.float64)
 
     CF_destruido_index = 1
     roturas_dict = {}
     current = 0.0  # inicialización para T_joule en k=0
+    # El dispositivo llega del SET en LRS, así que percola al entrar. Se arrastra de
+    # un paso al siguiente para no repetir el A* de is_path solo para el controlador.
+    percola = True
 
     # Al romperse el PRIMER filamento (el que sea) se reduce recombination_energy
     # para cambiar la dinámica de disolución. Factor ajustado manualmente.
@@ -131,9 +154,23 @@ def PP_reset(
     logger.info(f"Simulacion {num_simulation} - primera parte del reset")
 
     # Ciclo para la primera parte del reset
-    for k in range(0, params.num_pasos + 1):
+    for k in range(0, presupuesto + 1):
         simulation_time = params.paso_temporal * k
-        voltage = vector_ddp[k]
+        voltage = controller.next(
+            Medidas(
+                I_total=float(current),
+                V_anterior=voltage_anterior,
+                n_vacantes=int(np.sum(actual_state)),
+                n_filamentos=int(np.sum(~CF_destruido)),
+                percola=percola,  # del paso anterior: is_path es A* y ya se evalúa más abajo
+                k=k,
+            )
+        )
+        voltage_anterior = voltage
+
+        # VÍA 2 — forma de onda agotada: se corta antes de la física.
+        if controller.terminado:
+            break
 
         # Obtengo los valores del campo eléctrico
         E_field = abs(ElectricField.SimpleElectricField(voltage, params.device_size_x))
@@ -313,6 +350,7 @@ def PP_reset(
         tiempo_total = simulation_time + tiempo_sp_set
         fila = [tiempo_total, voltage, current, R_total] + I_fils + R_fils + T_fils
         data_pp_reset[k] = fila
+        n_filas = k + 1
 
         # Represento el estado cada X pasos
         if k % num_pasos_guardar_estado == 0:
@@ -336,6 +374,21 @@ def PP_reset(
                 temperatura=locals().get("temperatura"),
                 mapa_resistencias=locals().get("R_local"),
             )
+
+        # VÍA 1 — la rampa ha llegado al voltaje objetivo. Se comprueba DESPUÉS de
+        # guardar para que el punto de -voltaje_final_reset entre en los datos.
+        if controller.objetivo_alcanzado(voltage):
+            break
+
+    # Recorto a las filas realmente escritas y calculo el traspaso a SP_reset.
+    data_pp_reset = data_pp_reset[:n_filas]
+    # Traspaso a SP_reset: instante ABSOLUTO que le tocaría a la fila siguiente.
+    # Incluye tiempo_sp_set, que es el origen del eje de esta fase.
+    tiempo_pp_reset = tiempo_sp_set + params.paso_temporal * n_filas
+    logger.info(
+        f"PP_reset termina: {n_filas} filas, V final {data_pp_reset[-1, 1]:.5f} V, "
+        f"t traspaso {tiempo_pp_reset:.5f} s"
+    )
 
     # Guardo el estado final si el último k no cayó en múltiplo de num_pasos_guardar_estado
     if k % num_pasos_guardar_estado != 0:
@@ -379,12 +432,13 @@ def PP_reset(
         "sim_ctes": sim_ctes,
         "params": params,
         "Temperatura_final": temperatura,
-        "voltaje_max_reset": voltage,
-        "tiempo_pp_reset": simulation_time,
+        "voltaje_max_reset": float(data_pp_reset[-1, 1]),
+        "tiempo_pp_reset": tiempo_pp_reset,
         "CF_destruido": CF_destruido,
         "voltage_CF_destruido": voltage_CF_destruido,
         "CF_destruido_index": CF_destruido_index,
         "roturas_dict": roturas_dict,
+        "waveform_estado": controller.estado(),
         "temperatura_final": temperatura,
         "centros_calculados": CF_centros,
         "T_max_fils": T_max_fils,
@@ -446,8 +500,8 @@ def SP_reset(
     cols += [f"T_{i}[K]" for i in range(1, N + 1)]
     header_sp_reset = ",".join(cols)
 
-    data_sp_reset = np.zeros((params.num_pasos, num_columnas), dtype=np.float64)
-    resistencia_vector = np.zeros((params.num_pasos, 3), dtype=np.float64)
+    # (data_sp_reset y resistencia_vector se reservan más abajo, cuando el
+    #  controlador ya ha calculado el presupuesto de pasos de la fase.)
 
     # Máximo histórico de temperatura de cada filamento en esta fase (solo pasos FVM).
     T_max_fils: List[float | None] = [None] * N
@@ -467,19 +521,52 @@ def SP_reset(
     logger.info(f"Los filamentos destruidos al inicio del SP reset son:  {CF_destruido}")
 
     E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
-    vector_ddp = np.arange(
-        -params.voltaje_final_reset,
-        0,
-        params.paso_potencial_reset,
+
+    # Controlador de la vuelta a 0 V: arranca un paso por encima del voltaje final de
+    # PP_reset (esa fila ya existe allí) y sube hasta 0 V.
+    v_inicial_spr = -params.voltaje_final_reset + params.paso_potencial_reset
+    controller = VoltageController(
+        segmentos=getattr(sim_ctes, "waveform_sp_reset", None),
+        paso_potencial=params.paso_potencial_reset,
+        v_inicial=v_inicial_spr,
+        sentido=+1,
+        v_objetivo=0.0,
     )
+    presupuesto = controller.presupuesto()
+    voltage_anterior = v_inicial_spr
+    n_filas = 0
+    # Igual que en PP_reset: el controlador lee la corriente del paso anterior y en
+    # k=0 todavía no hay ninguna. No afecta a ninguna condición porque `next()` no
+    # evalúa transiciones en el primer paso.
+    current = 0.0
     logger.info(f"El paso de potencial para la parte de set es: {params.paso_potencial_reset} ")
+    logger.info(f"Presupuesto de pasos de SP_reset: {presupuesto}")
+    if not controller.legacy:
+        logger.info(f"Forma de onda de SP_reset: {controller.segmentos}")
+
+    data_sp_reset = np.zeros((presupuesto + 1, num_columnas), dtype=np.float64)
+    resistencia_vector = np.zeros((presupuesto + 1, 3), dtype=np.float64)
 
     logger.info(f"\nSimulacion {num_simulation} - segunda parte del reset")
 
     # Ciclo para la primera parte del reset
-    for k in range(0, params.num_pasos):
+    for k in range(0, presupuesto + 1):
         simulation_time = params.paso_temporal * k
-        voltage = vector_ddp[k]
+        voltage = controller.next(
+            Medidas(
+                I_total=float(current),
+                V_anterior=voltage_anterior,
+                n_vacantes=int(np.sum(actual_state)),
+                n_filamentos=int(np.sum(~CF_destruido)),
+                percola=percola,
+                k=k,
+            )
+        )
+        voltage_anterior = voltage
+
+        # VÍA 2 — forma de onda agotada: se corta antes de la física.
+        if controller.terminado:
+            break
 
         # Obtengo los valores del campo eléctrico y la temperatura
         E_field = abs(ElectricField.SimpleElectricField(voltage, params.device_size_x))
@@ -641,6 +728,7 @@ def SP_reset(
         tiempo_total = simulation_time + tiempo_pp_reset
         fila = [tiempo_total, voltage, current, R_total] + I_fils + R_fils + T_fils
         data_sp_reset[k] = fila
+        n_filas = k + 1
 
         if locals().get("resistencia") is not None:
             resistencia_vector[k] = np.array([k, voltage, resistencia])
@@ -666,6 +754,16 @@ def SP_reset(
                 temperatura=locals().get("temperatura"),
                 mapa_resistencias=locals().get("R_local"),
             )
+
+        # VÍA 1 — la rampa ha vuelto a 0 V. Se comprueba DESPUÉS de guardar para que
+        # el punto de 0 V entre en los datos.
+        if controller.objetivo_alcanzado(voltage):
+            break
+
+    # Recorto a las filas realmente escritas.
+    data_sp_reset = data_sp_reset[:n_filas]
+    resistencia_vector = resistencia_vector[:n_filas]
+    logger.info(f"SP_reset termina: {n_filas} filas, V final {data_sp_reset[-1, 1]:.5f} V")
 
     # Guardo el estado final si el último k no cayó en múltiplo de num_pasos_guardar_estado
     if k % num_pasos_guardar_estado != 0:
@@ -709,6 +807,7 @@ def SP_reset(
         "CF_destruido": CF_destruido,
         "roturas_dict": roturas_dict,
         "T_max_fils": T_max_fils,
+        "waveform_estado": controller.estado(),
     }
 
     logger.info(f"Temperatura máxima por filamento en sp_reset: {T_max_fils} K")
