@@ -60,6 +60,9 @@ class SimulationConstants:
     # que interpreta RRAM.voltage_controller. None = rampa legacy (comportamiento
     # histórico exacto). Viaja por el CSV como string "[('rampa', {...}), ...]".
     waveform_pp_set: Optional[list] = None
+    waveform_sp_set: Optional[list] = None
+    waveform_pp_reset: Optional[list] = None
+    waveform_sp_reset: Optional[list] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SimulationConstants":

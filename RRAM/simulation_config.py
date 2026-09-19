@@ -101,6 +101,9 @@ SET_RESET_DEFAULTS = {
     # Forma de onda de PP_set (ver RRAM.voltage_controller). None = rampa legacy.
     # Ejemplo compliance: "[('rampa', {'hasta_I': 1e-4}), ('constante', {})]"
     "waveform_pp_set": None,
+    "waveform_sp_set": None,
+    "waveform_pp_reset": None,
+    "waveform_sp_reset": None,
     "voltaje_gen_oxigeno_pp_1": 1.1,
     "num_oxigenos_pp_reset_1": 7,  # 2
     "voltaje_gen_oxigeno_pp_2": 1.15,
@@ -249,6 +252,9 @@ class ConfigManager:
             "factor_libre_sp_set",
             "lim_voltage_percolacion",
             "waveform_pp_set",
+            "waveform_sp_set",
+            "waveform_pp_reset",
+            "waveform_sp_reset",
             "voltaje_gen_oxigeno_pp_1",
             "num_oxigenos_pp_reset_1",
             "voltaje_gen_oxigeno_pp_2",

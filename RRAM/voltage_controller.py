@@ -39,6 +39,7 @@ ast.literal_eval por `SimulationConstants.from_dict`) → dataclass → fase.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from typing import Any, List, Optional, Tuple
 import logging
@@ -132,6 +133,7 @@ class VoltageController:
         paso_potencial: float = 0.0,
         v_inicial: float = 0.0,
         sentido: int = +1,
+        v_objetivo: Optional[float] = None,
     ):
         self.segmentos = parsear_segmentos(segmentos)
         if self.segmentos is None:
@@ -145,10 +147,17 @@ class VoltageController:
         self.paso_potencial = paso_potencial
         self.v_inicial = v_inicial
         self.sentido = sentido
+        self.v_objetivo = v_objetivo
 
         self._idx = 0  # segmento activo
         self._pasos_en_segmento = 0  # pasos ya consumidos en el segmento activo
         self._v_base_segmento = v_inicial  # V con el que arrancó el segmento activo
+        # Desplazamiento del primer paso de una rampa. El PRIMER segmento arranca en
+        # v_inicial (offset 0), pero una rampa que RELEVA a otro segmento debe avanzar
+        # ya en su primer paso (offset 1): si no, repetiría el voltaje que dejó el
+        # segmento anterior y una meseta de N pasos saldría de N+1 pasos planos,
+        # robándole un paso de potencial a la rampa.
+        self._offset_rampa = 0
         self._V = v_inicial  # último voltaje devuelto
         self.terminado = False
         self.transiciones: List[_Transicion] = []
@@ -158,6 +167,80 @@ class VoltageController:
     def en_rampa(self) -> bool:
         """True si el segmento activo es una rampa (o el modo legacy)."""
         return self.segmentos[self._idx][0] == "rampa"
+
+    def objetivo_alcanzado(self, V: float) -> bool:
+        """
+        True si la rampa ha llegado (o pasado) el voltaje objetivo de la fase.
+
+        La comparación se hace con el signo del sentido de avance, de modo que
+        sirve para las cuatro combinaciones sin casos especiales:
+        subida a +V_set, bajada a 0, bajada a -V_reset y subida a 0.
+        """
+        if self.v_objetivo is None:
+            return False
+        return self.sentido * (V - self.v_objetivo) >= 0
+
+    def presupuesto(self) -> int:
+        """
+        COTA SUPERIOR del número de pasos que puede durar la fase.
+
+        Los arrays de datos se reservan antes del bucle, así que hace falta saber
+        cuántas filas como máximo se van a producir. Se recorre la forma de onda
+        suponiendo que cada rampa llega tan lejos como podría:
+
+          - rampa sin destino fijo  -> los pasos necesarios para llegar a v_objetivo
+          - rampa con 'hasta_V'     -> los necesarios para llegar a ese umbral
+          - rampa con 'pasos'       -> esos pasos
+          - meseta con 'pasos'      -> esos pasos (el voltaje no avanza, salvo 'V' explícito)
+          - meseta sin 'pasos'      -> 0: no tiene duración propia, absorbe el sobrante
+                                       que dejen las rampas que cortaron antes de tiempo
+
+        Las condiciones estocásticas (hasta_I, hasta_percolacion, hasta_vacantes,
+        hasta_filamentos) solo pueden ACORTAR un tramo, nunca alargarlo, así que el
+        recorrido es siempre cota superior. Pasarse es inofensivo (las filas
+        sobrantes se recortan); quedarse corto dejaría la rampa sin llegar a su
+        voltaje final, por eso hay que recorrer los segmentos en vez de sumar en
+        plano: una meseta con 'V' explícito puede mover el voltaje HACIA ATRÁS y
+        obligar a una rampa posterior a recorrer dos veces el mismo tramo.
+        """
+        if self.v_objetivo is None:
+            raise ValueError("presupuesto() requiere v_objetivo en el constructor.")
+
+        V = float(self.v_inicial)
+        total = 0
+
+        for modo, opciones in self.segmentos:
+            if modo == "constante":
+                if "V" in opciones:
+                    V = float(opciones["V"])
+                total += int(opciones.get("pasos", 0))
+                continue
+
+            # rampa
+            if "pasos" in opciones:
+                n = int(opciones["pasos"])
+                V = V + n * self.paso_potencial * self.sentido
+            else:
+                destino = self._umbral_con_signo(opciones["hasta_V"]) if "hasta_V" in opciones else self.v_objetivo
+                n = int(math.ceil(abs(destino - V) / self.paso_potencial))
+                V = destino
+            total += n
+
+        return total
+
+    def _umbral_con_signo(self, valor: float) -> float:
+        """
+        Convierte un umbral de voltaje escrito como MAGNITUD en el CSV al valor
+        con signo que corresponde al rango de la fase.
+
+        El usuario escribe `hasta_V: 0.8` sin preocuparse del signo; en una fase de
+        RESET eso significa -0.8 V. El signo se toma del extremo no nulo del rango
+        (v_inicial o v_objetivo), no del sentido de avance: en SP_set el voltaje es
+        positivo aunque la rampa baje.
+        """
+        referencia = self.v_inicial if self.v_inicial != 0 else (self.v_objetivo or 0.0)
+        signo = -1.0 if referencia < 0 else 1.0
+        return abs(float(valor)) * signo
 
     def next(self, medidas: Medidas) -> float:
         """
@@ -187,6 +270,8 @@ class VoltageController:
                     self._pasos_en_segmento = 0
                     self._v_base_segmento = self._V
                     modo, opciones = self.segmentos[self._idx]
+                    # Una rampa que releva a otro segmento avanza ya en su primer paso.
+                    self._offset_rampa = 1
                     logger.info(
                         f"waveform: transición al segmento {self._idx} ({modo}) en k={medidas.k}, "
                         f"V={self._V:.5f} V, condición={self.transiciones[-1].condicion}"
@@ -204,7 +289,8 @@ class VoltageController:
         if modo == "rampa":
             # Misma aritmética que np.arange: base + n * paso (no acumulación),
             # para que el modo legacy sea bit a bit idéntico al vector_ddp.
-            self._V = self._v_base_segmento + self._pasos_en_segmento * self.paso_potencial * self.sentido
+            n = self._pasos_en_segmento + self._offset_rampa
+            self._V = self._v_base_segmento + n * self.paso_potencial * self.sentido
         else:  # constante
             self._V = float(opciones["V"]) if "V" in opciones else self._v_base_segmento
 
@@ -231,8 +317,14 @@ class VoltageController:
         """Devuelve el nombre de la primera condición cumplida, o None."""
         if "hasta_I" in opciones and abs(medidas.I_total) >= float(opciones["hasta_I"]):
             return "hasta_I"
-        if "hasta_V" in opciones and abs(medidas.V_anterior) >= abs(float(opciones["hasta_V"])):
-            return "hasta_V"
+        if "hasta_V" in opciones:
+            # Comparación con el sentido de avance: en una rampa que SUBE dispara al
+            # superar el umbral, y en una que BAJA al caer por debajo. Comparar
+            # magnitudes (abs >= abs) solo funcionaría en las rampas que se alejan de
+            # cero y dispararía desde el primer paso en SP_set / SP_reset.
+            umbral = self._umbral_con_signo(opciones["hasta_V"])
+            if self.sentido * (medidas.V_anterior - umbral) >= 0:
+                return "hasta_V"
         if "hasta_vacantes" in opciones and medidas.n_vacantes >= int(opciones["hasta_vacantes"]):
             return "hasta_vacantes"
         if "hasta_filamentos" in opciones and medidas.n_filamentos >= int(opciones["hasta_filamentos"]):

@@ -129,9 +129,15 @@ def PP_set(
         paso_potencial=params.paso_potencial_set,
         v_inicial=0.0,
         sentido=+1,
+        v_objetivo=params.voltaje_final_set,
     )
+    # Presupuesto de pasos de la fase: lo dicta la forma de onda, no `num_pasos`.
+    # Así una meseta de voltaje constante AÑADE duración en lugar de robarle pasos
+    # a las rampas (que es lo que impedía a la última rampa llegar a voltaje_final_set).
+    presupuesto = controller.presupuesto()
     voltage_anterior = 0.0
     logger.info(f"El paso de potencial para la parte de set es: {params.paso_potencial_set} ")
+    logger.info(f"Presupuesto de pasos de PP_set: {presupuesto} (num_pasos del CSV: {params.num_pasos})")
     if not controller.legacy:
         logger.info(f"Forma de onda de PP_set: {controller.segmentos}")
 
@@ -148,10 +154,12 @@ def PP_set(
     cols += [f"T_{i}[K]" for i in range(1, N + 1)]
     header_pp_set = ",".join(cols)
 
-    # Defino la matriz para almacenar los datos
-    data_pp_set = np.zeros((params.num_pasos, num_columnas), dtype=np.float64)
-    resistencia_vector = np.zeros((params.num_pasos, 3), dtype=np.float64)
-    num_vacantes_total = np.zeros((params.num_pasos, 3), dtype=np.float64)
+    # Defino la matriz para almacenar los datos. El presupuesto es una COTA SUPERIOR:
+    # se reservan presupuesto+1 filas (k = 0 … presupuesto) y al final se recortan
+    # las que no se hayan usado si la forma de onda terminó antes.
+    data_pp_set = np.zeros((presupuesto + 1, num_columnas), dtype=np.float64)
+    resistencia_vector = np.zeros((presupuesto + 1, 3), dtype=np.float64)
+    num_vacantes_total = np.zeros((presupuesto + 1, 3), dtype=np.float64)
 
     logger.info(f"El grosor de los filamentos es de {sim_ctes.grosor_filamento} filas")
 
@@ -186,17 +194,16 @@ def PP_set(
 
     logger.info(f"Simulacion {num_simulation} - Primera parte del set")
     all_CFs_created = False
+    # Filas realmente escritas. Se lleva aparte del contador del bucle porque la
+    # fase puede salir por tres vías distintas y el recorte final debe ser el mismo.
+    n_filas = 0
 
-    for k in range(0, params.num_pasos + 1):
+    for k in range(0, presupuesto + 1):
         total_vacantes = np.sum(actual_state)
 
         if total_vacantes > int(params.num_max_vacantes):
             # Si se llena el 90 del espacio de la matriz salto a otra simulación. Ponerlo aqui puede dar el problema de que nada mas empezar esté lleno y de error, pero eso NO debe pasar asi q no me preocupa.
             raise exceptions.MaxVacantesException(k=k - 1, voltage=voltage_anterior)
-        else:
-            # Verifica si el sistema ha percolado
-            if (k == params.num_pasos - 1) and (not sistema_percola):
-                raise exceptions.NoPercolationException()
 
         # Actualizo el tiempo de simulación y el voltaje. El controlador decide
         # con las medidas del paso ANTERIOR (mismo convenio que la temperatura).
@@ -223,31 +230,10 @@ def PP_set(
                 grid_size=params.atom_size,
             )
 
-        # Fin de fase: en rampa, al alcanzar el voltaje final (comportamiento
-        # histórico); en cualquier modo, si la forma de onda se ha agotado
-        # (p.ej. segmento 'constante' con 'pasos' consumidos) o se agota el
-        # presupuesto de pasos de la fase (k == num_pasos, donde la rampa
-        # legacy cruza exactamente voltaje_final_set: mismo k de salida).
-        if (
-            (controller.en_rampa() and voltage >= params.voltaje_final_set)
-            or controller.terminado
-            or k == params.num_pasos
-        ):
-            if not sistema_percola:
-                raise exceptions.NoPercolationException()
-
-            voltaje_max_set = voltage
-            tiempo_pp_set = params.paso_temporal * (
-                k - 1
-            )  # Le quitamos un paso porque se ha superado el voltaje de ruptura
-
-            logger.info(f"Voltaje final set {voltaje_max_set} en el tiempo {tiempo_pp_set} ")
-            # Recorto por índice las filas válidas (0..k-2). Se descuenta un paso
-            # porque en este paso ya se ha superado el voltaje final del set.
-            # NOTA: no se puede filtrar por NaN, porque las filas pre-percolación
-            # llevan NaN legítimo en las columnas R_total/I_fils/R_fils (aún no hay
-            # filamento conductor) y ese filtro borraría toda la rama pp_set.
-            data_pp_set = data_pp_set[: k - 1]
+        # VÍA 2 — la forma de onda se ha agotado (el último segmento consumió sus
+        # 'pasos'). Se corta ANTES de la física para que una meseta dure exactamente
+        # los pasos pedidos y no uno más.
+        if controller.terminado:
             break
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
@@ -512,6 +498,7 @@ def PP_set(
         # Guardo los datos de la simulación
         fila = [simulation_time, voltage, current, R_total] + I_fils + R_fils + T_fils
         data_pp_set[k] = fila
+        n_filas = k + 1
 
         if locals().get("resistencia") is not None:
             resistencia_vector[k] = np.array([k, voltage, resistencia])
@@ -568,6 +555,34 @@ def PP_set(
                 mapa_resistencias=locals().get("R_local"),
             )
         # endregion
+
+        # VÍA 1 — la rampa ha llegado al voltaje objetivo de la fase. Se comprueba
+        # DESPUÉS de guardar, para que el punto del voltaje final entre en los datos
+        # (un barrido de 0 a 1.1 V incluye el punto de 1.1 V).
+        if controller.objetivo_alcanzado(voltage):
+            break
+
+    # Recorto a las filas realmente escritas (la forma de onda pudo terminar antes
+    # de agotar el presupuesto, que es solo una cota superior).
+    # NOTA: no se puede filtrar por NaN, porque las filas pre-percolación llevan NaN
+    # legítimo en R_total/I_fils/R_fils (aún no hay filamento) y ese filtro borraría
+    # toda la rama pp_set.
+    data_pp_set = data_pp_set[:n_filas]
+    resistencia_vector = resistencia_vector[:n_filas]
+    num_vacantes_total = num_vacantes_total[:n_filas]
+
+    if not sistema_percola:
+        raise exceptions.NoPercolationException()
+
+    # Último voltaje aplicado y guardado: es de donde arranca la bajada de SP_set.
+    voltaje_max_set = float(data_pp_set[-1, 1])
+    # Traspaso de tiempo a la fase siguiente: el instante que le tocaría a la fila
+    # siguiente, expresado sobre el contador de pasos (no sobre cuántas filas se
+    # hayan decidido volcar a disco).
+    tiempo_pp_set = params.paso_temporal * n_filas
+    logger.info(
+        f"PP_set termina: {n_filas} filas, V final {voltaje_max_set:.5f} V, t traspaso {tiempo_pp_set:.5f} s"
+    )
 
     # Guardo el estado final si el último k no cayó en múltiplo de num_pasos_guardar_estado
     if k % num_pasos_guardar_estado != 0:
@@ -630,7 +645,7 @@ def PP_set(
         "Temperatura_final": temperatura,
         "voltaje_max_set": voltaje_max_set,
         "voltaje_percolacion": voltaje_percolacion,
-        "tiempo_pp_set": simulation_time,
+        "tiempo_pp_set": tiempo_pp_set,
         "current_final": current,
         "ocupacion_percola": ocupacion_percola,
         "intensidad_final": current,
@@ -693,7 +708,6 @@ def SP_set(
     actual_state = final_state_pp_set["actual_state"]
     logger.info(f"El número inicial de vacantes es: {np.sum(actual_state)}")
 
-    k_max = final_state_pp_set["k_maxima"] - 1
     sistema_percola = final_state_pp_set["sistema_percola"]
     sim_ctes = final_state_pp_set["sim_ctes"]
     params = final_state_pp_set["params"]
@@ -721,7 +735,29 @@ def SP_set(
     temperatura_anterior = final_state_pp_set["Temperatura_final"][:, 1:-1]
 
     logger.info(f"El paso de potencial para sp set es: {params.paso_potencial_set} ")
-    vector_ddp = np.arange(voltaje_max_set, 0.000, -params.paso_potencial_set)
+
+    # Controlador de la bajada: parte del último voltaje aplicado por PP_set (sea el
+    # final de la rampa o el de una meseta) y baja hasta 0 V.
+    # SP_set ya NO hereda su duración de PP_set (antes k_max = k_maxima - 1): con
+    # formas de onda esa herencia hacía que la bajada cruzase el cero hacia voltajes
+    # negativos. Ahora el presupuesto sale de su propia excursión de voltaje.
+    # La bajada arranca UN PASO por debajo del último voltaje de PP_set: ese voltaje
+    # ya tiene su fila en los datos de PP_set y repetirlo duplicaría el pico del
+    # barrido (en una medida real el voltaje máximo se mide una sola vez).
+    v_inicial_sp = voltaje_max_set - params.paso_potencial_set
+    controller = VoltageController(
+        segmentos=getattr(sim_ctes, "waveform_sp_set", None),
+        paso_potencial=params.paso_potencial_set,
+        v_inicial=v_inicial_sp,
+        sentido=-1,
+        v_objetivo=0.0,
+    )
+    presupuesto = controller.presupuesto()
+    voltage_anterior = v_inicial_sp
+    n_filas = 0
+    logger.info(f"Presupuesto de pasos de SP_set: {presupuesto} (bajada desde {v_inicial_sp:.5f} V)")
+    if not controller.legacy:
+        logger.info(f"Forma de onda de SP_set: {controller.segmentos}")
 
     E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
 
@@ -737,7 +773,7 @@ def SP_set(
     cols += [f"T_{i}[K]" for i in range(1, N + 1)]
     header_sp_set = ",".join(cols)
 
-    data_sp_set = np.zeros((k_max, num_columnas), dtype=np.float64)
+    data_sp_set = np.zeros((presupuesto + 1, num_columnas), dtype=np.float64)
 
     # Máximo histórico de temperatura de cada filamento en esta fase (solo pasos FVM).
     T_max_fils: List[float | None] = [None] * N
@@ -760,20 +796,30 @@ def SP_set(
     # )
 
     logger.info(f"Simulacion {num_simulation} - Segunda parte del set")
-    for k in range(0, k_max):
+    for k in range(0, presupuesto + 1):
         total_vacantes = np.sum(actual_state)
 
         if total_vacantes > int(params.num_max_vacantes):
             # Si se llena el 90 del espacio de la matriz salto a otra simulación. Ponerlo aqui puede dar el problema de que nada mas empezar esté lleno y de error, pero eso NO debe pasar asi q no me preocupa.
-            raise exceptions.MaxVacantesException(k=k - 1, voltage=vector_ddp[k - 1])
-        else:
-            # Verifica si el sistema ha percolado
-            if (k == params.num_pasos - 1) and (not sistema_percola):
-                raise exceptions.NoPercolationException()
+            raise exceptions.MaxVacantesException(k=k - 1, voltage=voltage_anterior)
 
         # Actualizo el tiempo de simulación y el voltaje
         simulation_time = params.paso_temporal * k
-        voltage = vector_ddp[k]
+        voltage = controller.next(
+            Medidas(
+                I_total=float(current),
+                V_anterior=voltage_anterior,
+                n_vacantes=int(total_vacantes),
+                n_filamentos=N,
+                percola=sistema_percola,
+                k=k,
+            )
+        )
+        voltage_anterior = voltage
+
+        # VÍA 2 — forma de onda agotada: se corta antes de la física.
+        if controller.terminado:
+            break
 
         # Genero el vector campo eléctrico
         for i in range(0, actual_state.shape[0]):
@@ -990,8 +1036,19 @@ def SP_set(
         # Guardo los datos de la simulación
         fila = [simulation_time + tiempo_pp_set, voltage, current, R_total] + I_fils + R_fils + T_fils
         data_sp_set[k] = fila
+        n_filas = k + 1
 
-    tiempo_sp_set = simulation_time + tiempo_pp_set
+        # VÍA 1 — la bajada ha llegado a 0 V. Se comprueba DESPUÉS de guardar para
+        # que el punto de 0 V entre en los datos.
+        if controller.objetivo_alcanzado(voltage):
+            break
+
+    # Recorto a las filas realmente escritas y calculo el traspaso a PP_reset.
+    data_sp_set = data_sp_set[:n_filas]
+    tiempo_sp_set = tiempo_pp_set + params.paso_temporal * n_filas
+    logger.info(
+        f"SP_set termina: {n_filas} filas, V final {data_sp_set[-1, 1]:.5f} V, t traspaso {tiempo_sp_set:.5f} s"
+    )
 
     # Guardo el estado final si el último k no cayó en múltiplo de num_pasos_guardar_estado
     if k % num_pasos_guardar_estado != 0:

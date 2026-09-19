@@ -135,6 +135,66 @@ for raw, debe_fallar in [
         fallo = True
     check(f"parsear_segmentos({raw!r})", fallo == debe_fallar)
 
+# ---------------------------------------------------------------- 8
+print("\n[8] presupuesto(): cota superior de pasos de la fase")
+for nombre, segs, esperado in [
+    ("legacy (una rampa)", None, 10000),
+    ("fin tras meseta", [("rampa", {"hasta_I": 1e-4}), ("constante", {"pasos": 1000})], 11000),
+    ("meseta en medio", [("rampa", {"hasta_filamentos": 1}), ("constante", {"pasos": 500}), ("rampa", {})], 10500),
+    ("meseta sin 'pasos'", [("rampa", {"hasta_I": 1e-4}), ("constante", {})], 10000),
+    ("V explicito hacia atras", [("rampa", {"hasta_V": 0.8}), ("constante", {"V": 0.3, "pasos": 100}), ("rampa", {})], 14646),
+]:
+    c = VoltageController(segmentos=segs, paso_potencial=PASO, v_inicial=0.0, sentido=+1, v_objetivo=1.1)
+    p = c.presupuesto()
+    check(f"presupuesto {nombre}", p == esperado, f"{p} (esperado {esperado})")
+
+# ---------------------------------------------------------------- 9
+print("\n[9] Las 4 etapas: la rampa llega EXACTO a su objetivo")
+ETAPAS = [
+    ("PP_set", 0.0, 1.1, +1, 1.1 / 10000),
+    ("SP_set", 1.1, 0.0, -1, 1.1 / 10000),
+    ("PP_reset", 0.0, -1.4, -1, 1.4 / 10000),
+    ("SP_reset", -1.4, 0.0, +1, 1.4 / 10000),
+]
+for nombre, vi, vo, sent, paso in ETAPAS:
+    c = VoltageController(segmentos=None, paso_potencial=paso, v_inicial=vi, sentido=sent, v_objetivo=vo)
+    pre = c.presupuesto()
+    v_ant, v = vi, vi
+    for k in range(pre + 1):
+        v = c.next(medidas(k, V_ant=v_ant)); v_ant = v
+        if c.objetivo_alcanzado(v):
+            break
+    check(f"{nombre}: llega a {vo:+.1f} V", abs(v - vo) < 1e-9, f"V final={v:+.6f}, pasos={pre}")
+
+# ---------------------------------------------------------------- 10
+print("\n[10] hasta_V se interpreta con el signo del rango de la etapa")
+for nombre, vi, vo, sent, paso, esperado in [
+    ("PP_set", 0.0, 1.1, +1, 1.1 / 10000, +0.8),
+    ("SP_set", 1.1, 0.0, -1, 1.1 / 10000, +0.8),
+    ("PP_reset", 0.0, -1.4, -1, 1.4 / 10000, -0.8),
+    ("SP_reset", -1.4, 0.0, +1, 1.4 / 10000, -0.8),
+]:
+    c = VoltageController(segmentos=None, paso_potencial=paso, v_inicial=vi, sentido=sent, v_objetivo=vo)
+    u = c._umbral_con_signo(0.8)
+    check(f"{nombre}: 'hasta_V: 0.8' -> {esperado:+.1f} V", abs(u - esperado) < 1e-12, f"{u:+.2f}")
+
+# ---------------------------------------------------------------- 11
+print("\n[11] Una meseta de N pasos dura EXACTAMENTE N pasos planos")
+P2 = 1.1 / 300
+c = VoltageController(
+    segmentos=[("rampa", {"hasta_V": 0.5}), ("constante", {"pasos": 50}), ("rampa", {})],
+    paso_potencial=P2, v_inicial=0.0, sentido=+1, v_objetivo=1.1,
+)
+vs, v_ant = [], 0.0
+for k in range(c.presupuesto() + 1):
+    v = c.next(medidas(k, V_ant=v_ant)); vs.append(v); v_ant = v
+    if c.objetivo_alcanzado(v):
+        break
+vs = np.array(vs)
+planos = int(np.sum(np.abs(np.diff(vs)) < 1e-12))
+check("la meseta dura 50 pasos, no 51", planos == 50, f"{planos} pasos planos")
+check("y la rampa final llega a 1.1 exacto", abs(vs[-1] - 1.1) < 1e-9, f"V={vs[-1]:.6f}")
+
 # ----------------------------------------------------------------
 print(f"\n{'=' * 60}")
 if fallos:
