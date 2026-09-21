@@ -29,8 +29,8 @@ MATERIAL_DEFAULTS = {
     # de atom_size (paso de red en el plano) y del Delta z del solver térmico. Por
     # defecto igual a atom_size para reproducir exactamente el comportamiento histórico.
     "delta_z_r": 0.25e-9,
-    "num_filamentos": 2,
-    "grosor_filamento": [1, 3],
+    "num_filamentos": 1,
+    "grosor_filamento": [],
 }
 
 # ============================================================================
