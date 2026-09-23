@@ -146,7 +146,7 @@ def actualizar_parametros_por_filamento(
     if num_esperados == 1:
         if filamentos_actuales == 1:
             logger.info("Todos los filamentos creados.")
-            sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 1)  # 3 en el caso de factor_gamma_activado
+            sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 1.5)  # 3 en el caso de factor_gamma_activado
             # sim_ctes = sim_ctes.update_generation_energy(1.75)
             all_CFs_created = True
 
@@ -154,11 +154,11 @@ def actualizar_parametros_por_filamento(
     elif num_esperados == 2:
         if filamentos_actuales == 1:
             logger.info("Se ha formado el primer filamento de dos.")
-            sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 1)
+            sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 1.5)
 
         elif filamentos_actuales == 2:
             logger.info("Se ha formado el segundo filamento de dos.")
-            sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 6)
+            sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 1.5)
             all_CFs_created = True
             filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(CF_centros)
 

@@ -15,7 +15,7 @@ MATERIAL_DEFAULTS = {
     "permitividad_relativa_set": 299.977,
     "permitividad_relativa_reset": 399.998,
     "generation_energy": 1.04,
-    "recombination_energy": 1.55,
+    "recombination_energy": 1.27,
     "pb_metal_insul_set": 0.0026,
     "pb_metal_insul_reset": 0.0307,
     "recom_enchancement_factor": 3e3,
@@ -23,14 +23,14 @@ MATERIAL_DEFAULTS = {
     # sigma(T) = sigma_0 / (1 + alpha_T * (T - T_0)).
     # sigma_0 = 1 / (R_ref * delta_z_r) = 1 / (4.3 * 0.25e-9): a T_0 reproduce
     # exactamente R = 4.3 Ohm, la resistencia de celda usada históricamente.
-    "sigma_0": 4.3e8,  # 930232558.1395348,
+    "sigma_0": 4.5e8,  # 930232558.1395348,
     "alpha_T": 2e-3,
     # Espesor Delta z de la rama eléctrica/resistencia (R = rho/delta_z_r), independiente
     # de atom_size (paso de red en el plano) y del Delta z del solver térmico. Por
     # defecto igual a atom_size para reproducir exactamente el comportamiento histórico.
     "delta_z_r": 0.25e-9,
-    "num_filamentos": 1,
-    "grosor_filamento": [],
+    "num_filamentos": 2,
+    "grosor_filamento": [32, 28],
 }
 
 # ============================================================================
@@ -72,7 +72,7 @@ THERMAL_DEFAULTS = {
 # ============================================================================
 SIMULATION_DEFAULTS = {
     "device_size_x": 10e-9,  # Ancho entre electrodos, debe corresponder a los dispositivos medidos
-    "device_size_y": 35e-9,
+    "device_size_y": 90e-9,
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
     "num_trampas": 150,
     "total_simulation_time": 10.0,

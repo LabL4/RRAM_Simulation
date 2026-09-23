@@ -1,32 +1,36 @@
 {
   "num_simulation": 1,
-  "voltaje_percolacion": 0.55814,
+  "voltaje_percolacion": 0.5852,
   "creaciones_dict": {
     "0": {
       "filamento": 1,
-      "voltaje": 0.55814,
+      "voltaje": 0.5852,
+      "etapa": "pp_set"
+    },
+    "1": {
+      "filamento": 2,
+      "voltaje": 0.83809,
       "etapa": "pp_set"
     }
   },
-  "roturas_dict": {
-    "0": {
-      "filamento": 1,
-      "voltaje": -1.25636,
-      "etapa": "pp"
-    }
-  },
+  "roturas_dict": {},
   "centros_calculados": [
-    239
+    89,
+    269
   ],
   "cf_ranges": [
     [
       0,
-      479
+      179
+    ],
+    [
+      180,
+      359
     ]
   ],
   "params_dict": {
     "device_size_x": 1e-08,
-    "device_size_y": 1.2e-07,
+    "device_size_y": 9e-08,
     "atom_size": 2.5e-10,
     "num_trampas": 150,
     "total_simulation_time": 10.0,
@@ -37,8 +41,8 @@
     "densidad_vacantes": 4.0,
     "seed": 42,
     "x_size": 40,
-    "y_size": 480,
-    "num_max_vacantes": 18240,
+    "y_size": 360,
+    "num_max_vacantes": 13680,
     "paso_temporal": 0.001,
     "paso_potencial_set": 0.00011,
     "paso_potencial_reset": 0.00014
@@ -57,9 +61,10 @@
     "sigma_0": 450000000.0,
     "alpha_T": 0.002,
     "delta_z_r": 2.5e-10,
-    "num_filamentos": 1,
+    "num_filamentos": 2,
     "grosor_filamento": [
-      500
+      32,
+      28
     ],
     "gamma": 10.0,
     "gamma_drift": 10.0,
@@ -93,23 +98,15 @@
   "extra": {
     "status": "completed",
     "start_from": "pp_set",
-    "stop_at": "sp_reset",
+    "stop_at": "pp_set",
     "muro_termico": false,
     "seed": 42,
     "temperaturas_max": {
       "pp_set": {
-        "T_1": 541.9432321638772
-      },
-      "sp_set": {
-        "T_1": 541.9829481355788
-      },
-      "pp_reset": {
-        "T_1": 716.1308308089401
-      },
-      "sp_reset": {
-        "T_1": null
+        "T_1": 538.9372602610329,
+        "T_2": 537.1396421514645
       }
     },
-    "T_final_pp_set": 550.9963289439096
+    "T_final_pp_set": 537.010087802205
   }
 }
