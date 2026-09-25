@@ -29,8 +29,14 @@ MATERIAL_DEFAULTS = {
     # de atom_size (paso de red en el plano) y del Delta z del solver térmico. Por
     # defecto igual a atom_size para reproducir exactamente el comportamiento histórico.
     "delta_z_r": 0.25e-9,
-    "num_filamentos": 2,
-    "grosor_filamento": [32, 28],
+    "num_filamentos": 1,
+    "grosor_filamento": [[7]],
+    # None (defecto) → las trampas/vacantes iniciales se distribuyen con el
+    # mismo grosor que grosor_filamento (comportamiento histórico). Si se fija
+    # (p.ej. [10]), el sorteo de trampas en `init` usa ESE grosor en vez de
+    # grosor_filamento, sin tocar la máscara de crecimiento ni el resto de la
+    # física, que siguen usando grosor_filamento. Ver init_simulation.build_initial_states.
+    "grosor_filamento_init": None,
 }
 
 # ============================================================================
@@ -72,7 +78,7 @@ THERMAL_DEFAULTS = {
 # ============================================================================
 SIMULATION_DEFAULTS = {
     "device_size_x": 10e-9,  # Ancho entre electrodos, debe corresponder a los dispositivos medidos
-    "device_size_y": 90e-9,
+    "device_size_y": 30e-9,
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
     "num_trampas": 150,
     "total_simulation_time": 10.0,
@@ -222,6 +228,7 @@ class ConfigManager:
             "delta_z_r",
             "num_filamentos",
             "grosor_filamento",
+            "grosor_filamento_init",
             "vibration_frequency",
             "gamma",
             "gamma_drift",

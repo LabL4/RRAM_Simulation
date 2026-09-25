@@ -28,6 +28,8 @@ class SimulationConstants:
     # Independiente del espesor que asuma el solver termico (Delta z_T), que no lo usa.
     delta_z_r: float  # Espesor Delta z de la resistencia [m]
     num_filamentos: int
+    # grosor "oficial": define la máscara que limita DÓNDE se generan vacantes
+    # NUEVAS durante el crecimiento (PP_set) y se usa en logging/metadata.
     grosor_filamento: int
     gamma: float
     gamma_drift: float
@@ -57,6 +59,13 @@ class SimulationConstants:
     voltaje_gen_oxigeno_sp: float
     num_oxigenos_sp_reset: int
     centros_filamento: Optional[List[int]] = None  # ← nuevo
+    # grosor usado SOLO para ponderar el sorteo de trampas iniciales (init).
+    # None (defecto) → se usa grosor_filamento (comportamiento histórico: un
+    # único grosor para todo). Si se especifica, las vacantes/trampas iniciales
+    # se distribuyen como si el filamento tuviera este grosor, mientras que
+    # grosor_filamento sigue mandando en la máscara de generación durante el
+    # crecimiento y en el resto de la física/metadata.
+    grosor_filamento_init: Optional[Any] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SimulationConstants":

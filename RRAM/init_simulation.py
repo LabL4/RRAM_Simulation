@@ -68,17 +68,28 @@ class SimulationConfig:
 def build_initial_states(
     init_data_dir: Path | str = "Init_data",
     seed: Optional[int] = None,
+    mismo_estado_inicial: bool = False,
 ) -> int:
     """
     Pre-genera `init_state_{i}.npz` para todas las simulaciones del CSV.
 
     Args:
         init_data_dir: Carpeta con los CSVs, donde se escriben los `.npz`.
-        seed: Si se especifica, cada simulación `i` siembra np.random con
-            `seed + i` justo antes de sortear sus trampas, de forma que el
-            estado inicial sea reproducible entre corridas sin que todas las
-            simulaciones arranquen del mismo estado (el ensemble se conserva).
+        seed: Si se especifica, siembra np.random antes de sortear las trampas
+            de cada simulación `i`, de forma reproducible entre corridas.
             None (defecto) = aleatorio real, comportamiento histórico.
+        mismo_estado_inicial: Controla cómo se combina `seed` con el índice `i`:
+            False (defecto) → siembra con `seed + i`: cada simulación arranca de
+                un estado distinto pero reproducible corrida a corrida (se
+                conserva la diversidad del ensemble; comportamiento histórico).
+            True  → siembra con `seed` fijo (sin `+i`) en todas las simulaciones.
+                Si además todas comparten geometría (eje_x, eje_y, num_trampas,
+                num_filamentos, grosor/centros de filamento), el sorteo de
+                trampas es idéntico byte a byte en todo el ensemble: útil para
+                aislar el efecto de un parámetro (p.ej. Delta_z_R) controlando
+                el resto de la física. Si la geometría difiere entre sims, el
+                estado ya no es idéntico aunque la semilla sí lo sea.
+            Ignorado si `seed` es None.
     """
     init_data_dir = Path(init_data_dir)
     archivo_params = init_data_dir / "simulation_parameters.csv"
@@ -97,10 +108,11 @@ def build_initial_states(
 
     for i, row in df_params.iterrows():
         # Semilla por simulación: `seed + i` mantiene cada init_state distinto
-        # entre sims pero idéntico corrida a corrida. Sin seed no se toca
-        # np.random (aleatorio real).
+        # entre sims pero idéntico corrida a corrida. Con mismo_estado_inicial=True
+        # se usa `seed` fijo para las N sims (mismo sorteo de trampas si además
+        # comparten geometría). Sin seed no se toca np.random (aleatorio real).
         if seed is not None:
-            np.random.seed(seed + int(i))
+            np.random.seed(seed if mismo_estado_inicial else seed + int(i))
 
         eje_x = int(math.ceil(row["device_size_y"] / row["atom_size"]))
         eje_y = int(math.ceil(row["device_size_x"] / row["atom_size"]))
@@ -108,6 +120,7 @@ def build_initial_states(
 
         num_filamentos = 2
         grosor_filamento = None
+        grosor_filamento_init = None
         centros_filamento = None
         if df_ctes is not None and i < len(df_ctes):
             raw_nf = df_ctes.iloc[i].get("num_filamentos", None)
@@ -124,6 +137,18 @@ def build_initial_states(
                 except (ValueError, SyntaxError):
                     grosor_filamento = int(float(raw_gf))
 
+            # grosor_filamento_init: override opcional SOLO para el sorteo de
+            # trampas/vacantes iniciales (ver docstring). Vacío/NaN = no fijado
+            # -> se usa grosor_filamento (comportamiento histórico).
+            raw_gfi = df_ctes.iloc[i].get("grosor_filamento_init", None)
+            if raw_gfi is not None and not (isinstance(raw_gfi, float) and math.isnan(raw_gfi)):
+                raw_gfi_str = str(raw_gfi).strip()
+                if raw_gfi_str not in ("", "None", "nan"):
+                    try:
+                        grosor_filamento_init = ast.literal_eval(raw_gfi_str)
+                    except (ValueError, SyntaxError):
+                        grosor_filamento_init = int(float(raw_gfi))
+
             raw_cf = df_ctes.iloc[i].get("centros_filamento", None)
             if raw_cf is not None:
                 try:
@@ -133,24 +158,38 @@ def build_initial_states(
                 except (ValueError, SyntaxError):
                     pass
 
+        # Grosor usado SOLO para ponderar dónde caen las trampas/vacantes
+        # iniciales. Si grosor_filamento_init no está fijado, cae en
+        # grosor_filamento (idéntico a antes). f_ranges (rango de filas por
+        # filamento) se descarta aquí: NO afecta a esta llamada, es bookkeeping
+        # que SimulationConfig.__post_init__ recalcula con grosor_filamento
+        # "oficial" al cargar la sim para exec.
+        grosor_para_trampas = grosor_filamento_init if grosor_filamento_init is not None else grosor_filamento
+
         f_ranges, regiones_pesos, _ = utils.generar_configuracion_filamentos(
             eje_x,
             eje_y,
             num_filamentos=num_filamentos,
-            grosores_filamento=grosor_filamento,
+            grosores_filamento=grosor_para_trampas,
             centros_override=centros_filamento,
         )
         init_state = Generation.initial_state_priv(eje_x, eje_y, num_trampas, regiones_pesos)
 
         logger.info(
             f"Simulación {i}: dispositivo=({eje_x},{eje_y}) "
-            f"trampas={num_trampas} filamentos={num_filamentos} ranges={f_ranges} grosor={grosor_filamento}"
+            f"trampas={num_trampas} filamentos={num_filamentos} ranges={f_ranges} "
+            f"grosor={grosor_filamento} grosor_init={grosor_filamento_init or '(=grosor_filamento)'}"
         )
 
         out = init_data_dir / f"init_state_{i}.npz"
         np.savez_compressed(out, actual_state=init_state)
 
-    origen = f"seed={seed} (por sim: seed+i)" if seed is not None else "aleatorio real"
+    if seed is None:
+        origen = "aleatorio real"
+    elif mismo_estado_inicial:
+        origen = f"seed={seed} (fija, mismo estado inicial para todas las sims)"
+    else:
+        origen = f"seed={seed} (por sim: seed+i)"
     logger.info(f"{num_simulations} estados iniciales generados en {init_data_dir} · {origen}.")
     return num_simulations
 

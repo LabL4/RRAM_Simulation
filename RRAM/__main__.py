@@ -56,6 +56,19 @@ def _build_parser() -> argparse.ArgumentParser:
             "Por defecto: aleatorio real (sin fijar)."
         ),
     )
+    p_init.add_argument(
+        "--mismo-estado-inicial",
+        action="store_true",
+        default=False,
+        help=(
+            "Con --seed fijado, usa la MISMA semilla (sin +i) para todas las "
+            "simulaciones en vez de seed+i. Si además comparten geometría "
+            "(eje_x, eje_y, num_trampas, filamentos), el estado inicial "
+            "(posición de trampas) es idéntico en todo el ensemble. Útil para "
+            "aislar el efecto de un parámetro del barrido controlando el resto. "
+            "Por defecto: False (seed+i, ensemble con estados distintos)."
+        ),
+    )
 
     # exec
     p_exec = sub.add_parser("exec", help="Ejecuta el ciclo SET → RESET.")
@@ -127,6 +140,16 @@ def _build_parser() -> argparse.ArgumentParser:
             "Por defecto: aleatorio real (sin fijar)."
         ),
     )
+    p_all.add_argument(
+        "--mismo-estado-inicial",
+        action="store_true",
+        default=False,
+        help=(
+            "Con --seed fijado, usa la MISMA semilla (sin +i) al generar el "
+            "estado inicial de todas las simulaciones (ver 'init --mismo-estado-inicial'). "
+            "Solo tiene efecto si esta sim dispara la generación de Init_data."
+        ),
+    )
     p_all.add_argument("--guardar-datos", action="store_true")
     p_all.add_argument("--init-data-dir", default="Init_data")
     p_all.add_argument("--results-dir", default="Results")
@@ -154,7 +177,11 @@ def _build_parser() -> argparse.ArgumentParser:
 def _cmd_init(args) -> int:
 
     setup_logging(num_simulation=None, to_console=True)
-    build_initial_states(init_data_dir=args.init_data_dir, seed=args.seed)
+    build_initial_states(
+        init_data_dir=args.init_data_dir,
+        seed=args.seed,
+        mismo_estado_inicial=args.mismo_estado_inicial,
+    )
     return 0
 
 
@@ -220,7 +247,11 @@ def _cmd_all(args) -> int:
     init_state_path = Path(args.init_data_dir) / f"init_state_{args.num_simulation}.npz"
     if not init_state_path.is_file():
         logger.info(f"init_state ausente ({init_state_path}); generando todos los iniciales.")
-        build_initial_states(init_data_dir=args.init_data_dir, seed=args.seed)
+        build_initial_states(
+            init_data_dir=args.init_data_dir,
+            seed=args.seed,
+            mismo_estado_inicial=args.mismo_estado_inicial,
+        )
     else:
         logger.info(f"init_state ya existe ({init_state_path}); saltando init.")
 
