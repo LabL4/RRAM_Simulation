@@ -48,6 +48,20 @@ class SimulationParameters:
         self.y_size = int(np.ceil(self.device_size_y / self.atom_size))  # Número de "casillas" en la dimensión y
         self.num_max_vacantes = int(0.95 * (self.x_size * self.y_size))  # 95% de la matriz puede llenarse de vacantes
         self.total_simulation_time = self.num_pasos * self.paso_temporal  # Duración nominal en segundos
+
+        # Los voltajes finales se guardan como MAGNITUD. El signo lo pone cada fase
+        # (el RESET se aplica en negativo), así que el usuario puede escribir en el CSV
+        # `-1.4` o `1.4` para el RESET y obtiene la misma simulación. Sin esto, un
+        # voltaje_final_reset negativo se invertía por doble negación en las fases
+        # de RESET, que ya le anteponen el signo menos.
+        self.voltaje_final_set = abs(self.voltaje_final_set)
+        self.voltaje_final_reset = abs(self.voltaje_final_reset)
+        for nombre in ("voltaje_final_set", "voltaje_final_reset"):
+            if getattr(self, nombre) == 0:
+                raise ValueError(
+                    f"'{nombre}' no puede valer 0: define la excursión de voltaje de la fase y el paso de potencial."
+                )
+
         self.paso_potencial_set = self.voltaje_final_set / self.num_pasos  # Paso de voltaje para la parte de set
         self.paso_potencial_reset = self.voltaje_final_reset / self.num_pasos  # Paso de voltaje para la parte de reset
 

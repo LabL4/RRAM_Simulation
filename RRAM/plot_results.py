@@ -69,6 +69,7 @@ def _plot_results_impl(
     skip_failed: bool,
     marcado: bool,
     intensidad_minima: float,
+    plot_forma_onda: bool = True,
 ) -> bool:
     """Implementación compartida de `plot_results` / `plot_results_marcado`."""
     results_dir = Path(results_dir)
@@ -119,24 +120,25 @@ def _plot_results_impl(
         intensidad_minima=intensidad_minima,
     )
 
-    # Con forma de onda no legacy en PP_set, genera además la figura V-t / I-t
-    # con las transiciones marcadas (solo en el plot sin marcar, para no
-    # duplicarla cuando `all` lanza plot + plot_marcado).
-    if not marcado:
-        _plot_waveform_pp_set(meta, simulation_path, figures_dir, num_simulation)
+    # Figuras V-t / I-t de las etapas con forma de onda no legacy, con las
+    # transiciones marcadas. Solo en el plot sin marcar, para no duplicarlas
+    # cuando `all` lanza plot + plot_marcado.
+    if not marcado and plot_forma_onda:
+        for fase in TODAS_FASES:
+            _plot_forma_onda(meta, simulation_path, figures_dir, num_simulation, fase)
 
     return True
 
 
-def _plot_waveform_pp_set(meta, simulation_path: Path, figures_dir: Path, num_simulation: int) -> None:
-    """Dibuja V-t/I-t de pp_set si la metadata registra una forma de onda no legacy."""
-    estado = (meta.extra or {}).get("waveform_estado_pp_set")
+def _plot_forma_onda(meta, simulation_path: Path, figures_dir: Path, num_simulation: int, fase: str) -> None:
+    """Dibuja V-t/I-t de una etapa si la metadata registra en ella una forma de onda no legacy."""
+    estado = (meta.extra or {}).get(f"waveform_estado_{fase}")
     if not estado or estado.get("legacy", False):
         return
 
-    data_file = simulation_path / f"Data_pp_set_{num_simulation}.npz"
+    data_file = simulation_path / f"Data_{fase}_{num_simulation}.npz"
     if not data_file.is_file():
-        logger.warning(f"waveform_estado presente pero falta {data_file.name}; se omite V-t/I-t.")
+        logger.warning(f"waveform_estado_{fase} presente pero falta {data_file.name}; se omite V-t/I-t.")
         return
 
     d = np.load(data_file)
@@ -145,16 +147,16 @@ def _plot_waveform_pp_set(meta, simulation_path: Path, figures_dir: Path, num_si
 
     from .Representate import plot_Vt_It
 
-    out = figures_dir / f"V-t_I-t_pp_set_{num_simulation}.png"
+    out = figures_dir / f"V-t_I-t_{fase}_{num_simulation}.png"
     plot_Vt_It(
         t=datos[:, 0],
         v=datos[:, 1],
         i=datos[:, 2],
         filename=str(out),
         transiciones=estado.get("transiciones", []),
-        titulo=f"PP set waveform - sim {num_simulation}",
+        titulo=f"{fase} waveform - sim {num_simulation}",
     )
-    logger.info(f"Figura V-t/I-t de pp_set guardada en {out}")
+    logger.info(f"Figura V-t/I-t de {fase} guardada en {out}")
 
 
 def plot_results(
@@ -164,6 +166,7 @@ def plot_results(
     desplazamiento: Optional[dict] = None,
     skip_failed: bool = True,
     intensidad_minima: float = INTENSIDAD_MINIMA_DEFAULT,
+    plot_forma_onda: bool = True,
 ) -> bool:
     """
     Genera `I-V_{N}.png` (curva sin marcar) de una simulación leyendo todo del
@@ -188,6 +191,9 @@ def plot_results(
         intensidad_minima: Umbral absoluto de intensidad (A, default 1e-7).
             Cualquier punto con |I| por debajo se descarta antes de dibujar
             (ruido de fondo cerca de I=0 en la escala log).
+        plot_forma_onda: Si True (default), genera además `V-t_I-t_{fase}_{N}.png`
+            para cada etapa que usó una forma de onda no legacy. Con False no se
+            genera ninguna.
 
     Returns:
         True si se generó la figura; False si la simulación se saltó.
@@ -203,6 +209,7 @@ def plot_results(
         skip_failed=skip_failed,
         marcado=False,
         intensidad_minima=intensidad_minima,
+        plot_forma_onda=plot_forma_onda,
     )
 
 

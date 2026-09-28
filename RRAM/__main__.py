@@ -103,6 +103,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p_plot = sub.add_parser("plot", help="Replotea la curva I-V sin marcar (I-V_{N}.png).")
     p_plot.add_argument("num_simulation", type=int, help="Índice usado al ejecutar (offset +1).")
     p_plot.add_argument("--results-dir", default="Results")
+    p_plot.add_argument(
+        "--no-forma-onda",
+        action="store_true",
+        default=False,
+        help="No genera las figuras V-t/I-t de las etapas con forma de onda (V-t_I-t_{fase}_{N}.png).",
+    )
 
     # plot_marcado
     p_plot_marcado = sub.add_parser(
@@ -147,6 +153,12 @@ def _build_parser() -> argparse.ArgumentParser:
         metavar="FASE",
         help="Fase en la que terminar la simulacion, inclusive (pp_set | sp_set | pp_reset | sp_reset).",
     )
+    p_all.add_argument(
+        "--no-forma-onda",
+        action="store_true",
+        default=False,
+        help="No genera las figuras V-t/I-t de las etapas con forma de onda (V-t_I-t_{fase}_{N}.png).",
+    )
 
     return p
 
@@ -186,7 +198,11 @@ def _cmd_plot(args) -> int:
     setup_logging(num_simulation=args.num_simulation, file_mode="a")
     log = logging.getLogger("RRAM.__main__")
     try:
-        plot_results(num_simulation=args.num_simulation, results_dir=args.results_dir)
+        plot_results(
+            num_simulation=args.num_simulation,
+            results_dir=args.results_dir,
+            plot_forma_onda=not args.no_forma_onda,
+        )
         return 0
     except FileNotFoundError as e:
         log.error(f"plot sim={args.num_simulation}: {e}")
@@ -249,6 +265,7 @@ def _cmd_all(args) -> int:
         plot_results(
             num_simulation=args.num_simulation + 1,
             results_dir=args.results_dir,
+            plot_forma_onda=not args.no_forma_onda,
         )
         plot_results_marcado(
             num_simulation=args.num_simulation + 1,

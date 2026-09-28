@@ -195,6 +195,45 @@ planos = int(np.sum(np.abs(np.diff(vs)) < 1e-12))
 check("la meseta dura 50 pasos, no 51", planos == 50, f"{planos} pasos planos")
 check("y la rampa final llega a 1.1 exacto", abs(vs[-1] - 1.1) < 1e-9, f"V={vs[-1]:.6f}")
 
+# ---------------------------------------------------------------- 12
+print("\n[12] 'V' explicito: se usa la magnitud y el signo lo pone la etapa")
+for nombre, vi, vo, sent, paso, esperado in [
+    ("PP_set", 0.0, 1.1, +1, 1.1 / 10000, +0.8),
+    ("SP_set", 1.1 - 1.1 / 10000, 0.0, -1, 1.1 / 10000, +0.8),
+    ("PP_reset", -1.4 / 10000, -1.4, -1, 1.4 / 10000, -0.8),
+    ("SP_reset", -1.4 + 1.4 / 10000, 0.0, +1, 1.4 / 10000, -0.8),
+]:
+    aplicados = []
+    for v in (0.8, -0.8):
+        c = VoltageController(segmentos=[("constante", {"V": v, "pasos": 5})], paso_potencial=paso, v_inicial=vi, sentido=sent, v_objetivo=vo)
+        aplicados.append(c.next(medidas(0)))
+    check(f"{nombre}: 'V' = +0.8 y -0.8 aplican {esperado:+.1f} V", all(abs(a - esperado) < 1e-12 for a in aplicados), f"{aplicados}")
+
+c = VoltageController(segmentos=[("constante", {"V": 0.8, "pasos": 10}), ("rampa", {})], paso_potencial=1.4 / 10000, v_inicial=-1.4 / 10000, sentido=-1, v_objetivo=-1.4)
+vs, v_ant = [], -1.4 / 10000
+for k in range(c.presupuesto() + 1):
+    v = c.next(medidas(k, V_ant=v_ant)); vs.append(v); v_ant = v
+    if c.objetivo_alcanzado(v):
+        break
+# Desde -0.8 V el objetivo -1.4 V no cae en la rejilla de pasos (4285.71 pasos), así que
+# la rampa se detiene en el primer punto que lo alcanza: hasta un paso más allá.
+check("PP_reset: meseta 'V'=+0.8 seguida de rampa no cruza el cero", max(vs) < 0 and -1.4 - 1.4 / 10000 < vs[-1] <= -1.4, f"V {vs[0]:+.3f} -> {vs[-1]:+.6f}")
+
+# ---------------------------------------------------------------- 13
+print("\n[13] voltaje_final_reset / _set: se aceptan con cualquier signo")
+from RRAM.parameters import SimulationParameters  # noqa: E402
+
+BASE = dict(device_size_x=10e-9, device_size_y=35e-9, atom_size=0.25e-9, num_trampas=150, paso_temporal=1e-3, num_pasos=10000, voltaje_final_reset=1.4, voltaje_final_set=1.1, init_temp=300.0, densidad_vacantes=4.0)
+p_pos = SimulationParameters(**BASE)
+p_neg = SimulationParameters(**{**BASE, "voltaje_final_reset": -1.4, "voltaje_final_set": -1.1})
+check("-1.4 y +1.4 dan el mismo paso_potencial_reset", p_pos.paso_potencial_reset == p_neg.paso_potencial_reset > 0, f"{p_neg.paso_potencial_reset:+.2e}")
+check("-1.1 y +1.1 dan el mismo paso_potencial_set", p_pos.paso_potencial_set == p_neg.paso_potencial_set > 0, f"{p_neg.paso_potencial_set:+.2e}")
+try:
+    SimulationParameters(**{**BASE, "voltaje_final_reset": 0.0})
+    check("voltaje_final_reset = 0 se rechaza", False, "no lanzo error")
+except ValueError:
+    check("voltaje_final_reset = 0 se rechaza", True)
+
 # ----------------------------------------------------------------
 print(f"\n{'=' * 60}")
 if fallos:

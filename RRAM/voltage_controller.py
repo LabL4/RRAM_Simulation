@@ -218,7 +218,7 @@ class VoltageController:
         for modo, opciones in self.segmentos:
             if modo == "constante":
                 if "V" in opciones:
-                    V = float(opciones["V"])
+                    V = self._umbral_con_signo(opciones["V"])
                 total += int(opciones.get("pasos", 0))
                 continue
 
@@ -236,13 +236,13 @@ class VoltageController:
 
     def _umbral_con_signo(self, valor: float) -> float:
         """
-        Convierte un umbral de voltaje escrito como MAGNITUD en el CSV al valor
-        con signo que corresponde al rango de la fase.
+        Convierte un voltaje de la forma de onda (el umbral de `hasta_V` o el `V`
+        explícito de una meseta) al valor con signo que corresponde al rango de la
+        fase. Se usa su MAGNITUD, así que el signo que escriba el usuario da igual:
+        en una fase de RESET, `0.8` y `-0.8` significan ambos -0.8 V.
 
-        El usuario escribe `hasta_V: 0.8` sin preocuparse del signo; en una fase de
-        RESET eso significa -0.8 V. El signo se toma del extremo no nulo del rango
-        (v_inicial o v_objetivo), no del sentido de avance: en SP_set el voltaje es
-        positivo aunque la rampa baje.
+        El signo se toma del extremo no nulo del rango (v_inicial o v_objetivo), no
+        del sentido de avance: en SP_set el voltaje es positivo aunque la rampa baje.
         """
         referencia = self.v_inicial if self.v_inicial != 0 else (self.v_objetivo or 0.0)
         signo = -1.0 if referencia < 0 else 1.0
@@ -298,7 +298,7 @@ class VoltageController:
             n = self._pasos_en_segmento + self._offset_rampa
             self._V = self._v_base_segmento + n * self.paso_potencial * self.sentido
         else:  # constante
-            self._V = float(opciones["V"]) if "V" in opciones else self._v_base_segmento
+            self._V = self._umbral_con_signo(opciones["V"]) if "V" in opciones else self._v_base_segmento
 
         self._pasos_en_segmento += 1
         return self._V

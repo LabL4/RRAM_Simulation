@@ -1398,17 +1398,19 @@ def plot_Vt_It(
     ax_i.set_xlabel("Time (s)")
 
     # Marcar las transiciones de la forma de onda (si las hay)
-    for trans in transiciones or []:
+    for n, trans in enumerate(transiciones or []):
         k = int(trans.get("k", -1))
         if not (0 <= k < len(t)):
             continue
         etiqueta = f"{trans.get('condicion', '?')} (V={trans.get('V', float('nan')):.3f})"
         for ax in (ax_v, ax_i):
             ax.axvline(t[k], color="gray", linestyle="--", linewidth=1.5)
+        # Altura alterna: dos transiciones próximas (p. ej. entrada y salida de una
+        # meseta corta) tendrían sus etiquetas superpuestas.
         ax_v.annotate(
             etiqueta,
             xy=(t[k], v[k] if k < len(v) else 0),
-            xytext=(5, 5),
+            xytext=(5, 5 + 16 * (n % 2)),
             textcoords="offset points",
             fontsize=9,
             color="gray",

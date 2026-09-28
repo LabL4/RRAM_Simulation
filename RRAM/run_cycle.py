@@ -121,6 +121,12 @@ def _save_partial_metadata(
     roturas = sp_reset.get("roturas_dict", {}) or {}
     vecindad_inicial = sp_set.get("vecindad_inicial", None)
 
+    # Internamente voltaje_final_reset es una magnitud (SimulationParameters la
+    # normaliza); en la metadata se documenta con el signo con el que se aplica,
+    # negativo, igual que aparece en los datos de salida del RESET.
+    params_dict = serialize_dataclass(cfg.params)
+    params_dict["voltaje_final_reset"] = -abs(params_dict["voltaje_final_reset"])
+
     meta = SimulationMetadata(
         num_simulation=n_save,
         voltaje_percolacion=float(voltaje_perco) if voltaje_perco is not None else 0.0,
@@ -130,7 +136,7 @@ def _save_partial_metadata(
         cf_ranges=[list(t) for t in cfg.cf_ranges],
         # Snapshot de la configuración usada para esta sim — fuente de verdad
         # para auditar/reproducir aunque cambie el CSV original.
-        params_dict=serialize_dataclass(cfg.params),
+        params_dict=params_dict,
         ctes_dict=serialize_dataclass(cfg.sim_ctes),
         extra={
             "status": status,
