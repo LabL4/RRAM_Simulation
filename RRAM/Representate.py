@@ -348,6 +348,26 @@ def RepresentateTwoStates(
     return None
 
 
+def _cargar_ciclo_experimental():
+    """
+    Carga el ciclo I-V experimental de referencia (SET y RESET).
+
+    Returns:
+        (x_set, y_set, x_reset, y_reset): voltajes y |corrientes| de cada rama.
+    """
+    ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt"
+    ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt"
+
+    data_set = np.loadtxt(ruta_archivo_set, skiprows=1)
+    data_reset = np.loadtxt(ruta_archivo_reset, skiprows=1)
+
+    x_set = data_set[:, 0]
+    y_set = data_set[:, 1]
+    x_reset = data_reset[:, 0]  # * (-1.0)   TODO: Importante comprobar si las medidas se leen con el signo ya o no
+    y_reset = abs(data_reset[:, 1])
+    return x_set, y_set, x_reset, y_reset
+
+
 def plot_IV(
     v_set,
     i_set,
@@ -357,6 +377,7 @@ def plot_IV(
     titulo_figura="I-V Characteristics",
     figures_path="Results/Figures",
     extension_guardado="png",
+    mostrar_experimental=True,
 ):
     """
     Plots the I-V characteristics of a device.
@@ -371,6 +392,9 @@ def plot_IV(
             se recibe (así el llamador decide la ruta, p.ej. results_dir de
             pruebas). Se crea si no existe.
         extension_guardado (str): Format to save the figure ('png', 'pdf', 'svg').
+        mostrar_experimental (bool): Si True (default), superpone el ciclo
+            experimental de referencia. Con False solo se dibuja la simulación
+            y no hace falta tener los ficheros de Datos_Experimentales.
     """
 
     os.makedirs(figures_path, exist_ok=True)
@@ -414,25 +438,11 @@ def plot_IV(
     axes.plot(v_set, i_set, color="red", linewidth=4, label="Simulation")
     axes.plot(v_reset, i_reset, color="red", linewidth=4)
 
-    # Ruta de los datos experimentales
-    # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Set_1t'
-    # ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Reset_1.txt'
-
-    ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt"
-    ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt"
-
-    # Cargar datos experimentales
-    data_set = np.loadtxt(ruta_archivo_set, skiprows=1)
-    data_reset = np.loadtxt(ruta_archivo_reset, skiprows=1)
-
-    x_set = data_set[:, 0]
-    y_set = data_set[:, 1]
-    x_reset = data_reset[:, 0]  # * (-1.0)   TODO: Importante comprobar si las medidas se leen con el signo ya o no
-    y_reset = abs(data_reset[:, 1])
-
     # Curvas experimentales
-    axes.plot(x_set, y_set, "black", label="Experimental", linewidth=2)
-    axes.plot(x_reset, y_reset, "black", linewidth=2)
+    if mostrar_experimental:
+        x_set, y_set, x_reset, y_reset = _cargar_ciclo_experimental()
+        axes.plot(x_set, y_set, "black", label="Experimental", linewidth=2)
+        axes.plot(x_reset, y_reset, "black", linewidth=2)
     # Antes ponia 2.5 de grosor de linea (antes de las medidas de arturo)
     # Leyenda ajustada en la parte inferior izquierda
     axes.legend(
@@ -477,6 +487,7 @@ def plot_IV_marcado(
     desplazamiento,
     figures_path="Results/Figures",
     extension_guardado="png",
+    mostrar_experimental=True,
 ):
     """
     Plots the I-V characteristics of a device.
@@ -490,6 +501,8 @@ def plot_IV_marcado(
         figures_path (str): Carpeta donde guardar la figura. Se respeta tal cual
             se recibe (así el llamador decide la ruta, p.ej. results_dir de
             pruebas). Se crea si no existe.
+        mostrar_experimental (bool): Si True (default), superpone el ciclo
+            experimental de referencia.
     """
 
     os.makedirs(figures_path, exist_ok=True)
@@ -536,19 +549,6 @@ def plot_IV_marcado(
     axes.plot(v_set, i_set, color="red", linewidth=4, label="SET")
     axes.plot(v_reset, i_reset, color="red", linewidth=4, label="RESET")
 
-    # Ruta de los datos experimentales
-    ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt"
-    ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt"
-
-    # Cargar datos experimentales
-    data_set = np.loadtxt(ruta_archivo_set, skiprows=1)
-    data_reset = np.loadtxt(ruta_archivo_reset, skiprows=1)
-
-    x_set = data_set[:, 0]
-    y_set = data_set[:, 1]
-    x_reset = data_reset[:, 0]  # * (-1.0)   TODO: Importante comprobar si las medidas se leen con el signo ya o no
-    y_reset = abs(data_reset[:, 1])
-
     (x_0, y_0) = next(iter(lista_puntos.values()))
     # print("Punto de referencia (0,0): ", (x_0, y_0))
     axes.scatter(
@@ -561,8 +561,10 @@ def plot_IV_marcado(
     )
 
     # Curvas experimentales
-    axes.plot(x_set, y_set, "black", label="Set Exp.", linewidth=2)
-    axes.plot(x_reset, y_reset, "black", label="Reset Exp.", linewidth=2)
+    if mostrar_experimental:
+        x_set, y_set, x_reset, y_reset = _cargar_ciclo_experimental()
+        axes.plot(x_set, y_set, "black", label="Set Exp.", linewidth=2)
+        axes.plot(x_reset, y_reset, "black", label="Reset Exp.", linewidth=2)
 
     for label, (xp, yp) in lista_puntos.items():
         dx, factor_y = desplazamiento.get(label, (0.02, 1.0))  # 1.0 = sin desplazamiento en y

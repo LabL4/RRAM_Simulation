@@ -24,6 +24,7 @@ def simulation_IV(
     roturas_dict: dict,
     marcado: bool = False,
     intensidad_minima: float = INTENSIDAD_MINIMA_DEFAULT,
+    mostrar_experimental: bool = True,
 ):
     """
     Genera UNA figura: la curva I-V sin marcar (``marcado=False``, default) o
@@ -106,6 +107,7 @@ def simulation_IV(
             num_simulation - 1,
             titulo_figura="",
             figures_path=str(figures_path),
+            mostrar_experimental=mostrar_experimental,
         )
         return None
 
@@ -166,6 +168,7 @@ def simulation_IV(
         puntos_totales,
         desplazamiento,
         figures_path=str(figures_path),
+        mostrar_experimental=mostrar_experimental,
     )
 
     return None

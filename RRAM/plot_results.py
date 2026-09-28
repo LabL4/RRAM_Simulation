@@ -70,6 +70,7 @@ def _plot_results_impl(
     marcado: bool,
     intensidad_minima: float,
     plot_forma_onda: bool = True,
+    mostrar_experimental: bool = True,
 ) -> bool:
     """Implementación compartida de `plot_results` / `plot_results_marcado`."""
     results_dir = Path(results_dir)
@@ -118,6 +119,7 @@ def _plot_results_impl(
         roturas_dict=meta.roturas_dict,
         marcado=marcado,
         intensidad_minima=intensidad_minima,
+        mostrar_experimental=mostrar_experimental,
     )
 
     # Figuras V-t / I-t de las etapas con forma de onda no legacy, con las
@@ -167,6 +169,7 @@ def plot_results(
     skip_failed: bool = True,
     intensidad_minima: float = INTENSIDAD_MINIMA_DEFAULT,
     plot_forma_onda: bool = True,
+    mostrar_experimental: bool = True,
 ) -> bool:
     """
     Genera `I-V_{N}.png` (curva sin marcar) de una simulación leyendo todo del
@@ -194,6 +197,8 @@ def plot_results(
         plot_forma_onda: Si True (default), genera además `V-t_I-t_{fase}_{N}.png`
             para cada etapa que usó una forma de onda no legacy. Con False no se
             genera ninguna.
+        mostrar_experimental: Si True (default), superpone el ciclo experimental
+            de referencia en la curva I-V.
 
     Returns:
         True si se generó la figura; False si la simulación se saltó.
@@ -210,6 +215,7 @@ def plot_results(
         marcado=False,
         intensidad_minima=intensidad_minima,
         plot_forma_onda=plot_forma_onda,
+        mostrar_experimental=mostrar_experimental,
     )
 
 
@@ -220,6 +226,7 @@ def plot_results_marcado(
     desplazamiento: Optional[dict] = None,
     skip_failed: bool = True,
     intensidad_minima: float = INTENSIDAD_MINIMA_DEFAULT,
+    mostrar_experimental: bool = True,
 ) -> bool:
     """
     Genera `I-V_marcado_{N}.png` (curva + puntos a-g) de una simulación
@@ -239,6 +246,7 @@ def plot_results_marcado(
         skip_failed=skip_failed,
         marcado=True,
         intensidad_minima=intensidad_minima,
+        mostrar_experimental=mostrar_experimental,
     )
 
 

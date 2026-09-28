@@ -110,12 +110,25 @@ def _build_parser() -> argparse.ArgumentParser:
         help="No genera las figuras V-t/I-t de las etapas con forma de onda (V-t_I-t_{fase}_{N}.png).",
     )
 
+    p_plot.add_argument(
+        "--sin-experimental",
+        action="store_true",
+        default=False,
+        help="No superpone el ciclo experimental en la curva I-V.",
+    )
+
     # plot_marcado
     p_plot_marcado = sub.add_parser(
         "plot_marcado", help="Replotea la curva I-V con puntos a-g marcados (I-V_marcado_{N}.png)."
     )
     p_plot_marcado.add_argument("num_simulation", type=int, help="Índice usado al ejecutar (offset +1).")
     p_plot_marcado.add_argument("--results-dir", default="Results")
+    p_plot_marcado.add_argument(
+        "--sin-experimental",
+        action="store_true",
+        default=False,
+        help="No superpone el ciclo experimental en la curva I-V.",
+    )
 
     # all (compat con el flujo histórico)
     p_all = sub.add_parser("all", help="init (si falta) + exec + plot.")
@@ -160,6 +173,13 @@ def _build_parser() -> argparse.ArgumentParser:
         help="No genera las figuras V-t/I-t de las etapas con forma de onda (V-t_I-t_{fase}_{N}.png).",
     )
 
+    p_all.add_argument(
+        "--sin-experimental",
+        action="store_true",
+        default=False,
+        help="No superpone el ciclo experimental en la curva I-V.",
+    )
+
     return p
 
 
@@ -202,6 +222,7 @@ def _cmd_plot(args) -> int:
             num_simulation=args.num_simulation,
             results_dir=args.results_dir,
             plot_forma_onda=not args.no_forma_onda,
+            mostrar_experimental=not args.sin_experimental,
         )
         return 0
     except FileNotFoundError as e:
@@ -216,7 +237,11 @@ def _cmd_plot_marcado(args) -> int:
     setup_logging(num_simulation=args.num_simulation, file_mode="a")
     log = logging.getLogger("RRAM.__main__")
     try:
-        plot_results_marcado(num_simulation=args.num_simulation, results_dir=args.results_dir)
+        plot_results_marcado(
+            num_simulation=args.num_simulation,
+            results_dir=args.results_dir,
+            mostrar_experimental=not args.sin_experimental,
+        )
         return 0
     except FileNotFoundError as e:
         log.error(f"plot_marcado sim={args.num_simulation}: {e}")
@@ -266,10 +291,12 @@ def _cmd_all(args) -> int:
             num_simulation=args.num_simulation + 1,
             results_dir=args.results_dir,
             plot_forma_onda=not args.no_forma_onda,
+            mostrar_experimental=not args.sin_experimental,
         )
         plot_results_marcado(
             num_simulation=args.num_simulation + 1,
             results_dir=args.results_dir,
+            mostrar_experimental=not args.sin_experimental,
         )
     except FileNotFoundError as e:
         logger.error(f"all/plot sim={args.num_simulation + 1}: {e}")
