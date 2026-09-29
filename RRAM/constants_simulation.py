@@ -61,6 +61,8 @@ class SimulationConstants:
     # histórico exacto). Viaja por el CSV como string "[('rampa', {...}), ...]".
     waveform_pp_set: Optional[list] = None
     waveform_sp_set: Optional[list] = None
+    # Voltaje [V] del primer paso de SP_set. None = un paso por debajo del último V de PP_set.
+    v_inicial_sp_set: Optional[float] = None
     waveform_pp_reset: Optional[list] = None
     waveform_sp_reset: Optional[list] = None
 

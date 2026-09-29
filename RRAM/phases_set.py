@@ -744,7 +744,13 @@ def SP_set(
     # La bajada arranca UN PASO por debajo del último voltaje de PP_set: ese voltaje
     # ya tiene su fila en los datos de PP_set y repetirlo duplicaría el pico del
     # barrido (en una medida real el voltaje máximo se mide una sola vez).
-    v_inicial_sp = voltaje_max_set - params.paso_potencial_set
+    # Si v_inicial_sp_set está definido manda sobre el último V de PP_set (p.ej. cuando
+    # PP_set acaba en 0 V, que dejaría a SP_set sin bajada). Es un voltaje SET, positivo.
+    v_inicial_cfg = getattr(sim_ctes, "v_inicial_sp_set", None)
+    if v_inicial_cfg is not None:
+        v_inicial_sp = abs(float(v_inicial_cfg))
+    else:
+        v_inicial_sp = voltaje_max_set - params.paso_potencial_set
     controller = VoltageController(
         segmentos=getattr(sim_ctes, "waveform_sp_set", None),
         paso_potencial=params.paso_potencial_set,

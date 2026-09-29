@@ -104,6 +104,8 @@ SET_RESET_DEFAULTS = {
     # Ejemplo compliance: "[('rampa', {'hasta_I': 1e-4}), ('constante', {})]"
     "waveform_pp_set": None,
     "waveform_sp_set": None,
+    # Voltaje del primer paso de SP_set [V]. None = un paso por debajo del último V de PP_set.
+    "v_inicial_sp_set": None,
     "waveform_pp_reset": None,
     "waveform_sp_reset": None,
     "voltaje_gen_oxigeno_pp_1": 1.1,
@@ -255,6 +257,7 @@ class ConfigManager:
             "lim_voltage_percolacion",
             "waveform_pp_set",
             "waveform_sp_set",
+            "v_inicial_sp_set",
             "waveform_pp_reset",
             "waveform_sp_reset",
             "voltaje_gen_oxigeno_pp_1",

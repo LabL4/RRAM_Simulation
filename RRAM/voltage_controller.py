@@ -178,6 +178,12 @@ class VoltageController:
         """
         if self.v_objetivo is None:
             return False
+        # Con forma de onda explícita solo corta la ÚLTIMA rampa: una meseta (o una
+        # rampa intermedia) que toca v_objetivo no es el fin de la fase, y un tren de
+        # pulsos con meseta = v_objetivo abortaría en el primer paso. Las mesetas
+        # terminan por sus 'pasos' (terminado); el modo legacy conserva su corte.
+        if not self.legacy and not (self.en_rampa() and self._idx == len(self.segmentos) - 1):
+            return False
         # Tolerancia para absorber el error de coma flotante acumulado por la rampa:
         # tras cientos de pasos, un objetivo de 0 V se alcanza como -1e-17 y una
         # comparación estricta daría False, haciendo que la rampa se pasase un paso
