@@ -30,7 +30,7 @@ MATERIAL_DEFAULTS = {
     # defecto igual a atom_size para reproducir exactamente el comportamiento histórico.
     "delta_z_r": 0.25e-9,
     "num_filamentos": 1,
-    "grosor_filamento": [[7]],
+    "grosor_filamento": [[3]],
     # None (defecto) → las trampas/vacantes iniciales se distribuyen con el
     # mismo grosor que grosor_filamento (comportamiento histórico). Si se fija
     # (p.ej. [10]), el sorteo de trampas en `init` usa ESE grosor en vez de
