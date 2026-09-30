@@ -24,6 +24,7 @@ import numpy as np
 
 from .constants_simulation import SimulationConstants
 from .parameters import SimulationParameters
+from .voltage_controller import ProtocoloVoltaje
 from . import Generation, utils
 
 logger = logging.getLogger(__name__)
@@ -42,6 +43,8 @@ class SimulationConfig:
     sim_ctes: SimulationConstants
     actual_state: np.ndarray
     num_trampas: int
+    # Todo el voltaje de la simulación (Init_data/simulation_voltage.csv).
+    protocolo: ProtocoloVoltaje
 
     cf_ranges: List[tuple] = field(init=False)
     cf_centros: List[int] = field(init=False)
@@ -206,6 +209,15 @@ def load_simulation_config(
             logger.info(f"grosor_filamento truncado a {num_filamentos} elemento(s): {grosor}")
         ctes = dc_replace(ctes, num_filamentos=num_filamentos, grosor_filamento=grosor)
 
+    archivo_voltaje = init_data_dir / "simulation_voltage.csv"
+    if not archivo_voltaje.is_file():
+        raise FileNotFoundError(
+            f"No existe {archivo_voltaje}. Regenera Init_data desde el notebook "
+            f"(ConfigManager.export_to_init_data) con 'protocolo_voltaje' en cada simulación."
+        )
+    filas_voltaje = utils.read_csv_to_dic(str(archivo_voltaje))
+    protocolo = ProtocoloVoltaje.desde_config(filas_voltaje[num_simulation]["protocolo_voltaje"])
+
     init_state_path = init_data_dir / f"init_state_{num_simulation}"
     actual_state = utils.cargar_estado(init_state_path)
 
@@ -217,6 +229,7 @@ def load_simulation_config(
         sim_ctes=ctes,
         actual_state=actual_state,
         num_trampas=num_trampas,
+        protocolo=protocolo,
     )
 
     logger.info(

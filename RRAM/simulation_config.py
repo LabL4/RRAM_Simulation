@@ -4,6 +4,8 @@ import itertools
 import logging
 import os
 
+from .voltage_controller import ProtocoloVoltaje
+
 logger = logging.getLogger(__name__)
 
 
@@ -75,16 +77,11 @@ SIMULATION_DEFAULTS = {
     "device_size_y": 30e-9,
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
     "num_trampas": 150,
-    # Paso temporal [s]. ENTRADA obligatoria (antes se derivaba de
-    # total_simulation_time / num_pasos, que con este valor daba 10.0/10000 = 1e-3).
-    # Cambiarlo altera la física calibrada: ver MANUAL_FORMAS_DE_ONDA.md.
+    # Paso temporal [s]. ENTRADA obligatoria. Cambiarlo altera la física
+    # calibrada: ver MANUAL_FORMAS_DE_ONDA.md.
     "paso_temporal": 1e-3,
-    "num_pasos": 10000,
-    "voltaje_final": 1.1,
-    "voltaje_final_set": 1.1,
-    # Convención: el RESET se escribe en negativo. Se acepta también en positivo;
-    # internamente se usa la magnitud y el signo lo pone la fase.
-    "voltaje_final_reset": -1.4,
+    # El voltaje NO tiene valores por defecto: cada simulación debe traer su
+    # "protocolo_voltaje" (ver RRAM.voltage_controller.ProtocoloVoltaje).
     "densidad_vacantes": 4.0,  # vacantes / nm²
     "centros_filamento": None,
 }
@@ -100,14 +97,6 @@ SET_RESET_DEFAULTS = {
     "factor_vecinos_sp_set": 1.0,
     "factor_libre_sp_set": 0.9,
     "lim_voltage_percolacion": 1.4,
-    # Forma de onda de PP_set (ver RRAM.voltage_controller). None = rampa legacy.
-    # Ejemplo compliance: "[('rampa', {'hasta_I': 1e-4}), ('constante', {})]"
-    "waveform_pp_set": None,
-    "waveform_sp_set": None,
-    # Voltaje del primer paso de SP_set [V]. None = un paso por debajo del último V de PP_set.
-    "v_inicial_sp_set": None,
-    "waveform_pp_reset": None,
-    "waveform_sp_reset": None,
     "voltaje_gen_oxigeno_pp_1": 1.1,
     "num_oxigenos_pp_reset_1": 7,  # 2
     "voltaje_gen_oxigeno_pp_2": 1.15,
@@ -210,10 +199,6 @@ class ConfigManager:
             "atom_size",
             "num_trampas",
             "paso_temporal",
-            "num_pasos",
-            "voltaje_final",
-            "voltaje_final_set",
-            "voltaje_final_reset",
             "init_temp",
             "densidad_vacantes",
         ]
@@ -255,11 +240,6 @@ class ConfigManager:
             "factor_vecinos_sp_set",
             "factor_libre_sp_set",
             "lim_voltage_percolacion",
-            "waveform_pp_set",
-            "waveform_sp_set",
-            "v_inicial_sp_set",
-            "waveform_pp_reset",
-            "waveform_sp_reset",
             "voltaje_gen_oxigeno_pp_1",
             "num_oxigenos_pp_reset_1",
             "voltaje_gen_oxigeno_pp_2",
@@ -269,6 +249,20 @@ class ConfigManager:
             "centros_filamento",  # ← añadir al final
         ]
 
+        # Protocolo de voltaje: obligatorio, validado aquí (una errata falla en el
+        # notebook y no a mitad de simulación) y exportado a su propio CSV.
+        protocolos = []
+        for sim in self.simulations:
+            if "protocolo_voltaje" not in sim.params:
+                raise ValueError(
+                    f"sim {sim.sim_id}: falta 'protocolo_voltaje'. Cada simulación debe definir su voltaje "
+                    f"(ver RRAM.voltage_controller.ProtocoloVoltaje)."
+                )
+            try:
+                protocolos.append(ProtocoloVoltaje.desde_config(sim.params["protocolo_voltaje"]))
+            except ValueError as e:
+                raise ValueError(f"sim {sim.sim_id}: protocolo_voltaje inválido: {e}") from e
+
         data_params = [{col: sim.params[col] for col in cols_params} for sim in self.simulations]
         data_ctes = [{col: sim.params[col] for col in cols_ctes} for sim in self.simulations]
 
@@ -277,5 +271,14 @@ class ConfigManager:
 
         df_params.to_csv(os.path.join(output_dir, "simulation_parameters.csv"), index=False)
         df_ctes.to_csv(os.path.join(output_dir, "simulation_constants.csv"), index=False)
+        pd.DataFrame({"protocolo_voltaje": [p.a_texto() for p in protocolos]}).to_csv(
+            os.path.join(output_dir, "simulation_voltage.csv"), index=False
+        )
+
+        # Resumen del voltaje de cada simulación: hace visible un salto o una errata
+        # aunque no se llame a voltage_controller.previsualizar().
+        for sim, p in zip(self.simulations, protocolos):
+            print(f"--- sim {sim.sim_id}: protocolo de voltaje ---")
+            print(p.resumen())
 
         logger.info(f"✅ Exportados parámetros y constantes ({len(self.simulations)} casos) a {output_dir}/")

@@ -1,20 +1,29 @@
 """
-Verificación de `RRAM.voltage_controller.VoltageController`.
+Verificación de `RRAM.voltage_controller` (ProtocoloVoltaje y VoltageController).
 
 Ejecutar desde la raíz del repo:
     python3 tests/test_voltage_controller.py
 """
 
-import json
 import sys
 from pathlib import Path
 
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from RRAM.voltage_controller import Medidas, VoltageController, parsear_segmentos  # noqa: E402
+from RRAM.voltage_controller import (  # noqa: E402
+    CondicionExigidaNoCumplida,
+    Medidas,
+    ProtocoloVoltaje,
+    VoltageController,
+    constante,
+    parsear_segmentos,
+    rampa,
+    tren_pulsos,
+)
 
-PASO = 1.1 / 10000  # paso_potencial_set típico (voltaje_final_set / num_pasos)
+DS = 1.1 / 1000
+DR = 1.4 / 1000
 
 fallos = []
 
@@ -25,214 +34,139 @@ def check(nombre, cond, detalle=""):
         fallos.append(nombre)
 
 
-def medidas(k, I=0.0, V_ant=0.0, vac=0, fils=0, percola=False):
-    return Medidas(I_total=I, V_anterior=V_ant, n_vacantes=vac, n_filamentos=fils, percola=percola, k=k)
+def medidas(k, I=0.0, vac=0, fils=0, percola=False):
+    return Medidas(I_total=I, n_vacantes=vac, n_filamentos=fils, percola=percola, k=k)
+
+
+def recorrer(c, medida=None):
+    """Voltajes que produce el controlador hasta `terminado` (como el bucle de una fase)."""
+    vs = []
+    for k in range(c.presupuesto() + 1):
+        v = c.next(medida(k) if medida else medidas(k))
+        if c.terminado:
+            break
+        vs.append(v)
+    return np.array(vs)
+
+
+def igual(vs, esperado):
+    return len(vs) == len(esperado) and np.allclose(vs, esperado)
+
+
+def falla(fn):
+    try:
+        fn()
+        return False
+    except (ValueError, CondicionExigidaNoCumplida):
+        return True
 
 
 # ---------------------------------------------------------------- 1
-print("\n[1] Modo legacy: reproduce exactamente np.arange (vector_ddp histórico)")
-N = 12000
-esperado = np.arange(0.000, 1.4 + PASO, PASO)  # mismo vector que PP_set construía
-ctrl = VoltageController(segmentos=None, paso_potencial=PASO)
-obtenido = np.array([ctrl.next(medidas(k)) for k in range(N)])
-check("legacy es bit a bit idéntico a np.arange", np.array_equal(obtenido, esperado[:N]))
-check("legacy nunca termina por sí mismo", not ctrl.terminado)
-check("legacy siempre en rampa", ctrl.en_rampa())
+print("\n[1] Rampa: misma aritmética que np.arange, extremos incluidos")
+c = VoltageController("pp_set", [rampa(0.0, 1.1, DS)])
+vs = recorrer(c)
+esperado = np.array([0.0 + k * DS for k in range(1001)])
+check("rampa 0 → 1.1 V bit a bit igual a base + k·dV", np.array_equal(vs, esperado))
+check("1001 puntos y presupuesto exacto", len(vs) == 1001 == c.presupuesto(), f"{len(vs)}, {c.presupuesto()}")
+check("termina por 'hasta'", c.completada and c.fin_por == "hasta")
+
+vs = recorrer(VoltageController("pp_reset", [rampa(0.0, -1.4, DR)]))
+check("rampa decreciente 0 → -1.4 V (dV positivo)", abs(vs[0]) < 1e-15 and abs(vs[-1] + 1.4) < 1e-12 and np.all(np.diff(vs) < 0))
+
+vs = recorrer(VoltageController("pp_set", [rampa(0.0, 1.0, 0.3)]))
+check("si dV no divide el tramo, el último punto se recorta a 'hasta'", igual(vs, [0, 0.3, 0.6, 0.9, 1.0]), f"{vs}")
 
 # ---------------------------------------------------------------- 2
-print("\n[2] Compliance de corriente: rampa hasta I >= umbral, luego V constante")
-ctrl = VoltageController(
-    segmentos=[("rampa", {"hasta_I": 1e-4}), ("constante", {})],
-    paso_potencial=PASO,
-)
-K_CRUCE = 500  # a partir de este paso la corriente medida supera el umbral
-vs = []
-for k in range(1000):
-    I = 2e-4 if k >= K_CRUCE else 1e-6
-    vs.append(ctrl.next(medidas(k, I=I, V_ant=vs[-1] if vs else 0.0)))
-vs = np.array(vs)
-# La transición se evalúa en el paso siguiente al primero con I >= umbral
-v_congelado = vs[K_CRUCE]
-check("antes del cruce la rampa es lineal", np.allclose(np.diff(vs[:K_CRUCE]), PASO))
-check("tras el cruce el voltaje queda constante", np.all(vs[K_CRUCE + 1 :] == v_congelado), f"V={v_congelado:.5f}")
-check("el segmento activo ya no es rampa", not ctrl.en_rampa())
-est = ctrl.estado()
-check("se registró 1 transición por hasta_I", len(est["transiciones"]) == 1 and est["transiciones"][0]["condicion"] == "hasta_I")
-# La medida con I >= umbral se pasa en k=K_CRUCE, así que la transición se
-# registra en ese mismo paso y el V congelado es el del paso anterior.
-check("la transición registra k y V coherentes", est["transiciones"][0]["k"] == K_CRUCE and abs(est["transiciones"][0]["V"] - v_congelado) < 1e-12)
+print("\n[2] 'anterior'")
+c = VoltageController("sp_set", [rampa("anterior", 0.0, 0.25)], v_previo=1.0)
+vs = recorrer(c)
+check("rampa 'anterior' continúa un dV más allá (no repite el punto)", igual(vs, [0.75, 0.5, 0.25, 0.0]), f"{vs}")
+check("se registra el valor resuelto", c.anterior_resuelto[0]["V"] == 1.0)
+check("el enganche lo marca como continuación", c.estado()["enganche"]["continua_anterior"])
+
+c = VoltageController("pp_set", [rampa(0.0, 1.0, 0.1, hasta_I=1e-4), constante("anterior", 3)])
+vs = recorrer(c, lambda k: medidas(k, I=2e-4 if k >= 5 else 0.0))
+check("compliance: meseta en el voltaje congelado", igual(vs, [0, 0.1, 0.2, 0.3, 0.4, 0.4, 0.4, 0.4]), f"{vs}")
+check("transición por hasta_I", c.transiciones[0].condicion == "hasta_I")
+
+c = VoltageController("sp_reset", [rampa("anterior", 0.0, 0.5), constante(0.0, 2)], v_previo=0.0)
+vs = recorrer(c)
+check("rampa 'anterior' ya en su 'hasta' no produce puntos", igual(vs, [0.0, 0.0]), f"{vs}")
 
 # ---------------------------------------------------------------- 3
-print("\n[3] Resto de condiciones de disparo")
-casos = {
-    "hasta_V": dict(config={"hasta_V": 0.5}, kwargs=lambda k, v_ant: dict(V_ant=v_ant)),
-    "hasta_vacantes": dict(config={"hasta_vacantes": 300}, kwargs=lambda k, v_ant: dict(vac=k)),
-    "hasta_filamentos": dict(config={"hasta_filamentos": 2}, kwargs=lambda k, v_ant: dict(fils=2 if k >= 100 else 1)),
-    "hasta_percolacion": dict(config={"hasta_percolacion": True}, kwargs=lambda k, v_ant: dict(percola=k >= 100)),
-}
-for nombre, caso in casos.items():
-    ctrl = VoltageController(segmentos=[("rampa", caso["config"]), ("constante", {})], paso_potencial=PASO)
-    v_ant = 0.0
-    disparo = None
-    for k in range(10000):
-        v = ctrl.next(medidas(k, **caso["kwargs"](k, v_ant)))
-        if disparo is None and not ctrl.en_rampa():
-            disparo = k
-        v_ant = v
-    est = ctrl.estado()
-    ok = len(est["transiciones"]) == 1 and est["transiciones"][0]["condicion"] == nombre
-    check(f"disparo por {nombre}", ok, f"k={est['transiciones'][0]['k'] if est['transiciones'] else '—'}")
+print("\n[3] Mesetas y trenes de pulsos")
+c = VoltageController("pp_set", tren_pulsos(1.1, 3, 0.0, 2, 2))
+vs = recorrer(c)
+check("tren de pulsos exacto", igual(vs, [1.1, 1.1, 1.1, 0, 0, 1.1, 1.1, 1.1, 0, 0]), f"{vs}")
+check("una meseta a 1.1 V no corta la etapa", c.fin_por == "pasos" and len(vs) == 10)
+check("presupuesto = suma de pasos", c.presupuesto() == 10)
 
 # ---------------------------------------------------------------- 4
-print("\n[4] Segmento constante con 'pasos': terminado al agotarlos")
-ctrl = VoltageController(
-    segmentos=[("rampa", {"hasta_V": 0.3}), ("constante", {"pasos": 50})],
-    paso_potencial=PASO,
-)
-v_ant = 0.0
-k_fin = None
-for k in range(10000):
-    v = ctrl.next(medidas(k, V_ant=v_ant))
-    v_ant = v
-    if ctrl.terminado:
-        k_fin = k
-        break
-check("terminado se activa", ctrl.terminado)
-k_transicion = ctrl.estado()["transiciones"][0]["k"]
-check("dura exactamente 'pasos' pasos en constante", k_fin is not None and k_fin - k_transicion == 50, f"transición k={k_transicion}, fin k={k_fin}")
+print("\n[4] Condiciones y 'exigir'")
+c = VoltageController("pp_set", [rampa(0.0, 1.0, 0.1, hasta_percolacion=True, exigir=True), constante("anterior", 2)])
+vs = recorrer(c, lambda k: medidas(k, percola=k >= 4))
+check("exigir cumplido: sigue al siguiente segmento", igual(vs, [0, 0.1, 0.2, 0.3, 0.3, 0.3]), f"{vs}")
+
+c = VoltageController("pp_set", [rampa(0.0, 0.3, 0.1, hasta_percolacion=True, exigir=True), constante("anterior", 2)])
+check("exigir no cumplido: aborta la etapa", falla(lambda: recorrer(c)))
+
+c = VoltageController("pp_set", [rampa(0.0, 0.3, 0.1, hasta_percolacion=True), constante("anterior", 2)])
+vs = recorrer(c)
+check("sin exigir: pasa al siguiente segmento en 'hasta'", igual(vs, [0, 0.1, 0.2, 0.3, 0.3, 0.3]), f"{vs}")
+
+c = VoltageController("pp_set", [rampa(0.0, 1.0, 0.1, pasos=3), constante("anterior", 1)])
+vs = recorrer(c)
+check("rampa con 'pasos' corta a los N puntos", igual(vs, [0, 0.1, 0.2, 0.2]), f"{vs}")
 
 # ---------------------------------------------------------------- 5
-print("\n[5] Constante con V explícito")
-ctrl = VoltageController(segmentos=[("rampa", {"hasta_V": 0.2}), ("constante", {"V": 0.15})], paso_potencial=PASO)
-v_ant = 0.0
-for k in range(5000):
-    v = ctrl.next(medidas(k, V_ant=v_ant))
-    v_ant = v
-check("mantiene el V explícito", not ctrl.en_rampa() and v_ant == 0.15)
+print("\n[5] Validación")
+malos = [
+    [("rampa", {"desde": 0.0, "hasta": 1.0})],  # falta dV
+    [("rampa", {"desde": 0.0, "hasta": 1.0, "dV": -0.1})],  # dV negativo
+    [("rampa", {"desde": 0.0, "hasta": 1.0, "dV": 0})],
+    [("rampa", {"desde": 0.5, "hasta": 0.5, "dV": 0.1})],  # desde == hasta
+    [("rampa", {"desde": 0.0, "hasta": "anterior", "dV": 0.1})],
+    [("rampa", {"desde": 0.0, "hasta": 1.0, "dV": 0.1, "V": 1.0})],  # V en rampa
+    [("constante", {"V": 1.0})],  # falta pasos
+    [("constante", {"V": 1.0, "pasos": 0})],
+    [("constante", {"V": 1.0, "pasos": 5, "dV": 0.1})],
+    [("constante", {"V": 1.0, "pasos": 5, "exigir": True})],  # exigir sin condición
+    [("constante", {"V": 1.0, "pasos": 5, "hasta_percolacion": False})],
+    [("rampa", {"desde": 0.0, "hasta": 1.0, "dV": 0.1, "hasta_V": 0.5})],  # clave eliminada
+    [("triangular", {})],
+    [],
+]
+for m in malos:
+    check(f"se rechaza {m}", falla(lambda m=m: parsear_segmentos(m, "test")))
+
+check("'anterior' sin etapa previa se rechaza", falla(lambda: VoltageController("sp_set", [rampa("anterior", 0.0, 0.1)])))
+
+base = {"pp_set": [rampa(0.0, 1.1, DS)], "sp_set": [rampa("anterior", 0.0, DS)],
+        "pp_reset": [rampa("anterior", -1.4, DR)], "sp_reset": [rampa("anterior", 0.0, DR)]}
+check("protocolo sin una etapa se rechaza", falla(lambda: ProtocoloVoltaje.desde_config({k: v for k, v in base.items() if k != "sp_reset"})))
+check("protocolo con etapa desconocida se rechaza", falla(lambda: ProtocoloVoltaje.desde_config({**base, "pp_sett": base["pp_set"]})))
+check("pp_set no puede empezar en 'anterior'", falla(lambda: ProtocoloVoltaje.desde_config({**base, "pp_set": [constante("anterior", 5)]})))
 
 # ---------------------------------------------------------------- 6
-print("\n[6] estado() es JSON-serializable")
-try:
-    json.dumps(ctrl.estado())
-    check("json.dumps(estado()) no falla", True)
-except TypeError as e:
-    check("json.dumps(estado()) no falla", False, str(e))
+print("\n[6] Protocolo: texto del CSV, enganches y recorrido")
+p = ProtocoloVoltaje.desde_config(base)
+q = ProtocoloVoltaje.desde_config(p.a_texto())
+check("a_texto → desde_config conserva la configuración", q.configuracion() == p.configuracion())
 
-# ---------------------------------------------------------------- 7
-print("\n[7] Validación de configuración")
-for raw, debe_fallar in [
-    (None, False),
-    ([("rampa", {"hasta_I": 1e-4})], False),
-    ([["rampa", {"hasta_I": 1e-4}], ["constante", {}]], False),  # listas en vez de tuplas (CSV)
-    ([("triangular", {})], True),
-    ([("rampa", {"hasta_X": 1})], True),
-    ("rampa", True),
-]:
-    try:
-        parsear_segmentos(raw)
-        fallo = False
-    except ValueError:
-        fallo = True
-    check(f"parsear_segmentos({raw!r})", fallo == debe_fallar)
+rec = p.recorrido()
+check("pp_set → sp_set continúa sin repetir el pico", abs(rec["sp_set"]["V"][0] - (1.1 - DS)) < 1e-12)
+check("pp_reset arranca un paso por debajo de 0", abs(rec["pp_reset"]["V"][0] + DR) < 1e-12)
+check("sp_reset termina en 0 V", abs(rec["sp_reset"]["V"][-1]) < 1e-12)
 
-# ---------------------------------------------------------------- 8
-print("\n[8] presupuesto(): cota superior de pasos de la fase")
-for nombre, segs, esperado in [
-    ("legacy (una rampa)", None, 10000),
-    ("fin tras meseta", [("rampa", {"hasta_I": 1e-4}), ("constante", {"pasos": 1000})], 11000),
-    ("meseta en medio", [("rampa", {"hasta_filamentos": 1}), ("constante", {"pasos": 500}), ("rampa", {})], 10500),
-    ("meseta sin 'pasos'", [("rampa", {"hasta_I": 1e-4}), ("constante", {})], 10000),
-    ("V explicito hacia atras", [("rampa", {"hasta_V": 0.8}), ("constante", {"V": 0.3, "pasos": 100}), ("rampa", {})], 14646),
-]:
-    c = VoltageController(segmentos=segs, paso_potencial=PASO, v_inicial=0.0, sentido=+1, v_objetivo=1.1)
-    p = c.presupuesto()
-    check(f"presupuesto {nombre}", p == esperado, f"{p} (esperado {esperado})")
+pulsos = ProtocoloVoltaje.desde_config({**base, "pp_set": tren_pulsos(1.1, 3, 0.0, 3, 2), "sp_set": [rampa(1.1, 0.0, DS)]})
+e = pulsos.recorrido()["sp_set"]["enganche"]
+check("un salto entre etapas queda registrado", abs(e["salto"] - 1.1) < 1e-12 and not e["continua_anterior"], f"{e}")
+check("el resumen marca el salto", "SALTO" in pulsos.resumen())
 
-# ---------------------------------------------------------------- 9
-print("\n[9] Las 4 etapas: la rampa llega EXACTO a su objetivo")
-ETAPAS = [
-    ("PP_set", 0.0, 1.1, +1, 1.1 / 10000),
-    ("SP_set", 1.1, 0.0, -1, 1.1 / 10000),
-    ("PP_reset", 0.0, -1.4, -1, 1.4 / 10000),
-    ("SP_reset", -1.4, 0.0, +1, 1.4 / 10000),
-]
-for nombre, vi, vo, sent, paso in ETAPAS:
-    c = VoltageController(segmentos=None, paso_potencial=paso, v_inicial=vi, sentido=sent, v_objetivo=vo)
-    pre = c.presupuesto()
-    v_ant, v = vi, vi
-    for k in range(pre + 1):
-        v = c.next(medidas(k, V_ant=v_ant)); v_ant = v
-        if c.objetivo_alcanzado(v):
-            break
-    check(f"{nombre}: llega a {vo:+.1f} V", abs(v - vo) < 1e-9, f"V final={v:+.6f}, pasos={pre}")
-
-# ---------------------------------------------------------------- 10
-print("\n[10] hasta_V se interpreta con el signo del rango de la etapa")
-for nombre, vi, vo, sent, paso, esperado in [
-    ("PP_set", 0.0, 1.1, +1, 1.1 / 10000, +0.8),
-    ("SP_set", 1.1, 0.0, -1, 1.1 / 10000, +0.8),
-    ("PP_reset", 0.0, -1.4, -1, 1.4 / 10000, -0.8),
-    ("SP_reset", -1.4, 0.0, +1, 1.4 / 10000, -0.8),
-]:
-    c = VoltageController(segmentos=None, paso_potencial=paso, v_inicial=vi, sentido=sent, v_objetivo=vo)
-    u = c._umbral_con_signo(0.8)
-    check(f"{nombre}: 'hasta_V: 0.8' -> {esperado:+.1f} V", abs(u - esperado) < 1e-12, f"{u:+.2f}")
-
-# ---------------------------------------------------------------- 11
-print("\n[11] Una meseta de N pasos dura EXACTAMENTE N pasos planos")
-P2 = 1.1 / 300
-c = VoltageController(
-    segmentos=[("rampa", {"hasta_V": 0.5}), ("constante", {"pasos": 50}), ("rampa", {})],
-    paso_potencial=P2, v_inicial=0.0, sentido=+1, v_objetivo=1.1,
-)
-vs, v_ant = [], 0.0
-for k in range(c.presupuesto() + 1):
-    v = c.next(medidas(k, V_ant=v_ant)); vs.append(v); v_ant = v
-    if c.objetivo_alcanzado(v):
-        break
-vs = np.array(vs)
-planos = int(np.sum(np.abs(np.diff(vs)) < 1e-12))
-check("la meseta dura 50 pasos, no 51", planos == 50, f"{planos} pasos planos")
-check("y la rampa final llega a 1.1 exacto", abs(vs[-1] - 1.1) < 1e-9, f"V={vs[-1]:.6f}")
-
-# ---------------------------------------------------------------- 12
-print("\n[12] 'V' explicito: se usa la magnitud y el signo lo pone la etapa")
-for nombre, vi, vo, sent, paso, esperado in [
-    ("PP_set", 0.0, 1.1, +1, 1.1 / 10000, +0.8),
-    ("SP_set", 1.1 - 1.1 / 10000, 0.0, -1, 1.1 / 10000, +0.8),
-    ("PP_reset", -1.4 / 10000, -1.4, -1, 1.4 / 10000, -0.8),
-    ("SP_reset", -1.4 + 1.4 / 10000, 0.0, +1, 1.4 / 10000, -0.8),
-]:
-    aplicados = []
-    for v in (0.8, -0.8):
-        c = VoltageController(segmentos=[("constante", {"V": v, "pasos": 5})], paso_potencial=paso, v_inicial=vi, sentido=sent, v_objetivo=vo)
-        aplicados.append(c.next(medidas(0)))
-    check(f"{nombre}: 'V' = +0.8 y -0.8 aplican {esperado:+.1f} V", all(abs(a - esperado) < 1e-12 for a in aplicados), f"{aplicados}")
-
-c = VoltageController(segmentos=[("constante", {"V": 0.8, "pasos": 10}), ("rampa", {})], paso_potencial=1.4 / 10000, v_inicial=-1.4 / 10000, sentido=-1, v_objetivo=-1.4)
-vs, v_ant = [], -1.4 / 10000
-for k in range(c.presupuesto() + 1):
-    v = c.next(medidas(k, V_ant=v_ant)); vs.append(v); v_ant = v
-    if c.objetivo_alcanzado(v):
-        break
-# Desde -0.8 V el objetivo -1.4 V no cae en la rejilla de pasos (4285.71 pasos), así que
-# la rampa se detiene en el primer punto que lo alcanza: hasta un paso más allá.
-check("PP_reset: meseta 'V'=+0.8 seguida de rampa no cruza el cero", max(vs) < 0 and -1.4 - 1.4 / 10000 < vs[-1] <= -1.4, f"V {vs[0]:+.3f} -> {vs[-1]:+.6f}")
-
-# ---------------------------------------------------------------- 13
-print("\n[13] voltaje_final_reset / _set: se aceptan con cualquier signo")
-from RRAM.parameters import SimulationParameters  # noqa: E402
-
-BASE = dict(device_size_x=10e-9, device_size_y=35e-9, atom_size=0.25e-9, num_trampas=150, paso_temporal=1e-3, num_pasos=10000, voltaje_final_reset=1.4, voltaje_final_set=1.1, init_temp=300.0, densidad_vacantes=4.0)
-p_pos = SimulationParameters(**BASE)
-p_neg = SimulationParameters(**{**BASE, "voltaje_final_reset": -1.4, "voltaje_final_set": -1.1})
-check("-1.4 y +1.4 dan el mismo paso_potencial_reset", p_pos.paso_potencial_reset == p_neg.paso_potencial_reset > 0, f"{p_neg.paso_potencial_reset:+.2e}")
-check("-1.1 y +1.1 dan el mismo paso_potencial_set", p_pos.paso_potencial_set == p_neg.paso_potencial_set > 0, f"{p_neg.paso_potencial_set:+.2e}")
-try:
-    SimulationParameters(**{**BASE, "voltaje_final_reset": 0.0})
-    check("voltaje_final_reset = 0 se rechaza", False, "no lanzo error")
-except ValueError:
-    check("voltaje_final_reset = 0 se rechaza", True)
+c = p.controlador("pp_set")
+recorrer(c)
+check("controlador(sp_set) toma V_fin del estado previo", abs(p.controlador("sp_set", previo={"voltaje": c.estado()}).v_previo - 1.1) < 1e-12)
+check("informe() incluye configuración y ejecución", set(p.informe()) == {"configuracion", "ejecucion"} and "pp_set" in p.informe()["ejecucion"])
 
 # ----------------------------------------------------------------
 print(f"\n{'=' * 60}")

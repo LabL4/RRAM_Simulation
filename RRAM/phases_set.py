@@ -22,7 +22,7 @@ from .filament_tracking import (
 )
 from .parameters import SimulationParameters
 from .state_updates import update_state_generation
-from .voltage_controller import Medidas, VoltageController
+from .voltage_controller import Medidas, ProtocoloVoltaje
 import logging
 
 logger = logging.getLogger(__name__)
@@ -34,6 +34,7 @@ def PP_set(
     sim_ctes: SimulationConstants,
     CF_ranges: List[tuple],
     CF_creado: np.ndarray,
+    protocolo: ProtocoloVoltaje,
     CF_centros: List[int] | None = None,
     actual_state: np.ndarray | None = None,
     usar_muro: bool = True,
@@ -53,6 +54,7 @@ def PP_set(
             factor of generation, and material properties.
         CF_ranges (List[tuple]): List of tuples defining the ranges for conductive filaments.
         CF_creado (np.ndarray): Boolean array indicating whether each conductive filament has been created.
+        protocolo (ProtocoloVoltaje): Protocolo de voltaje; da el controlador de la etapa pp_set.
         CF_centros (List[int] | None): Centro vertical de cada filamento esperado.
         actual_state (np.ndarray | None): Estado inicial precargado. Si es None,
             se carga desde `Init_data/init_state_{num_simulation - 1}` por
@@ -90,7 +92,7 @@ def PP_set(
     total_vacantes_pp_set = False
     num_pasos_guardar_estado = 50
     cf_clean_matrix = None
-    voltaje_percolacion = params.voltaje_final_set
+    voltaje_percolacion = None
 
     # --- TEMPORAL: pausa de generación tras percolar (quitar cuando ya no haga falta) ---
     k_percolacion = None
@@ -122,24 +124,11 @@ def PP_set(
     current = 0.0
     E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
 
-    # Controlador de la forma de onda: sustituye al antiguo vector_ddp rígido.
-    # Sin waveform_pp_set en el CSV es una rampa legacy idéntica a np.arange.
-    controller = VoltageController(
-        segmentos=getattr(sim_ctes, "waveform_pp_set", None),
-        paso_potencial=params.paso_potencial_set,
-        v_inicial=0.0,
-        sentido=+1,
-        v_objetivo=params.voltaje_final_set,
-    )
-    # Presupuesto de pasos de la fase: lo dicta la forma de onda, no `num_pasos`.
-    # Así una meseta de voltaje constante AÑADE duración en lugar de robarle pasos
-    # a las rampas (que es lo que impedía a la última rampa llegar a voltaje_final_set).
+    # Todo el voltaje lo decide el protocolo (RRAM.voltage_controller). El
+    # presupuesto es la cota superior de puntos de la forma de onda.
+    controller = protocolo.controlador("pp_set")
     presupuesto = controller.presupuesto()
-    voltage_anterior = 0.0
-    logger.info(f"El paso de potencial para la parte de set es: {params.paso_potencial_set} ")
-    logger.info(f"Presupuesto de pasos de PP_set: {presupuesto} (num_pasos del CSV: {params.num_pasos})")
-    if not controller.legacy:
-        logger.info(f"Forma de onda de PP_set: {controller.segmentos}")
+    voltage_anterior = controller.v_previo
 
     centros_calculados = CF_centros
 
@@ -211,7 +200,6 @@ def PP_set(
         voltage = controller.next(
             Medidas(
                 I_total=float(current),
-                V_anterior=voltage_anterior,
                 n_vacantes=int(total_vacantes),
                 n_filamentos=int(np.sum(CF_creado)),
                 percola=sistema_percola,
@@ -230,9 +218,8 @@ def PP_set(
                 grid_size=params.atom_size,
             )
 
-        # VÍA 2 — la forma de onda se ha agotado (el último segmento consumió sus
-        # 'pasos'). Se corta ANTES de la física para que una meseta dure exactamente
-        # los pasos pedidos y no uno más.
+        # La forma de onda ha terminado (su último segmento acabó en el paso
+        # anterior). Se corta ANTES de la física para no añadir un punto de más.
         if controller.terminado:
             break
 
@@ -556,12 +543,6 @@ def PP_set(
             )
         # endregion
 
-        # VÍA 1 — la rampa ha llegado al voltaje objetivo de la fase. Se comprueba
-        # DESPUÉS de guardar, para que el punto del voltaje final entre en los datos
-        # (un barrido de 0 a 1.1 V incluye el punto de 1.1 V).
-        if controller.objetivo_alcanzado(voltage):
-            break
-
     # Recorto a las filas realmente escritas (la forma de onda pudo terminar antes
     # de agotar el presupuesto, que es solo una cota superior).
     # NOTA: no se puede filtrar por NaN, porque las filas pre-percolación llevan NaN
@@ -574,14 +555,12 @@ def PP_set(
     if not sistema_percola:
         raise exceptions.NoPercolationException()
 
-    # Último voltaje aplicado y guardado: es de donde arranca la bajada de SP_set.
-    voltaje_max_set = float(data_pp_set[-1, 1])
     # Traspaso de tiempo a la fase siguiente: el instante que le tocaría a la fila
     # siguiente, expresado sobre el contador de pasos (no sobre cuántas filas se
     # hayan decidido volcar a disco).
     tiempo_pp_set = params.paso_temporal * n_filas
     logger.info(
-        f"PP_set termina: {n_filas} filas, V final {voltaje_max_set:.5f} V, t traspaso {tiempo_pp_set:.5f} s"
+        f"PP_set termina: {n_filas} filas, V final {data_pp_set[-1, 1]:.5f} V, t traspaso {tiempo_pp_set:.5f} s"
     )
 
     # Guardo el estado final si el último k no cayó en múltiplo de num_pasos_guardar_estado
@@ -643,7 +622,6 @@ def PP_set(
         "sim_ctes": sim_ctes,
         "params": params,
         "Temperatura_final": temperatura,
-        "voltaje_max_set": voltaje_max_set,
         "voltaje_percolacion": voltaje_percolacion,
         "tiempo_pp_set": tiempo_pp_set,
         "current_final": current,
@@ -652,9 +630,9 @@ def PP_set(
         "CF_centros": CF_centros,
         "creaciones_dict": creaciones_dict,
         "T_max_fils": T_max_fils,
-        # Estado final de la forma de onda (segmento, transiciones disparadas):
-        # JSON-serializable, viaja a phase_state_*.json y a la metadata.
-        "waveform_estado": controller.estado(),
+        # Estado del voltaje de la etapa (JSON-serializable): la etapa siguiente
+        # lee de aquí su V_fin para resolver 'anterior' y comprobar el enganche.
+        "voltaje": controller.estado(),
     }
 
     return final_state_pp_set
@@ -664,6 +642,7 @@ def SP_set(
     final_state_pp_set: dict,
     num_simulation: int,
     CF_ranges: List[tuple],
+    protocolo: ProtocoloVoltaje,
     usar_muro: bool = True,
     results_dir: str = "Results",
 ) -> dict:
@@ -682,10 +661,11 @@ def SP_set(
             - "sistema_percola": Boolean indicating if the system has percolated.
             - "sim_ctes": Simulation constants.
             - "params": Simulation parameters.
-            - "voltaje_max_set": Maximum voltage for the set process.
+            - "voltaje": Estado del voltaje de PP_set (su V_fin).
             - "Temperatura_final": Final temperature from the previous step.
         num_simulation (int): The simulation number, used for saving results.
         CF_ranges (List[tuple]): A list of tuples defining the ranges for classifying conductive filaments.
+        protocolo (ProtocoloVoltaje): Protocolo de voltaje; da el controlador de la etapa sp_set.
     Returns:
         dict: A dictionary containing the final state of the system after the "set" process.
         It includes the following keys:
@@ -712,7 +692,6 @@ def SP_set(
     sim_ctes = final_state_pp_set["sim_ctes"]
     params = final_state_pp_set["params"]
     utils.aplicar_semilla(params)
-    voltaje_max_set = final_state_pp_set["voltaje_max_set"]
     tiempo_pp_set = final_state_pp_set["tiempo_pp_set"]
     current = final_state_pp_set["current_final"]
     max_vancantes_pp_set = final_state_pp_set["ocupacion_percola"]
@@ -734,36 +713,12 @@ def SP_set(
     # Elimino las columnas 0 y ultima de la matriz de temperatura porque corresponden a los electrodos
     temperatura_anterior = final_state_pp_set["Temperatura_final"][:, 1:-1]
 
-    logger.info(f"El paso de potencial para sp set es: {params.paso_potencial_set} ")
-
-    # Controlador de la bajada: parte del último voltaje aplicado por PP_set (sea el
-    # final de la rampa o el de una meseta) y baja hasta 0 V.
-    # SP_set ya NO hereda su duración de PP_set (antes k_max = k_maxima - 1): con
-    # formas de onda esa herencia hacía que la bajada cruzase el cero hacia voltajes
-    # negativos. Ahora el presupuesto sale de su propia excursión de voltaje.
-    # La bajada arranca UN PASO por debajo del último voltaje de PP_set: ese voltaje
-    # ya tiene su fila en los datos de PP_set y repetirlo duplicaría el pico del
-    # barrido (en una medida real el voltaje máximo se mide una sola vez).
-    # Si v_inicial_sp_set está definido manda sobre el último V de PP_set (p.ej. cuando
-    # PP_set acaba en 0 V, que dejaría a SP_set sin bajada). Es un voltaje SET, positivo.
-    v_inicial_cfg = getattr(sim_ctes, "v_inicial_sp_set", None)
-    if v_inicial_cfg is not None:
-        v_inicial_sp = abs(float(v_inicial_cfg))
-    else:
-        v_inicial_sp = voltaje_max_set - params.paso_potencial_set
-    controller = VoltageController(
-        segmentos=getattr(sim_ctes, "waveform_sp_set", None),
-        paso_potencial=params.paso_potencial_set,
-        v_inicial=v_inicial_sp,
-        sentido=-1,
-        v_objetivo=0.0,
-    )
+    # Todo el voltaje lo decide el protocolo; de PP_set solo se toma su V final
+    # (para 'anterior' y para el informe de enganche).
+    controller = protocolo.controlador("sp_set", previo=final_state_pp_set)
     presupuesto = controller.presupuesto()
-    voltage_anterior = v_inicial_sp
+    voltage_anterior = controller.v_previo
     n_filas = 0
-    logger.info(f"Presupuesto de pasos de SP_set: {presupuesto} (bajada desde {v_inicial_sp:.5f} V)")
-    if not controller.legacy:
-        logger.info(f"Forma de onda de SP_set: {controller.segmentos}")
 
     E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
 
@@ -814,7 +769,6 @@ def SP_set(
         voltage = controller.next(
             Medidas(
                 I_total=float(current),
-                V_anterior=voltage_anterior,
                 n_vacantes=int(total_vacantes),
                 n_filamentos=N,
                 percola=sistema_percola,
@@ -823,7 +777,7 @@ def SP_set(
         )
         voltage_anterior = voltage
 
-        # VÍA 2 — forma de onda agotada: se corta antes de la física.
+        # La forma de onda ha terminado: se corta antes de la física.
         if controller.terminado:
             break
 
@@ -1044,11 +998,6 @@ def SP_set(
         data_sp_set[k] = fila
         n_filas = k + 1
 
-        # VÍA 1 — la bajada ha llegado a 0 V. Se comprueba DESPUÉS de guardar para
-        # que el punto de 0 V entre en los datos.
-        if controller.objetivo_alcanzado(voltage):
-            break
-
     # Recorto a las filas realmente escritas y calculo el traspaso a PP_reset.
     data_sp_set = data_sp_set[:n_filas]
     tiempo_sp_set = tiempo_pp_set + params.paso_temporal * n_filas
@@ -1087,7 +1036,7 @@ def SP_set(
         "centros_calculados": CF_centros,
         "tiempo_sp_set": tiempo_sp_set,
         "T_max_fils": T_max_fils,
-        "waveform_estado": controller.estado(),
+        "voltaje": controller.estado(),
     }
 
     np.savez(rutas["simulation_path"] / f"Final_state_sp_set_{num_simulation}.npz", actual_state)

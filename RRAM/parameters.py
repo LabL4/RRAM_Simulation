@@ -14,15 +14,11 @@ class SimulationParameters:
     num_trampas: int
     # Paso temporal [s]. Es ENTRADA del CSV, no un valor derivado: `dt` aparece
     # dentro de la física (probabilidad de generación en Generation.py, de
-    # recombinación y desplazamiento de iones en Recombination.py), así que si se
-    # derivase de `num_pasos` cualquier cambio del número de pasos movería `dt` en
-    # silencio y perturbaría la calibración del modelo. Fijándolo aquí, `num_pasos`
-    # solo gobierna el paso de potencial y el presupuesto de pasos de cada fase.
+    # recombinación y desplazamiento de iones en Recombination.py).
     # CUIDADO: cambiar su valor SÍ invalida la calibración (ver MANUAL_FORMAS_DE_ONDA.md).
+    # El voltaje (formas de onda, pasos de potencial) NO está aquí: vive entero en
+    # RRAM.voltage_controller.ProtocoloVoltaje.
     paso_temporal: float
-    num_pasos: int
-    voltaje_final_reset: float
-    voltaje_final_set: float
     init_temp: float
     densidad_vacantes: float
 
@@ -35,35 +31,11 @@ class SimulationParameters:
     x_size: int = field(init=False)
     y_size: int = field(init=False)
     num_max_vacantes: int = field(init=False)
-    # Duración NOMINAL de una fase [s] = num_pasos * paso_temporal. Es un valor
-    # derivado e informativo: la duración REAL de una fase es
-    # (pasos ejecutados) * paso_temporal, que con formas de onda puede ser menor
-    # (la fase termina antes) o mayor (mesetas que extienden el presupuesto).
-    total_simulation_time: float = field(init=False)
-    paso_potencial_set: float = field(init=False)
-    paso_potencial_reset: float = field(init=False)
 
     def __post_init__(self):
         self.x_size = int(np.ceil(self.device_size_x / self.atom_size))  # Número de "casillas" en la dimensión x
         self.y_size = int(np.ceil(self.device_size_y / self.atom_size))  # Número de "casillas" en la dimensión y
         self.num_max_vacantes = int(0.95 * (self.x_size * self.y_size))  # 95% de la matriz puede llenarse de vacantes
-        self.total_simulation_time = self.num_pasos * self.paso_temporal  # Duración nominal en segundos
-
-        # Los voltajes finales se guardan como MAGNITUD. El signo lo pone cada fase
-        # (el RESET se aplica en negativo), así que el usuario puede escribir en el CSV
-        # `-1.4` o `1.4` para el RESET y obtiene la misma simulación. Sin esto, un
-        # voltaje_final_reset negativo se invertía por doble negación en las fases
-        # de RESET, que ya le anteponen el signo menos.
-        self.voltaje_final_set = abs(self.voltaje_final_set)
-        self.voltaje_final_reset = abs(self.voltaje_final_reset)
-        for nombre in ("voltaje_final_set", "voltaje_final_reset"):
-            if getattr(self, nombre) == 0:
-                raise ValueError(
-                    f"'{nombre}' no puede valer 0: define la excursión de voltaje de la fase y el paso de potencial."
-                )
-
-        self.paso_potencial_set = self.voltaje_final_set / self.num_pasos  # Paso de voltaje para la parte de set
-        self.paso_potencial_reset = self.voltaje_final_reset / self.num_pasos  # Paso de voltaje para la parte de reset
 
     def __repr__(self):
         # Crear lista de líneas con "nombre=valor" para cada atributo

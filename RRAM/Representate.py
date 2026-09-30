@@ -1376,7 +1376,7 @@ def plot_Vt_It(
         v: Vector de voltajes aplicados [V] (columna 1 de datos_sim).
         i: Vector de corrientes [A] (columna 2 de datos_sim).
         filename: Ruta completa del archivo de salida (con extensión).
-        transiciones: Lista de dicts del waveform_estado de la metadata
+        transiciones: Lista de dicts de protocolo_voltaje → ejecucion → {fase} de la metadata
             ({"k": paso, "V": voltaje, "condicion": nombre}); cada una se marca
             con una línea vertical discontinua en su tiempo t[k].
         titulo: Título global de la figura.

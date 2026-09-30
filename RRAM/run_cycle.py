@@ -121,11 +121,7 @@ def _save_partial_metadata(
     roturas = sp_reset.get("roturas_dict", {}) or {}
     vecindad_inicial = sp_set.get("vecindad_inicial", None)
 
-    # Internamente voltaje_final_reset es una magnitud (SimulationParameters la
-    # normaliza); en la metadata se documenta con el signo con el que se aplica,
-    # negativo, igual que aparece en los datos de salida del RESET.
     params_dict = serialize_dataclass(cfg.params)
-    params_dict["voltaje_final_reset"] = -abs(params_dict["voltaje_final_reset"])
 
     meta = SimulationMetadata(
         num_simulation=n_save,
@@ -138,6 +134,9 @@ def _save_partial_metadata(
         # para auditar/reproducir aunque cambie el CSV original.
         params_dict=params_dict,
         ctes_dict=serialize_dataclass(cfg.sim_ctes),
+        # Todo el voltaje: lo pedido (configuracion) y lo que pasó en cada etapa
+        # ejecutada (ejecucion), también si la etapa falló a mitad.
+        protocolo_voltaje=cfg.protocolo.informe(),
         extra={
             "status": status,
             # Tramo del ciclo realmente ejecutado. Se guardan las fases efectivas,
@@ -150,18 +149,6 @@ def _save_partial_metadata(
             "seed": cfg.params.seed,
             # Pico de temperatura de cada filamento, por fase.
             "temperaturas_max": _temperaturas_max_por_fase(states),
-            # Forma de onda de PP_set: config y transiciones disparadas. Cambia
-            # la física de la corrida, así que se persiste como muro_termico/seed.
-            **{
-                f"waveform_{fase}": getattr(cfg.sim_ctes, f"waveform_{fase}")
-                for fase in PHASE_ORDER
-                if getattr(cfg.sim_ctes, f"waveform_{fase}", None) is not None
-            },
-            **{
-                f"waveform_estado_{fase}": (getattr(states, fase) or {}).get("waveform_estado")
-                for fase in PHASE_ORDER
-                if (getattr(states, fase) or {}).get("waveform_estado") is not None
-            },
             **({"error": error} if error else {}),
             **({"vecindad_inicial": vecindad_inicial} if vecindad_inicial is not None else {}),
         },
@@ -240,21 +227,21 @@ def run_cycle(
     fases_all = [
         ("pp_set",   lambda: PP_set(
             num_simulation=n_save, params=cfg.params, sim_ctes=cfg.sim_ctes,
-            CF_ranges=cfg.cf_ranges, CF_creado=cfg.cf_creado,
+            CF_ranges=cfg.cf_ranges, CF_creado=cfg.cf_creado, protocolo=cfg.protocolo,
             CF_centros=cfg.cf_centros, actual_state=cfg.actual_state,
             usar_muro=usar_muro, results_dir=results_dir,
         )),
         ("sp_set",   lambda: SP_set(
             final_state_pp_set=states.pp_set, num_simulation=n_save,
-            CF_ranges=cfg.cf_ranges, usar_muro=usar_muro, results_dir=results_dir,
+            CF_ranges=cfg.cf_ranges, protocolo=cfg.protocolo, usar_muro=usar_muro, results_dir=results_dir,
         )),
         ("pp_reset", lambda: PP_reset(
             final_state_sp_set=states.sp_set, num_simulation=n_save,
-            CF_ranges=cfg.cf_ranges, usar_muro=usar_muro, results_dir=results_dir,
+            CF_ranges=cfg.cf_ranges, protocolo=cfg.protocolo, usar_muro=usar_muro, results_dir=results_dir,
         )),
         ("sp_reset", lambda: SP_reset(
             final_state_pp_reset=states.pp_reset, num_simulation=n_save,
-            CF_ranges=cfg.cf_ranges, results_dir=results_dir,
+            CF_ranges=cfg.cf_ranges, protocolo=cfg.protocolo, results_dir=results_dir,
         )),
     ]
 

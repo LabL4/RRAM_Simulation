@@ -122,8 +122,7 @@ def _plot_results_impl(
         mostrar_experimental=mostrar_experimental,
     )
 
-    # Figuras V-t / I-t de las etapas con forma de onda no legacy, con las
-    # transiciones marcadas. Solo en el plot sin marcar, para no duplicarlas
+    # Figuras V-t / I-t de cada etapa ejecutada, con las transiciones marcadas. Solo en el plot sin marcar, para no duplicarlas
     # cuando `all` lanza plot + plot_marcado.
     if not marcado and plot_forma_onda:
         for fase in TODAS_FASES:
@@ -133,14 +132,14 @@ def _plot_results_impl(
 
 
 def _plot_forma_onda(meta, simulation_path: Path, figures_dir: Path, num_simulation: int, fase: str) -> None:
-    """Dibuja V-t/I-t de una etapa si la metadata registra en ella una forma de onda no legacy."""
-    estado = (meta.extra or {}).get(f"waveform_estado_{fase}")
-    if not estado or estado.get("legacy", False):
+    """Dibuja V-t/I-t de una etapa si la metadata registra su ejecución."""
+    estado = ((meta.protocolo_voltaje or {}).get("ejecucion") or {}).get(fase)
+    if not estado:
         return
 
     data_file = simulation_path / f"Data_{fase}_{num_simulation}.npz"
     if not data_file.is_file():
-        logger.warning(f"waveform_estado_{fase} presente pero falta {data_file.name}; se omite V-t/I-t.")
+        logger.warning(f"La metadata registra la etapa {fase} pero falta {data_file.name}; se omite V-t/I-t.")
         return
 
     d = np.load(data_file)
@@ -195,8 +194,8 @@ def plot_results(
             Cualquier punto con |I| por debajo se descarta antes de dibujar
             (ruido de fondo cerca de I=0 en la escala log).
         plot_forma_onda: Si True (default), genera además `V-t_I-t_{fase}_{N}.png`
-            para cada etapa que usó una forma de onda no legacy. Con False no se
-            genera ninguna.
+            para cada etapa ejecutada (según `protocolo_voltaje` de la metadata).
+            Con False no se genera ninguna.
         mostrar_experimental: Si True (default), superpone el ciclo experimental
             de referencia en la curva I-V.
 

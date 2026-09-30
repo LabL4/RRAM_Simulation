@@ -56,15 +56,6 @@ class SimulationConstants:
     voltaje_gen_oxigeno_sp: float
     num_oxigenos_sp_reset: int
     centros_filamento: Optional[List[int]] = None  # ← nuevo
-    # Forma de onda de voltaje de PP_set: lista de segmentos (modo, opciones)
-    # que interpreta RRAM.voltage_controller. None = rampa legacy (comportamiento
-    # histórico exacto). Viaja por el CSV como string "[('rampa', {...}), ...]".
-    waveform_pp_set: Optional[list] = None
-    waveform_sp_set: Optional[list] = None
-    # Voltaje [V] del primer paso de SP_set. None = un paso por debajo del último V de PP_set.
-    v_inicial_sp_set: Optional[float] = None
-    waveform_pp_reset: Optional[list] = None
-    waveform_sp_reset: Optional[list] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SimulationConstants":
@@ -97,7 +88,7 @@ class SimulationConstants:
                 value_stripped = value.strip()
 
                 # Celda vacía o "None" del CSV → None (campos opcionales como
-                # waveform_pp_set o centros_filamento sin valor).
+                # centros_filamento sin valor).
                 if value_stripped in ("", "None", "none", "nan"):
                     parsed_data[key] = None
                     continue

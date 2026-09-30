@@ -14,7 +14,7 @@ from . import (
 )
 from .filament_tracking import procesar_filamentos_destruidos
 from .state_updates import update_state_recombinate
-from .voltage_controller import Medidas, VoltageController
+from .voltage_controller import Medidas, ProtocoloVoltaje
 import logging
 
 logger = logging.getLogger(__name__)
@@ -24,6 +24,7 @@ def PP_reset(
     final_state_sp_set: dict,
     num_simulation: int,
     CF_ranges: List[tuple],
+    protocolo: ProtocoloVoltaje,
     num_pasos_guardar_estado: int = 50,  # Antes era cada 2000
     usar_muro: bool = True,
     results_dir: str = "Results",
@@ -42,6 +43,7 @@ def PP_reset(
 
          - num_simulation (int): The simulation number, used for file naming and tracking.
          - CF_ranges (List[tuple]): A list of tuples defining the ranges for conductive filaments (CFs).
+         - protocolo (ProtocoloVoltaje): Protocolo de voltaje; da el controlador de la etapa pp_reset.
     Returns:
         None. The function performs the simulation, updates the system's state, and saves
         intermediate results (e.g., figures, data files) to disk.
@@ -115,25 +117,12 @@ def PP_reset(
 
     E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
 
-    # Controlador de la bajada del RESET: arranca un paso por debajo de 0 V (SP_set
-    # ya dejó su fila en 0 V; repetirla duplicaría el paso por cero del ciclo) y baja
-    # hasta -voltaje_final_reset. El presupuesto sale de su propia excursión más las
-    # mesetas que declare su forma de onda.
-    v_inicial_ppr = -params.paso_potencial_reset
-    controller = VoltageController(
-        segmentos=getattr(sim_ctes, "waveform_pp_reset", None),
-        paso_potencial=params.paso_potencial_reset,
-        v_inicial=v_inicial_ppr,
-        sentido=-1,
-        v_objetivo=-params.voltaje_final_reset,
-    )
+    # Todo el voltaje lo decide el protocolo; de SP_set solo se toma su V final
+    # (para 'anterior' y para el informe de enganche).
+    controller = protocolo.controlador("pp_reset", previo=final_state_sp_set)
     presupuesto = controller.presupuesto()
-    voltage_anterior = v_inicial_ppr
+    voltage_anterior = controller.v_previo
     n_filas = 0
-    logger.info(f"El paso de potencial para la parte de set es: {params.paso_potencial_reset} ")
-    logger.info(f"Presupuesto de pasos de PP_reset: {presupuesto}")
-    if not controller.legacy:
-        logger.info(f"Forma de onda de PP_reset: {controller.segmentos}")
 
     # El presupuesto es una COTA SUPERIOR: se reservan presupuesto+1 filas y al final
     # se recortan las no usadas si la forma de onda terminó antes.
@@ -159,7 +148,6 @@ def PP_reset(
         voltage = controller.next(
             Medidas(
                 I_total=float(current),
-                V_anterior=voltage_anterior,
                 n_vacantes=int(np.sum(actual_state)),
                 n_filamentos=int(np.sum(~CF_destruido)),
                 percola=percola,  # del paso anterior: is_path es A* y ya se evalúa más abajo
@@ -168,7 +156,7 @@ def PP_reset(
         )
         voltage_anterior = voltage
 
-        # VÍA 2 — forma de onda agotada: se corta antes de la física.
+        # La forma de onda ha terminado: se corta antes de la física.
         if controller.terminado:
             break
 
@@ -375,11 +363,6 @@ def PP_reset(
                 mapa_resistencias=locals().get("R_local"),
             )
 
-        # VÍA 1 — la rampa ha llegado al voltaje objetivo. Se comprueba DESPUÉS de
-        # guardar para que el punto de -voltaje_final_reset entre en los datos.
-        if controller.objetivo_alcanzado(voltage):
-            break
-
     # Recorto a las filas realmente escritas y calculo el traspaso a SP_reset.
     data_pp_reset = data_pp_reset[:n_filas]
     # Traspaso a SP_reset: instante ABSOLUTO que le tocaría a la fila siguiente.
@@ -438,7 +421,8 @@ def PP_reset(
         "voltage_CF_destruido": voltage_CF_destruido,
         "CF_destruido_index": CF_destruido_index,
         "roturas_dict": roturas_dict,
-        "waveform_estado": controller.estado(),
+        # Estado del voltaje de la etapa: la siguiente lee de aquí su V_fin.
+        "voltaje": controller.estado(),
         "temperatura_final": temperatura,
         "centros_calculados": CF_centros,
         "T_max_fils": T_max_fils,
@@ -453,6 +437,7 @@ def SP_reset(
     final_state_pp_reset: dict,
     num_simulation: int,
     CF_ranges: List[tuple],
+    protocolo: ProtocoloVoltaje,
     num_pasos_guardar_estado: int = 50,
     results_dir: str = "Results",
 ):
@@ -522,27 +507,16 @@ def SP_reset(
 
     E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
 
-    # Controlador de la vuelta a 0 V: arranca un paso por encima del voltaje final de
-    # PP_reset (esa fila ya existe allí) y sube hasta 0 V.
-    v_inicial_spr = -params.voltaje_final_reset + params.paso_potencial_reset
-    controller = VoltageController(
-        segmentos=getattr(sim_ctes, "waveform_sp_reset", None),
-        paso_potencial=params.paso_potencial_reset,
-        v_inicial=v_inicial_spr,
-        sentido=+1,
-        v_objetivo=0.0,
-    )
+    # Todo el voltaje lo decide el protocolo; de PP_reset solo se toma su V final
+    # (para 'anterior' y para el informe de enganche).
+    controller = protocolo.controlador("sp_reset", previo=final_state_pp_reset)
     presupuesto = controller.presupuesto()
-    voltage_anterior = v_inicial_spr
+    voltage_anterior = controller.v_previo
     n_filas = 0
     # Igual que en PP_reset: el controlador lee la corriente del paso anterior y en
     # k=0 todavía no hay ninguna. No afecta a ninguna condición porque `next()` no
     # evalúa transiciones en el primer paso.
     current = 0.0
-    logger.info(f"El paso de potencial para la parte de set es: {params.paso_potencial_reset} ")
-    logger.info(f"Presupuesto de pasos de SP_reset: {presupuesto}")
-    if not controller.legacy:
-        logger.info(f"Forma de onda de SP_reset: {controller.segmentos}")
 
     data_sp_reset = np.zeros((presupuesto + 1, num_columnas), dtype=np.float64)
     resistencia_vector = np.zeros((presupuesto + 1, 3), dtype=np.float64)
@@ -555,7 +529,6 @@ def SP_reset(
         voltage = controller.next(
             Medidas(
                 I_total=float(current),
-                V_anterior=voltage_anterior,
                 n_vacantes=int(np.sum(actual_state)),
                 n_filamentos=int(np.sum(~CF_destruido)),
                 percola=percola,
@@ -564,7 +537,7 @@ def SP_reset(
         )
         voltage_anterior = voltage
 
-        # VÍA 2 — forma de onda agotada: se corta antes de la física.
+        # La forma de onda ha terminado: se corta antes de la física.
         if controller.terminado:
             break
 
@@ -755,11 +728,6 @@ def SP_reset(
                 mapa_resistencias=locals().get("R_local"),
             )
 
-        # VÍA 1 — la rampa ha vuelto a 0 V. Se comprueba DESPUÉS de guardar para que
-        # el punto de 0 V entre en los datos.
-        if controller.objetivo_alcanzado(voltage):
-            break
-
     # Recorto a las filas realmente escritas.
     data_sp_reset = data_sp_reset[:n_filas]
     resistencia_vector = resistencia_vector[:n_filas]
@@ -807,7 +775,8 @@ def SP_reset(
         "CF_destruido": CF_destruido,
         "roturas_dict": roturas_dict,
         "T_max_fils": T_max_fils,
-        "waveform_estado": controller.estado(),
+        # Estado del voltaje de la etapa: la siguiente lee de aquí su V_fin.
+        "voltaje": controller.estado(),
     }
 
     logger.info(f"Temperatura máxima por filamento en sp_reset: {T_max_fils} K")
