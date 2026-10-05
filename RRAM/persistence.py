@@ -78,12 +78,17 @@ class SimulationMetadata:
 
     num_simulation: int
     voltaje_percolacion: float
+    # Fila de Data_pp_set en que el sistema percola por primera vez (None si no percoló).
+    paso_percolacion: Optional[int] = None
     creaciones_dict: Dict[Any, Any] = field(default_factory=dict)
     roturas_dict: Dict[Any, Any] = field(default_factory=dict)
     centros_calculados: Optional[list] = None
     cf_ranges: Optional[list] = None
     params_dict: Dict[str, Any] = field(default_factory=dict)
     ctes_dict: Dict[str, Any] = field(default_factory=dict)
+    # Bloque de RRAM.voltage_controller.ProtocoloVoltaje.informe(): la
+    # configuración de voltaje de las cuatro etapas y lo que ocurrió en cada una.
+    protocolo_voltaje: Optional[Dict[str, Any]] = None
     extra: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:

@@ -2,7 +2,8 @@
 
 import numpy as np
 
-from . import Generation, Recombination
+from . import Recombination
+from . import Generation
 from .constants_simulation import SimulationConstants
 from .parameters import SimulationParameters
 
@@ -119,7 +120,7 @@ def update_state_generation(
 
 def update_state_recombinate(
     voltage: float,
-    E_field: float,
+    E_field_filas: np.ndarray,
     oxygen_config: dict,
     sim_ctes: SimulationConstants,
     params: SimulationParameters,
@@ -146,7 +147,7 @@ def update_state_recombinate(
         paso_temp=params.paso_temporal,
         oxygen_state=oxygen_state,
         temperature=temperatura,
-        E_field=E_field,
+        E_field_filas=E_field_filas,
         grid_size=params.atom_size,
         vibration_frequency=sim_ctes.vibration_frequency,
         gamma_drift=sim_ctes.gamma_drift,

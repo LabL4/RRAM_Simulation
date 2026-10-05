@@ -7,14 +7,14 @@ from typing import List
 import numpy as np
 
 from . import (
-    CurrentSolver,
-    ElectricField,
-    Generation,
-    Percolation,
-    Temperature,
-    exceptions,
     utils,
 )
+from . import CurrentSolver
+from . import ElectricField
+from . import Generation
+from . import Percolation
+from . import Temperature
+from . import exceptions
 from .constants_simulation import SimulationConstants
 from .filament_tracking import (
     actualizar_parametros_por_filamento,
@@ -22,6 +22,7 @@ from .filament_tracking import (
 )
 from .parameters import SimulationParameters
 from .state_updates import update_state_generation
+from .voltage_controller import Medidas, ProtocoloVoltaje
 import logging
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,8 @@ def PP_set(
     sim_ctes: SimulationConstants,
     CF_ranges: List[tuple],
     CF_creado: np.ndarray,
+    protocolo: ProtocoloVoltaje,
+    num_pasos_guardar_estado: int,
     CF_centros: List[int] | None = None,
     actual_state: np.ndarray | None = None,
     usar_muro: bool = True,
@@ -52,6 +55,8 @@ def PP_set(
             factor of generation, and material properties.
         CF_ranges (List[tuple]): List of tuples defining the ranges for conductive filaments.
         CF_creado (np.ndarray): Boolean array indicating whether each conductive filament has been created.
+        protocolo (ProtocoloVoltaje): Protocolo de voltaje; da el controlador de la etapa pp_set.
+        num_pasos_guardar_estado (int): Cada cuántos pasos se guarda el estado intermedio.
         CF_centros (List[int] | None): Centro vertical de cada filamento esperado.
         actual_state (np.ndarray | None): Estado inicial precargado. Si es None,
             se carga desde `Init_data/init_state_{num_simulation - 1}` por
@@ -61,7 +66,6 @@ def PP_set(
     Raises:
         exceptions.MaxVacantesException: Raised if the maximum number of vacancies is exceeded.
         exceptions.NoPercolationException: Raised if the system does not percolate.
-        exceptions.HighPercolationVoltageException: Raised if the percolation voltage is too high.
         exceptions.NullResistanceException: Raised if the resistance becomes null during the simulation.
 
     Returns:
@@ -87,20 +91,9 @@ def PP_set(
 
     sistema_percola = False
     total_vacantes_pp_set = False
-    num_pasos_guardar_estado = 50
     cf_clean_matrix = None
-    voltaje_percolacion = params.voltaje_final_set
-
-    # --- TEMPORAL: pausa de generación tras percolar (quitar cuando ya no haga falta) ---
-    k_percolacion = None
-    PASOS_PAUSA_GENERACION_POST_PERCOLACION = 0
-    # --- FIN TEMPORAL ---
-
-    # Voltaje a partir del cual, una vez percolado el sistema, se reduce gamma para
-    # frenar la dinámica de crecimiento del filamento. Se ajusta manualmente.
-    V_crecimiento = 0.85
-    factor_crecimiento = 1.65
-    gamma_actualizada = False
+    voltaje_percolacion = None
+    paso_percolacion = None  # fila de Data_pp_set en que percola por primera vez
 
     # AL inicio como la corriente es de tipo poole frenkel, la resitencia ohmica se considera nula
     resistencia = 0.0
@@ -120,8 +113,12 @@ def PP_set(
     temperatura = params.init_temp
     current = 0.0
     E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
-    vector_ddp = np.arange(0.000, params.voltaje_final_reset + params.paso_potencial_set, params.paso_potencial_set)
-    logger.info(f"El paso de potencial para la parte de set es: {params.paso_potencial_set} ")
+
+    # Todo el voltaje lo decide el protocolo (RRAM.voltage_controller). El
+    # presupuesto es la cota superior de puntos de la forma de onda.
+    controller = protocolo.controlador("pp_set")
+    presupuesto = controller.presupuesto()
+    voltage_anterior = controller.v_previo
 
     centros_calculados = CF_centros
 
@@ -136,10 +133,12 @@ def PP_set(
     cols += [f"T_{i}[K]" for i in range(1, N + 1)]
     header_pp_set = ",".join(cols)
 
-    # Defino la matriz para almacenar los datos
-    data_pp_set = np.zeros((params.num_pasos, num_columnas), dtype=np.float64)
-    resistencia_vector = np.zeros((params.num_pasos, 3), dtype=np.float64)
-    num_vacantes_total = np.zeros((params.num_pasos, 3), dtype=np.float64)
+    # Defino la matriz para almacenar los datos. El presupuesto es una COTA SUPERIOR:
+    # se reservan presupuesto+1 filas (k = 0 … presupuesto) y al final se recortan
+    # las que no se hayan usado si la forma de onda terminó antes.
+    data_pp_set = np.zeros((presupuesto + 1, num_columnas), dtype=np.float64)
+    resistencia_vector = np.zeros((presupuesto + 1, 3), dtype=np.float64)
+    num_vacantes_total = np.zeros((presupuesto + 1, 3), dtype=np.float64)
 
     logger.info(f"El grosor de los filamentos es de {sim_ctes.grosor_filamento} filas")
 
@@ -174,21 +173,30 @@ def PP_set(
 
     logger.info(f"Simulacion {num_simulation} - Primera parte del set")
     all_CFs_created = False
+    # Filas realmente escritas. Se lleva aparte del contador del bucle porque la
+    # fase puede salir por tres vías distintas y el recorte final debe ser el mismo.
+    n_filas = 0
 
-    for k in range(0, params.num_pasos + 1):
+    for k in range(0, presupuesto + 1):
         total_vacantes = np.sum(actual_state)
 
         if total_vacantes > int(params.num_max_vacantes):
             # Si se llena el 90 del espacio de la matriz salto a otra simulación. Ponerlo aqui puede dar el problema de que nada mas empezar esté lleno y de error, pero eso NO debe pasar asi q no me preocupa.
-            raise exceptions.MaxVacantesException(k=k - 1, voltage=vector_ddp[k - 1])
-        else:
-            # Verifica si el sistema ha percolado
-            if (k == params.num_pasos - 1) and (not sistema_percola):
-                raise exceptions.NoPercolationException()
+            raise exceptions.MaxVacantesException(k=k - 1, voltage=voltage_anterior)
 
-        # Actualizo el tiempo de simulación y el voltaje
+        # Actualizo el tiempo de simulación y el voltaje. El controlador decide
+        # con las medidas del paso ANTERIOR (mismo convenio que la temperatura).
         simulation_time = params.paso_temporal * k
-        voltage = vector_ddp[k]
+        voltage = controller.next(
+            Medidas(
+                I_total=float(current),
+                n_vacantes=int(total_vacantes),
+                n_filamentos=int(np.sum(CF_creado)),
+                percola=sistema_percola,
+                k=k,
+            )
+        )
+        voltage_anterior = voltage
 
         # Genero el vector campo eléctrico
         for i in range(0, actual_state.shape[0]):
@@ -200,39 +208,21 @@ def PP_set(
                 grid_size=params.atom_size,
             )
 
-        # Verifica si el sistema ha percolado
-        if voltage >= params.voltaje_final_set:
-            if not sistema_percola:
-                raise exceptions.NoPercolationException()
-
-            voltaje_max_set = vector_ddp[k]
-            tiempo_pp_set = params.paso_temporal * (
-                k - 1
-            )  # Le quitamos un paso porque se ha superado el voltaje de ruptura
-
-            logger.info(f"Voltaje final set {voltaje_max_set} en el tiempo {tiempo_pp_set} ")
-            # Recorto por índice las filas válidas (0..k-2). Se descuenta un paso
-            # porque en este paso ya se ha superado el voltaje final del set.
-            # NOTA: no se puede filtrar por NaN, porque las filas pre-percolación
-            # llevan NaN legítimo en las columnas R_total/I_fils/R_fils (aún no hay
-            # filamento conductor) y ese filtro borraría toda la rama pp_set.
-            data_pp_set = data_pp_set[: k - 1]
+        # La forma de onda ha terminado (su último segmento acabó en el paso
+        # anterior). Se corta ANTES de la física para no añadir un punto de más.
+        if controller.terminado:
             break
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
         if Percolation.is_path(actual_state):
             # Si es la primera vez que percola, siste_percola será falso y entra aquí
             if sistema_percola is False:
-                k_percolacion = k  # TEMPORAL: usado para pausar la generación tras percolar
                 voltaje_percolacion = voltage  # Guardo el voltaje de percolación
+                paso_percolacion = k
                 ocupacion_percola = np.sum(actual_state)
                 logger.info(
                     f"\nEl sistema ha percolado en la iteración: {k}  que corresponde con el voltaje: {round(voltaje_percolacion, 5)}  con una ocupación del: {round((np.sum(actual_state) / (params.num_max_vacantes)), 4) * 100} que corresponde con un numero de vacantes de: {int(np.sum(actual_state))} "
                 )
-
-                if voltaje_percolacion >= sim_ctes.lim_voltage_percolacion:
-                    # Si el voltaje de percolación es demasiado alto no va a coincidir con los datos experimentales, y no merece la pena seguir con la simulación
-                    raise exceptions.HighPercolationVoltageException(voltage_percola=voltaje_percolacion)
 
                 # Verificar si temperatura es un float y convertirlo a matriz
                 if isinstance(temperatura, (float, int)):
@@ -255,6 +245,7 @@ def PP_set(
                     voltage_CF_creado=voltage_CF_creado,
                     actual_state=actual_state,
                     num_simulation=num_simulation,
+                    k=k,
                     creaciones_dict=creaciones_dict,
                     etapa="pp_set",
                 )
@@ -279,10 +270,6 @@ def PP_set(
 
                 # Actualizamos el historial para que no vuelva a entrar en iteraciones futuras
                 filamentos_previos = filamentos_actuales
-
-            if sistema_percola and voltage >= V_crecimiento and not gamma_actualizada:
-                sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma * factor_crecimiento)
-                gamma_actualizada = True
 
             cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf, actual_state)
 
@@ -374,7 +361,7 @@ def PP_set(
                         Q_map=Q_source_map,
                         thermal_props=sim_ctes.propiedades_termicas,
                         atom_size=params.atom_size,
-                        T_ambient=params.init_temp,
+                        T_ambient=sim_ctes.Temperatura_electrodo,
                         matriz_muros=matriz_temperaturas_fijas_final,
                     )
                 else:
@@ -384,7 +371,7 @@ def PP_set(
                         Q_map=Q_source_map,
                         thermal_props=sim_ctes.propiedades_termicas,
                         atom_size=params.atom_size,
-                        T_ambient=params.init_temp,
+                        T_ambient=sim_ctes.Temperatura_electrodo,
                         matriz_muros=None,
                     )
 
@@ -451,24 +438,19 @@ def PP_set(
                 ) * (params.device_size_y)
 
         if total_vacantes < max_vancantes_pp_set:
-            # TEMPORAL: tras percolar, no se genera ninguna vacante durante N pasos (ver init de k_percolacion)
-            pausa_generacion_post_percolacion = (
-                k_percolacion is not None and (k - k_percolacion) < PASOS_PAUSA_GENERACION_POST_PERCOLACION
+            # Actualizo el estado del sistema
+            actual_state, probabilidad_matrix = update_state_generation(
+                actual_state,
+                params,
+                sim_ctes,
+                E_field_vector,
+                temperatura,
+                sim_ctes.factor_vecinos_pp_set,
+                sim_ctes.factor_libre_pp_set,
+                max_vancantes_pp_set,
+                custom_mask=limit_CF_witdh_mask_generation,
+                num_iteracion=k,
             )
-            if not pausa_generacion_post_percolacion:
-                # Actualizo el estado del sistema
-                actual_state, probabilidad_matrix = update_state_generation(
-                    actual_state,
-                    params,
-                    sim_ctes,
-                    E_field_vector,
-                    temperatura,
-                    sim_ctes.factor_vecinos_pp_set,
-                    sim_ctes.factor_libre_pp_set,
-                    max_vancantes_pp_set,
-                    custom_mask=limit_CF_witdh_mask_generation,
-                    num_iteracion=k,
-                )
 
         elif not total_vacantes_pp_set:
             logger.info(
@@ -481,6 +463,7 @@ def PP_set(
         # Guardo los datos de la simulación
         fila = [simulation_time, voltage, current, R_total] + I_fils + R_fils + T_fils
         data_pp_set[k] = fila
+        n_filas = k + 1
 
         if locals().get("resistencia") is not None:
             resistencia_vector[k] = np.array([k, voltage, resistencia])
@@ -538,6 +521,42 @@ def PP_set(
             )
         # endregion
 
+    # Recorto a las filas realmente escritas (la forma de onda pudo terminar antes
+    # de agotar el presupuesto, que es solo una cota superior).
+    # NOTA: no se puede filtrar por NaN, porque las filas pre-percolación llevan NaN
+    # legítimo en R_total/I_fils/R_fils (aún no hay filamento) y ese filtro borraría
+    # toda la rama pp_set.
+    data_pp_set = data_pp_set[:n_filas]
+    resistencia_vector = resistencia_vector[:n_filas]
+    num_vacantes_total = num_vacantes_total[:n_filas]
+
+    data_encabezados = {
+        "datos_simulacion": header_pp_set,
+        "vacantes": "paso, Voltaje [V], Total Vacantes",  # Correcto, porque solo hay 1 columna
+        "resistencia": "paso, Voltaje [V], Resistencia [Ohm]",  # Correcto, porque solo hay 1 columna
+    }
+
+    # Guardo los datos de la simulacion ANTES de comprobar la percolación: si no
+    # percola, la sim falla igual, pero queda Data_pp_set para plotear V-t / I-t.
+    utils.guardar_datos(
+        save_path_data=rutas["simulation_path"] / f"Data_pp_set_{num_simulation}",
+        headers=data_encabezados,
+        datos_sim=data_pp_set,
+        vacantes=num_vacantes_total,
+        resistencia=resistencia_vector,
+    )
+
+    if not sistema_percola:
+        raise exceptions.NoPercolationException()
+
+    # Traspaso de tiempo a la fase siguiente: el instante que le tocaría a la fila
+    # siguiente, expresado sobre el contador de pasos (no sobre cuántas filas se
+    # hayan decidido volcar a disco).
+    tiempo_pp_set = params.paso_temporal * n_filas
+    logger.info(
+        f"PP_set termina: {n_filas} filas, V final {data_pp_set[-1, 1]:.5f} V, t traspaso {tiempo_pp_set:.5f} s"
+    )
+
     # Guardo el estado final si el último k no cayó en múltiplo de num_pasos_guardar_estado
     if k % num_pasos_guardar_estado != 0:
         utils.guardar_estado_intermedio(
@@ -565,21 +584,6 @@ def PP_set(
             CF_esperados=len(CF_ranges),
         )
 
-    data_encabezados = {
-        "datos_simulacion": header_pp_set,
-        "vacantes": "paso, Voltaje [V], Total Vacantes",  # Correcto, porque solo hay 1 columna
-        "resistencia": "paso, Voltaje [V], Resistencia [Ohm]",  # Correcto, porque solo hay 1 columna
-    }
-
-    # Guardo los datos de la simulacion
-    utils.guardar_datos(
-        save_path_data=rutas["simulation_path"] / f"Data_pp_set_{num_simulation}",
-        headers=data_encabezados,
-        datos_sim=data_pp_set,
-        vacantes=num_vacantes_total,
-        resistencia=resistencia_vector,
-    )
-
     # Guardo el estado final
     np.savez(rutas["simulation_path"] / f"Final_state_{num_simulation}_pp_set.npz", actual_state)
 
@@ -597,15 +601,18 @@ def PP_set(
         "sim_ctes": sim_ctes,
         "params": params,
         "Temperatura_final": temperatura,
-        "voltaje_max_set": voltaje_max_set,
         "voltaje_percolacion": voltaje_percolacion,
-        "tiempo_pp_set": simulation_time,
+        "paso_percolacion": paso_percolacion,
+        "tiempo_pp_set": tiempo_pp_set,
         "current_final": current,
         "ocupacion_percola": ocupacion_percola,
         "intensidad_final": current,
         "CF_centros": CF_centros,
         "creaciones_dict": creaciones_dict,
         "T_max_fils": T_max_fils,
+        # Estado del voltaje de la etapa (JSON-serializable): la etapa siguiente
+        # lee de aquí su V_fin para resolver 'anterior' y comprobar el enganche.
+        "voltaje": controller.estado(),
     }
 
     return final_state_pp_set
@@ -615,6 +622,8 @@ def SP_set(
     final_state_pp_set: dict,
     num_simulation: int,
     CF_ranges: List[tuple],
+    protocolo: ProtocoloVoltaje,
+    num_pasos_guardar_estado: int,
     usar_muro: bool = True,
     results_dir: str = "Results",
 ) -> dict:
@@ -633,10 +642,12 @@ def SP_set(
             - "sistema_percola": Boolean indicating if the system has percolated.
             - "sim_ctes": Simulation constants.
             - "params": Simulation parameters.
-            - "voltaje_max_set": Maximum voltage for the set process.
+            - "voltaje": Estado del voltaje de PP_set (su V_fin).
             - "Temperatura_final": Final temperature from the previous step.
         num_simulation (int): The simulation number, used for saving results.
         CF_ranges (List[tuple]): A list of tuples defining the ranges for classifying conductive filaments.
+        protocolo (ProtocoloVoltaje): Protocolo de voltaje; da el controlador de la etapa sp_set.
+        num_pasos_guardar_estado (int): Cada cuántos pasos se guarda el estado intermedio.
     Returns:
         dict: A dictionary containing the final state of the system after the "set" process.
         It includes the following keys:
@@ -659,12 +670,10 @@ def SP_set(
     actual_state = final_state_pp_set["actual_state"]
     logger.info(f"El número inicial de vacantes es: {np.sum(actual_state)}")
 
-    k_max = final_state_pp_set["k_maxima"] - 1
     sistema_percola = final_state_pp_set["sistema_percola"]
     sim_ctes = final_state_pp_set["sim_ctes"]
     params = final_state_pp_set["params"]
     utils.aplicar_semilla(params)
-    voltaje_max_set = final_state_pp_set["voltaje_max_set"]
     tiempo_pp_set = final_state_pp_set["tiempo_pp_set"]
     current = final_state_pp_set["current_final"]
     max_vancantes_pp_set = final_state_pp_set["ocupacion_percola"]
@@ -678,7 +687,6 @@ def SP_set(
     ocupacion_max_sp_set = 0 + 0  # 0.35
     max_vancantes_sp_set = max_vancantes_pp_set + int(ocupacion_max_sp_set * params.num_max_vacantes)
     total_vacantes_sp_set = False
-    num_pasos_guardar_estado = 50
     rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="set", results_dir=results_dir)
 
     temperatura_anterior = final_state_pp_set["Temperatura_final"]
@@ -686,8 +694,12 @@ def SP_set(
     # Elimino las columnas 0 y ultima de la matriz de temperatura porque corresponden a los electrodos
     temperatura_anterior = final_state_pp_set["Temperatura_final"][:, 1:-1]
 
-    logger.info(f"El paso de potencial para sp set es: {params.paso_potencial_set} ")
-    vector_ddp = np.arange(voltaje_max_set, 0.000, -params.paso_potencial_set)
+    # Todo el voltaje lo decide el protocolo; de PP_set solo se toma su V final
+    # (para 'anterior' y para el informe de enganche).
+    controller = protocolo.controlador("sp_set", previo=final_state_pp_set)
+    presupuesto = controller.presupuesto()
+    voltage_anterior = controller.v_previo
+    n_filas = 0
 
     E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
 
@@ -703,7 +715,7 @@ def SP_set(
     cols += [f"T_{i}[K]" for i in range(1, N + 1)]
     header_sp_set = ",".join(cols)
 
-    data_sp_set = np.zeros((k_max, num_columnas), dtype=np.float64)
+    data_sp_set = np.zeros((presupuesto + 1, num_columnas), dtype=np.float64)
 
     # Máximo histórico de temperatura de cada filamento en esta fase (solo pasos FVM).
     T_max_fils: List[float | None] = [None] * N
@@ -726,20 +738,29 @@ def SP_set(
     # )
 
     logger.info(f"Simulacion {num_simulation} - Segunda parte del set")
-    for k in range(0, k_max):
+    for k in range(0, presupuesto + 1):
         total_vacantes = np.sum(actual_state)
 
         if total_vacantes > int(params.num_max_vacantes):
             # Si se llena el 90 del espacio de la matriz salto a otra simulación. Ponerlo aqui puede dar el problema de que nada mas empezar esté lleno y de error, pero eso NO debe pasar asi q no me preocupa.
-            raise exceptions.MaxVacantesException(k=k - 1, voltage=vector_ddp[k - 1])
-        else:
-            # Verifica si el sistema ha percolado
-            if (k == params.num_pasos - 1) and (not sistema_percola):
-                raise exceptions.NoPercolationException()
+            raise exceptions.MaxVacantesException(k=k - 1, voltage=voltage_anterior)
 
         # Actualizo el tiempo de simulación y el voltaje
         simulation_time = params.paso_temporal * k
-        voltage = vector_ddp[k]
+        voltage = controller.next(
+            Medidas(
+                I_total=float(current),
+                n_vacantes=int(total_vacantes),
+                n_filamentos=N,
+                percola=sistema_percola,
+                k=k,
+            )
+        )
+        voltage_anterior = voltage
+
+        # La forma de onda ha terminado: se corta antes de la física.
+        if controller.terminado:
+            break
 
         # Genero el vector campo eléctrico
         for i in range(0, actual_state.shape[0]):
@@ -868,7 +889,7 @@ def SP_set(
                     Q_map=Q_source_map,
                     thermal_props=sim_ctes.propiedades_termicas,
                     atom_size=params.atom_size,
-                    T_ambient=params.init_temp,
+                    T_ambient=sim_ctes.Temperatura_electrodo,
                     matriz_muros=matriz_temperaturas_fijas_final,
                 )
             else:
@@ -877,7 +898,7 @@ def SP_set(
                     Q_map=Q_source_map,
                     thermal_props=sim_ctes.propiedades_termicas,
                     atom_size=params.atom_size,
-                    T_ambient=params.init_temp,
+                    T_ambient=sim_ctes.Temperatura_electrodo,
                     matriz_muros=None,
                 )
 
@@ -956,8 +977,14 @@ def SP_set(
         # Guardo los datos de la simulación
         fila = [simulation_time + tiempo_pp_set, voltage, current, R_total] + I_fils + R_fils + T_fils
         data_sp_set[k] = fila
+        n_filas = k + 1
 
-    tiempo_sp_set = simulation_time + tiempo_pp_set
+    # Recorto a las filas realmente escritas y calculo el traspaso a PP_reset.
+    data_sp_set = data_sp_set[:n_filas]
+    tiempo_sp_set = tiempo_pp_set + params.paso_temporal * n_filas
+    logger.info(
+        f"SP_set termina: {n_filas} filas, V final {data_sp_set[-1, 1]:.5f} V, t traspaso {tiempo_sp_set:.5f} s"
+    )
 
     # Guardo el estado final si el último k no cayó en múltiplo de num_pasos_guardar_estado
     if k % num_pasos_guardar_estado != 0:
@@ -990,6 +1017,7 @@ def SP_set(
         "centros_calculados": CF_centros,
         "tiempo_sp_set": tiempo_sp_set,
         "T_max_fils": T_max_fils,
+        "voltaje": controller.estado(),
     }
 
     np.savez(rutas["simulation_path"] / f"Final_state_sp_set_{num_simulation}.npz", actual_state)

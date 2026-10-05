@@ -40,19 +40,6 @@ from .phases_set import PP_set, SP_set
 logger = logging.getLogger(__name__)
 
 
-# Desplazamientos por defecto para anotaciones de la curva I-V. NO se persiste
-# en metadata (es preferencia de plot, no propiedad de la simulación).
-DESPLAZAMIENTO_IV_DEFAULT = {
-    "a": (0.025, 1.0),
-    "b": (+0.005, 0.27),
-    "c": (0.02, 0.35),
-    "d": (0.02, 1.0),
-    "e": (-0.11, 0.66),
-    "f": (0.025, 0.25),
-    "g": (-0.12, 1),
-}
-
-
 @dataclass
 class SimulationStates:
     """Estados finales de las 4 fases del ciclo."""
@@ -117,21 +104,30 @@ def _save_partial_metadata(
     sp_reset = states.sp_reset or {}
 
     voltaje_perco = pp_set.get("voltaje_percolacion", 0.0)
+    paso_perco = pp_set.get("paso_percolacion")
     creaciones = pp_set.get("creaciones_dict", {}) or {}
-    roturas = sp_reset.get("roturas_dict", {}) or {}
+    # SP_reset recibe y amplía el roturas_dict de PP_reset: se toma el más avanzado
+    # disponible, para no perder las roturas si el ciclo se detiene en pp_reset.
+    roturas = (sp_reset or states.pp_reset or {}).get("roturas_dict", {}) or {}
     vecindad_inicial = sp_set.get("vecindad_inicial", None)
+
+    params_dict = serialize_dataclass(cfg.params)
 
     meta = SimulationMetadata(
         num_simulation=n_save,
         voltaje_percolacion=float(voltaje_perco) if voltaje_perco is not None else 0.0,
+        paso_percolacion=int(paso_perco) if paso_perco is not None else None,
         creaciones_dict=creaciones,
         roturas_dict=roturas,
         centros_calculados=list(cfg.cf_centros) if cfg.cf_centros else None,
         cf_ranges=[list(t) for t in cfg.cf_ranges],
         # Snapshot de la configuración usada para esta sim — fuente de verdad
         # para auditar/reproducir aunque cambie el CSV original.
-        params_dict=serialize_dataclass(cfg.params),
+        params_dict=params_dict,
         ctes_dict=serialize_dataclass(cfg.sim_ctes),
+        # Todo el voltaje: lo pedido (configuracion) y lo que pasó en cada etapa
+        # ejecutada (ejecucion), también si la etapa falló a mitad.
+        protocolo_voltaje=cfg.protocolo.informe(),
         extra={
             "status": status,
             # Tramo del ciclo realmente ejecutado. Se guardan las fases efectivas,
@@ -159,7 +155,6 @@ def run_cycle(
     start_from: Optional[str] = None,
     stop_at: Optional[str] = None,
     init_data_dir: Path | str = "Init_data",
-    desplazamiento_iv: Optional[dict] = None,  # noqa: ARG001 (kept for API stability)
     usar_muro: bool = True,
 ) -> SimulationStates:
     """
@@ -177,8 +172,6 @@ def run_cycle(
             ``None`` (defecto) el ciclo termina en ``sp_reset``.
         init_data_dir: Carpeta donde se leen/escriben los estados de fase
             (``phase_state_*.npz`` / ``.json``).  Por defecto ``"Init_data"``.
-        desplazamiento_iv: Aceptado por compatibilidad pero NO persistido
-            (es preferencia de plot, no estado de simulación).
 
     Returns:
         `SimulationStates` con los dicts de estado de las fases ejecutadas.
@@ -222,21 +215,28 @@ def run_cycle(
     fases_all = [
         ("pp_set",   lambda: PP_set(
             num_simulation=n_save, params=cfg.params, sim_ctes=cfg.sim_ctes,
-            CF_ranges=cfg.cf_ranges, CF_creado=cfg.cf_creado,
+            CF_ranges=cfg.cf_ranges, CF_creado=cfg.cf_creado, protocolo=cfg.protocolo,
+            num_pasos_guardar_estado=cfg.sim_ctes.pasos_guardar_estado,
             CF_centros=cfg.cf_centros, actual_state=cfg.actual_state,
             usar_muro=usar_muro, results_dir=results_dir,
         )),
         ("sp_set",   lambda: SP_set(
             final_state_pp_set=states.pp_set, num_simulation=n_save,
-            CF_ranges=cfg.cf_ranges, usar_muro=usar_muro, results_dir=results_dir,
+            CF_ranges=cfg.cf_ranges, protocolo=cfg.protocolo,
+            num_pasos_guardar_estado=cfg.sim_ctes.pasos_guardar_estado,
+            usar_muro=usar_muro, results_dir=results_dir,
         )),
         ("pp_reset", lambda: PP_reset(
             final_state_sp_set=states.sp_set, num_simulation=n_save,
-            CF_ranges=cfg.cf_ranges, usar_muro=usar_muro, results_dir=results_dir,
+            CF_ranges=cfg.cf_ranges, protocolo=cfg.protocolo,
+            num_pasos_guardar_estado=cfg.sim_ctes.pasos_guardar_estado,
+            usar_muro=usar_muro, results_dir=results_dir,
         )),
         ("sp_reset", lambda: SP_reset(
             final_state_pp_reset=states.pp_reset, num_simulation=n_save,
-            CF_ranges=cfg.cf_ranges, results_dir=results_dir,
+            CF_ranges=cfg.cf_ranges, protocolo=cfg.protocolo,
+            num_pasos_guardar_estado=cfg.sim_ctes.pasos_guardar_estado,
+            results_dir=results_dir,
         )),
     ]
 

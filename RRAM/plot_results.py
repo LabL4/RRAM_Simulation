@@ -26,8 +26,7 @@ import re
 import numpy as np
 
 from .persistence import load_metadata, save_metadata
-from .run_cycle import DESPLAZAMIENTO_IV_DEFAULT
-from .iv_analysis import INTENSIDAD_MINIMA_DEFAULT, simulation_IV
+from .iv_analysis import INTENSIDAD_MINIMA_DEFAULT, PUNTOS_IV, simulation_IV
 
 logger = logging.getLogger(__name__)
 
@@ -65,10 +64,12 @@ def _plot_results_impl(
     num_simulation: int,
     results_dir: Path | str,
     figures_dir: Optional[Path | str],
-    desplazamiento: Optional[dict],
+    puntos_iv: Optional[dict],
     skip_failed: bool,
     marcado: bool,
     intensidad_minima: float,
+    plot_forma_onda: bool = True,
+    mostrar_experimental: bool = True,
 ) -> bool:
     """Implementación compartida de `plot_results` / `plot_results_marcado`."""
     results_dir = Path(results_dir)
@@ -99,8 +100,6 @@ def _plot_results_impl(
     figures_dir = Path(figures_dir)
     figures_dir.mkdir(parents=True, exist_ok=True)
 
-    desp = desplazamiento or DESPLAZAMIENTO_IV_DEFAULT
-
     logger.info(
         f"Replot({'marcado' if marcado else 'sin marcar'}) · sim={num_simulation} · status={status} · "
         f"V_perco={meta.voltaje_percolacion:.4f}V · "
@@ -112,22 +111,63 @@ def _plot_results_impl(
         num_simulation=num_simulation,
         figures_path=figures_dir,
         simulation_path=simulation_path,
-        desplazamiento=desp,
-        voltaje_percolacion=meta.voltaje_percolacion,
+        # Sin tabla explícita se usa la lista por defecto; simulation_IV escribe
+        # en el log la que se aplica.
+        puntos_iv=puntos_iv if puntos_iv is not None else PUNTOS_IV,
+        paso_percolacion=meta.paso_percolacion,
+        creaciones_dict=meta.creaciones_dict,
         roturas_dict=meta.roturas_dict,
         marcado=marcado,
         intensidad_minima=intensidad_minima,
+        mostrar_experimental=mostrar_experimental,
     )
+
+    # Figuras V-t / I-t de cada etapa ejecutada, con las transiciones marcadas. Solo en el plot sin marcar, para no duplicarlas
+    # cuando `all` lanza plot + plot_marcado.
+    if not marcado and plot_forma_onda:
+        for fase in TODAS_FASES:
+            _plot_forma_onda(meta, simulation_path, figures_dir, num_simulation, fase)
+
     return True
+
+
+def _plot_forma_onda(meta, simulation_path: Path, figures_dir: Path, num_simulation: int, fase: str) -> None:
+    """Dibuja V-t/I-t de una etapa si la metadata registra su ejecución."""
+    estado = ((meta.protocolo_voltaje or {}).get("ejecucion") or {}).get(fase)
+    if not estado:
+        return
+
+    data_file = simulation_path / f"Data_{fase}_{num_simulation}.npz"
+    if not data_file.is_file():
+        logger.warning(f"La metadata registra la etapa {fase} pero falta {data_file.name}; se omite V-t/I-t.")
+        return
+
+    d = np.load(data_file)
+    datos = d["datos_sim"]
+    d.close()
+
+    from .Representate import plot_Vt_It
+
+    out = figures_dir / f"V-t_I-t_{fase}_{num_simulation}.png"
+    plot_Vt_It(
+        t=datos[:, 0],
+        v=datos[:, 1],
+        i=datos[:, 2],
+        filename=str(out),
+        transiciones=estado.get("transiciones", []),
+        titulo=f"{fase} waveform - sim {num_simulation}",
+    )
+    logger.info(f"Figura V-t/I-t de {fase} guardada en {out}")
 
 
 def plot_results(
     num_simulation: int,
     results_dir: Path | str = "Results",
     figures_dir: Optional[Path | str] = None,
-    desplazamiento: Optional[dict] = None,
     skip_failed: bool = True,
     intensidad_minima: float = INTENSIDAD_MINIMA_DEFAULT,
+    plot_forma_onda: bool = True,
+    mostrar_experimental: bool = True,
 ) -> bool:
     """
     Genera `I-V_{N}.png` (curva sin marcar) de una simulación leyendo todo del
@@ -142,9 +182,6 @@ def plot_results(
         figures_dir: Si se omite, se usa `simulation_{N}/Figures` (la carpeta
             propia de la simulación). Antes el código creaba `simulation_{N-1}/
             Figures`, lo que dejaba `simulation_0/` vacía cuando N=1.
-        desplazamiento: Anotaciones de la curva I-V. Si se omite, se usa el
-            default de `run_cycle.DESPLAZAMIENTO_IV_DEFAULT` (no se persiste
-            en metadata: es preferencia de plot, no estado de simulación).
         skip_failed: Si True (default), no dibuja nada cuando no hay ningún
             `Data_*.npz` en disco (nada que representar). Ya NO exige que la
             simulación esté `completed`: `simulation_IV` dibuja la curva con
@@ -152,6 +189,11 @@ def plot_results(
         intensidad_minima: Umbral absoluto de intensidad (A, default 1e-7).
             Cualquier punto con |I| por debajo se descarta antes de dibujar
             (ruido de fondo cerca de I=0 en la escala log).
+        plot_forma_onda: Si True (default), genera además `V-t_I-t_{fase}_{N}.png`
+            para cada etapa ejecutada (según `protocolo_voltaje` de la metadata).
+            Con False no se genera ninguna.
+        mostrar_experimental: Si True (default), superpone el ciclo experimental
+            de referencia en la curva I-V.
 
     Returns:
         True si se generó la figura; False si la simulación se saltó.
@@ -163,10 +205,12 @@ def plot_results(
         num_simulation=num_simulation,
         results_dir=results_dir,
         figures_dir=figures_dir,
-        desplazamiento=desplazamiento,
+        puntos_iv=None,
         skip_failed=skip_failed,
         marcado=False,
         intensidad_minima=intensidad_minima,
+        plot_forma_onda=plot_forma_onda,
+        mostrar_experimental=mostrar_experimental,
     )
 
 
@@ -174,14 +218,18 @@ def plot_results_marcado(
     num_simulation: int,
     results_dir: Path | str = "Results",
     figures_dir: Optional[Path | str] = None,
-    desplazamiento: Optional[dict] = None,
+    puntos_iv: Optional[dict] = None,
     skip_failed: bool = True,
     intensidad_minima: float = INTENSIDAD_MINIMA_DEFAULT,
+    mostrar_experimental: bool = True,
 ) -> bool:
     """
-    Genera `I-V_marcado_{N}.png` (curva + puntos a-g) de una simulación
+    Genera `I-V_marcado_{N}.png` (curva + puntos marcados) de una simulación
     leyendo todo del disco. Ver `plot_results` para el resto de argumentos y
     para la curva sin marcar.
+
+    `puntos_iv` es la tabla de puntos (formato de `iv_analysis.PUNTOS_IV`). Si
+    se omite se usa `PUNTOS_IV`; en ambos casos la tabla aplicada queda en el log.
 
     Si ningún punto marcado es calculable (p.ej. no hay datos de ninguna de
     las fases pp_set/pp_reset/sp_reset), se loguea un warning y no se genera
@@ -192,10 +240,11 @@ def plot_results_marcado(
         num_simulation=num_simulation,
         results_dir=results_dir,
         figures_dir=figures_dir,
-        desplazamiento=desplazamiento,
+        puntos_iv=puntos_iv,
         skip_failed=skip_failed,
         marcado=True,
         intensidad_minima=intensidad_minima,
+        mostrar_experimental=mostrar_experimental,
     )
 
 

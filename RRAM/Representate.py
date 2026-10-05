@@ -348,6 +348,26 @@ def RepresentateTwoStates(
     return None
 
 
+def _cargar_ciclo_experimental():
+    """
+    Carga el ciclo I-V experimental de referencia (SET y RESET).
+
+    Returns:
+        (x_set, y_set, x_reset, y_reset): voltajes y |corrientes| de cada rama.
+    """
+    ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt"
+    ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt"
+
+    data_set = np.loadtxt(ruta_archivo_set, skiprows=1)
+    data_reset = np.loadtxt(ruta_archivo_reset, skiprows=1)
+
+    x_set = data_set[:, 0]
+    y_set = data_set[:, 1]
+    x_reset = data_reset[:, 0]  # * (-1.0)   TODO: Importante comprobar si las medidas se leen con el signo ya o no
+    y_reset = abs(data_reset[:, 1])
+    return x_set, y_set, x_reset, y_reset
+
+
 def plot_IV(
     v_set,
     i_set,
@@ -357,6 +377,7 @@ def plot_IV(
     titulo_figura="I-V Characteristics",
     figures_path="Results/Figures",
     extension_guardado="png",
+    mostrar_experimental=True,
 ):
     """
     Plots the I-V characteristics of a device.
@@ -371,6 +392,9 @@ def plot_IV(
             se recibe (así el llamador decide la ruta, p.ej. results_dir de
             pruebas). Se crea si no existe.
         extension_guardado (str): Format to save the figure ('png', 'pdf', 'svg').
+        mostrar_experimental (bool): Si True (default), superpone el ciclo
+            experimental de referencia. Con False solo se dibuja la simulación
+            y no hace falta tener los ficheros de Datos_Experimentales.
     """
 
     os.makedirs(figures_path, exist_ok=True)
@@ -414,25 +438,11 @@ def plot_IV(
     axes.plot(v_set, i_set, color="red", linewidth=4, label="Simulation")
     axes.plot(v_reset, i_reset, color="red", linewidth=4)
 
-    # Ruta de los datos experimentales
-    # ruta_archivo_set = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Set_1t'
-    # ruta_archivo_reset = 'C:/Users/Usuario/Documents/GitHub/RRAM_Simulation/Datos_Experimentales/Ciclos_Experimentales/Mean_DC_Reset_1.txt'
-
-    ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt"
-    ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt"
-
-    # Cargar datos experimentales
-    data_set = np.loadtxt(ruta_archivo_set, skiprows=1)
-    data_reset = np.loadtxt(ruta_archivo_reset, skiprows=1)
-
-    x_set = data_set[:, 0]
-    y_set = data_set[:, 1]
-    x_reset = data_reset[:, 0]  # * (-1.0)   TODO: Importante comprobar si las medidas se leen con el signo ya o no
-    y_reset = abs(data_reset[:, 1])
-
     # Curvas experimentales
-    axes.plot(x_set, y_set, "black", label="Experimental", linewidth=2)
-    axes.plot(x_reset, y_reset, "black", linewidth=2)
+    if mostrar_experimental:
+        x_set, y_set, x_reset, y_reset = _cargar_ciclo_experimental()
+        axes.plot(x_set, y_set, "black", label="Experimental", linewidth=2)
+        axes.plot(x_reset, y_reset, "black", linewidth=2)
     # Antes ponia 2.5 de grosor de linea (antes de las medidas de arturo)
     # Leyenda ajustada en la parte inferior izquierda
     axes.legend(
@@ -477,6 +487,7 @@ def plot_IV_marcado(
     desplazamiento,
     figures_path="Results/Figures",
     extension_guardado="png",
+    mostrar_experimental=True,
 ):
     """
     Plots the I-V characteristics of a device.
@@ -490,6 +501,8 @@ def plot_IV_marcado(
         figures_path (str): Carpeta donde guardar la figura. Se respeta tal cual
             se recibe (así el llamador decide la ruta, p.ej. results_dir de
             pruebas). Se crea si no existe.
+        mostrar_experimental (bool): Si True (default), superpone el ciclo
+            experimental de referencia.
     """
 
     os.makedirs(figures_path, exist_ok=True)
@@ -536,19 +549,6 @@ def plot_IV_marcado(
     axes.plot(v_set, i_set, color="red", linewidth=4, label="SET")
     axes.plot(v_reset, i_reset, color="red", linewidth=4, label="RESET")
 
-    # Ruta de los datos experimentales
-    ruta_archivo_set = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_p_1000.txt"
-    ruta_archivo_reset = os.getcwd() + "/Datos_Experimentales/Ciclos_Experimentales/Cycle_n_1000.txt"
-
-    # Cargar datos experimentales
-    data_set = np.loadtxt(ruta_archivo_set, skiprows=1)
-    data_reset = np.loadtxt(ruta_archivo_reset, skiprows=1)
-
-    x_set = data_set[:, 0]
-    y_set = data_set[:, 1]
-    x_reset = data_reset[:, 0]  # * (-1.0)   TODO: Importante comprobar si las medidas se leen con el signo ya o no
-    y_reset = abs(data_reset[:, 1])
-
     (x_0, y_0) = next(iter(lista_puntos.values()))
     # print("Punto de referencia (0,0): ", (x_0, y_0))
     axes.scatter(
@@ -561,8 +561,10 @@ def plot_IV_marcado(
     )
 
     # Curvas experimentales
-    axes.plot(x_set, y_set, "black", label="Set Exp.", linewidth=2)
-    axes.plot(x_reset, y_reset, "black", label="Reset Exp.", linewidth=2)
+    if mostrar_experimental:
+        x_set, y_set, x_reset, y_reset = _cargar_ciclo_experimental()
+        axes.plot(x_set, y_set, "black", label="Set Exp.", linewidth=2)
+        axes.plot(x_reset, y_reset, "black", label="Reset Exp.", linewidth=2)
 
     for label, (xp, yp) in lista_puntos.items():
         dx, factor_y = desplazamiento.get(label, (0.02, 1.0))  # 1.0 = sin desplazamiento en y
@@ -1350,6 +1352,83 @@ def plot_perfil_temperatura(
         # ruta_pdf = os.path.splitext(save_path)[0] + ".pdf"
         # plt.savefig(ruta_pdf, bbox_inches="tight")
 
+    plt.close(fig)
+
+    return None
+
+
+#: Máximo de transiciones que `plot_Vt_It` marca; por encima no marca ninguna.
+MAX_TRANSICIONES_MARCADAS = 10
+
+
+def plot_Vt_It(
+    t: np.ndarray,
+    v: np.ndarray,
+    i: np.ndarray,
+    filename: str,
+    transiciones: list | None = None,
+    titulo: str = "",
+    usar_latex: bool = False,
+):
+    """
+    Dibuja V(t) e |I|(t) en dos paneles apilados con eje temporal común, para
+    validar formas de onda no lineales (p.ej. rampa + tramo constante por
+    compliance de corriente).
+
+    Args:
+        t: Vector de tiempos [s] (columna 0 de datos_sim).
+        v: Vector de voltajes aplicados [V] (columna 1 de datos_sim).
+        i: Vector de corrientes [A] (columna 2 de datos_sim).
+        filename: Ruta completa del archivo de salida (con extensión).
+        transiciones: Lista de dicts de protocolo_voltaje → ejecucion → {fase} de la metadata
+            ({"k": paso, "V": voltaje, "condicion": nombre}); cada una se marca
+            con una línea vertical discontinua en su tiempo t[k].
+        titulo: Título global de la figura.
+        usar_latex: Renderizado LaTeX de los textos (False por defecto: esta es
+            una figura de diagnóstico, no de paper).
+    """
+    setup_paper_plt(plt, latex=usar_latex, scaling=1.5)
+
+    fig, (ax_v, ax_i) = plt.subplots(2, 1, figsize=(12, 8), sharex=True)
+    config_ax(ax_v)
+    config_ax(ax_i)
+
+    ax_v.plot(t, v, color="tab:blue", linewidth=2)
+    ax_v.set_ylabel("Voltage (V)")
+    if titulo:
+        ax_v.set_title(titulo, pad=15)
+
+    ax_i.plot(t, np.abs(i), color="tab:red", linewidth=2)
+    ax_i.set_yscale("log")
+    ax_i.set_ylabel("|Current| (A)")
+    ax_i.set_xlabel("Time (s)")
+
+    # Marcar las transiciones de la forma de onda (si las hay). Con muchas (un tren
+    # de pulsos) las líneas y etiquetas tapan la curva: no se marca ninguna.
+    transiciones = transiciones or []
+    if len(transiciones) > MAX_TRANSICIONES_MARCADAS:
+        transiciones = []
+    for n, trans in enumerate(transiciones):
+        k = int(trans.get("k", -1))
+        if not (0 <= k < len(t)):
+            continue
+        etiqueta = f"{trans.get('condicion', '?')} (V={trans.get('V', float('nan')):.3f})"
+        for ax in (ax_v, ax_i):
+            ax.axvline(t[k], color="gray", linestyle="--", linewidth=1.5)
+        # Altura alterna: dos transiciones próximas (p. ej. entrada y salida de una
+        # meseta corta) tendrían sus etiquetas superpuestas.
+        ax_v.annotate(
+            etiqueta,
+            xy=(t[k], v[k] if k < len(v) else 0),
+            xytext=(5, 5 + 16 * (n % 2)),
+            textcoords="offset points",
+            fontsize=9,
+            color="gray",
+        )
+
+    plt.tight_layout()
+    os.makedirs(os.path.dirname(str(filename)) or ".", exist_ok=True)
+    fig.savefig(str(filename), dpi=300, bbox_inches="tight")
     plt.close(fig)
 
     return None

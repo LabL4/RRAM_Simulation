@@ -5,15 +5,16 @@ from typing import List
 import numpy as np
 
 from . import (
-    CurrentSolver,
-    ElectricField,
-    Percolation,
-    Temperature,
-    exceptions,
     utils,
 )
+from . import CurrentSolver
+from . import ElectricField
+from . import Percolation
+from . import Temperature
+from . import exceptions
 from .filament_tracking import procesar_filamentos_destruidos
 from .state_updates import update_state_recombinate
+from .voltage_controller import Medidas, ProtocoloVoltaje
 import logging
 
 logger = logging.getLogger(__name__)
@@ -23,7 +24,8 @@ def PP_reset(
     final_state_sp_set: dict,
     num_simulation: int,
     CF_ranges: List[tuple],
-    num_pasos_guardar_estado: int = 50,  # Antes era cada 2000
+    protocolo: ProtocoloVoltaje,
+    num_pasos_guardar_estado: int,
     usar_muro: bool = True,
     results_dir: str = "Results",
 ):
@@ -41,6 +43,8 @@ def PP_reset(
 
          - num_simulation (int): The simulation number, used for file naming and tracking.
          - CF_ranges (List[tuple]): A list of tuples defining the ranges for conductive filaments (CFs).
+         - protocolo (ProtocoloVoltaje): Protocolo de voltaje; da el controlador de la etapa pp_reset.
+         - num_pasos_guardar_estado (int): Cada cuántos pasos se guarda el estado intermedio.
     Returns:
         None. The function performs the simulation, updates the system's state, and saves
         intermediate results (e.g., figures, data files) to disk.
@@ -83,7 +87,8 @@ def PP_reset(
     cols += [f"T_{i}[K]" for i in range(1, N + 1)]
     header_pp_reset = ",".join(cols)
 
-    data_pp_reset = np.zeros((params.num_pasos + 1, num_columnas), dtype=np.float64)
+    # (data_pp_reset se reserva más abajo, cuando el controlador ya ha calculado
+    #  el presupuesto de pasos de la fase.)
 
     # Máximo histórico de temperatura de cada filamento en esta fase (solo pasos FVM).
     T_max_fils: List[float | None] = [None] * N
@@ -112,33 +117,51 @@ def PP_reset(
     voltage_CF_destruido = np.full(len(CF_ranges), 0.0)
 
     E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
-    vector_ddp = np.arange(
-        -0,
-        -(params.voltaje_final_reset + params.paso_potencial_reset),
-        -params.paso_potencial_reset,
-    )
-    logger.info(f"El paso de potencial para la parte de set es: {params.paso_potencial_reset} ")
+
+    # Todo el voltaje lo decide el protocolo; de SP_set solo se toma su V final
+    # (para 'anterior' y para el informe de enganche).
+    controller = protocolo.controlador("pp_reset", previo=final_state_sp_set)
+    presupuesto = controller.presupuesto()
+    voltage_anterior = controller.v_previo
+    n_filas = 0
+
+    # El presupuesto es una COTA SUPERIOR: se reservan presupuesto+1 filas y al final
+    # se recortan las no usadas si la forma de onda terminó antes.
+    data_pp_reset = np.zeros((presupuesto + 1, num_columnas), dtype=np.float64)
 
     CF_destruido_index = 1
     roturas_dict = {}
     current = 0.0  # inicialización para T_joule en k=0
-
-    # Al romperse el PRIMER filamento (el que sea) se reduce recombination_energy
-    # para cambiar la dinámica de disolución. Factor ajustado manualmente.
-    factor_recombinacion = 1.03
-    recombinacion_actualizada = False
+    # El dispositivo llega del SET en LRS, así que percola al entrar. Se arrastra de
+    # un paso al siguiente para no repetir el A* de is_path solo para el controlador.
+    percola = True
 
     logger.info(f"Simulacion {num_simulation} - primera parte del reset")
 
     # Ciclo para la primera parte del reset
-    for k in range(0, params.num_pasos + 1):
+    for k in range(0, presupuesto + 1):
         simulation_time = params.paso_temporal * k
-        voltage = vector_ddp[k]
+        voltage = controller.next(
+            Medidas(
+                I_total=float(current),
+                n_vacantes=int(np.sum(actual_state)),
+                n_filamentos=int(np.sum(~CF_destruido)),
+                percola=percola,  # del paso anterior: is_path es A* y ya se evalúa más abajo
+                k=k,
+            )
+        )
+        voltage_anterior = voltage
+
+        # La forma de onda ha terminado: se corta antes de la física.
+        if controller.terminado:
+            break
 
         # Obtengo los valores del campo eléctrico
         E_field = abs(ElectricField.SimpleElectricField(voltage, params.device_size_x))
 
-        # Genero el vector campo eléctrico
+        # Campo local por filas (GapElectricField). Lo usa el movimiento de los iones
+        # de oxígeno: hoy solo para la velocidad física de referencia (la aplicada sale
+        # de los umbrales), pero es la entrada del modelo físico que se quiere recuperar.
         for i in range(0, actual_state.shape[0]):
             E_field_vector[i] = abs(
                 ElectricField.GapElectricField(
@@ -153,7 +176,6 @@ def PP_reset(
         exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(CF_ranges))
 
         if any(~CF_destruido):  # mientras haya alguno sin romper
-            destruidos_antes = int(np.sum(CF_destruido))
             procesar_filamentos_destruidos(
                 imagen_path=rutas["figures_path"],
                 data_save_path=rutas["data_simulation_path"],
@@ -164,12 +186,9 @@ def PP_reset(
                 actual_state=actual_state,
                 num_simulation=num_simulation,
                 roturas_dict=roturas_dict,
-                etapa="pp",
+                k=k,
+                etapa="pp_reset",
             )
-
-            if not recombinacion_actualizada and int(np.sum(CF_destruido)) > destruidos_antes:
-                sim_ctes = sim_ctes.update_recombination_energy(sim_ctes.recombination_energy * factor_recombinacion)
-                recombinacion_actualizada = True
 
         # Temperatura Joule como semilla escalar (barato, siempre disponible).
         # Usa el current del paso anterior: en k=0 current=0 → T_joule=init_temp.
@@ -269,6 +288,9 @@ def PP_reset(
 
         else:
             percola = False
+            # TODO: usar la media del campo local por filas, np.mean(E_field_vector), como en
+            # PP_set/SP_set (mean_field), en lugar del campo uniforme E_field. Pendiente de
+            # decidir: cambia la corriente del tramo sin percolación del RESET.
             current = abs(
                 CurrentSolver.Poole_Frenkel(
                     T_joule,
@@ -299,7 +321,7 @@ def PP_reset(
         # Actualizo el estado del sistema con la recombinación
         actual_state, oxygen_state = update_state_recombinate(
             voltage=voltage,
-            E_field=E_field,
+            E_field_filas=E_field_vector,
             oxygen_config=oxygen_config,
             sim_ctes=sim_ctes,
             params=params,
@@ -313,6 +335,7 @@ def PP_reset(
         tiempo_total = simulation_time + tiempo_sp_set
         fila = [tiempo_total, voltage, current, R_total] + I_fils + R_fils + T_fils
         data_pp_reset[k] = fila
+        n_filas = k + 1
 
         # Represento el estado cada X pasos
         if k % num_pasos_guardar_estado == 0:
@@ -336,6 +359,15 @@ def PP_reset(
                 temperatura=locals().get("temperatura"),
                 mapa_resistencias=locals().get("R_local"),
             )
+
+    # Recorto a las filas realmente escritas y calculo el traspaso a SP_reset.
+    data_pp_reset = data_pp_reset[:n_filas]
+    # Traspaso a SP_reset: instante ABSOLUTO que le tocaría a la fila siguiente.
+    # Incluye tiempo_sp_set, que es el origen del eje de esta fase.
+    tiempo_pp_reset = tiempo_sp_set + params.paso_temporal * n_filas
+    logger.info(
+        f"PP_reset termina: {n_filas} filas, V final {data_pp_reset[-1, 1]:.5f} V, t traspaso {tiempo_pp_reset:.5f} s"
+    )
 
     # Guardo el estado final si el último k no cayó en múltiplo de num_pasos_guardar_estado
     if k % num_pasos_guardar_estado != 0:
@@ -379,12 +411,14 @@ def PP_reset(
         "sim_ctes": sim_ctes,
         "params": params,
         "Temperatura_final": temperatura,
-        "voltaje_max_reset": voltage,
-        "tiempo_pp_reset": simulation_time,
+        "voltaje_max_reset": float(data_pp_reset[-1, 1]),
+        "tiempo_pp_reset": tiempo_pp_reset,
         "CF_destruido": CF_destruido,
         "voltage_CF_destruido": voltage_CF_destruido,
         "CF_destruido_index": CF_destruido_index,
         "roturas_dict": roturas_dict,
+        # Estado del voltaje de la etapa: la siguiente lee de aquí su V_fin.
+        "voltaje": controller.estado(),
         "temperatura_final": temperatura,
         "centros_calculados": CF_centros,
         "T_max_fils": T_max_fils,
@@ -399,7 +433,8 @@ def SP_reset(
     final_state_pp_reset: dict,
     num_simulation: int,
     CF_ranges: List[tuple],
-    num_pasos_guardar_estado: int = 50,
+    protocolo: ProtocoloVoltaje,
+    num_pasos_guardar_estado: int,
     results_dir: str = "Results",
 ):
     params = final_state_pp_reset["params"]
@@ -446,8 +481,8 @@ def SP_reset(
     cols += [f"T_{i}[K]" for i in range(1, N + 1)]
     header_sp_reset = ",".join(cols)
 
-    data_sp_reset = np.zeros((params.num_pasos, num_columnas), dtype=np.float64)
-    resistencia_vector = np.zeros((params.num_pasos, 3), dtype=np.float64)
+    # (data_sp_reset y resistencia_vector se reservan más abajo, cuando el
+    #  controlador ya ha calculado el presupuesto de pasos de la fase.)
 
     # Máximo histórico de temperatura de cada filamento en esta fase (solo pasos FVM).
     T_max_fils: List[float | None] = [None] * N
@@ -467,24 +502,47 @@ def SP_reset(
     logger.info(f"Los filamentos destruidos al inicio del SP reset son:  {CF_destruido}")
 
     E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
-    vector_ddp = np.arange(
-        -params.voltaje_final_reset,
-        0,
-        params.paso_potencial_reset,
-    )
-    logger.info(f"El paso de potencial para la parte de set es: {params.paso_potencial_reset} ")
+
+    # Todo el voltaje lo decide el protocolo; de PP_reset solo se toma su V final
+    # (para 'anterior' y para el informe de enganche).
+    controller = protocolo.controlador("sp_reset", previo=final_state_pp_reset)
+    presupuesto = controller.presupuesto()
+    voltage_anterior = controller.v_previo
+    n_filas = 0
+    # Igual que en PP_reset: el controlador lee la corriente del paso anterior y en
+    # k=0 todavía no hay ninguna. No afecta a ninguna condición porque `next()` no
+    # evalúa transiciones en el primer paso.
+    current = 0.0
+
+    data_sp_reset = np.zeros((presupuesto + 1, num_columnas), dtype=np.float64)
+    resistencia_vector = np.zeros((presupuesto + 1, 3), dtype=np.float64)
 
     logger.info(f"\nSimulacion {num_simulation} - segunda parte del reset")
 
     # Ciclo para la primera parte del reset
-    for k in range(0, params.num_pasos):
+    for k in range(0, presupuesto + 1):
         simulation_time = params.paso_temporal * k
-        voltage = vector_ddp[k]
+        voltage = controller.next(
+            Medidas(
+                I_total=float(current),
+                n_vacantes=int(np.sum(actual_state)),
+                n_filamentos=int(np.sum(~CF_destruido)),
+                percola=percola,
+                k=k,
+            )
+        )
+        voltage_anterior = voltage
+
+        # La forma de onda ha terminado: se corta antes de la física.
+        if controller.terminado:
+            break
 
         # Obtengo los valores del campo eléctrico y la temperatura
         E_field = abs(ElectricField.SimpleElectricField(voltage, params.device_size_x))
 
-        # Genero el vector campo eléctrico
+        # Campo local por filas (GapElectricField). Lo usa el movimiento de los iones
+        # de oxígeno: hoy solo para la velocidad física de referencia (la aplicada sale
+        # de los umbrales), pero es la entrada del modelo físico que se quiere recuperar.
         for i in range(0, actual_state.shape[0]):
             E_field_vector[i] = abs(
                 ElectricField.GapElectricField(
@@ -511,7 +569,8 @@ def SP_reset(
                 actual_state=actual_state,
                 num_simulation=num_simulation,
                 roturas_dict=roturas_dict,
-                etapa="sp",
+                k=k,
+                etapa="sp_reset",
             )
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
@@ -574,7 +633,7 @@ def SP_reset(
                 Q_map=Q_source_map,
                 thermal_props=sim_ctes.propiedades_termicas,
                 atom_size=params.atom_size,
-                T_ambient=params.init_temp,
+                T_ambient=sim_ctes.Temperatura_electrodo,
                 matriz_muros=None,
             )
             # Actualizo la temperatura anterior para el siguiente paso, NO guardo las columnas primera y ultima ya q corresponden a los electrodos
@@ -596,6 +655,9 @@ def SP_reset(
                 raise ValueError(
                     "La temperatura calculada no es un valor escalar, no se puede calcular la corriente de Poole-Frenkel."
                 )
+            # TODO: usar la media del campo local por filas, np.mean(E_field_vector), como en
+            # PP_set/SP_set (mean_field), en lugar del campo uniforme E_field. Pendiente de
+            # decidir: cambia la corriente del tramo sin percolación del RESET.
             current = abs(
                 CurrentSolver.Poole_Frenkel(
                     temperatura,
@@ -627,7 +689,7 @@ def SP_reset(
         # Actualizo el estado del sistema con la recombinación
         actual_state, oxygen_state = update_state_recombinate(
             voltage=voltage,
-            E_field=E_field,
+            E_field_filas=E_field_vector,
             oxygen_config=oxygen_config,
             sim_ctes=sim_ctes,
             params=params,
@@ -641,6 +703,7 @@ def SP_reset(
         tiempo_total = simulation_time + tiempo_pp_reset
         fila = [tiempo_total, voltage, current, R_total] + I_fils + R_fils + T_fils
         data_sp_reset[k] = fila
+        n_filas = k + 1
 
         if locals().get("resistencia") is not None:
             resistencia_vector[k] = np.array([k, voltage, resistencia])
@@ -666,6 +729,11 @@ def SP_reset(
                 temperatura=locals().get("temperatura"),
                 mapa_resistencias=locals().get("R_local"),
             )
+
+    # Recorto a las filas realmente escritas.
+    data_sp_reset = data_sp_reset[:n_filas]
+    resistencia_vector = resistencia_vector[:n_filas]
+    logger.info(f"SP_reset termina: {n_filas} filas, V final {data_sp_reset[-1, 1]:.5f} V")
 
     # Guardo el estado final si el último k no cayó en múltiplo de num_pasos_guardar_estado
     if k % num_pasos_guardar_estado != 0:
@@ -709,6 +777,8 @@ def SP_reset(
         "CF_destruido": CF_destruido,
         "roturas_dict": roturas_dict,
         "T_max_fils": T_max_fils,
+        # Estado del voltaje de la etapa: la siguiente lee de aquí su V_fin.
+        "voltaje": controller.estado(),
     }
 
     logger.info(f"Temperatura máxima por filamento en sp_reset: {T_max_fils} K")

@@ -12,7 +12,6 @@ from .Generation import *
 from .exceptions import *
 from .io_manager import *
 from .Simulation import *
-from .Constants import *
 from .findpath import *
 from .utils import *
 from . import *

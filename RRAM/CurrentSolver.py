@@ -5,7 +5,6 @@ import os
 
 from scipy.constants import elementary_charge, Boltzmann, epsilon_0
 from RRAM import Representate as rp
-from RRAM import Constants as cte
 import logging
 
 logger = logging.getLogger(__name__)

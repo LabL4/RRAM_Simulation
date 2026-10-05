@@ -4,6 +4,8 @@ import itertools
 import logging
 import os
 
+from .voltage_controller import ProtocoloVoltaje
+
 logger = logging.getLogger(__name__)
 
 
@@ -22,21 +24,14 @@ MATERIAL_DEFAULTS = {
     "long_decaimiento_concentracion": 1e-9,
     # sigma(T) = sigma_0 / (1 + alpha_T * (T - T_0)).
     # sigma_0 = 1 / (R_ref * delta_z_r) = 1 / (4.3 * 0.25e-9): a T_0 reproduce
-    # exactamente R = 4.3 Ohm, la resistencia de celda usada históricamente.
-    "sigma_0": 4.5e8,  # 930232558.1395348,
+    # exactamente R = 4.3 Ohm, la resistencia de celda usada históricamente.\n    "sigma_0": 4.5e8,  # 930232558.1395348,\n
     "alpha_T": 2e-3,
     # Espesor Delta z de la rama eléctrica/resistencia (R = rho/delta_z_r), independiente
     # de atom_size (paso de red en el plano) y del Delta z del solver térmico. Por
     # defecto igual a atom_size para reproducir exactamente el comportamiento histórico.
     "delta_z_r": 0.25e-9,
     "num_filamentos": 1,
-    "grosor_filamento": [[3]],
-    # None (defecto) → las trampas/vacantes iniciales se distribuyen con el
-    # mismo grosor que grosor_filamento (comportamiento histórico). Si se fija
-    # (p.ej. [10]), el sorteo de trampas en `init` usa ESE grosor en vez de
-    # grosor_filamento, sin tocar la máscara de crecimiento ni el resto de la
-    # física, que siguen usando grosor_filamento. Ver init_simulation.build_initial_states.
-    "grosor_filamento_init": None,
+    "grosor_filamento": [[3]],\n    # None (defecto) → las trampas/vacantes iniciales se distribuyen con el\n    # mismo grosor que grosor_filamento (comportamiento histórico). Si se fija\n    # (p.ej. [10]), el sorteo de trampas en `init` usa ESE grosor en vez de\n    # grosor_filamento, sin tocar la máscara de crecimiento ni el resto de la\n    # física, que siguen usando grosor_filamento. Ver init_simulation.build_initial_states.\n    "grosor_filamento_init": None,\n
 }
 
 # ============================================================================
@@ -81,11 +76,11 @@ SIMULATION_DEFAULTS = {
     "device_size_y": 30e-9,
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
     "num_trampas": 150,
-    "total_simulation_time": 10.0,
-    "num_pasos": 10000,
-    "voltaje_final": 1.1,
-    "voltaje_final_set": 1.1,
-    "voltaje_final_reset": 1.4,
+    # Paso temporal [s]. ENTRADA obligatoria. Cambiarlo altera la física
+    # calibrada: ver MANUAL_FORMAS_DE_ONDA.md.
+    "paso_temporal": 1e-3,
+    # El voltaje NO tiene valores por defecto: cada simulación debe traer su
+    # "protocolo_voltaje" (ver RRAM.voltage_controller.ProtocoloVoltaje).
     "densidad_vacantes": 4.0,  # vacantes / nm²
     "centros_filamento": None,
 }
@@ -96,12 +91,12 @@ SIMULATION_DEFAULTS = {
 SET_RESET_DEFAULTS = {
     "ocupacion_max_pp_set": 0.8,
     "ocupacion_max_sp_set": 0.45,
+    # Cada cuántos pasos se guarda el estado intermedio (matrices) en las cuatro etapas.
+    "pasos_guardar_estado": 1,
     "factor_vecinos_pp_set": 1.0,
     "factor_libre_pp_set": 1.0,
     "factor_vecinos_sp_set": 1.0,
     "factor_libre_sp_set": 0.9,
-    "lim_voltage_percolacion": 1.4,
-    "compliance_voltage": 0.6,
     "voltaje_gen_oxigeno_pp_1": 1.1,
     "num_oxigenos_pp_reset_1": 7,  # 2
     "voltaje_gen_oxigeno_pp_2": 1.15,
@@ -203,11 +198,7 @@ class ConfigManager:
             "device_size_y",
             "atom_size",
             "num_trampas",
-            "total_simulation_time",
-            "num_pasos",
-            "voltaje_final",
-            "voltaje_final_set",
-            "voltaje_final_reset",
+            "paso_temporal",
             "init_temp",
             "densidad_vacantes",
         ]
@@ -245,12 +236,11 @@ class ConfigManager:
             "pendiente_temperatura",
             "ocupacion_max_pp_set",
             "ocupacion_max_sp_set",
+            "pasos_guardar_estado",
             "factor_vecinos_pp_set",
             "factor_libre_pp_set",
             "factor_vecinos_sp_set",
             "factor_libre_sp_set",
-            "lim_voltage_percolacion",
-            "compliance_voltage",
             "voltaje_gen_oxigeno_pp_1",
             "num_oxigenos_pp_reset_1",
             "voltaje_gen_oxigeno_pp_2",
@@ -260,6 +250,20 @@ class ConfigManager:
             "centros_filamento",  # ← añadir al final
         ]
 
+        # Protocolo de voltaje: obligatorio, validado aquí (una errata falla en el
+        # notebook y no a mitad de simulación) y exportado a su propio CSV.
+        protocolos = []
+        for sim in self.simulations:
+            if "protocolo_voltaje" not in sim.params:
+                raise ValueError(
+                    f"sim {sim.sim_id}: falta 'protocolo_voltaje'. Cada simulación debe definir su voltaje "
+                    f"(ver RRAM.voltage_controller.ProtocoloVoltaje)."
+                )
+            try:
+                protocolos.append(ProtocoloVoltaje.desde_config(sim.params["protocolo_voltaje"]))
+            except ValueError as e:
+                raise ValueError(f"sim {sim.sim_id}: protocolo_voltaje inválido: {e}") from e
+
         data_params = [{col: sim.params[col] for col in cols_params} for sim in self.simulations]
         data_ctes = [{col: sim.params[col] for col in cols_ctes} for sim in self.simulations]
 
@@ -268,5 +272,14 @@ class ConfigManager:
 
         df_params.to_csv(os.path.join(output_dir, "simulation_parameters.csv"), index=False)
         df_ctes.to_csv(os.path.join(output_dir, "simulation_constants.csv"), index=False)
+        pd.DataFrame({"protocolo_voltaje": [p.a_texto() for p in protocolos]}).to_csv(
+            os.path.join(output_dir, "simulation_voltage.csv"), index=False
+        )
+
+        # Resumen del voltaje de cada simulación: hace visible un salto o una errata
+        # aunque no se llame a voltage_controller.previsualizar().
+        for sim, p in zip(self.simulations, protocolos):
+            print(f"--- sim {sim.sim_id}: protocolo de voltaje ---")
+            print(p.resumen())
 
         logger.info(f"✅ Exportados parámetros y constantes ({len(self.simulations)} casos) a {output_dir}/")

@@ -1,10 +1,12 @@
-from . import Representate, utils
 from typing import List, Dict
 from typing import Optional
 from pathlib import Path
+from . import utils
 import numpy as np
 import logging
 import csv
+
+from . import Representate
 
 logger = logging.getLogger(__name__)
 

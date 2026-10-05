@@ -161,7 +161,7 @@ def move_oxygen_ions(
     paso_temp: float,
     oxygen_state: np.ndarray,
     temperature: np.ndarray | float,
-    E_field: float,
+    E_field_filas: np.ndarray,
     grid_size: float,
     vibration_frequency: float,
     gamma_drift: float,
@@ -173,11 +173,18 @@ def move_oxygen_ions(
     """
     Mueve los iones de oxígeno de forma estocástica. La velocidad se determina
     comparando el parámetro 'voltage' contra los umbrales en 'velocity_thresholds'.
+
+    `E_field_filas` es el campo local de cada fila (GapElectricField, un valor por
+    fila de oxygen_state). Hoy solo alimenta la velocidad física de referencia; el
+    objetivo es volver a ese modelo físico, con una velocidad por celda.
     """
 
     # =========================================================================
     # 1. CÁLCULO FÍSICO DE LA VELOCIDAD (Referencia que luego no se usa)
     # =========================================================================
+    # Campo de cada fila extendido a toda la fila: (filas, 1) se combina con una
+    # temperatura escalar o con el mapa (filas, columnas) y da una velocidad por celda.
+    E_field = np.asarray(E_field_filas, dtype=float)[:, np.newaxis]
     try:
         senoh = np.sinh((cte_red * E_field * gamma_drift) / (2 * k_b_ev * temperature))
         exp_velocity = np.exp(-migration_energy / (k_b_ev * temperature))
