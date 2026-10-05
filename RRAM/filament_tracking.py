@@ -4,7 +4,8 @@ from typing import Any, List
 
 import numpy as np
 
-from . import Representate, Temperature
+from . import Temperature
+from . import Representate
 from .constants_simulation import SimulationConstants
 import logging
 
@@ -20,6 +21,7 @@ def procesar_filamentos_creados(
     voltage_CF_creado,
     actual_state,
     num_simulation,
+    k: int,
     creaciones_dict: dict | None = None,
     etapa: str = "pp_set",
     plot_filamento: bool = False,
@@ -35,6 +37,8 @@ def procesar_filamentos_creados(
         voltage_CF_creado (np.ndarray): Array para registrar voltajes de creación.
         actual_state (np.ndarray): Estado actual del sistema.
         num_simulation (int): Número de simulación.
+        k (int): Paso de la etapa en que se detecta la creación. Es la fila
+            correspondiente en Data_{etapa}_{N}.npz.
         creaciones_dict (dict | None): Diccionario donde se acumulan los eventos
             de creación con el mismo formato que `roturas_dict`. Si es None se
             ignora (compatibilidad hacia atrás).
@@ -59,6 +63,7 @@ def procesar_filamentos_creados(
                 "filamento": i + 1,
                 "voltaje": float(voltage),
                 "etapa": etapa,
+                "k": int(k),
             }
 
         if plot_filamento:
@@ -81,6 +86,7 @@ def procesar_filamentos_destruidos(
     voltage_CF_destruido,
     actual_state,
     num_simulation,
+    k: int,
     roturas_dict,
     etapa,
     plot_filamento: bool = False,
@@ -96,8 +102,11 @@ def procesar_filamentos_destruidos(
         voltage_CF_destruido (np.ndarray): Array para registrar voltajes de destrucción.
         actual_state (np.ndarray): Estado actual del sistema.
         num_simulation (int): Número de simulación.
+        k (int): Paso de la etapa en que se detecta la rotura. Es la fila
+            correspondiente en Data_{etapa}_{N}.npz.
+        roturas_dict (dict): Diccionario donde se acumulan los eventos de rotura.
+        etapa (str): Etapa donde se ha producido la rotura ('pp_reset', 'sp_reset').
         imagen_path (Path): Ruta donde guardar imágenes.
-        pkl_path (Path): Ruta donde guardar archivos PKL.
 
     Returns:
         None
@@ -111,8 +120,9 @@ def procesar_filamentos_destruidos(
             j = len(roturas_dict)  # obtiene el siguiente índice disponible
             roturas_dict[j] = {
                 "filamento": i + 1,
-                "voltaje": voltage,
+                "voltaje": float(voltage),
                 "etapa": etapa,
+                "k": int(k),
             }
             logger.info(f"\nEl filamento {i + 1} se ha roto en el voltaje {round(voltage, 4)} (V)")
 
@@ -146,7 +156,7 @@ def actualizar_parametros_por_filamento(
     if num_esperados == 1:
         if filamentos_actuales == 1:
             logger.info("Todos los filamentos creados.")
-            sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 3)
+            sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 1.5)
             # sim_ctes = sim_ctes.update_generation_energy(1.75)
             all_CFs_created = True
 

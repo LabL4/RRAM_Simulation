@@ -50,6 +50,15 @@ ANTERIOR):
 
 La etapa termina cuando termina su último segmento.
 
+Limitaciones conocidas
+----------------------
+- ``hasta_filamentos`` no sirve en el RESET: el nº de filamentos que recibe el
+  controlador son los creados en PP_set, los intactos en PP_reset/SP_reset
+  (decrece, así que la condición se cumpliría desde el primer paso) y una
+  constante en SP_set.
+- Solo hay condiciones "mayor o igual": no se puede escribir "hasta que la
+  corriente baje de X" (lo natural para cortar un RESET).
+
 Configuración
 -------------
 `ProtocoloVoltaje` agrupa las cuatro etapas (``pp_set``, ``sp_set``,
@@ -497,9 +506,10 @@ class VoltageController:
             raise ValueError(f"{self.fase}: la forma de onda terminó sin producir ningún punto")
         if self.previsualizacion:
             return
+        n = len(self.transiciones)
         logger.info(
             f"{self.fase} terminada: {self.puntos} puntos, V {self.V_inicio:.5f} → {self._V:.5f} V, "
-            f"{len(self.transiciones)} transiciones, fin por {condicion}"
+            f"{n} {'transición' if n == 1 else 'transiciones'}, fin por {condicion}"
         )
 
     def _enganche(self) -> Optional[dict]:

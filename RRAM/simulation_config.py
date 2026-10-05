@@ -24,8 +24,7 @@ MATERIAL_DEFAULTS = {
     "long_decaimiento_concentracion": 1e-9,
     # sigma(T) = sigma_0 / (1 + alpha_T * (T - T_0)).
     # sigma_0 = 1 / (R_ref * delta_z_r) = 1 / (4.3 * 0.25e-9): a T_0 reproduce
-    # exactamente R = 4.3 Ohm, la resistencia de celda usada históricamente.
-    "sigma_0": 4.5e8,  # 930232558.1395348,
+    "sigma_0": 4.5e8,
     "alpha_T": 2e-3,
     # Espesor Delta z de la rama eléctrica/resistencia (R = rho/delta_z_r), independiente
     # de atom_size (paso de red en el plano) y del Delta z del solver térmico. Por
@@ -92,11 +91,12 @@ SIMULATION_DEFAULTS = {
 SET_RESET_DEFAULTS = {
     "ocupacion_max_pp_set": 0.8,
     "ocupacion_max_sp_set": 0.45,
+    # Cada cuántos pasos se guarda el estado intermedio (matrices) en las cuatro etapas.
+    "pasos_guardar_estado": 1,
     "factor_vecinos_pp_set": 1.0,
     "factor_libre_pp_set": 1.0,
     "factor_vecinos_sp_set": 1.0,
     "factor_libre_sp_set": 0.9,
-    "lim_voltage_percolacion": 1.4,
     "voltaje_gen_oxigeno_pp_1": 1.1,
     "num_oxigenos_pp_reset_1": 7,  # 2
     "voltaje_gen_oxigeno_pp_2": 1.15,
@@ -235,11 +235,11 @@ class ConfigManager:
             "pendiente_temperatura",
             "ocupacion_max_pp_set",
             "ocupacion_max_sp_set",
+            "pasos_guardar_estado",
             "factor_vecinos_pp_set",
             "factor_libre_pp_set",
             "factor_vecinos_sp_set",
             "factor_libre_sp_set",
-            "lim_voltage_percolacion",
             "voltaje_gen_oxigeno_pp_1",
             "num_oxigenos_pp_reset_1",
             "voltaje_gen_oxigeno_pp_2",

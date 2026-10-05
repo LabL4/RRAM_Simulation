@@ -23,9 +23,10 @@ import pandas as pd
 import numpy as np
 
 from .constants_simulation import SimulationConstants
-from .parameters import SimulationParameters
 from .voltage_controller import ProtocoloVoltaje
-from . import Generation, utils
+from .parameters import SimulationParameters
+from . import Generation
+from . import utils
 
 logger = logging.getLogger(__name__)
 

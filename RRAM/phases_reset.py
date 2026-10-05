@@ -5,13 +5,13 @@ from typing import List
 import numpy as np
 
 from . import (
-    CurrentSolver,
-    ElectricField,
-    Percolation,
-    Temperature,
-    exceptions,
     utils,
 )
+from . import CurrentSolver
+from . import ElectricField
+from . import Percolation
+from . import Temperature
+from . import exceptions
 from .filament_tracking import procesar_filamentos_destruidos
 from .state_updates import update_state_recombinate
 from .voltage_controller import Medidas, ProtocoloVoltaje
@@ -25,7 +25,7 @@ def PP_reset(
     num_simulation: int,
     CF_ranges: List[tuple],
     protocolo: ProtocoloVoltaje,
-    num_pasos_guardar_estado: int = 50,  # Antes era cada 2000
+    num_pasos_guardar_estado: int,
     usar_muro: bool = True,
     results_dir: str = "Results",
 ):
@@ -44,6 +44,7 @@ def PP_reset(
          - num_simulation (int): The simulation number, used for file naming and tracking.
          - CF_ranges (List[tuple]): A list of tuples defining the ranges for conductive filaments (CFs).
          - protocolo (ProtocoloVoltaje): Protocolo de voltaje; da el controlador de la etapa pp_reset.
+         - num_pasos_guardar_estado (int): Cada cuántos pasos se guarda el estado intermedio.
     Returns:
         None. The function performs the simulation, updates the system's state, and saves
         intermediate results (e.g., figures, data files) to disk.
@@ -135,11 +136,6 @@ def PP_reset(
     # un paso al siguiente para no repetir el A* de is_path solo para el controlador.
     percola = True
 
-    # Al romperse el PRIMER filamento (el que sea) se reduce recombination_energy
-    # para cambiar la dinámica de disolución. Factor ajustado manualmente.
-    factor_recombinacion = 1.03
-    recombinacion_actualizada = False
-
     logger.info(f"Simulacion {num_simulation} - primera parte del reset")
 
     # Ciclo para la primera parte del reset
@@ -163,7 +159,9 @@ def PP_reset(
         # Obtengo los valores del campo eléctrico
         E_field = abs(ElectricField.SimpleElectricField(voltage, params.device_size_x))
 
-        # Genero el vector campo eléctrico
+        # Campo local por filas (GapElectricField). Lo usa el movimiento de los iones
+        # de oxígeno: hoy solo para la velocidad física de referencia (la aplicada sale
+        # de los umbrales), pero es la entrada del modelo físico que se quiere recuperar.
         for i in range(0, actual_state.shape[0]):
             E_field_vector[i] = abs(
                 ElectricField.GapElectricField(
@@ -178,7 +176,6 @@ def PP_reset(
         exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(CF_ranges))
 
         if any(~CF_destruido):  # mientras haya alguno sin romper
-            destruidos_antes = int(np.sum(CF_destruido))
             procesar_filamentos_destruidos(
                 imagen_path=rutas["figures_path"],
                 data_save_path=rutas["data_simulation_path"],
@@ -189,12 +186,9 @@ def PP_reset(
                 actual_state=actual_state,
                 num_simulation=num_simulation,
                 roturas_dict=roturas_dict,
-                etapa="pp",
+                k=k,
+                etapa="pp_reset",
             )
-
-            if not recombinacion_actualizada and int(np.sum(CF_destruido)) > destruidos_antes:
-                sim_ctes = sim_ctes.update_recombination_energy(sim_ctes.recombination_energy * factor_recombinacion)
-                recombinacion_actualizada = True
 
         # Temperatura Joule como semilla escalar (barato, siempre disponible).
         # Usa el current del paso anterior: en k=0 current=0 → T_joule=init_temp.
@@ -294,6 +288,9 @@ def PP_reset(
 
         else:
             percola = False
+            # TODO: usar la media del campo local por filas, np.mean(E_field_vector), como en
+            # PP_set/SP_set (mean_field), en lugar del campo uniforme E_field. Pendiente de
+            # decidir: cambia la corriente del tramo sin percolación del RESET.
             current = abs(
                 CurrentSolver.Poole_Frenkel(
                     T_joule,
@@ -324,7 +321,7 @@ def PP_reset(
         # Actualizo el estado del sistema con la recombinación
         actual_state, oxygen_state = update_state_recombinate(
             voltage=voltage,
-            E_field=E_field,
+            E_field_filas=E_field_vector,
             oxygen_config=oxygen_config,
             sim_ctes=sim_ctes,
             params=params,
@@ -369,8 +366,7 @@ def PP_reset(
     # Incluye tiempo_sp_set, que es el origen del eje de esta fase.
     tiempo_pp_reset = tiempo_sp_set + params.paso_temporal * n_filas
     logger.info(
-        f"PP_reset termina: {n_filas} filas, V final {data_pp_reset[-1, 1]:.5f} V, "
-        f"t traspaso {tiempo_pp_reset:.5f} s"
+        f"PP_reset termina: {n_filas} filas, V final {data_pp_reset[-1, 1]:.5f} V, t traspaso {tiempo_pp_reset:.5f} s"
     )
 
     # Guardo el estado final si el último k no cayó en múltiplo de num_pasos_guardar_estado
@@ -438,7 +434,7 @@ def SP_reset(
     num_simulation: int,
     CF_ranges: List[tuple],
     protocolo: ProtocoloVoltaje,
-    num_pasos_guardar_estado: int = 50,
+    num_pasos_guardar_estado: int,
     results_dir: str = "Results",
 ):
     params = final_state_pp_reset["params"]
@@ -544,7 +540,9 @@ def SP_reset(
         # Obtengo los valores del campo eléctrico y la temperatura
         E_field = abs(ElectricField.SimpleElectricField(voltage, params.device_size_x))
 
-        # Genero el vector campo eléctrico
+        # Campo local por filas (GapElectricField). Lo usa el movimiento de los iones
+        # de oxígeno: hoy solo para la velocidad física de referencia (la aplicada sale
+        # de los umbrales), pero es la entrada del modelo físico que se quiere recuperar.
         for i in range(0, actual_state.shape[0]):
             E_field_vector[i] = abs(
                 ElectricField.GapElectricField(
@@ -571,7 +569,8 @@ def SP_reset(
                 actual_state=actual_state,
                 num_simulation=num_simulation,
                 roturas_dict=roturas_dict,
-                etapa="sp",
+                k=k,
+                etapa="sp_reset",
             )
 
         # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
@@ -634,7 +633,7 @@ def SP_reset(
                 Q_map=Q_source_map,
                 thermal_props=sim_ctes.propiedades_termicas,
                 atom_size=params.atom_size,
-                T_ambient=params.init_temp,
+                T_ambient=sim_ctes.Temperatura_electrodo,
                 matriz_muros=None,
             )
             # Actualizo la temperatura anterior para el siguiente paso, NO guardo las columnas primera y ultima ya q corresponden a los electrodos
@@ -656,6 +655,9 @@ def SP_reset(
                 raise ValueError(
                     "La temperatura calculada no es un valor escalar, no se puede calcular la corriente de Poole-Frenkel."
                 )
+            # TODO: usar la media del campo local por filas, np.mean(E_field_vector), como en
+            # PP_set/SP_set (mean_field), en lugar del campo uniforme E_field. Pendiente de
+            # decidir: cambia la corriente del tramo sin percolación del RESET.
             current = abs(
                 CurrentSolver.Poole_Frenkel(
                     temperatura,
@@ -687,7 +689,7 @@ def SP_reset(
         # Actualizo el estado del sistema con la recombinación
         actual_state, oxygen_state = update_state_recombinate(
             voltage=voltage,
-            E_field=E_field,
+            E_field_filas=E_field_vector,
             oxygen_config=oxygen_config,
             sim_ctes=sim_ctes,
             params=params,

@@ -28,21 +28,6 @@ class MaxVacantesException(Exception):
         super().__init__(message)
 
 
-# Excepción para cuando el voltaje de percolación es demasiado alto
-class HighPercolationVoltageException(Exception):
-    def __init__(self, voltage_percola=None, data_path=None, actual_state=None):
-        if voltage_percola is not None:
-            message = f"El voltaje de percolación es demasiado alto.\nEl voltaje de percolación es: {voltage_percola}"
-
-            # Guardo el estado de la simulación empleando npz si no data path y actual state none
-            if data_path and actual_state is not None:
-                np.save(data_path, actual_state)
-        else:
-            message = "El voltaje de percolación es demasiado alto"
-        self.message = message
-        super().__init__(self.message)
-
-
 # Excepción para cuando la resistencia de la parte óhmica es baja y no se reproduce la seguna parte del set
 class LowResistanceException(Exception):
     def __init__(self, valor_resistencia=None):

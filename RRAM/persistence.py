@@ -78,6 +78,8 @@ class SimulationMetadata:
 
     num_simulation: int
     voltaje_percolacion: float
+    # Fila de Data_pp_set en que el sistema percola por primera vez (None si no percoló).
+    paso_percolacion: Optional[int] = None
     creaciones_dict: Dict[Any, Any] = field(default_factory=dict)
     roturas_dict: Dict[Any, Any] = field(default_factory=dict)
     centros_calculados: Optional[list] = None

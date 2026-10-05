@@ -1,8 +1,11 @@
-"""Constantes físicas inmutables de la simulación RRAM (HfOx)."""
+"""Constantes físicas inmutables de la simulación RRAM."""
 
 import ast
+import logging
 from dataclasses import dataclass, replace
 from typing import Any, Dict, List, Optional, get_type_hints
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -44,11 +47,12 @@ class SimulationConstants:
     pendiente_temperatura: float
     ocupacion_max_pp_set: float
     ocupacion_max_sp_set: float
+    # Cada cuántos pasos se guarda el estado intermedio (matrices) en las cuatro etapas.
+    pasos_guardar_estado: int
     factor_vecinos_pp_set: float
     factor_libre_pp_set: float
     factor_vecinos_sp_set: float
     factor_libre_sp_set: float
-    lim_voltage_percolacion: float
     voltaje_gen_oxigeno_pp_1: float
     num_oxigenos_pp_reset_1: int
     voltaje_gen_oxigeno_pp_2: float
@@ -135,41 +139,47 @@ class SimulationConstants:
             3: {"k": self.conductividad_termica_electrodo},
         }
 
+    def _actualizar(self, atributo: str, nuevo_valor: Any) -> "SimulationConstants":
+        """
+        Devuelve una copia con `atributo` cambiado y deja el cambio en el log.
+
+        Todos los métodos update_* pasan por aquí, de modo que cualquier cambio de
+        una constante durante la simulación queda registrado (valor anterior y
+        nuevo), venga de donde venga.
+        """
+        logger.info(f"{atributo}: {getattr(self, atributo)} → {nuevo_valor}")
+        return replace(self, **{atributo: nuevo_valor})
+
     def update_gamma(self, nuevo_valor_gamma: float):
         # gamma no tiene distinción de set/reset en los atributos originales,
         # por lo que este se queda igual, pero asegurándonos de que la variable exista.
-        return replace(self, gamma=nuevo_valor_gamma)
+        return self._actualizar("gamma", nuevo_valor_gamma)
 
     def update_I_0(self, nuevo_I_0: float, fase: str = "set"):
         """Actualiza la corriente de referencia I_0 dependiendo de la fase ('set' o 'reset')."""
         if fase not in ["set", "reset"]:
             raise ValueError("El parámetro 'fase' debe ser 'set' o 'reset'.")
-
-        atributo = f"I_0_{fase}"
-        return replace(self, **{atributo: nuevo_I_0})
+        return self._actualizar(f"I_0_{fase}", nuevo_I_0)
 
     def update_pb_metal_insul(self, nuevo_pb_metal_insul: float, fase: str = "set"):
         """Actualiza la barrera de potencial dependiendo de la fase ('set' o 'reset')."""
         if fase not in ["set", "reset"]:
             raise ValueError("El parámetro 'fase' debe ser 'set' o 'reset'.")
-
-        atributo = f"pb_metal_insul_{fase}"
-        return replace(self, **{atributo: nuevo_pb_metal_insul})
+        return self._actualizar(f"pb_metal_insul_{fase}", nuevo_pb_metal_insul)
 
     def update_permitividad_relativa(self, permitividad_relativa_nuevo: float, fase: str = "set"):
         """Actualiza la permitividad relativa dependiendo de la fase ('set' o 'reset')."""
         if fase not in ["set", "reset"]:
             raise ValueError("El parámetro 'fase' debe ser 'set' o 'reset'.")
-        atributo = f"permitividad_relativa_{fase}"
-        return replace(self, **{atributo: permitividad_relativa_nuevo})
+        return self._actualizar(f"permitividad_relativa_{fase}", permitividad_relativa_nuevo)
 
     def update_generation_energy(self, nueva_energia: float):
         """Actualiza la energía de generación."""
-        return replace(self, generation_energy=nueva_energia)
+        return self._actualizar("generation_energy", nueva_energia)
 
     def update_recombination_energy(self, nueva_energia: float):
-        """Actualiza la energía de generación."""
-        return replace(self, recombination_energy=nueva_energia)
+        """Actualiza la energía de recombinación."""
+        return self._actualizar("recombination_energy", nueva_energia)
 
     def __repr__(self):
         # Crear lista de líneas con "nombre=valor" para cada atributo

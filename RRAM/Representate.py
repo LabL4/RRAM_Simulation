@@ -1357,6 +1357,10 @@ def plot_perfil_temperatura(
     return None
 
 
+#: Máximo de transiciones que `plot_Vt_It` marca; por encima no marca ninguna.
+MAX_TRANSICIONES_MARCADAS = 10
+
+
 def plot_Vt_It(
     t: np.ndarray,
     v: np.ndarray,
@@ -1399,8 +1403,12 @@ def plot_Vt_It(
     ax_i.set_ylabel("|Current| (A)")
     ax_i.set_xlabel("Time (s)")
 
-    # Marcar las transiciones de la forma de onda (si las hay)
-    for n, trans in enumerate(transiciones or []):
+    # Marcar las transiciones de la forma de onda (si las hay). Con muchas (un tren
+    # de pulsos) las líneas y etiquetas tapan la curva: no se marca ninguna.
+    transiciones = transiciones or []
+    if len(transiciones) > MAX_TRANSICIONES_MARCADAS:
+        transiciones = []
+    for n, trans in enumerate(transiciones):
         k = int(trans.get("k", -1))
         if not (0 <= k < len(t)):
             continue

@@ -124,6 +124,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p_plot_marcado.add_argument("num_simulation", type=int, help="Índice usado al ejecutar (offset +1).")
     p_plot_marcado.add_argument("--results-dir", default="Results")
     p_plot_marcado.add_argument(
+        "--puntos-iv",
+        default=None,
+        metavar="JSON",
+        help="Archivo JSON con la tabla de puntos marcados (formato de iv_analysis.PUNTOS_IV). Por defecto: PUNTOS_IV.",
+    )
+    p_plot_marcado.add_argument(
         "--sin-experimental",
         action="store_true",
         default=False,
@@ -149,6 +155,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p_all.add_argument("--guardar-datos", action="store_true")
     p_all.add_argument("--init-data-dir", default="Init_data")
     p_all.add_argument("--results-dir", default="Results")
+    p_all.add_argument(
+        "--puntos-iv",
+        default=None,
+        metavar="JSON",
+        help="Archivo JSON con la tabla de puntos marcados (formato de iv_analysis.PUNTOS_IV). Por defecto: PUNTOS_IV.",
+    )
     p_all.add_argument(
         "--start-from",
         choices=["sp_set", "pp_reset", "sp_reset"],
@@ -233,6 +245,16 @@ def _cmd_plot(args) -> int:
         return 1
 
 
+def _leer_puntos_iv(ruta: str | None) -> dict | None:
+    """Tabla de puntos marcados desde un JSON, o None para usar PUNTOS_IV."""
+    if ruta is None:
+        return None
+    import json
+
+    with open(ruta, encoding="utf-8") as f:
+        return json.load(f)
+
+
 def _cmd_plot_marcado(args) -> int:
     setup_logging(num_simulation=args.num_simulation, file_mode="a")
     log = logging.getLogger("RRAM.__main__")
@@ -240,6 +262,7 @@ def _cmd_plot_marcado(args) -> int:
         plot_results_marcado(
             num_simulation=args.num_simulation,
             results_dir=args.results_dir,
+            puntos_iv=_leer_puntos_iv(args.puntos_iv),
             mostrar_experimental=not args.sin_experimental,
         )
         return 0
@@ -296,6 +319,7 @@ def _cmd_all(args) -> int:
         plot_results_marcado(
             num_simulation=args.num_simulation + 1,
             results_dir=args.results_dir,
+            puntos_iv=_leer_puntos_iv(args.puntos_iv),
             mostrar_experimental=not args.sin_experimental,
         )
     except FileNotFoundError as e:

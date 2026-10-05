@@ -1,7 +1,6 @@
 from numba import njit
 import numpy as np
 
-from RRAM import Constants as cte
 import logging
 
 logger = logging.getLogger(__name__)
