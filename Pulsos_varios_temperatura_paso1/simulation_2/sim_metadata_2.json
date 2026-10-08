@@ -1,0 +1,2171 @@
+{
+  "num_simulation": 2,
+  "voltaje_percolacion": 0.4,
+  "paso_percolacion": 920,
+  "creaciones_dict": {
+    "0": {
+      "filamento": 1,
+      "voltaje": 0.4,
+      "etapa": "pp_set",
+      "k": 920
+    }
+  },
+  "roturas_dict": {},
+  "centros_calculados": [
+    59
+  ],
+  "cf_ranges": [
+    [
+      0,
+      119
+    ]
+  ],
+  "params_dict": {
+    "device_size_x": 1e-08,
+    "device_size_y": 3e-08,
+    "atom_size": 2.5e-10,
+    "num_trampas": 150,
+    "paso_temporal": 0.001,
+    "init_temp": 300.0,
+    "densidad_vacantes": 4.0,
+    "seed": 42,
+    "x_size": 40,
+    "y_size": 120,
+    "num_max_vacantes": 4560
+  },
+  "ctes_dict": {
+    "vibration_frequency": 10000000000000.0,
+    "cte_red": 2.5e-10,
+    "permitividad_relativa_set": 299.977,
+    "permitividad_relativa_reset": 399.998,
+    "generation_energy": 1.04,
+    "recombination_energy": 1.27,
+    "pb_metal_insul_set": 0.0026,
+    "pb_metal_insul_reset": 0.0307,
+    "recom_enchancement_factor": 3000.0,
+    "long_decaimiento_concentracion": 1e-09,
+    "sigma_0": 450000000.0,
+    "alpha_T": 0.002,
+    "delta_z_r": 2.5e-10,
+    "num_filamentos": 1,
+    "grosor_filamento": [
+      3
+    ],
+    "gamma": 10.0,
+    "gamma_drift": 10.0,
+    "E_m": 0.6,
+    "I_0_set": 0.00029806,
+    "I_0_reset": 0.00072588,
+    "r_termica_no_percola": 8000.0,
+    "conductividad_termica_dielectrico": 2.3,
+    "conductividad_termica_CF": 15.0,
+    "conductividad_termica_aislante": 1e-06,
+    "conductividad_termica_electrodo": 5.0,
+    "Temperatura_electrodo": 300.0,
+    "factor_generar_calor": 6e-05,
+    "pendiente_temperatura": -28.0,
+    "ocupacion_max_pp_set": 0.8,
+    "ocupacion_max_sp_set": 0.45,
+    "pasos_guardar_estado": 1,
+    "factor_vecinos_pp_set": 1.0,
+    "factor_libre_pp_set": 1.0,
+    "factor_vecinos_sp_set": 1.0,
+    "factor_libre_sp_set": 0.9,
+    "voltaje_gen_oxigeno_pp_1": 1.1,
+    "num_oxigenos_pp_reset_1": 7,
+    "voltaje_gen_oxigeno_pp_2": 1.15,
+    "num_oxigenos_pp_reset_2": 4,
+    "voltaje_gen_oxigeno_sp": -0.2,
+    "num_oxigenos_sp_reset": 5,
+    "centros_filamento": null,
+    "grosor_filamento_init": null,
+    "k_amortiguacion_termica": 10.0,
+    "umbral_caida_temperatura": 10.0
+  },
+  "protocolo_voltaje": {
+    "configuracion": {
+      "pp_set": [
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.4,
+            "pasos": 100
+          }
+        ],
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 100
+          }
+        ]
+      ],
+      "sp_set": [
+        [
+          "constante",
+          {
+            "V": 0.0,
+            "pasos": 1
+          }
+        ]
+      ],
+      "pp_reset": [
+        [
+          "rampa",
+          {
+            "desde": -0.00014,
+            "hasta": -1.4,
+            "dV": 0.00014
+          }
+        ]
+      ],
+      "sp_reset": [
+        [
+          "rampa",
+          {
+            "desde": -1.3998599999999999,
+            "hasta": 0.0,
+            "dV": 0.00014
+          }
+        ]
+      ]
+    },
+    "ejecucion": {
+      "pp_set": {
+        "fase": "pp_set",
+        "segmentos": [
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.4,
+              "pasos": 100
+            }
+          ],
+          [
+            "constante",
+            {
+              "V": 0.0,
+              "pasos": 100
+            }
+          ]
+        ],
+        "completada": true,
+        "fin_por": "pasos",
+        "V_inicio": 0.0,
+        "V_fin": 0.0,
+        "puntos": 10100,
+        "presupuesto": 10100,
+        "segmento_activo": 100,
+        "enganche": null,
+        "anterior_resuelto": [],
+        "n_transiciones": 101,
+        "transiciones": [
+          {
+            "segmento": 0,
+            "k": 100,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 1,
+            "k": 200,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 2,
+            "k": 300,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 3,
+            "k": 400,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 4,
+            "k": 500,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 5,
+            "k": 600,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 6,
+            "k": 700,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 7,
+            "k": 800,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 8,
+            "k": 900,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 9,
+            "k": 1000,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 10,
+            "k": 1100,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 11,
+            "k": 1200,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 12,
+            "k": 1300,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 13,
+            "k": 1400,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 14,
+            "k": 1500,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 15,
+            "k": 1600,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 16,
+            "k": 1700,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 17,
+            "k": 1800,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 18,
+            "k": 1900,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 19,
+            "k": 2000,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 20,
+            "k": 2100,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 21,
+            "k": 2200,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 22,
+            "k": 2300,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 23,
+            "k": 2400,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 24,
+            "k": 2500,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 25,
+            "k": 2600,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 26,
+            "k": 2700,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 27,
+            "k": 2800,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 28,
+            "k": 2900,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 29,
+            "k": 3000,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 30,
+            "k": 3100,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 31,
+            "k": 3200,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 32,
+            "k": 3300,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 33,
+            "k": 3400,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 34,
+            "k": 3500,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 35,
+            "k": 3600,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 36,
+            "k": 3700,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 37,
+            "k": 3800,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 38,
+            "k": 3900,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 39,
+            "k": 4000,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 40,
+            "k": 4100,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 41,
+            "k": 4200,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 42,
+            "k": 4300,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 43,
+            "k": 4400,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 44,
+            "k": 4500,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 45,
+            "k": 4600,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 46,
+            "k": 4700,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 47,
+            "k": 4800,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 48,
+            "k": 4900,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 49,
+            "k": 5000,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 50,
+            "k": 5100,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 51,
+            "k": 5200,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 52,
+            "k": 5300,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 53,
+            "k": 5400,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 54,
+            "k": 5500,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 55,
+            "k": 5600,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 56,
+            "k": 5700,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 57,
+            "k": 5800,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 58,
+            "k": 5900,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 59,
+            "k": 6000,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 60,
+            "k": 6100,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 61,
+            "k": 6200,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 62,
+            "k": 6300,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 63,
+            "k": 6400,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 64,
+            "k": 6500,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 65,
+            "k": 6600,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 66,
+            "k": 6700,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 67,
+            "k": 6800,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 68,
+            "k": 6900,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 69,
+            "k": 7000,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 70,
+            "k": 7100,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 71,
+            "k": 7200,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 72,
+            "k": 7300,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 73,
+            "k": 7400,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 74,
+            "k": 7500,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 75,
+            "k": 7600,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 76,
+            "k": 7700,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 77,
+            "k": 7800,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 78,
+            "k": 7900,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 79,
+            "k": 8000,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 80,
+            "k": 8100,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 81,
+            "k": 8200,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 82,
+            "k": 8300,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 83,
+            "k": 8400,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 84,
+            "k": 8500,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 85,
+            "k": 8600,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 86,
+            "k": 8700,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 87,
+            "k": 8800,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 88,
+            "k": 8900,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 89,
+            "k": 9000,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 90,
+            "k": 9100,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 91,
+            "k": 9200,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 92,
+            "k": 9300,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 93,
+            "k": 9400,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 94,
+            "k": 9500,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 95,
+            "k": 9600,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 96,
+            "k": 9700,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 97,
+            "k": 9800,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 98,
+            "k": 9900,
+            "V": 0.0,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 99,
+            "k": 10000,
+            "V": 0.4,
+            "condicion": "pasos"
+          },
+          {
+            "segmento": 100,
+            "k": 10100,
+            "V": 0.0,
+            "condicion": "pasos"
+          }
+        ]
+      }
+    }
+  },
+  "extra": {
+    "status": "completed",
+    "start_from": "pp_set",
+    "stop_at": "pp_set",
+    "muro_termico": false,
+    "seed": 42,
+    "temperaturas_max": {
+      "pp_set": {
+        "T_1": 309.3239938215647
+      }
+    }
+  }
+}

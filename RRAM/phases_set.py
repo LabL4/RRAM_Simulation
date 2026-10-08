@@ -28,6 +28,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _extra_sin_amortiguar(sim_ctes, temperatura_sin_amortiguar) -> dict:
+    """Kwargs extra para guardar_estado_intermedio: el mapa de T sin amortiguar, solo si la amortiguación está activa."""
+    if Temperature.amortiguacion_activa(sim_ctes.k_amortiguacion_termica) and temperatura_sin_amortiguar is not None:
+        return {"temperatura_sin_amortiguar": temperatura_sin_amortiguar}
+    return {}
+
+
 def PP_set(
     num_simulation: int,
     params: SimulationParameters,
@@ -375,6 +382,18 @@ def PP_set(
                         matriz_muros=None,
                     )
 
+                # Amortiguación de caídas bruscas (conserva las columnas de electrodo). Se guarda
+                # el mapa FVM sin amortiguar para poder compararlo con el amortiguado.
+                temperatura_sin_amortiguar = temperatura
+                temperatura = Temperature.amortiguar_mapa_fvm(
+                    temperatura,
+                    temperatura_anterior,
+                    T_0=params.init_temp,
+                    k=sim_ctes.k_amortiguacion_termica,
+                    dt=params.paso_temporal,
+                    umbral=sim_ctes.umbral_caida_temperatura,
+                )
+
                 # Actualizo la temperatura anterior para el siguiente paso, NO guardo las columnas primera y ultima ya q corresponden a los electrodos
                 temperatura_anterior = temperatura[:, 1:-1]
 
@@ -418,6 +437,17 @@ def PP_set(
             temperatura = Temperature.Temperature_Joule(
                 voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola
             )
+            # Amortiguación de caídas bruscas (escalar contra el escalar del paso anterior)
+            temperatura_sin_amortiguar = temperatura
+            temperatura = Temperature.amortiguar_enfriamiento(
+                temperatura,
+                temperatura_anterior,
+                T_0=params.init_temp,
+                k=sim_ctes.k_amortiguacion_termica,
+                dt=params.paso_temporal,
+                umbral=sim_ctes.umbral_caida_temperatura,
+            )
+            temperatura_anterior = temperatura
             # print(f"El valor de la temperatura es {temperatura} K, se usa el modelo de temperatura de Joule\n")
 
             # No ha percolado: valores neutros por filamento (no hay resistencia/corriente/mapa FVM por filamento)
@@ -518,6 +548,7 @@ def PP_set(
                 probabilidad_matrix=locals().get("probabilidad_matrix"),
                 matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
                 mapa_resistencias=locals().get("R_local"),
+                **_extra_sin_amortiguar(sim_ctes, locals().get("temperatura_sin_amortiguar")),
             )
         # endregion
 
@@ -570,6 +601,7 @@ def PP_set(
             probabilidad_matrix=locals().get("probabilidad_matrix"),
             matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
             mapa_resistencias=locals().get("R_local"),
+            **_extra_sin_amortiguar(sim_ctes, locals().get("temperatura_sin_amortiguar")),
         )
 
     logger.info(f"Temperatura máxima por filamento en pp_set: {T_max_fils} K")
@@ -902,6 +934,18 @@ def SP_set(
                     matriz_muros=None,
                 )
 
+            # Amortiguación de caídas bruscas (conserva las columnas de electrodo). Se guarda
+            # el mapa FVM sin amortiguar para poder compararlo con el amortiguado.
+            temperatura_sin_amortiguar = temperatura
+            temperatura = Temperature.amortiguar_mapa_fvm(
+                temperatura,
+                temperatura_anterior,
+                T_0=params.init_temp,
+                k=sim_ctes.k_amortiguacion_termica,
+                dt=params.paso_temporal,
+                umbral=sim_ctes.umbral_caida_temperatura,
+            )
+
             # Importante para que se actualice el perfil termico de los filamentos
             temperatura_anterior = temperatura[:, 1:-1]
 
@@ -930,10 +974,14 @@ def SP_set(
                     temperatura=locals().get("temperatura"),
                     matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
                     mapa_resistencias=locals().get("R_local"),
+                    **_extra_sin_amortiguar(sim_ctes, locals().get("temperatura_sin_amortiguar")),
                 )
 
         else:
             # Obtengo los valores del campo eléctrico y la temperatura
+            # NO se amortigua aquí: en SP_set no hay recombinación, así que el filamento que
+            # percoló en PP_set no puede destruirse y esta rama no se alcanza. Si se alcanzara,
+            # temperatura_anterior es una matriz y el resultado ya no sería escalar.
             temperatura = Temperature.Temperature_Joule(
                 voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola
             )
@@ -998,6 +1046,7 @@ def SP_set(
             temperatura=locals().get("temperatura"),
             matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
             mapa_resistencias=locals().get("R_local"),
+            **_extra_sin_amortiguar(sim_ctes, locals().get("temperatura_sin_amortiguar")),
         )
 
     # Guardo los datos de la simulación

@@ -69,6 +69,10 @@ class SimulationConstants:
     # grosor_filamento sigue mandando en la máscara de generación durante el
     # crecimiento y en el resto de la física/metadata.
     grosor_filamento_init: Optional[Any] = None
+    # Amortiguación de caídas bruscas de temperatura (Temperature.amortiguar_enfriamiento).
+    # k = 0 (defecto) la desactiva; los CSV antiguos sin estas columnas siguen cargando.
+    k_amortiguacion_termica: float = 0.0
+    umbral_caida_temperatura: float = 10.0
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SimulationConstants":

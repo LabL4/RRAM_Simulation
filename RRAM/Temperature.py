@@ -35,6 +35,68 @@ def Temperature_Joule(potencial: float, intensidad: float, T_0: float, r_termica
     return temperatura_disipacion
 
 
+def amortiguacion_activa(k) -> bool:
+    """True si la constante de amortiguación `k` es un número finito > 0 (None/NaN/<=0 = desactivada)."""
+    try:
+        return bool(np.isfinite(k) and k > 0)
+    except TypeError:
+        return False
+
+
+def amortiguar_enfriamiento(T_calc, T_prev, T_0: float, k, dt: float, umbral: float):
+    """
+    Frena las caídas bruscas de temperatura (p. ej. V=0 entre pulsos).
+
+    Donde la temperatura calculada CAE respecto a la del paso anterior más que `umbral`:
+        T = max(T_calc, T_0 + (T_prev - T_0) * exp(-k * dt))
+    En cualquier otro caso (calentamiento, caída pequeña) T = T_calc.
+
+    Args:
+        T_calc: temperatura recién calculada (escalar o matriz).
+        T_prev: temperatura del paso anterior YA amortiguada (escalar o matriz, mismo
+            tamaño que T_calc o escalar; se hace broadcast).
+        T_0: temperatura ambiente [K].
+        k: constante de amortiguación [1/s]. None/NaN/<=0 desactiva la función.
+        dt: paso temporal [s].
+        umbral: caída mínima [K] para activar la amortiguación (> 0).
+
+    Returns:
+        float si T_calc y T_prev son escalares; si no, un array NUEVO (las entradas
+        no se modifican). Con la función desactivada devuelve T_calc tal cual.
+    """
+    if not amortiguacion_activa(k):
+        return T_calc
+    if umbral is None or not umbral > 0:
+        raise ValueError(f"umbral_caida_temperatura debe ser > 0, recibido {umbral!r}")
+
+    factor = float(np.exp(-k * dt))
+
+    if np.ndim(T_calc) == 0 and np.ndim(T_prev) == 0:
+        T_calc_f, T_prev_f = float(T_calc), float(T_prev)
+        if T_calc_f < T_prev_f and (T_prev_f - T_calc_f) > umbral:
+            return max(T_calc_f, T_0 + (T_prev_f - T_0) * factor)
+        return T_calc_f
+
+    T_calc_a = np.asarray(T_calc, dtype=float)
+    T_prev_a = np.asarray(T_prev, dtype=float)
+    T_amortiguada = T_0 + (T_prev_a - T_0) * factor
+    mascara = (T_calc_a < T_prev_a) & ((T_prev_a - T_calc_a) > umbral)
+    return np.where(mascara, np.maximum(T_calc_a, T_amortiguada), T_calc_a)
+
+
+def amortiguar_mapa_fvm(T_fvm: np.ndarray, T_prev: np.ndarray, T_0: float, k, dt: float, umbral: float) -> np.ndarray:
+    """
+    Aplica `amortiguar_enfriamiento` al mapa FVM (Ny, Nx+2) sin tocar las columnas de
+    electrodo (0 y -1, condición de contorno). `T_prev` es (Ny, Nx), sin electrodos.
+    Devuelve una copia; con la amortiguación desactivada devuelve `T_fvm` tal cual.
+    """
+    if not amortiguacion_activa(k):
+        return T_fvm
+    T_out = np.array(T_fvm, dtype=float, copy=True)
+    T_out[:, 1:-1] = amortiguar_enfriamiento(T_fvm[:, 1:-1], T_prev, T_0, k, dt, umbral)
+    return T_out
+
+
 def legacy_matriz_materiales(matriz_filamentos: np.ndarray) -> np.ndarray:
     """
     Recibe la matriz de estado (0: Vacante/Aire, 1: Filamento).

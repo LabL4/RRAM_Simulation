@@ -23,15 +23,18 @@ MATERIAL_DEFAULTS = {
     "recom_enchancement_factor": 3e3,
     "long_decaimiento_concentracion": 1e-9,
     # sigma(T) = sigma_0 / (1 + alpha_T * (T - T_0)).
-    # sigma_0 = 1 / (R_ref * delta_z_r) = 1 / (4.3 * 0.25e-9): a T_0 reproduce
-    # exactamente R = 4.3 Ohm, la resistencia de celda usada históricamente.\n    "sigma_0": 4.5e8,  # 930232558.1395348,\n
+    "sigma_0": 4.5e8,
     "alpha_T": 2e-3,
-    # Espesor Delta z de la rama eléctrica/resistencia (R = rho/delta_z_r), independiente
-    # de atom_size (paso de red en el plano) y del Delta z del solver térmico. Por
-    # defecto igual a atom_size para reproducir exactamente el comportamiento histórico.
+    # Espesor Delta z de la rama eléctrica/resistencia (R = rho/delta_z_r), independiente de atom_size (paso de red en el plano) y del Delta z del solver térmico. Por defecto igual a atom_size para reproducir exactamente el comportamiento histórico.
     "delta_z_r": 0.25e-9,
     "num_filamentos": 1,
-    "grosor_filamento": [[3]],\n    # None (defecto) → las trampas/vacantes iniciales se distribuyen con el\n    # mismo grosor que grosor_filamento (comportamiento histórico). Si se fija\n    # (p.ej. [10]), el sorteo de trampas en `init` usa ESE grosor en vez de\n    # grosor_filamento, sin tocar la máscara de crecimiento ni el resto de la\n    # física, que siguen usando grosor_filamento. Ver init_simulation.build_initial_states.\n    "grosor_filamento_init": None,\n
+    "grosor_filamento": [3],
+    # None (defecto) → las trampas/vacantes iniciales se distribuyen con el
+    # mismo grosor que grosor_filamento (comportamiento histórico). Si se fija
+    # (p.ej. [10]), el sorteo de trampas en `init` usa ESE grosor en vez de
+    # grosor_filamento, sin tocar la máscara de crecimiento ni el resto de la
+    # física, que siguen usando grosor_filamento. Ver init_simulation.build_initial_states.
+    "grosor_filamento_init": None,
 }
 
 # ============================================================================
@@ -65,6 +68,11 @@ THERMAL_DEFAULTS = {
     "Temperatura_electrodo": 300,
     "factor_generar_calor": 6e-5,  # 5.5e-5,
     "pendiente_temperatura": -28,  # -24.7,
+    # Amortiguación de caídas bruscas de T (ver Temperature.amortiguar_enfriamiento):
+    # donde T cae más que `umbral_caida_temperatura` [K] respecto al paso anterior,
+    # T = T_0 + (T_prev - T_0) * exp(-k * paso_temporal). k = 0 la desactiva.
+    "k_amortiguacion_termica": 1.0,  # [1/s]
+    "umbral_caida_temperatura": 4,  # [K], > 0
 }
 
 
@@ -92,7 +100,7 @@ SET_RESET_DEFAULTS = {
     "ocupacion_max_pp_set": 0.8,
     "ocupacion_max_sp_set": 0.45,
     # Cada cuántos pasos se guarda el estado intermedio (matrices) en las cuatro etapas.
-    "pasos_guardar_estado": 1,
+    "pasos_guardar_estado": 10,
     "factor_vecinos_pp_set": 1.0,
     "factor_libre_pp_set": 1.0,
     "factor_vecinos_sp_set": 1.0,
@@ -234,6 +242,8 @@ class ConfigManager:
             "Temperatura_electrodo",
             "factor_generar_calor",
             "pendiente_temperatura",
+            "k_amortiguacion_termica",
+            "umbral_caida_temperatura",
             "ocupacion_max_pp_set",
             "ocupacion_max_sp_set",
             "pasos_guardar_estado",
@@ -263,6 +273,11 @@ class ConfigManager:
                 protocolos.append(ProtocoloVoltaje.desde_config(sim.params["protocolo_voltaje"]))
             except ValueError as e:
                 raise ValueError(f"sim {sim.sim_id}: protocolo_voltaje inválido: {e}") from e
+
+        for sim in self.simulations:
+            umbral = sim.params.get("umbral_caida_temperatura", 10.0)
+            if not umbral > 0:
+                raise ValueError(f"sim {sim.sim_id}: umbral_caida_temperatura debe ser > 0, recibido {umbral!r}")
 
         data_params = [{col: sim.params[col] for col in cols_params} for sim in self.simulations]
         data_ctes = [{col: sim.params[col] for col in cols_ctes} for sim in self.simulations]
