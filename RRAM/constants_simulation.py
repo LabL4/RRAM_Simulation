@@ -194,6 +194,10 @@ class SimulationConstants:
         """Actualiza la energía de recombinación."""
         return self._actualizar("recombination_energy", nueva_energia)
 
+    def update_temperatura_electrodo(self, nueva_Temperatura: float):
+        """Actualiza la energía de recombinación."""
+        return self._actualizar("Temperatura_electrodo", nueva_Temperatura)
+
     def __repr__(self):
         # Crear lista de líneas con "nombre=valor" para cada atributo
         atributos = []

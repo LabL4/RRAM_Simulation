@@ -20,6 +20,13 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _extra_sin_amortiguar(sim_ctes, temperatura_sin_amortiguar) -> dict:
+    """Kwargs extra para guardar_estado_intermedio: el mapa de T sin amortiguar, solo si la amortiguación está activa."""
+    if Temperature.amortiguacion_activa(sim_ctes.k_amortiguacion_termica) and temperatura_sin_amortiguar is not None:
+        return {"temperatura_sin_amortiguar": temperatura_sin_amortiguar}
+    return {}
+
+
 def PP_reset(
     final_state_sp_set: dict,
     num_simulation: int,
@@ -277,6 +284,18 @@ def PP_reset(
                     matriz_muros=None,
                 )
 
+            # Amortiguación de caídas bruscas (conserva las columnas de electrodo). Se guarda
+            # el mapa FVM sin amortiguar para poder compararlo con el amortiguado.
+            temperatura_sin_amortiguar = temperatura
+            temperatura = Temperature.amortiguar_mapa_fvm(
+                temperatura,
+                temperatura_anterior,
+                T_0=params.init_temp,
+                k=sim_ctes.k_amortiguacion_termica,
+                dt=params.paso_temporal,
+                umbral=sim_ctes.umbral_caida_temperatura,
+            )
+
             temperatura_anterior = temperatura[:, 1:-1]
 
             # Temperatura por filamento: extraída del mapa FVM ya resuelto, en la fila central de cada filamento
@@ -304,6 +323,22 @@ def PP_reset(
             temperatura = Temperature.Temperature_Joule(
                 voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola
             )
+
+            # Amortiguación de caídas bruscas. El paso en que se pasa del mapa FVM al escalar
+            # de Joule (rotura del filamento) NO se amortigua: no hay un valor anterior
+            # calculado con Joule con el que comparar (temperatura_anterior sigue siendo la
+            # matriz FVM). A partir del paso siguiente el anterior es escalar y ya se amortigua.
+            temperatura_sin_amortiguar = temperatura
+            if not isinstance(temperatura_anterior, np.ndarray):
+                temperatura = Temperature.amortiguar_enfriamiento(
+                    temperatura,
+                    temperatura_anterior,
+                    T_0=params.init_temp,
+                    k=sim_ctes.k_amortiguacion_termica,
+                    dt=params.paso_temporal,
+                    umbral=sim_ctes.umbral_caida_temperatura,
+                )
+            temperatura_anterior = temperatura
 
             # No ha percolado: valores neutros por filamento (no hay resistencia/corriente/mapa FVM por filamento)
             R_total = np.nan
@@ -358,6 +393,7 @@ def PP_reset(
                 cf_clean_matrix=locals().get("cf_clean_matrix"),  # Si no existe, devuelve None
                 temperatura=locals().get("temperatura"),
                 mapa_resistencias=locals().get("R_local"),
+                **_extra_sin_amortiguar(sim_ctes, locals().get("temperatura_sin_amortiguar")),
             )
 
     # Recorto a las filas realmente escritas y calculo el traspaso a SP_reset.
@@ -381,6 +417,7 @@ def PP_reset(
             temperatura=locals().get("temperatura"),
             matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
             mapa_resistencias=locals().get("R_local"),
+            **_extra_sin_amortiguar(sim_ctes, locals().get("temperatura_sin_amortiguar")),
         )
 
     # Guardo los datos de la simulacion
@@ -637,6 +674,7 @@ def SP_reset(
                 matriz_muros=None,
             )
             # Actualizo la temperatura anterior para el siguiente paso, NO guardo las columnas primera y ultima ya q corresponden a los electrodos
+            # No se amortigua: en SP_reset ya no hay filamentos, esta rama FVM no se alcanza.
             temperatura_anterior = temperatura[:, 1:-1]
 
             # Temperatura por filamento: extraída del mapa FVM ya resuelto, en la fila central de cada filamento
@@ -672,6 +710,22 @@ def SP_reset(
             temperatura = Temperature.Temperature_Joule(
                 voltage, current, params.init_temp, r_termica=sim_ctes.r_termica_no_percola
             )
+
+            # Amortiguación de caídas bruscas. El paso en que se pasa del mapa FVM al escalar
+            # de Joule (rotura del filamento) NO se amortigua: no hay un valor anterior
+            # calculado con Joule con el que comparar (temperatura_anterior sigue siendo la
+            # matriz FVM). A partir del paso siguiente el anterior es escalar y ya se amortigua.
+            temperatura_sin_amortiguar = temperatura
+            if not isinstance(temperatura_anterior, np.ndarray):
+                temperatura = Temperature.amortiguar_enfriamiento(
+                    temperatura,
+                    temperatura_anterior,
+                    T_0=params.init_temp,
+                    k=sim_ctes.k_amortiguacion_termica,
+                    dt=params.paso_temporal,
+                    umbral=sim_ctes.umbral_caida_temperatura,
+                )
+            temperatura_anterior = temperatura
 
             # No ha percolado: valores neutros por filamento (no hay resistencia/corriente/mapa FVM por filamento)
             R_total = np.nan
@@ -728,6 +782,7 @@ def SP_reset(
                 cf_clean_matrix=locals().get("cf_clean_matrix"),  # Si no existe, devuelve None
                 temperatura=locals().get("temperatura"),
                 mapa_resistencias=locals().get("R_local"),
+                **_extra_sin_amortiguar(sim_ctes, locals().get("temperatura_sin_amortiguar")),
             )
 
     # Recorto a las filas realmente escritas.
@@ -747,6 +802,7 @@ def SP_reset(
             temperatura=locals().get("temperatura"),
             matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
             mapa_resistencias=locals().get("R_local"),
+            **_extra_sin_amortiguar(sim_ctes, locals().get("temperatura_sin_amortiguar")),
         )
 
     # Guardo los datos de la simulación

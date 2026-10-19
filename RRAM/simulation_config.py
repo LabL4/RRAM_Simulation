@@ -72,7 +72,7 @@ THERMAL_DEFAULTS = {
     # donde T cae más que `umbral_caida_temperatura` [K] respecto al paso anterior,
     # T = T_0 + (T_prev - T_0) * exp(-k * paso_temporal). k = 0 la desactiva.
     "k_amortiguacion_termica": 1.0,  # [1/s]
-    "umbral_caida_temperatura": 4,  # [K], > 0
+    "umbral_caida_temperatura": 1,  # [K], > 0
 }
 
 
@@ -83,7 +83,7 @@ SIMULATION_DEFAULTS = {
     "device_size_x": 10e-9,  # Ancho entre electrodos, debe corresponder a los dispositivos medidos
     "device_size_y": 30e-9,
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
-    "num_trampas": 150,
+    "num_trampas": 120,
     # Paso temporal [s]. ENTRADA obligatoria. Cambiarlo altera la física
     # calibrada: ver MANUAL_FORMAS_DE_ONDA.md.
     "paso_temporal": 1e-3,
