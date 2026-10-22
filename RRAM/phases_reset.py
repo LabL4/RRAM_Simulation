@@ -74,6 +74,9 @@ def PP_reset(
     # Parametros termicos
     temperatura_anterior = final_state_sp_set["Temperatura_final"][:, 1:-1]
     pendiente_temperatura = sim_ctes.pendiente_temperatura
+    # Temperatura dinámica de los electrodos: parte de la que dejó SP_set en sim_ctes
+    T_electrodo = sim_ctes.Temperatura_electrodo
+    T_ady_anterior = -np.inf
 
     filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(CF_centros)
 
@@ -84,14 +87,15 @@ def PP_reset(
     oxygen_state = np.zeros_like(actual_state, dtype=np.int8)
 
     N = len(CF_ranges)
-    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], ..., I_N[A], R_1[Ohm], ..., R_N[Ohm], T_1[K], ..., T_N[K]
+    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], ..., I_N[A], R_1[Ohm], ..., R_N[Ohm], T_1[K], ..., T_N[K], T_electrodo[K]
     # El orden por bloques debe coincidir con el ensamblado de cada fila:
-    # [t, V, I_total, R_total] + I_fils + R_fils + T_fils
-    num_columnas = 4 + 3 * N
+    # [t, V, I_total, R_total] + I_fils + R_fils + T_fils + [T_electrodo_paso]
+    num_columnas = 4 + 3 * N + 1  # +1: T_electrodo[K] (temperatura de electrodo usada en el paso)
     cols = ["t[s]", "V[V]", "I_total[A]", "R_total[Ohm]"]
     cols += [f"I_{i}[A]" for i in range(1, N + 1)]
     cols += [f"R_{i}[Ohm]" for i in range(1, N + 1)]
     cols += [f"T_{i}[K]" for i in range(1, N + 1)]
+    cols += ["T_electrodo[K]"]
     header_pp_reset = ",".join(cols)
 
     # (data_pp_reset se reserva más abajo, cuando el controlador ya ha calculado
@@ -147,6 +151,7 @@ def PP_reset(
 
     # Ciclo para la primera parte del reset
     for k in range(0, presupuesto + 1):
+        T_electrodo_paso = T_electrodo  # la que usa el solver en este paso (antes de actualizarla)
         simulation_time = params.paso_temporal * k
         voltage = controller.next(
             Medidas(
@@ -271,7 +276,7 @@ def PP_reset(
                     Q_map=Q_source_map,
                     thermal_props=sim_ctes.propiedades_termicas,
                     atom_size=params.atom_size,
-                    T_ambient=sim_ctes.Temperatura_electrodo,
+                    T_electrodo=T_electrodo,
                     matriz_muros=matriz_temperaturas_fijas_final,
                 )
             else:
@@ -280,7 +285,7 @@ def PP_reset(
                     Q_map=Q_source_map,
                     thermal_props=sim_ctes.propiedades_termicas,
                     atom_size=params.atom_size,
-                    T_ambient=sim_ctes.Temperatura_electrodo,
+                    T_electrodo=T_electrodo,
                     matriz_muros=None,
                 )
 
@@ -297,6 +302,16 @@ def PP_reset(
             )
 
             temperatura_anterior = temperatura[:, 1:-1]
+
+            # Temperatura de los electrodos para el paso siguiente
+            T_electrodo, T_ady_anterior = Temperature.actualizar_temperatura_electrodo(
+                temperatura,
+                T_electrodo,
+                T_ady_anterior,
+                T_0=params.init_temp,
+                k=sim_ctes.k_electrodo_enfriamiento,
+                dt=params.paso_temporal,
+            )
 
             # Temperatura por filamento: extraída del mapa FVM ya resuelto, en la fila central de cada filamento
             perfiles_T_fils = Temperature.extraer_perfiles_filamentos(
@@ -339,6 +354,9 @@ def PP_reset(
                     umbral=sim_ctes.umbral_caida_temperatura,
                 )
             temperatura_anterior = temperatura
+            T_electrodo, T_ady_anterior = Temperature.temperatura_electrodo_joule(
+                temperatura, T_electrodo, k=sim_ctes.k_electrodo_enfriamiento
+            )
 
             # No ha percolado: valores neutros por filamento (no hay resistencia/corriente/mapa FVM por filamento)
             R_total = np.nan
@@ -368,7 +386,7 @@ def PP_reset(
 
         # Tiempo total de la simulacion
         tiempo_total = simulation_time + tiempo_sp_set
-        fila = [tiempo_total, voltage, current, R_total] + I_fils + R_fils + T_fils
+        fila = [tiempo_total, voltage, current, R_total] + I_fils + R_fils + T_fils + [T_electrodo_paso]
         data_pp_reset[k] = fila
         n_filas = k + 1
 
@@ -441,6 +459,10 @@ def PP_reset(
         )
 
     # Guardo todas las variables del estado final del PP set para usarlas en el PS set
+    # La temperatura final del electrodo pasa a la etapa siguiente dentro de sim_ctes
+    if Temperature.amortiguacion_activa(sim_ctes.k_electrodo_enfriamiento):
+        sim_ctes = sim_ctes.update_temperatura_electrodo(T_electrodo)
+
     final_state_pp_reset = {
         "actual_state": actual_state,
         "oxygen_state": oxygen_state,
@@ -503,19 +525,24 @@ def SP_reset(
         # ValueError explicativo en lugar de NameError.
         temperatura_anterior = temperatura
 
+    # Temperatura dinámica de los electrodos: parte de la que dejó PP_reset en sim_ctes
+    T_electrodo = sim_ctes.Temperatura_electrodo
+    T_ady_anterior = -np.inf
+
     logger.info(f"Lol voltaje de rotura de pp reset son:  {voltage_CF_destruido}")
 
     rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="reset", results_dir=results_dir)
 
     N = len(CF_ranges)
-    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], ..., I_N[A], R_1[Ohm], ..., R_N[Ohm], T_1[K], ..., T_N[K]
+    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], ..., I_N[A], R_1[Ohm], ..., R_N[Ohm], T_1[K], ..., T_N[K], T_electrodo[K]
     # El orden por bloques debe coincidir con el ensamblado de cada fila:
-    # [t, V, I_total, R_total] + I_fils + R_fils + T_fils
-    num_columnas = 4 + 3 * N
+    # [t, V, I_total, R_total] + I_fils + R_fils + T_fils + [T_electrodo_paso]
+    num_columnas = 4 + 3 * N + 1  # +1: T_electrodo[K] (temperatura de electrodo usada en el paso)
     cols = ["t[s]", "V[V]", "I_total[A]", "R_total[Ohm]"]
     cols += [f"I_{i}[A]" for i in range(1, N + 1)]
     cols += [f"R_{i}[Ohm]" for i in range(1, N + 1)]
     cols += [f"T_{i}[K]" for i in range(1, N + 1)]
+    cols += ["T_electrodo[K]"]
     header_sp_reset = ",".join(cols)
 
     # (data_sp_reset y resistencia_vector se reservan más abajo, cuando el
@@ -558,6 +585,7 @@ def SP_reset(
 
     # Ciclo para la primera parte del reset
     for k in range(0, presupuesto + 1):
+        T_electrodo_paso = T_electrodo  # la que usa el solver en este paso (antes de actualizarla)
         simulation_time = params.paso_temporal * k
         voltage = controller.next(
             Medidas(
@@ -670,12 +698,22 @@ def SP_reset(
                 Q_map=Q_source_map,
                 thermal_props=sim_ctes.propiedades_termicas,
                 atom_size=params.atom_size,
-                T_ambient=sim_ctes.Temperatura_electrodo,
+                T_electrodo=T_electrodo,
                 matriz_muros=None,
             )
             # Actualizo la temperatura anterior para el siguiente paso, NO guardo las columnas primera y ultima ya q corresponden a los electrodos
             # No se amortigua: en SP_reset ya no hay filamentos, esta rama FVM no se alcanza.
             temperatura_anterior = temperatura[:, 1:-1]
+
+            # Temperatura de los electrodos para el paso siguiente
+            T_electrodo, T_ady_anterior = Temperature.actualizar_temperatura_electrodo(
+                temperatura,
+                T_electrodo,
+                T_ady_anterior,
+                T_0=params.init_temp,
+                k=sim_ctes.k_electrodo_enfriamiento,
+                dt=params.paso_temporal,
+            )
 
             # Temperatura por filamento: extraída del mapa FVM ya resuelto, en la fila central de cada filamento
             perfiles_T_fils = Temperature.extraer_perfiles_filamentos(
@@ -726,6 +764,9 @@ def SP_reset(
                     umbral=sim_ctes.umbral_caida_temperatura,
                 )
             temperatura_anterior = temperatura
+            T_electrodo, T_ady_anterior = Temperature.temperatura_electrodo_joule(
+                temperatura, T_electrodo, k=sim_ctes.k_electrodo_enfriamiento
+            )
 
             # No ha percolado: valores neutros por filamento (no hay resistencia/corriente/mapa FVM por filamento)
             R_total = np.nan
@@ -755,7 +796,7 @@ def SP_reset(
 
         # Tiempo total de la simulacion
         tiempo_total = simulation_time + tiempo_pp_reset
-        fila = [tiempo_total, voltage, current, R_total] + I_fils + R_fils + T_fils
+        fila = [tiempo_total, voltage, current, R_total] + I_fils + R_fils + T_fils + [T_electrodo_paso]
         data_sp_reset[k] = fila
         n_filas = k + 1
 
@@ -821,6 +862,10 @@ def SP_reset(
     logger.info(f"\nSimulación {num_simulation} finalizada correctamente.")
 
     # Guardo todas las variables del estado final del PP set para usarlas en el PS set
+    # La temperatura final del electrodo pasa a la etapa siguiente dentro de sim_ctes
+    if Temperature.amortiguacion_activa(sim_ctes.k_electrodo_enfriamiento):
+        sim_ctes = sim_ctes.update_temperatura_electrodo(T_electrodo)
+
     final_state_sp_reset = {
         "actual_state": actual_state,
         "oxygen_state": oxygen_state,

@@ -97,6 +97,50 @@ def amortiguar_mapa_fvm(T_fvm: np.ndarray, T_prev: np.ndarray, T_0: float, k, dt
     return T_out
 
 
+def actualizar_temperatura_electrodo(T_fvm: np.ndarray, T_e_prev: float, T_ady_prev: float, T_0: float, k, dt: float) -> tuple[float, float]:
+    """
+    Temperatura de los electrodos para el paso siguiente a partir del mapa FVM (Ny, Nx+2).
+
+    T_ady = menor de las medias de las columnas adyacentes a cada electrodo (1 y -2):
+        - si T_ady > T_ady_prev: T_e = T_ady (calentamiento instantáneo)
+        - si no:                 T_e = T_0 + (T_e_prev - T_0) * exp(-k * dt)
+    Sin tensión el mapa es uniforme e igual a T_e_prev, así que T_ady == T_ady_prev y
+    entra en la rama de enfriamiento. Ambos electrodos comparten la misma temperatura.
+
+    OJO: con tensión T_ady = T_e + delta en cada paso, de modo que el electrodo sube
+    delta por paso sin tope dentro del pulso (y más cuanto menor sea dt).
+
+    Args:
+        T_fvm: mapa de temperatura del solver, con las columnas de electrodo.
+        T_e_prev: temperatura de electrodo usada para resolver este mapa [K].
+        T_ady_prev: T_ady del paso anterior [K] (-inf al empezar la etapa).
+        T_0: temperatura ambiente [K], destino del enfriamiento.
+        k: constante de enfriamiento [1/s]. None/NaN/<=0 desactiva: electrodo fijo.
+        dt: paso temporal [s].
+
+    Returns:
+        (T_e, T_ady): nueva temperatura de electrodo y T_ady de este paso.
+    """
+    T_ady = float(min(np.mean(T_fvm[:, 1]), np.mean(T_fvm[:, -2])))
+    if not amortiguacion_activa(k):
+        return T_e_prev, T_ady
+    if T_ady > T_ady_prev:
+        return T_ady, T_ady
+    return float(T_0 + (T_e_prev - T_0) * np.exp(-k * dt)), T_ady
+
+
+def temperatura_electrodo_joule(T_joule: float, T_e_prev: float, k) -> tuple[float, float]:
+    """
+    Temperatura de los electrodos cuando no hay mapa FVM (modelo Joule escalar): el
+    electrodo sigue a la temperatura del dispositivo. Devuelve (T_e, T_ady), con
+    T_ady = T_joule para que el primer paso con mapa FVM compare contra ella.
+    Con k desactivada el electrodo se queda en T_e_prev.
+    """
+    if not amortiguacion_activa(k):
+        return T_e_prev, float(T_joule)
+    return float(T_joule), float(T_joule)
+
+
 def legacy_matriz_materiales(matriz_filamentos: np.ndarray) -> np.ndarray:
     """
     Recibe la matriz de estado (0: Vacante/Aire, 1: Filamento).
@@ -256,7 +300,7 @@ def solve_thermal_state(
     Q_map: np.ndarray,
     thermal_props: dict,
     atom_size: float,
-    T_ambient: float,
+    T_electrodo: float,
     matriz_muros: Optional[np.ndarray] = None,
 ) -> np.ndarray:
     """
@@ -286,7 +330,7 @@ def solve_thermal_state(
                 data.append(1.0)
                 rows_idx.append(n)
                 cols_idx.append(n)
-                b[n] = T_ambient
+                b[n] = T_electrodo
                 continue
 
             # ==========================================================

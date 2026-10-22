@@ -106,6 +106,9 @@ def PP_set(
     resistencia = 0.0
     temperatura_anterior = params.init_temp
     pendiente_temperatura = sim_ctes.pendiente_temperatura
+    # Temperatura dinámica de los electrodos (Temperature.actualizar_temperatura_electrodo)
+    T_electrodo = sim_ctes.Temperatura_electrodo
+    T_ady_anterior = -np.inf
 
     logger.info(
         f"Los valores de factor vecinos y factor libre son: {sim_ctes.factor_vecinos_pp_set} y {sim_ctes.factor_libre_pp_set} "
@@ -130,14 +133,15 @@ def PP_set(
     centros_calculados = CF_centros
 
     N = len(CF_ranges)
-    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], ..., I_N[A], R_1[Ohm], ..., R_N[Ohm], T_1[K], ..., T_N[K]
+    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], ..., I_N[A], R_1[Ohm], ..., R_N[Ohm], T_1[K], ..., T_N[K], T_electrodo[K]
     # El orden por bloques debe coincidir con el ensamblado de cada fila:
-    # [t, V, I_total, R_total] + I_fils + R_fils + T_fils
-    num_columnas = 4 + 3 * N
+    # [t, V, I_total, R_total] + I_fils + R_fils + T_fils + [T_electrodo_paso]
+    num_columnas = 4 + 3 * N + 1  # +1: T_electrodo[K] (temperatura de electrodo usada en el paso)
     cols = ["t[s]", "V[V]", "I_total[A]", "R_total[Ohm]"]
     cols += [f"I_{i}[A]" for i in range(1, N + 1)]
     cols += [f"R_{i}[Ohm]" for i in range(1, N + 1)]
     cols += [f"T_{i}[K]" for i in range(1, N + 1)]
+    cols += ["T_electrodo[K]"]
     header_pp_set = ",".join(cols)
 
     # Defino la matriz para almacenar los datos. El presupuesto es una COTA SUPERIOR:
@@ -185,6 +189,7 @@ def PP_set(
     n_filas = 0
 
     for k in range(0, presupuesto + 1):
+        T_electrodo_paso = T_electrodo  # la que usa el solver en este paso (antes de actualizarla)
         total_vacantes = np.sum(actual_state)
 
         if total_vacantes > int(params.num_max_vacantes):
@@ -368,7 +373,7 @@ def PP_set(
                         Q_map=Q_source_map,
                         thermal_props=sim_ctes.propiedades_termicas,
                         atom_size=params.atom_size,
-                        T_ambient=sim_ctes.Temperatura_electrodo,
+                        T_electrodo=T_electrodo,
                         matriz_muros=matriz_temperaturas_fijas_final,
                     )
                 else:
@@ -378,7 +383,7 @@ def PP_set(
                         Q_map=Q_source_map,
                         thermal_props=sim_ctes.propiedades_termicas,
                         atom_size=params.atom_size,
-                        T_ambient=sim_ctes.Temperatura_electrodo,
+                        T_electrodo=T_electrodo,
                         matriz_muros=None,
                     )
 
@@ -396,6 +401,16 @@ def PP_set(
 
                 # Actualizo la temperatura anterior para el siguiente paso, NO guardo las columnas primera y ultima ya q corresponden a los electrodos
                 temperatura_anterior = temperatura[:, 1:-1]
+
+                # Temperatura de los electrodos para el paso siguiente
+                T_electrodo, T_ady_anterior = Temperature.actualizar_temperatura_electrodo(
+                    temperatura,
+                    T_electrodo,
+                    T_ady_anterior,
+                    T_0=params.init_temp,
+                    k=sim_ctes.k_electrodo_enfriamiento,
+                    dt=params.paso_temporal,
+                )
 
                 # Temperatura por filamento: extraída del mapa FVM ya resuelto, en la fila central de cada filamento
                 perfiles_T_fils = Temperature.extraer_perfiles_filamentos(
@@ -425,6 +440,9 @@ def PP_set(
                     r_termica=sim_ctes.r_termica_no_percola,
                     T_fondo=float(temperatura),
                 )
+                T_electrodo, T_ady_anterior = Temperature.temperatura_electrodo_joule(
+                    temperatura, T_electrodo, k=sim_ctes.k_electrodo_enfriamiento
+                )
                 # Extiendo el valor para formar una matriz del mismo tamaño que el estado, para que no de error al usarlo en la función de generación si no ha percolado
                 # dtype=float obligatorio: actual_state es int64 y sin él la temperatura se trunca a entero
                 temperatura = np.full_like(actual_state, temperatura, dtype=float)
@@ -448,6 +466,9 @@ def PP_set(
                 umbral=sim_ctes.umbral_caida_temperatura,
             )
             temperatura_anterior = temperatura
+            T_electrodo, T_ady_anterior = Temperature.temperatura_electrodo_joule(
+                temperatura, T_electrodo, k=sim_ctes.k_electrodo_enfriamiento
+            )
             # print(f"El valor de la temperatura es {temperatura} K, se usa el modelo de temperatura de Joule\n")
 
             # No ha percolado: valores neutros por filamento (no hay resistencia/corriente/mapa FVM por filamento)
@@ -491,7 +512,7 @@ def PP_set(
         # region GUARDAR ESTADO
 
         # Guardo los datos de la simulación
-        fila = [simulation_time, voltage, current, R_total] + I_fils + R_fils + T_fils
+        fila = [simulation_time, voltage, current, R_total] + I_fils + R_fils + T_fils + [T_electrodo_paso]
         data_pp_set[k] = fila
         n_filas = k + 1
 
@@ -624,6 +645,10 @@ def PP_set(
     #     # No se ha llegado a la resistencia necesaria para la segunda parte del set, directamelo lo descarto
     #     raise exceptions.LowResistanceException(valor_resistencia=resistencia)
 
+    # La temperatura final del electrodo pasa a la etapa siguiente dentro de sim_ctes
+    if Temperature.amortiguacion_activa(sim_ctes.k_electrodo_enfriamiento):
+        sim_ctes = sim_ctes.update_temperatura_electrodo(T_electrodo)
+
     # Guardo todas las variables del estado final del PP set para usarlas en el PS set
     final_state_pp_set = {
         "actual_state": actual_state,
@@ -726,6 +751,10 @@ def SP_set(
     # Elimino las columnas 0 y ultima de la matriz de temperatura porque corresponden a los electrodos
     temperatura_anterior = final_state_pp_set["Temperatura_final"][:, 1:-1]
 
+    # Temperatura dinámica de los electrodos: parte de la que dejó PP_set en sim_ctes
+    T_electrodo = sim_ctes.Temperatura_electrodo
+    T_ady_anterior = -np.inf
+
     # Todo el voltaje lo decide el protocolo; de PP_set solo se toma su V final
     # (para 'anterior' y para el informe de enganche).
     controller = protocolo.controlador("sp_set", previo=final_state_pp_set)
@@ -737,14 +766,15 @@ def SP_set(
 
     # Defino la matriz para almacenar los datos
     N = len(CF_ranges)
-    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], ..., I_N[A], R_1[Ohm], ..., R_N[Ohm], T_1[K], ..., T_N[K]
+    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], ..., I_N[A], R_1[Ohm], ..., R_N[Ohm], T_1[K], ..., T_N[K], T_electrodo[K]
     # El orden por bloques debe coincidir con el ensamblado de cada fila:
-    # [t, V, I_total, R_total] + I_fils + R_fils + T_fils
-    num_columnas = 4 + 3 * N
+    # [t, V, I_total, R_total] + I_fils + R_fils + T_fils + [T_electrodo_paso]
+    num_columnas = 4 + 3 * N + 1  # +1: T_electrodo[K] (temperatura de electrodo usada en el paso)
     cols = ["t[s]", "V[V]", "I_total[A]", "R_total[Ohm]"]
     cols += [f"I_{i}[A]" for i in range(1, N + 1)]
     cols += [f"R_{i}[Ohm]" for i in range(1, N + 1)]
     cols += [f"T_{i}[K]" for i in range(1, N + 1)]
+    cols += ["T_electrodo[K]"]
     header_sp_set = ",".join(cols)
 
     data_sp_set = np.zeros((presupuesto + 1, num_columnas), dtype=np.float64)
@@ -771,6 +801,7 @@ def SP_set(
 
     logger.info(f"Simulacion {num_simulation} - Segunda parte del set")
     for k in range(0, presupuesto + 1):
+        T_electrodo_paso = T_electrodo  # la que usa el solver en este paso (antes de actualizarla)
         total_vacantes = np.sum(actual_state)
 
         if total_vacantes > int(params.num_max_vacantes):
@@ -921,7 +952,7 @@ def SP_set(
                     Q_map=Q_source_map,
                     thermal_props=sim_ctes.propiedades_termicas,
                     atom_size=params.atom_size,
-                    T_ambient=sim_ctes.Temperatura_electrodo,
+                    T_electrodo=T_electrodo,
                     matriz_muros=matriz_temperaturas_fijas_final,
                 )
             else:
@@ -930,7 +961,7 @@ def SP_set(
                     Q_map=Q_source_map,
                     thermal_props=sim_ctes.propiedades_termicas,
                     atom_size=params.atom_size,
-                    T_ambient=sim_ctes.Temperatura_electrodo,
+                    T_electrodo=T_electrodo,
                     matriz_muros=None,
                 )
 
@@ -948,6 +979,16 @@ def SP_set(
 
             # Importante para que se actualice el perfil termico de los filamentos
             temperatura_anterior = temperatura[:, 1:-1]
+
+            # Temperatura de los electrodos para el paso siguiente
+            T_electrodo, T_ady_anterior = Temperature.actualizar_temperatura_electrodo(
+                temperatura,
+                T_electrodo,
+                T_ady_anterior,
+                T_0=params.init_temp,
+                k=sim_ctes.k_electrodo_enfriamiento,
+                dt=params.paso_temporal,
+            )
 
             # Temperatura por filamento: extraída del mapa FVM ya resuelto, en la fila central de cada filamento
             perfiles_T_fils = Temperature.extraer_perfiles_filamentos(
@@ -984,6 +1025,9 @@ def SP_set(
             # temperatura_anterior es una matriz y el resultado ya no sería escalar.
             temperatura = Temperature.Temperature_Joule(
                 voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola
+            )
+            T_electrodo, T_ady_anterior = Temperature.temperatura_electrodo_joule(
+                temperatura, T_electrodo, k=sim_ctes.k_electrodo_enfriamiento
             )
             sistema_percola = False
             mean_field = np.mean(E_field_vector).item()
@@ -1023,7 +1067,7 @@ def SP_set(
             total_vacantes_sp_set = True
 
         # Guardo los datos de la simulación
-        fila = [simulation_time + tiempo_pp_set, voltage, current, R_total] + I_fils + R_fils + T_fils
+        fila = [simulation_time + tiempo_pp_set, voltage, current, R_total] + I_fils + R_fils + T_fils + [T_electrodo_paso]
         data_sp_set[k] = fila
         n_filas = k + 1
 
@@ -1055,6 +1099,10 @@ def SP_set(
         headers={"datos_simulacion": header_sp_set},
         datos_sim=data_sp_set,
     )
+
+    # La temperatura final del electrodo pasa a la etapa siguiente dentro de sim_ctes
+    if Temperature.amortiguacion_activa(sim_ctes.k_electrodo_enfriamiento):
+        sim_ctes = sim_ctes.update_temperatura_electrodo(T_electrodo)
 
     # Guardo todas las variables del estado final del PP set para usarlas en el PS set
     final_state_sp_set = {

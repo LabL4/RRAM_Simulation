@@ -73,6 +73,10 @@ THERMAL_DEFAULTS = {
     # T = T_0 + (T_prev - T_0) * exp(-k * paso_temporal). k = 0 la desactiva.
     "k_amortiguacion_termica": 1.0,  # [1/s]
     "umbral_caida_temperatura": 1,  # [K], > 0
+    # Temperatura dinámica de los electrodos (ver Temperature.actualizar_temperatura_electrodo):
+    # sube a la media (menor) de las columnas adyacentes cuando esta crece y, si no,
+    # se enfría hacia init_temp con exp(-k * paso_temporal). k = 0 la desactiva.
+    "k_electrodo_enfriamiento": 2.0,  # [1/s]
 }
 
 
@@ -85,7 +89,6 @@ SIMULATION_DEFAULTS = {
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
     "num_trampas": 120,
     # Paso temporal [s]. ENTRADA obligatoria. Cambiarlo altera la física
-    # calibrada: ver MANUAL_FORMAS_DE_ONDA.md.
     "paso_temporal": 1e-3,
     # El voltaje NO tiene valores por defecto: cada simulación debe traer su
     # "protocolo_voltaje" (ver RRAM.voltage_controller.ProtocoloVoltaje).
@@ -123,8 +126,7 @@ DEFAULT_PARAMS = {
 }
 
 
-# Esta clase no es mas que un contenedor vacío, inicialmente se creó para tener un lugar donde crear nuevos oarámetros a partir de los
-# base pero ya se hace en las clases SimulationParameters y SimulationConstants, por lo que esta clase ya no tiene sentido para no tardar en eliminarla, se deja como un contenedor de parámetros que no hace nada.
+# Esta clase no es mas que un contenedor vacío, inicialmente se creó para tener un lugar donde crear nuevos oarámetros a partir de los base pero ya se hace en las clases SimulationParameters y SimulationConstants, por lo que esta clase ya no tiene sentido para no tardar en eliminarla, se deja como un contenedor de parámetros que no hace nada.
 class SimulationConfig:
     def __init__(self, sim_id: int):
         self.sim_id = sim_id
@@ -152,8 +154,7 @@ class ConfigManager:
 
     def add_zip(self, zip_params: Dict[str, List[Any]], fixed_params: Optional[Dict[str, Any]] = None):
         """
-        Genera simulaciones emparejando los valores por posición (zip), no por
-        producto cartesiano. Todas las listas deben tener la misma longitud.
+        Genera simulaciones emparejando los valores por posición (zip), no por producto cartesiano. Todas las listas deben tener la misma longitud.
 
         Args:
             zip_params: Diccionario de parámetros a emparejar por posición.
@@ -244,6 +245,7 @@ class ConfigManager:
             "pendiente_temperatura",
             "k_amortiguacion_termica",
             "umbral_caida_temperatura",
+            "k_electrodo_enfriamiento",
             "ocupacion_max_pp_set",
             "ocupacion_max_sp_set",
             "pasos_guardar_estado",

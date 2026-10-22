@@ -69,11 +69,11 @@ diccionario en texto (``ast.literal_eval``).
 
 from __future__ import annotations
 
-import ast
+from typing import Any, Dict, List, Optional, Tuple
+from dataclasses import dataclass, field
 import logging
 import math
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Tuple
+import ast
 
 logger = logging.getLogger(__name__)
 
@@ -758,7 +758,7 @@ def previsualizar(fuente: Any, sims: Optional[List[int]] = None, max_figuras: in
     import matplotlib.pyplot as plt  # solo aquí: el controlador no depende de matplotlib
 
     # Figura de diagnóstico: sin LaTeX (el paquete puede haberlo activado globalmente).
-    with plt.rc_context({"text.usetex": False}):
+    with plt.rc_context({"text.usetex": True}):
         n = len(protocolos)
         cols = 1 if n == 1 else 2
         filas = math.ceil(n / cols)

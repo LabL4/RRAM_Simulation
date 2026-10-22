@@ -73,6 +73,11 @@ class SimulationConstants:
     # k = 0 (defecto) la desactiva; los CSV antiguos sin estas columnas siguen cargando.
     k_amortiguacion_termica: float = 0.0
     umbral_caida_temperatura: float = 10.0
+    # Temperatura dinámica de los electrodos (Temperature.actualizar_temperatura_electrodo).
+    # k = 0 (defecto) la desactiva: el electrodo se queda fijo en Temperatura_electrodo.
+    # OJO: con k > 0 el calentamiento suma la subida adyacente en CADA paso, así que
+    # dentro de un pulso largo crece sin tope y depende de paso_temporal.
+    k_electrodo_enfriamiento: float = 0.0
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SimulationConstants":
@@ -195,7 +200,7 @@ class SimulationConstants:
         return self._actualizar("recombination_energy", nueva_energia)
 
     def update_temperatura_electrodo(self, nueva_Temperatura: float):
-        """Actualiza la energía de recombinación."""
+        """Actualiza la temperatura de los electrodos."""
         return self._actualizar("Temperatura_electrodo", nueva_Temperatura)
 
     def __repr__(self):
