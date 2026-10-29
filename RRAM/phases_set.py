@@ -28,13 +28,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-def _extra_sin_amortiguar(sim_ctes, temperatura_sin_amortiguar) -> dict:
-    """Kwargs extra para guardar_estado_intermedio: el mapa de T sin amortiguar, solo si la amortiguación está activa."""
-    if Temperature.amortiguacion_activa(sim_ctes.k_amortiguacion_termica) and temperatura_sin_amortiguar is not None:
-        return {"temperatura_sin_amortiguar": temperatura_sin_amortiguar}
-    return {}
-
-
 def PP_set(
     num_simulation: int,
     params: SimulationParameters,
@@ -106,12 +99,12 @@ def PP_set(
     resistencia = 0.0
     temperatura_anterior = params.init_temp
     pendiente_temperatura = sim_ctes.pendiente_temperatura
-    # Temperatura dinámica de los electrodos (Temperature.actualizar_temperatura_electrodo)
+    # Temperatura de los electrodos: se copia la constante y se trabaja con la copia
+    # (Temperature.actualizar_temperatura_electrodo); viaja a la etapa siguiente en el dict
     T_electrodo = sim_ctes.Temperatura_electrodo
-    T_ady_anterior = -np.inf
 
     logger.info(
-        f"Los valores de factor vecinos y factor libre son: {sim_ctes.factor_vecinos_pp_set} y {sim_ctes.factor_libre_pp_set} "
+        f"Los valores de factor vecinos y factor libre son: {sim_ctes.factor_vecinos_pp_set} y {sim_ctes.factor_libre_pp_set} (vecinos: {sim_ctes.neighbor_mode_pp_set}) "
     )
 
     max_vancantes_pp_set = int(sim_ctes.ocupacion_max_pp_set * params.num_max_vacantes)
@@ -133,21 +126,22 @@ def PP_set(
     centros_calculados = CF_centros
 
     N = len(CF_ranges)
-    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], ..., I_N[A], R_1[Ohm], ..., R_N[Ohm], T_1[K], ..., T_N[K], T_electrodo[K]
+    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], ..., I_N[A], R_1[Ohm], ..., R_N[Ohm], T_1[K], ..., T_N[K]
     # El orden por bloques debe coincidir con el ensamblado de cada fila:
-    # [t, V, I_total, R_total] + I_fils + R_fils + T_fils + [T_electrodo_paso]
-    num_columnas = 4 + 3 * N + 1  # +1: T_electrodo[K] (temperatura de electrodo usada en el paso)
+    # [t, V, I_total, R_total] + I_fils + R_fils + T_fils
+    num_columnas = 4 + 3 * N
     cols = ["t[s]", "V[V]", "I_total[A]", "R_total[Ohm]"]
     cols += [f"I_{i}[A]" for i in range(1, N + 1)]
     cols += [f"R_{i}[Ohm]" for i in range(1, N + 1)]
     cols += [f"T_{i}[K]" for i in range(1, N + 1)]
-    cols += ["T_electrodo[K]"]
     header_pp_set = ",".join(cols)
 
     # Defino la matriz para almacenar los datos. El presupuesto es una COTA SUPERIOR:
     # se reservan presupuesto+1 filas (k = 0 … presupuesto) y al final se recortan
     # las que no se hayan usado si la forma de onda terminó antes.
     data_pp_set = np.zeros((presupuesto + 1, num_columnas), dtype=np.float64)
+    # Perfil de temperatura del electrodo usado en cada paso (escalar repetido sin FVM)
+    perfil_electrodo = np.zeros((presupuesto + 1, actual_state.shape[0]), dtype=np.float64)
     resistencia_vector = np.zeros((presupuesto + 1, 3), dtype=np.float64)
     num_vacantes_total = np.zeros((presupuesto + 1, 3), dtype=np.float64)
 
@@ -238,7 +232,7 @@ def PP_set(
 
                 # Verificar si temperatura es un float y convertirlo a matriz
                 if isinstance(temperatura, (float, int)):
-                    temperatura_anterior = np.full_like(actual_state, temperatura, dtype=float)
+                    temperatura_anterior = Temperature.como_mapa(temperatura, actual_state.shape)
 
             sistema_percola = True
 
@@ -387,37 +381,20 @@ def PP_set(
                         matriz_muros=None,
                     )
 
-                # Amortiguación de caídas bruscas (conserva las columnas de electrodo). Se guarda
+                # Amortiguación, temperatura anterior, electrodo y T por filamento. Se guarda
                 # el mapa FVM sin amortiguar para poder compararlo con el amortiguado.
                 temperatura_sin_amortiguar = temperatura
-                temperatura = Temperature.amortiguar_mapa_fvm(
-                    temperatura,
-                    temperatura_anterior,
-                    T_0=params.init_temp,
-                    k=sim_ctes.k_amortiguacion_termica,
-                    dt=params.paso_temporal,
-                    umbral=sim_ctes.umbral_caida_temperatura,
+                temperatura, temperatura_anterior, T_electrodo, T_fils = (
+                    Temperature.procesar_temperatura_amortiguamiento(
+                        temperatura_sin_amortiguar,
+                        temperatura_anterior,
+                        T_electrodo,
+                        params,
+                        sim_ctes,
+                        centros=centros_calculados,
+                        N=N,
+                    )
                 )
-
-                # Actualizo la temperatura anterior para el siguiente paso, NO guardo las columnas primera y ultima ya q corresponden a los electrodos
-                temperatura_anterior = temperatura[:, 1:-1]
-
-                # Temperatura de los electrodos para el paso siguiente
-                T_electrodo, T_ady_anterior = Temperature.actualizar_temperatura_electrodo(
-                    temperatura,
-                    T_electrodo,
-                    T_ady_anterior,
-                    T_0=params.init_temp,
-                    k=sim_ctes.k_electrodo_enfriamiento,
-                    dt=params.paso_temporal,
-                )
-
-                # Temperatura por filamento: extraída del mapa FVM ya resuelto, en la fila central de cada filamento
-                perfiles_T_fils = Temperature.extraer_perfiles_filamentos(
-                    matriz_temperaturas=temperatura_anterior,
-                    filas_centros=centros_calculados,  # type: ignore
-                )
-                T_fils = [float(np.max(p)) if p is not None else params.init_temp for p in perfiles_T_fils]
                 T_max_fils = utils.acumular_T_max_filamentos(T_max_fils, T_fils)
 
             else:
@@ -440,12 +417,23 @@ def PP_set(
                     r_termica=sim_ctes.r_termica_no_percola,
                     T_fondo=float(temperatura),
                 )
-                T_electrodo, T_ady_anterior = Temperature.temperatura_electrodo_joule(
-                    temperatura, T_electrodo, k=sim_ctes.k_electrodo_enfriamiento
+                # Sin amortiguar ni actualizar la anterior. La temperatura se devuelve como
+                # matriz del tamaño del estado para que no falle la función de generación.
+                temperatura, temperatura_anterior, T_electrodo, T_fils = (
+                    Temperature.procesar_temperatura_amortiguamiento(
+                        temperatura,
+                        temperatura_anterior,
+                        T_electrodo,
+                        params,
+                        sim_ctes,
+                        centros=centros_calculados,
+                        N=N,
+                        amortiguar=False,
+                        actualizar_anterior=False,
+                        T_fils=T_fils,
+                        forma=actual_state.shape,
+                    )
                 )
-                # Extiendo el valor para formar una matriz del mismo tamaño que el estado, para que no de error al usarlo en la función de generación si no ha percolado
-                # dtype=float obligatorio: actual_state es int64 y sin él la temperatura se trunca a entero
-                temperatura = np.full_like(actual_state, temperatura, dtype=float)
 
         else:
             sistema_percola = False
@@ -457,17 +445,16 @@ def PP_set(
             )
             # Amortiguación de caídas bruscas (escalar contra el escalar del paso anterior)
             temperatura_sin_amortiguar = temperatura
-            temperatura = Temperature.amortiguar_enfriamiento(
-                temperatura,
-                temperatura_anterior,
-                T_0=params.init_temp,
-                k=sim_ctes.k_amortiguacion_termica,
-                dt=params.paso_temporal,
-                umbral=sim_ctes.umbral_caida_temperatura,
-            )
-            temperatura_anterior = temperatura
-            T_electrodo, T_ady_anterior = Temperature.temperatura_electrodo_joule(
-                temperatura, T_electrodo, k=sim_ctes.k_electrodo_enfriamiento
+            temperatura, temperatura_anterior, T_electrodo, T_fils = (
+                Temperature.procesar_temperatura_amortiguamiento(
+                    temperatura_sin_amortiguar,
+                    temperatura_anterior,
+                    T_electrodo,
+                    params,
+                    sim_ctes,
+                    centros=centros_calculados,
+                    N=N,
+                )
             )
             # print(f"El valor de la temperatura es {temperatura} K, se usa el modelo de temperatura de Joule\n")
 
@@ -475,7 +462,6 @@ def PP_set(
             R_total = np.nan
             I_fils = [np.nan] * N
             R_fils = [np.nan] * N
-            T_fils = [temperatura] * N
 
             # simple_field = ElectricField.SimpleElectricField(voltage, params.device_size)
             # Si no ha percolado uso la corriente de Poole-Frenkel
@@ -499,6 +485,7 @@ def PP_set(
                 sim_ctes.factor_vecinos_pp_set,
                 sim_ctes.factor_libre_pp_set,
                 max_vancantes_pp_set,
+                neighbor_mode=sim_ctes.neighbor_mode_pp_set,
                 custom_mask=limit_CF_witdh_mask_generation,
                 num_iteracion=k,
             )
@@ -512,8 +499,9 @@ def PP_set(
         # region GUARDAR ESTADO
 
         # Guardo los datos de la simulación
-        fila = [simulation_time, voltage, current, R_total] + I_fils + R_fils + T_fils + [T_electrodo_paso]
+        fila = [simulation_time, voltage, current, R_total] + I_fils + R_fils + T_fils
         data_pp_set[k] = fila
+        perfil_electrodo[k] = T_electrodo_paso
         n_filas = k + 1
 
         if locals().get("resistencia") is not None:
@@ -569,7 +557,7 @@ def PP_set(
                 probabilidad_matrix=locals().get("probabilidad_matrix"),
                 matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
                 mapa_resistencias=locals().get("R_local"),
-                **_extra_sin_amortiguar(sim_ctes, locals().get("temperatura_sin_amortiguar")),
+                **Temperature.extra_sin_amortiguar(sim_ctes, locals().get("temperatura_sin_amortiguar")),
             )
         # endregion
 
@@ -579,6 +567,7 @@ def PP_set(
     # legítimo en R_total/I_fils/R_fils (aún no hay filamento) y ese filtro borraría
     # toda la rama pp_set.
     data_pp_set = data_pp_set[:n_filas]
+    perfil_electrodo = perfil_electrodo[:n_filas]
     resistencia_vector = resistencia_vector[:n_filas]
     num_vacantes_total = num_vacantes_total[:n_filas]
 
@@ -594,6 +583,7 @@ def PP_set(
         save_path_data=rutas["simulation_path"] / f"Data_pp_set_{num_simulation}",
         headers=data_encabezados,
         datos_sim=data_pp_set,
+        perfil_electrodo=perfil_electrodo,
         vacantes=num_vacantes_total,
         resistencia=resistencia_vector,
     )
@@ -622,7 +612,7 @@ def PP_set(
             probabilidad_matrix=locals().get("probabilidad_matrix"),
             matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
             mapa_resistencias=locals().get("R_local"),
-            **_extra_sin_amortiguar(sim_ctes, locals().get("temperatura_sin_amortiguar")),
+            **Temperature.extra_sin_amortiguar(sim_ctes, locals().get("temperatura_sin_amortiguar")),
         )
 
     logger.info(f"Temperatura máxima por filamento en pp_set: {T_max_fils} K")
@@ -645,12 +635,10 @@ def PP_set(
     #     # No se ha llegado a la resistencia necesaria para la segunda parte del set, directamelo lo descarto
     #     raise exceptions.LowResistanceException(valor_resistencia=resistencia)
 
-    # La temperatura final del electrodo pasa a la etapa siguiente dentro de sim_ctes
-    if Temperature.amortiguacion_activa(sim_ctes.k_electrodo_enfriamiento):
-        sim_ctes = sim_ctes.update_temperatura_electrodo(T_electrodo)
-
     # Guardo todas las variables del estado final del PP set para usarlas en el PS set
     final_state_pp_set = {
+        # Perfil (o escalar) del electrodo con el que arranca la etapa siguiente
+        "perfil_electrodo": T_electrodo,
         "actual_state": actual_state,
         "cf_clean_matrix": cf_clean_matrix,
         "sistema_percola": sistema_percola,
@@ -751,9 +739,8 @@ def SP_set(
     # Elimino las columnas 0 y ultima de la matriz de temperatura porque corresponden a los electrodos
     temperatura_anterior = final_state_pp_set["Temperatura_final"][:, 1:-1]
 
-    # Temperatura dinámica de los electrodos: parte de la que dejó PP_set en sim_ctes
-    T_electrodo = sim_ctes.Temperatura_electrodo
-    T_ady_anterior = -np.inf
+    # Temperatura de los electrodos: parte del perfil que dejó PP_set (estados antiguos sin él: la constante)
+    T_electrodo = final_state_pp_set.get("perfil_electrodo", sim_ctes.Temperatura_electrodo)
 
     # Todo el voltaje lo decide el protocolo; de PP_set solo se toma su V final
     # (para 'anterior' y para el informe de enganche).
@@ -766,18 +753,19 @@ def SP_set(
 
     # Defino la matriz para almacenar los datos
     N = len(CF_ranges)
-    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], ..., I_N[A], R_1[Ohm], ..., R_N[Ohm], T_1[K], ..., T_N[K], T_electrodo[K]
+    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], ..., I_N[A], R_1[Ohm], ..., R_N[Ohm], T_1[K], ..., T_N[K]
     # El orden por bloques debe coincidir con el ensamblado de cada fila:
-    # [t, V, I_total, R_total] + I_fils + R_fils + T_fils + [T_electrodo_paso]
-    num_columnas = 4 + 3 * N + 1  # +1: T_electrodo[K] (temperatura de electrodo usada en el paso)
+    # [t, V, I_total, R_total] + I_fils + R_fils + T_fils
+    num_columnas = 4 + 3 * N
     cols = ["t[s]", "V[V]", "I_total[A]", "R_total[Ohm]"]
     cols += [f"I_{i}[A]" for i in range(1, N + 1)]
     cols += [f"R_{i}[Ohm]" for i in range(1, N + 1)]
     cols += [f"T_{i}[K]" for i in range(1, N + 1)]
-    cols += ["T_electrodo[K]"]
     header_sp_set = ",".join(cols)
 
     data_sp_set = np.zeros((presupuesto + 1, num_columnas), dtype=np.float64)
+    # Perfil de temperatura del electrodo usado en cada paso (escalar repetido sin FVM)
+    perfil_electrodo = np.zeros((presupuesto + 1, actual_state.shape[0]), dtype=np.float64)
 
     # Máximo histórico de temperatura de cada filamento en esta fase (solo pasos FVM).
     T_max_fils: List[float | None] = [None] * N
@@ -968,33 +956,19 @@ def SP_set(
             # Amortiguación de caídas bruscas (conserva las columnas de electrodo). Se guarda
             # el mapa FVM sin amortiguar para poder compararlo con el amortiguado.
             temperatura_sin_amortiguar = temperatura
-            temperatura = Temperature.amortiguar_mapa_fvm(
-                temperatura,
-                temperatura_anterior,
-                T_0=params.init_temp,
-                k=sim_ctes.k_amortiguacion_termica,
-                dt=params.paso_temporal,
-                umbral=sim_ctes.umbral_caida_temperatura,
+            # Amortiguación, temperatura anterior (importante para que se actualice el perfil
+            # térmico de los filamentos), electrodo y T por filamento
+            temperatura, temperatura_anterior, T_electrodo, T_fils = (
+                Temperature.procesar_temperatura_amortiguamiento(
+                    temperatura_sin_amortiguar,
+                    temperatura_anterior,
+                    T_electrodo,
+                    params,
+                    sim_ctes,
+                    centros=CF_centros,
+                    N=N,
+                )
             )
-
-            # Importante para que se actualice el perfil termico de los filamentos
-            temperatura_anterior = temperatura[:, 1:-1]
-
-            # Temperatura de los electrodos para el paso siguiente
-            T_electrodo, T_ady_anterior = Temperature.actualizar_temperatura_electrodo(
-                temperatura,
-                T_electrodo,
-                T_ady_anterior,
-                T_0=params.init_temp,
-                k=sim_ctes.k_electrodo_enfriamiento,
-                dt=params.paso_temporal,
-            )
-
-            # Temperatura por filamento: extraída del mapa FVM ya resuelto, en la fila central de cada filamento
-            perfiles_T_fils = Temperature.extraer_perfiles_filamentos(
-                matriz_temperaturas=temperatura_anterior, filas_centros=CF_centros
-            )
-            T_fils = [float(np.max(p)) if p is not None else params.init_temp for p in perfiles_T_fils]
             T_max_fils = utils.acumular_T_max_filamentos(T_max_fils, T_fils)
 
             if k % num_pasos_guardar_estado == 0:
@@ -1015,7 +989,7 @@ def SP_set(
                     temperatura=locals().get("temperatura"),
                     matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
                     mapa_resistencias=locals().get("R_local"),
-                    **_extra_sin_amortiguar(sim_ctes, locals().get("temperatura_sin_amortiguar")),
+                    **Temperature.extra_sin_amortiguar(sim_ctes, locals().get("temperatura_sin_amortiguar")),
                 )
 
         else:
@@ -1026,8 +1000,18 @@ def SP_set(
             temperatura = Temperature.Temperature_Joule(
                 voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola
             )
-            T_electrodo, T_ady_anterior = Temperature.temperatura_electrodo_joule(
-                temperatura, T_electrodo, k=sim_ctes.k_electrodo_enfriamiento
+            temperatura, temperatura_anterior, T_electrodo, T_fils = (
+                Temperature.procesar_temperatura_amortiguamiento(
+                    temperatura,
+                    temperatura_anterior,
+                    T_electrodo,
+                    params,
+                    sim_ctes,
+                    centros=CF_centros,
+                    N=N,
+                    amortiguar=False,
+                    actualizar_anterior=False,
+                )
             )
             sistema_percola = False
             mean_field = np.mean(E_field_vector).item()
@@ -1044,7 +1028,6 @@ def SP_set(
             R_total = np.nan
             I_fils = [np.nan] * N
             R_fils = [np.nan] * N
-            T_fils = [temperatura] * N
 
         if total_vacantes < max_vancantes_sp_set:
             # Actualizo el estado del sistema
@@ -1057,6 +1040,7 @@ def SP_set(
                 sim_ctes.factor_vecinos_sp_set,
                 sim_ctes.factor_libre_sp_set,
                 ocupacion_max_sp_set,
+                neighbor_mode=sim_ctes.neighbor_mode_sp_set,
                 num_iteracion=k,
             )
 
@@ -1067,12 +1051,14 @@ def SP_set(
             total_vacantes_sp_set = True
 
         # Guardo los datos de la simulación
-        fila = [simulation_time + tiempo_pp_set, voltage, current, R_total] + I_fils + R_fils + T_fils + [T_electrodo_paso]
+        fila = [simulation_time + tiempo_pp_set, voltage, current, R_total] + I_fils + R_fils + T_fils
         data_sp_set[k] = fila
+        perfil_electrodo[k] = T_electrodo_paso
         n_filas = k + 1
 
     # Recorto a las filas realmente escritas y calculo el traspaso a PP_reset.
     data_sp_set = data_sp_set[:n_filas]
+    perfil_electrodo = perfil_electrodo[:n_filas]
     tiempo_sp_set = tiempo_pp_set + params.paso_temporal * n_filas
     logger.info(
         f"SP_set termina: {n_filas} filas, V final {data_sp_set[-1, 1]:.5f} V, t traspaso {tiempo_sp_set:.5f} s"
@@ -1090,7 +1076,7 @@ def SP_set(
             temperatura=locals().get("temperatura"),
             matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
             mapa_resistencias=locals().get("R_local"),
-            **_extra_sin_amortiguar(sim_ctes, locals().get("temperatura_sin_amortiguar")),
+            **Temperature.extra_sin_amortiguar(sim_ctes, locals().get("temperatura_sin_amortiguar")),
         )
 
     # Guardo los datos de la simulación
@@ -1098,14 +1084,13 @@ def SP_set(
         save_path_data=rutas["simulation_path"] / f"Data_sp_set_{num_simulation}",
         headers={"datos_simulacion": header_sp_set},
         datos_sim=data_sp_set,
+        perfil_electrodo=perfil_electrodo,
     )
-
-    # La temperatura final del electrodo pasa a la etapa siguiente dentro de sim_ctes
-    if Temperature.amortiguacion_activa(sim_ctes.k_electrodo_enfriamiento):
-        sim_ctes = sim_ctes.update_temperatura_electrodo(T_electrodo)
 
     # Guardo todas las variables del estado final del PP set para usarlas en el PS set
     final_state_sp_set = {
+        # Perfil (o escalar) del electrodo con el que arranca la etapa siguiente
+        "perfil_electrodo": T_electrodo,
         "actual_state": actual_state,
         "sim_ctes": sim_ctes,
         "params": params,

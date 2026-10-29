@@ -5,6 +5,7 @@ import logging
 import os
 
 from .voltage_controller import ProtocoloVoltaje
+from .Generation import NEIGHBOR_MODES
 
 logger = logging.getLogger(__name__)
 
@@ -28,13 +29,13 @@ MATERIAL_DEFAULTS = {
     # Espesor Delta z de la rama eléctrica/resistencia (R = rho/delta_z_r), independiente de atom_size (paso de red en el plano) y del Delta z del solver térmico. Por defecto igual a atom_size para reproducir exactamente el comportamiento histórico.
     "delta_z_r": 0.25e-9,
     "num_filamentos": 1,
-    "grosor_filamento": [3],
+    "grosor_filamento": [50],
     # None (defecto) → las trampas/vacantes iniciales se distribuyen con el
     # mismo grosor que grosor_filamento (comportamiento histórico). Si se fija
     # (p.ej. [10]), el sorteo de trampas en `init` usa ESE grosor en vez de
     # grosor_filamento, sin tocar la máscara de crecimiento ni el resto de la
     # física, que siguen usando grosor_filamento. Ver init_simulation.build_initial_states.
-    "grosor_filamento_init": None,
+    "grosor_filamento_init": [10],
 }
 
 # ============================================================================
@@ -73,10 +74,12 @@ THERMAL_DEFAULTS = {
     # T = T_0 + (T_prev - T_0) * exp(-k * paso_temporal). k = 0 la desactiva.
     "k_amortiguacion_termica": 1.0,  # [1/s]
     "umbral_caida_temperatura": 1,  # [K], > 0
-    # Temperatura dinámica de los electrodos (ver Temperature.actualizar_temperatura_electrodo):
-    # sube a la media (menor) de las columnas adyacentes cuando esta crece y, si no,
-    # se enfría hacia init_temp con exp(-k * paso_temporal). k = 0 la desactiva.
-    "k_electrodo_enfriamiento": 2.0,  # [1/s]
+    # Perfil de temperatura de los electrodos (ver Temperature.actualizar_temperatura_electrodo):
+    # columna adyacente sin amortiguar en las filas centro ± grosor de cada filamento y
+    # init_temp en el resto; las celdas que caen más que `umbral_caida_electrodo` [K] se
+    # enfrían con exp(-k * paso_temporal). k = 0 lo desactiva (electrodo fijo).
+    "k_electrodo_enfriamiento": 0.0,  # [1/s]
+    "umbral_caida_electrodo": 0.1,  # [K], > 0
 }
 
 
@@ -87,7 +90,7 @@ SIMULATION_DEFAULTS = {
     "device_size_x": 10e-9,  # Ancho entre electrodos, debe corresponder a los dispositivos medidos
     "device_size_y": 30e-9,
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
-    "num_trampas": 120,
+    "num_trampas": 250,
     # Paso temporal [s]. ENTRADA obligatoria. Cambiarlo altera la física
     "paso_temporal": 1e-3,
     # El voltaje NO tiene valores por defecto: cada simulación debe traer su
@@ -100,14 +103,17 @@ SIMULATION_DEFAULTS = {
 # PARÁMETROS SET / RESET
 # ============================================================================
 SET_RESET_DEFAULTS = {
-    "ocupacion_max_pp_set": 0.8,
+    "ocupacion_max_pp_set": 0.99,
     "ocupacion_max_sp_set": 0.45,
     # Cada cuántos pasos se guarda el estado intermedio (matrices) en las cuatro etapas.
     "pasos_guardar_estado": 10,
-    "factor_vecinos_pp_set": 1.0,
+    "factor_vecinos_pp_set": 1.5,
     "factor_libre_pp_set": 1.0,
     "factor_vecinos_sp_set": 1.0,
     "factor_libre_sp_set": 0.9,
+    # Vecinos que cuentan en la generación de vacantes: "horizontal", "vertical" o "both".
+    "neighbor_mode_pp_set": "both",
+    "neighbor_mode_sp_set": "both",
     "voltaje_gen_oxigeno_pp_1": 1.1,
     "num_oxigenos_pp_reset_1": 7,  # 2
     "voltaje_gen_oxigeno_pp_2": 1.15,
@@ -246,6 +252,7 @@ class ConfigManager:
             "k_amortiguacion_termica",
             "umbral_caida_temperatura",
             "k_electrodo_enfriamiento",
+            "umbral_caida_electrodo",
             "ocupacion_max_pp_set",
             "ocupacion_max_sp_set",
             "pasos_guardar_estado",
@@ -253,6 +260,8 @@ class ConfigManager:
             "factor_libre_pp_set",
             "factor_vecinos_sp_set",
             "factor_libre_sp_set",
+            "neighbor_mode_pp_set",
+            "neighbor_mode_sp_set",
             "voltaje_gen_oxigeno_pp_1",
             "num_oxigenos_pp_reset_1",
             "voltaje_gen_oxigeno_pp_2",
@@ -277,9 +286,18 @@ class ConfigManager:
                 raise ValueError(f"sim {sim.sim_id}: protocolo_voltaje inválido: {e}") from e
 
         for sim in self.simulations:
+            for clave in ("neighbor_mode_pp_set", "neighbor_mode_sp_set"):
+                modo = sim.params.get(clave, "both")
+                if modo not in NEIGHBOR_MODES:
+                    raise ValueError(f"sim {sim.sim_id}: {clave} debe ser uno de {NEIGHBOR_MODES}, recibido {modo!r}")
+
+        for sim in self.simulations:
             umbral = sim.params.get("umbral_caida_temperatura", 10.0)
             if not umbral > 0:
                 raise ValueError(f"sim {sim.sim_id}: umbral_caida_temperatura debe ser > 0, recibido {umbral!r}")
+            umbral_e = sim.params.get("umbral_caida_electrodo", 0.1)
+            if not umbral_e > 0:
+                raise ValueError(f"sim {sim.sim_id}: umbral_caida_electrodo debe ser > 0, recibido {umbral_e!r}")
 
         data_params = [{col: sim.params[col] for col in cols_params} for sim in self.simulations]
         data_ctes = [{col: sim.params[col] for col in cols_ctes} for sim in self.simulations]

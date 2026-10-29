@@ -97,48 +97,156 @@ def amortiguar_mapa_fvm(T_fvm: np.ndarray, T_prev: np.ndarray, T_0: float, k, dt
     return T_out
 
 
-def actualizar_temperatura_electrodo(T_fvm: np.ndarray, T_e_prev: float, T_ady_prev: float, T_0: float, k, dt: float) -> tuple[float, float]:
+def filas_filamento(Ny: int, centros, grosor) -> np.ndarray:
     """
-    Temperatura de los electrodos para el paso siguiente a partir del mapa FVM (Ny, Nx+2).
+    Máscara 1D (Ny,) de las filas de los filamentos: centro ± grosor de cada uno.
 
-    T_ady = menor de las medias de las columnas adyacentes a cada electrodo (1 y -2):
-        - si T_ady > T_ady_prev: T_e = T_ady (calentamiento instantáneo)
-        - si no:                 T_e = T_0 + (T_e_prev - T_0) * exp(-k * dt)
-    Sin tensión el mapa es uniforme e igual a T_e_prev, así que T_ady == T_ady_prev y
-    entra en la rama de enfriamiento. Ambos electrodos comparten la misma temperatura.
+    `grosor` es un entero común o una lista con un valor por filamento (misma banda
+    que Generation.create_custom_mask, pero en 1D).
+    """
+    grosores = [int(grosor)] * len(centros) if isinstance(grosor, (int, np.integer)) else list(grosor)
+    if len(grosores) != len(centros):
+        raise ValueError("Debe haber un grosor asignado para cada centro de filamento.")
+    filas = np.zeros(Ny, dtype=bool)
+    for centro, g in zip(centros, grosores):
+        filas[max(0, centro - g) : min(Ny, centro + g + 1)] = True
+    return filas
 
-    OJO: con tensión T_ady = T_e + delta en cada paso, de modo que el electrodo sube
-    delta por paso sin tope dentro del pulso (y más cuanto menor sea dt).
+
+def actualizar_temperatura_electrodo(T_fvm_sin_amortiguar: np.ndarray, T_e_prev, filas: np.ndarray, T_0: float, k, dt: float, umbral: float):
+    """
+    Perfil de temperatura de los electrodos para el paso siguiente.
+
+    1. Perfil de cada lado: columna adyacente al electrodo (1 y -2) del mapa SIN amortiguar
+       en las filas de los filamentos (`filas`) y T_0 en el resto.
+    2. Se elige el perfil con menor temperatura máxima; ambos electrodos comparten ese perfil.
+    3. Se compara con el perfil anterior: las celdas que caen más que `umbral` se enfrían
+       como T_0 + (T_prev - T_0) * exp(-k * dt) (amortiguar_enfriamiento con constantes propias).
 
     Args:
-        T_fvm: mapa de temperatura del solver, con las columnas de electrodo.
-        T_e_prev: temperatura de electrodo usada para resolver este mapa [K].
-        T_ady_prev: T_ady del paso anterior [K] (-inf al empezar la etapa).
-        T_0: temperatura ambiente [K], destino del enfriamiento.
-        k: constante de enfriamiento [1/s]. None/NaN/<=0 desactiva: electrodo fijo.
+        T_fvm_sin_amortiguar: mapa del solver (Ny, Nx+2), antes de amortiguar el interior.
+        T_e_prev: electrodo usado para resolver este mapa (escalar o perfil (Ny,)) [K].
+        filas: máscara (Ny,) de filas de los filamentos (ver filas_filamento).
+        T_0: temperatura ambiente [K].
+        k: constante de enfriamiento del electrodo [1/s]. None/NaN/<=0 desactiva: electrodo fijo.
         dt: paso temporal [s].
+        umbral: caída mínima [K] para enfriar una celda (> 0).
 
     Returns:
-        (T_e, T_ady): nueva temperatura de electrodo y T_ady de este paso.
+        Perfil (Ny,) del electrodo; con k desactivada, T_e_prev tal cual.
     """
-    T_ady = float(min(np.mean(T_fvm[:, 1]), np.mean(T_fvm[:, -2])))
     if not amortiguacion_activa(k):
-        return T_e_prev, T_ady
-    if T_ady > T_ady_prev:
-        return T_ady, T_ady
-    return float(T_0 + (T_e_prev - T_0) * np.exp(-k * dt)), T_ady
+        return T_e_prev
+    perfil_izq = np.where(filas, T_fvm_sin_amortiguar[:, 1], T_0)
+    perfil_der = np.where(filas, T_fvm_sin_amortiguar[:, -2], T_0)
+    perfil = perfil_izq if perfil_izq.max() <= perfil_der.max() else perfil_der
+    return amortiguar_enfriamiento(perfil, T_e_prev, T_0, k, dt, umbral)
 
 
-def temperatura_electrodo_joule(T_joule: float, T_e_prev: float, k) -> tuple[float, float]:
+def temperatura_electrodo_joule(T_joule: float, T_e_prev, k):
     """
     Temperatura de los electrodos cuando no hay mapa FVM (modelo Joule escalar): el
-    electrodo sigue a la temperatura del dispositivo. Devuelve (T_e, T_ady), con
-    T_ady = T_joule para que el primer paso con mapa FVM compare contra ella.
+    electrodo es un escalar que sigue a la temperatura del dispositivo.
     Con k desactivada el electrodo se queda en T_e_prev.
     """
     if not amortiguacion_activa(k):
-        return T_e_prev, float(T_joule)
-    return float(T_joule), float(T_joule)
+        return T_e_prev
+    return float(T_joule)
+
+
+def como_mapa(T, forma) -> np.ndarray:
+    """Convierte una temperatura escalar en un mapa de forma `forma` (float: sin truncar a entero)."""
+    return np.full(forma, T, dtype=float)
+
+
+def extra_sin_amortiguar(sim_ctes, temperatura_sin_amortiguar) -> dict:
+    """Kwargs extra para guardar_estado_intermedio: el mapa de T sin amortiguar, solo si la amortiguación está activa."""
+    if amortiguacion_activa(sim_ctes.k_amortiguacion_termica) and temperatura_sin_amortiguar is not None:
+        return {"temperatura_sin_amortiguar": temperatura_sin_amortiguar}
+    return {}
+
+
+def procesar_temperatura_amortiguamiento(
+    T_sin_amortiguar,
+    temperatura_anterior,
+    T_electrodo,
+    params,
+    sim_ctes,
+    centros,
+    N: int,
+    amortiguar: bool = True,
+    actualizar_anterior: bool = True,
+    T_fils=None,
+    forma=None,
+):
+    """
+    Todo lo que se hace con la temperatura de un paso una vez calculada (Joule o FVM).
+
+    Mapa FVM (Ny, Nx+2):
+        1. perfil de los electrodos para el paso siguiente, con el mapa SIN amortiguar
+        2. amortigua el mapa contra `temperatura_anterior` (si `amortiguar`)
+        3. temperatura_anterior = mapa sin columnas de electrodo
+        4. T_fils = máximo de cada filamento sobre el mapa amortiguado
+    Escalar (Joule):
+        1. amortigua contra `temperatura_anterior` (si `amortiguar` y la anterior es escalar:
+           en el paso en que se pasa del mapa al escalar no hay con qué comparar)
+        2. temperatura_anterior = T (si `actualizar_anterior`)
+        3. el electrodo sigue a la temperatura Joule
+        4. T_fils = las recibidas o [T] * N
+        5. si se da `forma`, la temperatura devuelta es un mapa de esa forma
+
+    Returns:
+        (temperatura, temperatura_anterior, T_electrodo, T_fils)
+    """
+    T_0, dt = params.init_temp, params.paso_temporal
+
+    if isinstance(T_sin_amortiguar, np.ndarray) and T_sin_amortiguar.ndim == 2:
+        # El perfil del electrodo se obtiene ANTES de amortiguar el interior (con k
+        # desactivada el electrodo se queda fijo y no hace falta calcular las filas)
+        if amortiguacion_activa(sim_ctes.k_electrodo_enfriamiento):
+            T_electrodo = actualizar_temperatura_electrodo(
+                T_sin_amortiguar,
+                T_electrodo,
+                filas_filamento(T_sin_amortiguar.shape[0], centros, sim_ctes.grosor_filamento),
+                T_0=T_0,
+                k=sim_ctes.k_electrodo_enfriamiento,
+                dt=dt,
+                umbral=sim_ctes.umbral_caida_electrodo,
+            )
+        temperatura = T_sin_amortiguar
+        if amortiguar:
+            temperatura = amortiguar_mapa_fvm(
+                temperatura,
+                temperatura_anterior,
+                T_0=T_0,
+                k=sim_ctes.k_amortiguacion_termica,
+                dt=dt,
+                umbral=sim_ctes.umbral_caida_temperatura,
+            )
+        # Sin las columnas primera y última, que son los electrodos
+        temperatura_anterior = temperatura[:, 1:-1]
+        perfiles_T_fils = extraer_perfiles_filamentos(matriz_temperaturas=temperatura_anterior, filas_centros=centros)
+        T_fils = [float(np.max(p)) if p is not None else T_0 for p in perfiles_T_fils]
+        return temperatura, temperatura_anterior, T_electrodo, T_fils
+
+    temperatura = T_sin_amortiguar
+    if amortiguar and not isinstance(temperatura_anterior, np.ndarray):
+        temperatura = amortiguar_enfriamiento(
+            temperatura,
+            temperatura_anterior,
+            T_0=T_0,
+            k=sim_ctes.k_amortiguacion_termica,
+            dt=dt,
+            umbral=sim_ctes.umbral_caida_temperatura,
+        )
+    if actualizar_anterior:
+        temperatura_anterior = temperatura
+    T_electrodo = temperatura_electrodo_joule(temperatura, T_electrodo, k=sim_ctes.k_electrodo_enfriamiento)
+    if T_fils is None:
+        T_fils = [temperatura] * N
+    if forma is not None:
+        temperatura = como_mapa(temperatura, forma)
+    return temperatura, temperatura_anterior, T_electrodo, T_fils
 
 
 def legacy_matriz_materiales(matriz_filamentos: np.ndarray) -> np.ndarray:
@@ -300,13 +408,17 @@ def solve_thermal_state(
     Q_map: np.ndarray,
     thermal_props: dict,
     atom_size: float,
-    T_electrodo: float,
+    T_electrodo,
     matriz_muros: Optional[np.ndarray] = None,
 ) -> np.ndarray:
     """
     Ensambla y resuelve la ecuación del calor en estado estacionario (FVM).
+
+    `T_electrodo` es la temperatura de las celdas de electrodo (Dirichlet): un escalar
+    común o un perfil (Ny,) con una temperatura por fila.
     """
     Ny, Nx = types_map.shape
+    T_electrodo_filas = np.broadcast_to(np.asarray(T_electrodo, dtype=float), (Ny,))
     N = Ny * Nx  # Número total de incógnitas
 
     data = []
@@ -330,7 +442,7 @@ def solve_thermal_state(
                 data.append(1.0)
                 rows_idx.append(n)
                 cols_idx.append(n)
-                b[n] = T_electrodo
+                b[n] = T_electrodo_filas[i]
                 continue
 
             # ==========================================================

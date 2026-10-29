@@ -73,11 +73,16 @@ class SimulationConstants:
     # k = 0 (defecto) la desactiva; los CSV antiguos sin estas columnas siguen cargando.
     k_amortiguacion_termica: float = 0.0
     umbral_caida_temperatura: float = 10.0
-    # Temperatura dinámica de los electrodos (Temperature.actualizar_temperatura_electrodo).
-    # k = 0 (defecto) la desactiva: el electrodo se queda fijo en Temperatura_electrodo.
-    # OJO: con k > 0 el calentamiento suma la subida adyacente en CADA paso, así que
-    # dentro de un pulso largo crece sin tope y depende de paso_temporal.
+    # Perfil de temperatura de los electrodos (Temperature.actualizar_temperatura_electrodo).
+    # k = 0 (defecto) lo desactiva: el electrodo se queda fijo en Temperatura_electrodo.
+    # Con k > 0, las celdas del perfil que caen más que umbral_caida_electrodo [K] se
+    # enfrían con exp(-k * paso_temporal).
     k_electrodo_enfriamiento: float = 0.0
+    umbral_caida_electrodo: float = 0.1
+    # Qué vecinos cuentan en la lógica de generación de vacantes (factor_vecinos_* / factor_libre_*):
+    # "horizontal", "vertical" o "both" (los 4 vecinos directos). Uno por fase de SET.
+    neighbor_mode_pp_set: str = "both"
+    neighbor_mode_sp_set: str = "both"
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SimulationConstants":

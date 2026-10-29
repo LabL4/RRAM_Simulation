@@ -70,6 +70,9 @@ def calcular_probabilidad_generacion(
     return prob_matrix
 
 
+NEIGHBOR_MODES = ("horizontal", "vertical", "both")
+
+
 def get_generation_probabilities_matrix(
     state: np.ndarray,
     paso_temporal: float,
@@ -88,11 +91,19 @@ def get_generation_probabilities_matrix(
     """
     Calcula el mapa de probabilidades locales (0 a 1) para generar nuevas vacantes en la red.
 
-    Si se proporciona custom_mask, sobreescribe neighbor_mode: la probabilidad base se
-    multiplica por 1 en celdas con True y por 0 en celdas con False.
-    Sin custom_mask se aplica la lógica de vecinos según neighbor_mode ("horizontal",
-    "vertical" o "both"), usando factor_vecinos y factor_sin_vecinos.
+    La probabilidad de una celda libre es:
+        prob_base * factor_vecinos      si tiene algún vecino ocupado
+        prob_base * factor_sin_vecinos  si no lo tiene
+    donde "vecino" lo define neighbor_mode ("horizontal", "vertical" o "both"; solo los
+    4 vecinos directos, sin diagonales).
+
+    Si se proporciona custom_mask, se aplica DESPUÉS de la lógica de vecinos: se multiplica
+    por 1 en celdas con True y por 0 en celdas con False (limita dónde se genera sin
+    anular los factores de vecinos).
     """
+
+    if neighbor_mode not in NEIGHBOR_MODES:
+        raise ValueError(f"neighbor_mode debe ser uno de {NEIGHBOR_MODES}, recibido {neighbor_mode!r}")
 
     free_mask = state == 0
 
@@ -113,28 +124,28 @@ def get_generation_probabilities_matrix(
     else:
         prob_base_matrix = prob_base_raw
 
-    if custom_mask is not None:
-        # True → factor 1 (probabilidad normal), False → factor 0 (probabilidad nula)
-        prob_final = prob_base_matrix * free_mask * custom_mask.astype(float)
-    else:
-        # Lógica de vecinos estándar
-        vecino_mask = np.zeros_like(state, dtype=bool)
-        if neighbor_mode in ["horizontal", "both"]:
-            left_neighbor = np.zeros_like(state, dtype=bool)
-            left_neighbor[:, 1:] = state[:, :-1] == 1
-            right_neighbor = np.zeros_like(state, dtype=bool)
-            right_neighbor[:, :-1] = state[:, 1:] == 1
-            vecino_mask |= left_neighbor | right_neighbor
-        if neighbor_mode in ["vertical", "both"]:
-            up_neighbor = np.zeros_like(state, dtype=bool)
-            up_neighbor[1:, :] = state[:-1, :] == 1
-            down_neighbor = np.zeros_like(state, dtype=bool)
-            down_neighbor[:-1, :] = state[1:, :] == 1
-            vecino_mask |= up_neighbor | down_neighbor
+    # Lógica de vecinos
+    vecino_mask = np.zeros_like(state, dtype=bool)
+    if neighbor_mode in ["horizontal", "both"]:
+        left_neighbor = np.zeros_like(state, dtype=bool)
+        left_neighbor[:, 1:] = state[:, :-1] == 1
+        right_neighbor = np.zeros_like(state, dtype=bool)
+        right_neighbor[:, :-1] = state[:, 1:] == 1
+        vecino_mask |= left_neighbor | right_neighbor
+    if neighbor_mode in ["vertical", "both"]:
+        up_neighbor = np.zeros_like(state, dtype=bool)
+        up_neighbor[1:, :] = state[:-1, :] == 1
+        down_neighbor = np.zeros_like(state, dtype=bool)
+        down_neighbor[:-1, :] = state[1:, :] == 1
+        vecino_mask |= up_neighbor | down_neighbor
 
-        prob_final = np.zeros_like(prob_base_matrix)
-        prob_final[free_mask & vecino_mask] = prob_base_matrix[free_mask & vecino_mask] * factor_vecinos
-        prob_final[free_mask & ~vecino_mask] = prob_base_matrix[free_mask & ~vecino_mask] * factor_sin_vecinos
+    prob_final = np.zeros_like(prob_base_matrix)
+    prob_final[free_mask & vecino_mask] = prob_base_matrix[free_mask & vecino_mask] * factor_vecinos
+    prob_final[free_mask & ~vecino_mask] = prob_base_matrix[free_mask & ~vecino_mask] * factor_sin_vecinos
+
+    if custom_mask is not None:
+        # True → se conserva la probabilidad, False → probabilidad nula
+        prob_final = prob_final * custom_mask.astype(float)
 
     return np.minimum(prob_final, 1.0)
 
