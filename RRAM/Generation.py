@@ -147,6 +147,11 @@ def get_generation_probabilities_matrix(
         # True → se conserva la probabilidad, False → probabilidad nula
         prob_final = prob_final * custom_mask.astype(float)
 
+    # SEGUNDO recorte a 1 (el primero está en calcular_probabilidad_generacion, sobre la
+    # probabilidad base, ANTES de aplicar factor_vecinos / factor_sin_vecinos).
+    # Consecuencia del doble recorte: con factor >= 1 el resultado es min(p_base_sin_recortar * factor, 1),
+    # pero con factor < 1 y p_base_sin_recortar > 1 la celda se queda en `factor` (p. ej. 0.9) y no en 1,
+    # por mucho que suban campo o temperatura. Hoy no afecta (PP_set usa factores 5 y 1; SP_set no genera).
     return np.minimum(prob_final, 1.0)
 
 

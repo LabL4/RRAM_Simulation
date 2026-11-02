@@ -474,9 +474,11 @@ def PP_set(
                     I_0=sim_ctes.I_0_set,
                 ) * (params.device_size_y)
 
+        # Si en este paso no se sortea (cupo lleno) no debe arrastrarse la matriz de un paso anterior
+        aleatorios_matrix = None
         if total_vacantes < max_vancantes_pp_set:
             # Actualizo el estado del sistema
-            actual_state, probabilidad_matrix = update_state_generation(
+            actual_state, probabilidad_matrix, aleatorios_matrix = update_state_generation(
                 actual_state,
                 params,
                 sim_ctes,
@@ -555,6 +557,7 @@ def PP_set(
                 cf_clean_matrix=locals().get("cf_clean_matrix"),
                 temperatura=locals().get("temperatura"),
                 probabilidad_matrix=locals().get("probabilidad_matrix"),
+                aleatorios_matrix=aleatorios_matrix,
                 matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
                 mapa_resistencias=locals().get("R_local"),
                 **Temperature.extra_sin_amortiguar(sim_ctes, locals().get("temperatura_sin_amortiguar")),
@@ -610,6 +613,7 @@ def PP_set(
             cf_clean_matrix=locals().get("cf_clean_matrix"),
             temperatura=locals().get("temperatura"),
             probabilidad_matrix=locals().get("probabilidad_matrix"),
+            aleatorios_matrix=aleatorios_matrix,
             matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
             mapa_resistencias=locals().get("R_local"),
             **Temperature.extra_sin_amortiguar(sim_ctes, locals().get("temperatura_sin_amortiguar")),
@@ -1031,7 +1035,7 @@ def SP_set(
 
         if total_vacantes < max_vancantes_sp_set:
             # Actualizo el estado del sistema
-            actual_state, _ = update_state_generation(
+            actual_state, _, _ = update_state_generation(
                 actual_state,
                 params,
                 sim_ctes,

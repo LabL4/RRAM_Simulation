@@ -1,11 +1,15 @@
 """Actualizaciones del estado del sistema (generación y recombinación)."""
 
+import logging
+
 import numpy as np
 
 from . import Recombination
 from . import Generation
 from .constants_simulation import SimulationConstants
 from .parameters import SimulationParameters
+
+logger = logging.getLogger(__name__)
 
 
 def update_state_generation(
@@ -20,10 +24,14 @@ def update_state_generation(
     neighbor_mode: str = "both",
     custom_mask: np.ndarray | None = None,
     num_iteracion=None,
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Orquesta el proceso de generación de vacantes asegurando que no se supere
-    el límite máximo establecido. Prioriza aquellas con mayor probabilidad.
+    el límite máximo establecido. Si las candidatas superan el cupo, se eligen
+    al azar entre ellas (todas con la misma oportunidad).
+
+    Devuelve (estado, probabilidades, aleatorios): `aleatorios` es la matriz de U(0,1) del sorteo
+    `aleatorios < prob_final`, para poder comprobar a posteriori que es uniforme.
     """
 
     # En NumPy el primer valor devuelto por shape son las filas y el segundo las columnas, por lo que asumo que x_size son tus filas en el eje Y físico, y y_size son tus columnas en el eje X físico. Mientras mantengas esa lógica, es perfecto).
@@ -91,31 +99,32 @@ def update_state_generation(
 
     if vacantes_disponibles <= 0:
         # Ya estamos en el límite, no se permite generar ninguna más
-        return act_state, prob_final
+        return act_state, prob_final, aleatorios
 
     if num_nuevas > vacantes_disponibles:
-        # Se ha superado el límite. Toca priorizar.
+        # Se ha superado el límite: se eligen al azar `vacantes_disponibles` candidatas.
+        # Todas pasaron ya el sorteo `aleatorios < prob_final`, así que la probabilidad
+        # ya está tenida en cuenta; ordenar por ella la aplicaría dos veces y, con
+        # empates (p = 1), la elección la decidiría el orden interno de argsort.
+        logger.warning(
+            f"Paso {num_iteracion}: {num_nuevas} vacantes candidatas superan el cupo "
+            f"({vacantes_disponibles} disponibles de {max_vacantes_permitidas}); "
+            f"se eligen {vacantes_disponibles} al azar entre las candidatas."
+        )
 
         # Obtenemos las coordenadas (i,j) de las candidatas
         coords = np.argwhere(nueva_vacante)
 
-        # Extraemos las probabilidades exactas que tenían estas candidatas
-        probs_candidatas = prob_final[nueva_vacante]
+        # Elección al azar sin repetición (np.random global: respeta la semilla de aplicar_semilla)
+        elegidas = coords[np.random.choice(len(coords), vacantes_disponibles, replace=False)]
 
-        # Ordenamos los índices de las candidatas de MAYOR a MENOR probabilidad
-        indices_ordenados = np.argsort(probs_candidatas)[::-1]
-
-        # Nos quedamos estrictamente con las mejores según el cupo disponible
-        mejores_indices = indices_ordenados[:vacantes_disponibles]
-        mejores_coords = coords[mejores_indices]
-
-        # Actualizamos la matriz solo con las ganadoras
-        act_state[mejores_coords[:, 0], mejores_coords[:, 1]] = 1
+        # Actualizamos la matriz solo con las elegidas
+        act_state[elegidas[:, 0], elegidas[:, 1]] = 1
     else:
         # Si no se ha superado el límite, se aprueban todas
         act_state[nueva_vacante] = 1
 
-    return act_state, prob_final
+    return act_state, prob_final, aleatorios
 
 
 def update_state_recombinate(

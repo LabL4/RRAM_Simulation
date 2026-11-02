@@ -35,7 +35,7 @@ MATERIAL_DEFAULTS = {
     # (p.ej. [10]), el sorteo de trampas en `init` usa ESE grosor en vez de
     # grosor_filamento, sin tocar la máscara de crecimiento ni el resto de la
     # física, que siguen usando grosor_filamento. Ver init_simulation.build_initial_states.
-    "grosor_filamento_init": [10],
+    "grosor_filamento_init": [50],
 }
 
 # ============================================================================
@@ -107,7 +107,7 @@ SET_RESET_DEFAULTS = {
     "ocupacion_max_sp_set": 0.45,
     # Cada cuántos pasos se guarda el estado intermedio (matrices) en las cuatro etapas.
     "pasos_guardar_estado": 10,
-    "factor_vecinos_pp_set": 1.5,
+    "factor_vecinos_pp_set": 1.0,
     "factor_libre_pp_set": 1.0,
     "factor_vecinos_sp_set": 1.0,
     "factor_libre_sp_set": 0.9,
