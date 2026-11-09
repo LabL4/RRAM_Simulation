@@ -24,6 +24,7 @@ def update_state_generation(
     neighbor_mode: str = "both",
     custom_mask: np.ndarray | None = None,
     num_iteracion=None,
+    tiempo_efectivo: float | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Orquesta el proceso de generación de vacantes asegurando que no se supere
@@ -53,7 +54,7 @@ def update_state_generation(
     # 3. Cálculo de la matriz de probabilidades
     prob_final = Generation.get_generation_probabilities_matrix(
         state=state,
-        paso_temporal=params.paso_temporal,
+        paso_temporal=params.paso_temporal if tiempo_efectivo is None else tiempo_efectivo,
         Electric_field=E_field_matrix,
         temperatura=temp_matrix,
         factor_vecinos=factor_vecinos,
@@ -137,6 +138,7 @@ def update_state_recombinate(
     oxygen_state: np.ndarray,
     temperatura: float | np.ndarray,
     velocity_thresholds: dict,  # Diccionario pasado como argumento
+    tiempo_efectivo: float | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Orquesta el proceso completo de RESET en un paso de tiempo:
@@ -172,7 +174,7 @@ def update_state_recombinate(
     actual_state_update, oxygen_state_update = Recombination.Recombine_opt(
         vacancy_state=actual_state,
         oxygen_state=oxygen_state,
-        paso_temp=params.paso_temporal,
+        paso_temp=params.paso_temporal if tiempo_efectivo is None else tiempo_efectivo,
         velocidad=velocidad,
         temperatura=temperatura,
         vibration_frequency=sim_ctes.vibration_frequency,

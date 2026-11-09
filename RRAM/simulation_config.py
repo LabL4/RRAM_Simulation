@@ -29,13 +29,13 @@ MATERIAL_DEFAULTS = {
     # Espesor Delta z de la rama eléctrica/resistencia (R = rho/delta_z_r), independiente de atom_size (paso de red en el plano) y del Delta z del solver térmico. Por defecto igual a atom_size para reproducir exactamente el comportamiento histórico.
     "delta_z_r": 0.25e-9,
     "num_filamentos": 1,
-    "grosor_filamento": [50],
+    "grosor_filamento": [3],
     # None (defecto) → las trampas/vacantes iniciales se distribuyen con el
     # mismo grosor que grosor_filamento (comportamiento histórico). Si se fija
     # (p.ej. [10]), el sorteo de trampas en `init` usa ESE grosor en vez de
     # grosor_filamento, sin tocar la máscara de crecimiento ni el resto de la
     # física, que siguen usando grosor_filamento. Ver init_simulation.build_initial_states.
-    "grosor_filamento_init": [50],
+    "grosor_filamento_init": None,
 }
 
 # ============================================================================
@@ -78,7 +78,7 @@ THERMAL_DEFAULTS = {
     # columna adyacente sin amortiguar en las filas centro ± grosor de cada filamento y
     # init_temp en el resto; las celdas que caen más que `umbral_caida_electrodo` [K] se
     # enfrían con exp(-k * paso_temporal). k = 0 lo desactiva (electrodo fijo).
-    "k_electrodo_enfriamiento": 0.0,  # [1/s]
+    "k_electrodo_enfriamiento": 2.0,  # [1/s]
     "umbral_caida_electrodo": 0.1,  # [K], > 0
 }
 
@@ -90,9 +90,9 @@ SIMULATION_DEFAULTS = {
     "device_size_x": 10e-9,  # Ancho entre electrodos, debe corresponder a los dispositivos medidos
     "device_size_y": 30e-9,
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
-    "num_trampas": 250,
+    "num_trampas": 100,
     # Paso temporal [s]. ENTRADA obligatoria. Cambiarlo altera la física
-    "paso_temporal": 1e-3,
+    "paso_temporal": 1e-6,
     # El voltaje NO tiene valores por defecto: cada simulación debe traer su
     # "protocolo_voltaje" (ver RRAM.voltage_controller.ProtocoloVoltaje).
     "densidad_vacantes": 4.0,  # vacantes / nm²

@@ -13,6 +13,7 @@ from . import Percolation
 from . import Temperature
 from . import exceptions
 from .filament_tracking import procesar_filamentos_destruidos
+from .acumulador_tiempo import AcumuladorTiempo
 from .state_updates import update_state_recombinate
 from .voltage_controller import Medidas, ProtocoloVoltaje
 import logging
@@ -143,6 +144,7 @@ def PP_reset(
     logger.info(f"Simulacion {num_simulation} - primera parte del reset")
 
     # Ciclo para la primera parte del reset
+    acumulador_tiempo = AcumuladorTiempo(params.paso_temporal)
     for k in range(0, presupuesto + 1):
         T_electrodo_paso = T_electrodo  # la que usa el solver en este paso (antes de actualizarla)
         simulation_time = params.paso_temporal * k
@@ -155,6 +157,7 @@ def PP_reset(
                 k=k,
             )
         )
+        tiempo_efectivo = acumulador_tiempo.actualizar(voltage)
         voltage_anterior = voltage
 
         # La forma de onda ha terminado: se corta antes de la física.
@@ -357,6 +360,7 @@ def PP_reset(
             oxygen_state=oxygen_state,
             temperatura=temperatura_para_recombinacion,
             velocity_thresholds=velocity_thresholds,
+            tiempo_efectivo=tiempo_efectivo,
         )
 
         # Tiempo total de la simulacion
@@ -384,6 +388,7 @@ def PP_reset(
                 num_simulation=num_simulation,
                 k=k,
                 actual_state=actual_state,
+                oxygen_state=oxygen_state,
                 cf_clean_matrix=locals().get("cf_clean_matrix"),  # Si no existe, devuelve None
                 temperatura=locals().get("temperatura"),
                 mapa_resistencias=locals().get("R_local"),
@@ -408,6 +413,7 @@ def PP_reset(
             num_simulation=num_simulation,
             k=k,
             actual_state=actual_state,
+            oxygen_state=oxygen_state,
             cf_clean_matrix=locals().get("cf_clean_matrix"),
             temperatura=locals().get("temperatura"),
             matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
@@ -560,6 +566,7 @@ def SP_reset(
     logger.info(f"\nSimulacion {num_simulation} - segunda parte del reset")
 
     # Ciclo para la primera parte del reset
+    acumulador_tiempo = AcumuladorTiempo(params.paso_temporal)
     for k in range(0, presupuesto + 1):
         T_electrodo_paso = T_electrodo  # la que usa el solver en este paso (antes de actualizarla)
         simulation_time = params.paso_temporal * k
@@ -572,6 +579,7 @@ def SP_reset(
                 k=k,
             )
         )
+        tiempo_efectivo = acumulador_tiempo.actualizar(voltage)
         voltage_anterior = voltage
 
         # La forma de onda ha terminado: se corta antes de la física.
@@ -759,6 +767,7 @@ def SP_reset(
             oxygen_state=oxygen_state,
             temperatura=temperatura_para_recombinacion,
             velocity_thresholds=velocity_thresholds,
+            tiempo_efectivo=tiempo_efectivo,
         )
 
         # Tiempo total de la simulacion
@@ -788,6 +797,7 @@ def SP_reset(
                 num_simulation=num_simulation,
                 k=k,
                 actual_state=actual_state,
+                oxygen_state=oxygen_state,
                 cf_clean_matrix=locals().get("cf_clean_matrix"),  # Si no existe, devuelve None
                 temperatura=locals().get("temperatura"),
                 mapa_resistencias=locals().get("R_local"),
@@ -808,6 +818,7 @@ def SP_reset(
             num_simulation=num_simulation,
             k=k,
             actual_state=actual_state,
+            oxygen_state=oxygen_state,
             cf_clean_matrix=locals().get("cf_clean_matrix"),
             temperatura=locals().get("temperatura"),
             matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),

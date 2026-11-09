@@ -21,6 +21,7 @@ from .filament_tracking import (
     procesar_filamentos_creados,
 )
 from .parameters import SimulationParameters
+from .acumulador_tiempo import AcumuladorTiempo
 from .state_updates import update_state_generation
 from .voltage_controller import Medidas, ProtocoloVoltaje
 import logging
@@ -182,6 +183,7 @@ def PP_set(
     # fase puede salir por tres vías distintas y el recorte final debe ser el mismo.
     n_filas = 0
 
+    acumulador_tiempo = AcumuladorTiempo(params.paso_temporal)
     for k in range(0, presupuesto + 1):
         T_electrodo_paso = T_electrodo  # la que usa el solver en este paso (antes de actualizarla)
         total_vacantes = np.sum(actual_state)
@@ -202,6 +204,7 @@ def PP_set(
                 k=k,
             )
         )
+        tiempo_efectivo = acumulador_tiempo.actualizar(voltage)
         voltage_anterior = voltage
 
         # Genero el vector campo eléctrico
@@ -490,6 +493,7 @@ def PP_set(
                 neighbor_mode=sim_ctes.neighbor_mode_pp_set,
                 custom_mask=limit_CF_witdh_mask_generation,
                 num_iteracion=k,
+                tiempo_efectivo=tiempo_efectivo,
             )
 
         elif not total_vacantes_pp_set:
@@ -792,6 +796,7 @@ def SP_set(
     # )
 
     logger.info(f"Simulacion {num_simulation} - Segunda parte del set")
+    acumulador_tiempo = AcumuladorTiempo(params.paso_temporal)
     for k in range(0, presupuesto + 1):
         T_electrodo_paso = T_electrodo  # la que usa el solver en este paso (antes de actualizarla)
         total_vacantes = np.sum(actual_state)
@@ -811,6 +816,7 @@ def SP_set(
                 k=k,
             )
         )
+        tiempo_efectivo = acumulador_tiempo.actualizar(voltage)
         voltage_anterior = voltage
 
         # La forma de onda ha terminado: se corta antes de la física.
@@ -1046,6 +1052,7 @@ def SP_set(
                 ocupacion_max_sp_set,
                 neighbor_mode=sim_ctes.neighbor_mode_sp_set,
                 num_iteracion=k,
+                tiempo_efectivo=tiempo_efectivo,
             )
 
         elif not total_vacantes_sp_set:
