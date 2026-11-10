@@ -145,6 +145,7 @@ def PP_reset(
 
     # Ciclo para la primera parte del reset
     acumulador_tiempo = AcumuladorTiempo(params.paso_temporal)
+    acumulador_movimiento = AcumuladorTiempo(params.paso_temporal)
     for k in range(0, presupuesto + 1):
         T_electrodo_paso = T_electrodo  # la que usa el solver en este paso (antes de actualizarla)
         simulation_time = params.paso_temporal * k
@@ -158,6 +159,7 @@ def PP_reset(
             )
         )
         tiempo_efectivo = acumulador_tiempo.actualizar(voltage)
+        tiempo_movimiento = acumulador_movimiento.actualizar(voltage)
         voltage_anterior = voltage
 
         # La forma de onda ha terminado: se corta antes de la física.
@@ -350,7 +352,7 @@ def PP_reset(
         temperatura_para_recombinacion = temperatura[:, 1:-1] if isinstance(temperatura, np.ndarray) else temperatura
 
         # Actualizo el estado del sistema con la recombinación
-        actual_state, oxygen_state = update_state_recombinate(
+        actual_state, oxygen_state, movimiento_posible = update_state_recombinate(
             voltage=voltage,
             E_field_filas=E_field_vector,
             oxygen_config=oxygen_config,
@@ -361,7 +363,10 @@ def PP_reset(
             temperatura=temperatura_para_recombinacion,
             velocity_thresholds=velocity_thresholds,
             tiempo_efectivo=tiempo_efectivo,
+            tiempo_movimiento=tiempo_movimiento,
         )
+        if movimiento_posible:
+            acumulador_movimiento.reiniciar()
 
         # Tiempo total de la simulacion
         tiempo_total = simulation_time + tiempo_sp_set
@@ -567,6 +572,7 @@ def SP_reset(
 
     # Ciclo para la primera parte del reset
     acumulador_tiempo = AcumuladorTiempo(params.paso_temporal)
+    acumulador_movimiento = AcumuladorTiempo(params.paso_temporal)
     for k in range(0, presupuesto + 1):
         T_electrodo_paso = T_electrodo  # la que usa el solver en este paso (antes de actualizarla)
         simulation_time = params.paso_temporal * k
@@ -580,6 +586,7 @@ def SP_reset(
             )
         )
         tiempo_efectivo = acumulador_tiempo.actualizar(voltage)
+        tiempo_movimiento = acumulador_movimiento.actualizar(voltage)
         voltage_anterior = voltage
 
         # La forma de onda ha terminado: se corta antes de la física.
@@ -757,7 +764,7 @@ def SP_reset(
         temperatura_para_recombinacion = temperatura[:, 1:-1] if isinstance(temperatura, np.ndarray) else temperatura
 
         # Actualizo el estado del sistema con la recombinación
-        actual_state, oxygen_state = update_state_recombinate(
+        actual_state, oxygen_state, movimiento_posible = update_state_recombinate(
             voltage=voltage,
             E_field_filas=E_field_vector,
             oxygen_config=oxygen_config,
@@ -768,7 +775,10 @@ def SP_reset(
             temperatura=temperatura_para_recombinacion,
             velocity_thresholds=velocity_thresholds,
             tiempo_efectivo=tiempo_efectivo,
+            tiempo_movimiento=tiempo_movimiento,
         )
+        if movimiento_posible:
+            acumulador_movimiento.reiniciar()
 
         # Tiempo total de la simulacion
         tiempo_total = simulation_time + tiempo_pp_reset

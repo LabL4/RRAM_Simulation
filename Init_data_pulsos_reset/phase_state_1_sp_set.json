@@ -1,0 +1,15 @@
+{
+  "percola": true,
+  "centros_calculados": [
+    59
+  ],
+  "tiempo_sp_set": 0.0,
+  "vecindad_inicial": {
+    "vecinos_0": 3,
+    "vecinos_1": 16,
+    "vecinos_2": 47,
+    "vecinos_3": 78,
+    "vecinos_4": 66,
+    "total_vacantes_zona": 210
+  }
+}

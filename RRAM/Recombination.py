@@ -157,8 +157,13 @@ def Recombine_opt(
     return state_updated, oxygen_updated
 
 
+def desplazamiento_maximo(velocidad: float | np.ndarray, tiempo: float, grid_size: float) -> np.ndarray:
+    """Celdas que como máximo puede avanzar un ion con velocidad `velocidad` durante `tiempo`: round(v·t/celda)."""
+    return np.array(np.round((velocidad * tiempo) / grid_size), dtype=int)
+
+
 def move_oxygen_ions(
-    paso_temp: float,
+    tiempo_mov: float,
     oxygen_state: np.ndarray,
     temperature: np.ndarray | float,
     E_field_filas: np.ndarray,
@@ -169,10 +174,15 @@ def move_oxygen_ions(
     cte_red: float,
     voltage: float,
     velocity_thresholds: dict,  # Diccionario pasado como argumento
-) -> tuple[np.ndarray, np.ndarray | float]:
+) -> tuple[np.ndarray, np.ndarray | float, bool]:
     """
     Mueve los iones de oxígeno de forma estocástica. La velocidad se determina
     comparando el parámetro 'voltage' contra los umbrales en 'velocity_thresholds'.
+
+    `tiempo_mov` es el tiempo acumulado de movimiento (n·dt a V constante). Si
+    round(v·tiempo_mov/celda) < 1 los iones no se mueven y el llamador sigue acumulando.
+    Devuelve (oxygen_state, velocidad, movimiento_posible): `movimiento_posible` es True cuando
+    el desplazamiento máximo es >= 1 celda, haya o no iones; con él se resetea el reloj de movimiento.
 
     `E_field_filas` es el campo local de cada fila (GapElectricField, un valor por
     fila de oxygen_state). Hoy solo alimenta la velocidad física de referencia; el
@@ -211,7 +221,8 @@ def move_oxygen_ions(
     # =========================================================================
     # 3. CÁLCULO DEL DESPLAZAMIENTO MÁXIMO
     # =========================================================================
-    max_displacement = np.array(np.round((oxygen_velocity * paso_temp) / grid_size), dtype=int)
+    max_displacement = desplazamiento_maximo(oxygen_velocity, tiempo_mov, grid_size)
+    movimiento_posible = bool(np.any(max_displacement >= 1))
     oxygen_state_new = np.zeros_like(oxygen_state)
 
     # =========================================================================
@@ -241,4 +252,4 @@ def move_oxygen_ions(
 
         oxygen_state_new[valid_rows, valid_new_cols] = 1
 
-    return oxygen_state_new, oxygen_velocity
+    return oxygen_state_new, oxygen_velocity, movimiento_posible

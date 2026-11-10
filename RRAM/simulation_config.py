@@ -72,14 +72,14 @@ THERMAL_DEFAULTS = {
     # Amortiguación de caídas bruscas de T (ver Temperature.amortiguar_enfriamiento):
     # donde T cae más que `umbral_caida_temperatura` [K] respecto al paso anterior,
     # T = T_0 + (T_prev - T_0) * exp(-k * paso_temporal). k = 0 la desactiva.
-    "k_amortiguacion_termica": 1.0,  # [1/s]
-    "umbral_caida_temperatura": 1,  # [K], > 0
+    "k_amortiguacion_termica": 1e04,  # [1/s]
+    "umbral_caida_temperatura": 0.01,  # [K], > 0
     # Perfil de temperatura de los electrodos (ver Temperature.actualizar_temperatura_electrodo):
     # columna adyacente sin amortiguar en las filas centro ± grosor de cada filamento y
     # init_temp en el resto; las celdas que caen más que `umbral_caida_electrodo` [K] se
     # enfrían con exp(-k * paso_temporal). k = 0 lo desactiva (electrodo fijo).
-    "k_electrodo_enfriamiento": 2.0,  # [1/s]
-    "umbral_caida_electrodo": 0.1,  # [K], > 0
+    "k_electrodo_enfriamiento": 2e04,  # [1/s]
+    "umbral_caida_electrodo": 0.01,  # [K], > 0
 }
 
 
@@ -87,12 +87,12 @@ THERMAL_DEFAULTS = {
 # PARÁMETROS GEOMÉTRICOS Y DE SIMULACIÓN
 # ============================================================================
 SIMULATION_DEFAULTS = {
-    "device_size_x": 10e-9,  # Ancho entre electrodos, debe corresponder a los dispositivos medidos
-    "device_size_y": 30e-9,
+    "device_size_x": 40e-6,  # 10e-9 Ancho entre electrodos, debe corresponder a los dispositivos medidos
+    "device_size_y": 40e-6,
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
     "num_trampas": 100,
     # Paso temporal [s]. ENTRADA obligatoria. Cambiarlo altera la física
-    "paso_temporal": 1e-6,
+    "paso_temporal": 1e-3,
     # El voltaje NO tiene valores por defecto: cada simulación debe traer su
     # "protocolo_voltaje" (ver RRAM.voltage_controller.ProtocoloVoltaje).
     "densidad_vacantes": 4.0,  # vacantes / nm²
@@ -114,9 +114,9 @@ SET_RESET_DEFAULTS = {
     # Vecinos que cuentan en la generación de vacantes: "horizontal", "vertical" o "both".
     "neighbor_mode_pp_set": "both",
     "neighbor_mode_sp_set": "both",
-    "voltaje_gen_oxigeno_pp_1": 1.1,
+    "voltaje_gen_oxigeno_pp_1": 0.3,
     "num_oxigenos_pp_reset_1": 7,  # 2
-    "voltaje_gen_oxigeno_pp_2": 1.15,
+    "voltaje_gen_oxigeno_pp_2": 0.45,
     "num_oxigenos_pp_reset_2": 4,  # 10
     "voltaje_gen_oxigeno_sp": -0.2,
     "num_oxigenos_sp_reset": 5,

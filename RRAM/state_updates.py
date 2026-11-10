@@ -139,9 +139,16 @@ def update_state_recombinate(
     temperatura: float | np.ndarray,
     velocity_thresholds: dict,  # Diccionario pasado como argumento
     tiempo_efectivo: float | None = None,
-) -> tuple[np.ndarray, np.ndarray]:
+    tiempo_movimiento: float | None = None,
+) -> tuple[np.ndarray, np.ndarray, bool]:
     """
-    Orquesta el proceso completo de RESET en un paso de tiempo:
+    Orquesta el proceso completo de RESET en un paso de tiempo.
+
+    `tiempo_efectivo` multiplica las tasas de recombinación y `tiempo_movimiento` es el reloj
+    (independiente) del desplazamiento de iones; si no se pasan, valen `paso_temporal`.
+    Devuelve (vacantes, oxígenos, movimiento_posible); el último indica que el reloj de
+    movimiento alcanzó el umbral de una celda y el llamador debe reiniciarlo.
+
     1. Generación de iones oxígenos por voltaje.
     2. Movimiento de iones.
     3. Recombinación.
@@ -154,8 +161,8 @@ def update_state_recombinate(
             break  # Solo usar el umbral más alto superado
 
     # 2. Movemos los ionesx
-    oxygen_state, velocidad = Recombination.move_oxygen_ions(
-        paso_temp=params.paso_temporal,
+    oxygen_state, velocidad, movimiento_posible = Recombination.move_oxygen_ions(
+        tiempo_mov=params.paso_temporal if tiempo_movimiento is None else tiempo_movimiento,
         oxygen_state=oxygen_state,
         temperature=temperatura,
         E_field_filas=E_field_filas,
@@ -183,4 +190,4 @@ def update_state_recombinate(
         long_decaimiento_concentracion=sim_ctes.long_decaimiento_concentracion,
     )
 
-    return actual_state_update, oxygen_state_update
+    return actual_state_update, oxygen_state_update, movimiento_posible

@@ -17,6 +17,10 @@ class AcumuladorTiempo:
         self._v_prev: float | None = None
         self._n = 0
 
+    def reiniciar(self) -> None:
+        """Pone la cuenta a 0 sin olvidar el voltaje previo: el siguiente paso con el mismo V vale 1·dt."""
+        self._n = 0
+
     def actualizar(self, voltage: float) -> float:
         if voltage == 0:
             self._n = 0
