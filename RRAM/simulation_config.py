@@ -70,16 +70,16 @@ THERMAL_DEFAULTS = {
     "factor_generar_calor": 6e-5,  # 5.5e-5,
     "pendiente_temperatura": -28,  # -24.7,
     # Amortiguación de caídas bruscas de T (ver Temperature.amortiguar_enfriamiento):
-    # donde T cae más que `umbral_caida_temperatura` [K] respecto al paso anterior,
+    # donde T cae más que 'umbral_caida_temperatura' [K] respecto al paso anterior,
     # T = T_0 + (T_prev - T_0) * exp(-k * paso_temporal). k = 0 la desactiva.
-    "k_amortiguacion_termica": 1e04,  # [1/s]
-    "umbral_caida_temperatura": 0.01,  # [K], > 0
+    "k_amortiguacion_termica": 1,  # [1/s]
+    "umbral_caida_temperatura": 1,  # [K], > 0
     # Perfil de temperatura de los electrodos (ver Temperature.actualizar_temperatura_electrodo):
     # columna adyacente sin amortiguar en las filas centro ± grosor de cada filamento y
-    # init_temp en el resto; las celdas que caen más que `umbral_caida_electrodo` [K] se
+    # init_temp en el resto; las celdas que caen más que 'umbral_caida_electrodo' [K] se
     # enfrían con exp(-k * paso_temporal). k = 0 lo desactiva (electrodo fijo).
-    "k_electrodo_enfriamiento": 2e04,  # [1/s]
-    "umbral_caida_electrodo": 0.01,  # [K], > 0
+    "k_electrodo_enfriamiento": 2,  # [1/s]
+    "umbral_caida_electrodo": 0.1,  # [K], > 0
 }
 
 
@@ -87,8 +87,8 @@ THERMAL_DEFAULTS = {
 # PARÁMETROS GEOMÉTRICOS Y DE SIMULACIÓN
 # ============================================================================
 SIMULATION_DEFAULTS = {
-    "device_size_x": 40e-6,  # 10e-9 Ancho entre electrodos, debe corresponder a los dispositivos medidos
-    "device_size_y": 40e-6,
+    "device_size_x": 10e-9,  # 10e-9 Ancho entre electrodos, debe corresponder a los dispositivos medidos
+    "device_size_y": 30e-9,
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
     "num_trampas": 100,
     # Paso temporal [s]. ENTRADA obligatoria. Cambiarlo altera la física
@@ -120,6 +120,8 @@ SET_RESET_DEFAULTS = {
     "num_oxigenos_pp_reset_2": 4,  # 10
     "voltaje_gen_oxigeno_sp": -0.2,
     "num_oxigenos_sp_reset": 5,
+    # Máximo de iones de oxígeno simultáneos en el reset. None (defecto) → se usa 'vacantes_generadas_set' del estado del set. Si se fija, manda este valor (aviso en el log). Obligatorio si el reset arranca de un estado sin 'vacantes_generadas_set'.
+    "max_oxigenos_reset": 150,
 }
 
 DEFAULT_PARAMS = {
@@ -132,7 +134,7 @@ DEFAULT_PARAMS = {
 }
 
 
-# Esta clase no es mas que un contenedor vacío, inicialmente se creó para tener un lugar donde crear nuevos oarámetros a partir de los base pero ya se hace en las clases SimulationParameters y SimulationConstants, por lo que esta clase ya no tiene sentido para no tardar en eliminarla, se deja como un contenedor de parámetros que no hace nada.
+# Esta clase no es mas que un contenedor vacío, inicialmente se creó para tener un lugar donde crear nuevos parámetros a partir de los base pero ya se hace en las clases SimulationParameters y SimulationConstants, por lo que esta clase ya no tiene sentido para no tardar en eliminarla, se deja como un contenedor de parámetros que no hace nada.
 class SimulationConfig:
     def __init__(self, sim_id: int):
         self.sim_id = sim_id
@@ -269,6 +271,7 @@ class ConfigManager:
             "voltaje_gen_oxigeno_sp",
             "num_oxigenos_sp_reset",
             "centros_filamento",  # ← añadir al final
+            "max_oxigenos_reset",
         ]
 
         # Protocolo de voltaje: obligatorio, validado aquí (una errata falla en el

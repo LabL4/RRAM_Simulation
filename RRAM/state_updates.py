@@ -6,6 +6,7 @@ import numpy as np
 
 from . import Recombination
 from . import Generation
+from .acumulador_tiempo import RelojesIones
 from .constants_simulation import SimulationConstants
 from .parameters import SimulationParameters
 
@@ -138,35 +139,48 @@ def update_state_recombinate(
     oxygen_state: np.ndarray,
     temperatura: float | np.ndarray,
     velocity_thresholds: dict,  # Diccionario pasado como argumento
+    relojes: RelojesIones,
+    filas_permitidas: np.ndarray,
+    max_oxigenos: int,
     tiempo_efectivo: float | None = None,
-    tiempo_movimiento: float | None = None,
-) -> tuple[np.ndarray, np.ndarray, bool]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
     Orquesta el proceso completo de RESET en un paso de tiempo.
 
-    `tiempo_efectivo` multiplica las tasas de recombinación y `tiempo_movimiento` es el reloj
-    (independiente) del desplazamiento de iones; si no se pasan, valen `paso_temporal`.
-    Devuelve (vacantes, oxígenos, movimiento_posible); el último indica que el reloj de
-    movimiento alcanzó el umbral de una celda y el llamador debe reiniciarlo.
+    `filas_permitidas` (Ny,) son las filas de la interfaz donde se pueden generar
+    oxígenos (banda de los filamentos, ver Recombination.filas_interfaz_filamento).
+    `max_oxigenos` es el máximo de iones simultáneos (ver Recombination.resolver_limite_oxigenos).
+    `tiempo_efectivo` multiplica las tasas de recombinación (si no se pasa, vale `paso_temporal`);
+    el exponente exp(-dt·v/L) usa siempre `paso_temporal`.
+    `relojes` lleva el reloj propio de cada ion: el llamador ya lo ha avanzado este paso
+    (`relojes.actualizar`, antes de generar); aquí se mueve con él y, tras recombinar, se
+    borra el reloj de los iones desaparecidos (`relojes.limpiar`).
+    Devuelve (vacantes, oxígenos, prob_recombinacion):
+      - prob_recombinacion es el CAMPO de probabilidad de recombinación de este paso en toda
+        la matriz (misma forma que actual_state), con el mismo tiempo, velocidad y temperatura
+        que el sorteo real; solo se usa de verdad en las celdas con ion y vacante.
 
-    1. Generación de iones oxígenos por voltaje.
+    1. Generación de iones oxígenos por voltaje (solo en `filas_permitidas`).
     2. Movimiento de iones.
     3. Recombinación.
     """
 
     # 1. Se generan oxígenos según el voltaje
-    for threshold_voltage, max_oxigenos in oxygen_config.items():
+    for threshold_voltage, max_oxigenos_paso in oxygen_config.items():
         if abs(voltage) > abs(threshold_voltage):
-            oxygen_state = Recombination.generate_oxygen(oxygen_state, max_oxigenos)
+            filas_candidatas = Recombination.filas_libres_interfaz(oxygen_state, filas_permitidas)
+            cupo = Recombination.cupo_oxigenos(oxygen_state, max_oxigenos)
+            oxygen_state = Recombination.generate_oxygen(oxygen_state, max_oxigenos_paso, filas_candidatas, cupo)
             break  # Solo usar el umbral más alto superado
 
     # 2. Movemos los ionesx
-    oxygen_state, velocidad, movimiento_posible = Recombination.move_oxygen_ions(
-        tiempo_mov=params.paso_temporal if tiempo_movimiento is None else tiempo_movimiento,
+    oxygen_state, velocidad = Recombination.move_oxygen_ions(
+        reloj_iones=relojes.reloj,
         oxygen_state=oxygen_state,
         temperature=temperatura,
         E_field_filas=E_field_filas,
         grid_size=params.atom_size,
+        paso_temporal=params.paso_temporal,
         vibration_frequency=sim_ctes.vibration_frequency,
         gamma_drift=sim_ctes.gamma_drift,
         migration_energy=sim_ctes.E_m,
@@ -177,11 +191,14 @@ def update_state_recombinate(
 
     # print(f"Velocidad de los iones oxígeno en este paso: {velocidad:.4e} m/s")
 
-    # 3.Recombinación de iones con vacantes
+    # 3.Recombinación de iones con vacantes. t_ef solo multiplica la tasa (ν·t); el exponente
+    # exp(-dt·v/L) usa siempre el dt del paso (ver Recombination.Prob_Recombination).
+    tiempo_tasa = params.paso_temporal if tiempo_efectivo is None else tiempo_efectivo
     actual_state_update, oxygen_state_update = Recombination.Recombine_opt(
         vacancy_state=actual_state,
         oxygen_state=oxygen_state,
-        paso_temp=params.paso_temporal if tiempo_efectivo is None else tiempo_efectivo,
+        tiempo_tasa=tiempo_tasa,
+        paso_temporal=params.paso_temporal,
         velocidad=velocidad,
         temperatura=temperatura,
         vibration_frequency=sim_ctes.vibration_frequency,
@@ -189,5 +206,22 @@ def update_state_recombinate(
         recombination_energy=sim_ctes.recombination_energy,
         long_decaimiento_concentracion=sim_ctes.long_decaimiento_concentracion,
     )
+    relojes.limpiar(oxygen_state_update)  # iones recombinados: su reloj a 0
 
-    return actual_state_update, oxygen_state_update, movimiento_posible
+    # 4. Campo de probabilidad de recombinación (para guardarlo, como la matriz de generación)
+    prob_recombinacion = np.minimum(
+        Recombination.Prob_Recombination(
+            tiempo_tasa=tiempo_tasa,
+            paso_temporal=params.paso_temporal,
+            velocidad=velocidad,
+            temp=temperatura,
+            vibration_frequency=sim_ctes.vibration_frequency,
+            recom_enchancement_factor=sim_ctes.recom_enchancement_factor,
+            recombination_energy=sim_ctes.recombination_energy,
+            long_decaimiento_concentracion=sim_ctes.long_decaimiento_concentracion,
+        ),
+        1.0,
+    )
+    prob_recombinacion = np.broadcast_to(prob_recombinacion, actual_state.shape).copy()
+
+    return actual_state_update, oxygen_state_update, prob_recombinacion

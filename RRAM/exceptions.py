@@ -127,3 +127,14 @@ class FilamentosNoDestruidosException(Exception):
             pickle.dump({"actual_state": self.actual_state}, f)
 
         super().__init__(f"Se esperaba que se destruyeran {CF_esperados} y se han destruido {CF_destruidos}.")
+
+
+# Excepción para cuando el reset no tiene de dónde sacar el límite de iones de oxígeno
+class LimiteOxigenosNoDefinidoException(Exception):
+    def __init__(self):
+        message = (
+            "No hay límite de iones de oxígeno para el reset: el estado del set no trae "
+            "'vacantes_generadas_set' y 'max_oxigenos_reset' no está fijado en simulation_config.py."
+        )
+        logger.error(message)
+        super().__init__(message)

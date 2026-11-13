@@ -202,6 +202,15 @@ def contar_vecinos_zona_filamento(
     return resultados
 
 
+def contar_vacantes_generadas(estado_inicial: np.ndarray, estado_final: np.ndarray) -> int:
+    """
+    Vacantes generadas entre dos estados: vacantes al final - vacantes al inicio.
+
+    Válido en el SET, donde solo se generan vacantes (no se eliminan).
+    """
+    return int(np.sum(estado_final)) - int(np.sum(estado_inicial))
+
+
 def create_custom_mask(state, centros_CF, grosor_CF):
     """
     Crea una máscara para filamentos que ocupan TODA la fila horizontal del dispositivo.

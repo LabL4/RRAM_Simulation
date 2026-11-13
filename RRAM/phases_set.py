@@ -87,6 +87,8 @@ def PP_set(
     else:
         actual_state = actual_state.copy()
 
+    # Estado inicial (antes de generar) para contar las vacantes generadas en la fase
+    estado_inicial_pp_set = actual_state.copy()
     logger.info(f"EL numero de vacanes iniciales es {actual_state.sum()}")
     logger.info(f"Los centros de cada filamento son: {CF_centros}")
 
@@ -643,6 +645,9 @@ def PP_set(
     #     # No se ha llegado a la resistencia necesaria para la segunda parte del set, directamelo lo descarto
     #     raise exceptions.LowResistanceException(valor_resistencia=resistencia)
 
+    vacantes_generadas_set = Generation.contar_vacantes_generadas(estado_inicial_pp_set, actual_state)
+    logger.info(f"Vacantes generadas en PP_set: {vacantes_generadas_set}")
+
     # Guardo todas las variables del estado final del PP set para usarlas en el PS set
     final_state_pp_set = {
         # Perfil (o escalar) del electrodo con el que arranca la etapa siguiente
@@ -663,6 +668,8 @@ def PP_set(
         "CF_centros": CF_centros,
         "creaciones_dict": creaciones_dict,
         "T_max_fils": T_max_fils,
+        # Vacantes generadas en PP_set (sin las iniciales); SP_set le suma las suyas
+        "vacantes_generadas_set": vacantes_generadas_set,
         # Estado del voltaje de la etapa (JSON-serializable): la etapa siguiente
         # lee de aquí su V_fin para resolver 'anterior' y comprobar el enganche.
         "voltaje": controller.estado(),
@@ -735,6 +742,9 @@ def SP_set(
     cf_clean_matrix = final_state_pp_set["cf_clean_matrix"]
 
     logger.info(f"El numero de vacantes al inicio del SP set es: {np.sum(actual_state)}")
+    # Estado inicial (antes de generar) y vacantes generadas en PP_set (None en estados antiguos sin la clave)
+    estado_inicial_sp_set = actual_state.copy()
+    vacantes_generadas_pp_set = final_state_pp_set.get("vacantes_generadas_set")
     logger.info(f"El numero de vacantes al percolar fue : {max_vancantes_pp_set}")
 
     ocupacion_max_sp_set = 0 + 0  # 0.35
@@ -1098,6 +1108,20 @@ def SP_set(
         perfil_electrodo=perfil_electrodo,
     )
 
+    vacantes_generadas_sp_set = Generation.contar_vacantes_generadas(estado_inicial_sp_set, actual_state)
+    if vacantes_generadas_pp_set is None:
+        vacantes_generadas_set = None
+        logger.warning(
+            f"El estado de PP_set no trae 'vacantes_generadas_set': no se puede dar el total del set "
+            f"(SP_set ha generado {vacantes_generadas_sp_set}). El reset necesitará 'max_oxigenos_reset' en la configuración."
+        )
+    else:
+        vacantes_generadas_set = int(vacantes_generadas_pp_set) + vacantes_generadas_sp_set
+        logger.info(
+            f"Vacantes generadas en el set: {vacantes_generadas_set} "
+            f"(PP_set {vacantes_generadas_pp_set} + SP_set {vacantes_generadas_sp_set})"
+        )
+
     # Guardo todas las variables del estado final del PP set para usarlas en el PS set
     final_state_sp_set = {
         # Perfil (o escalar) del electrodo con el que arranca la etapa siguiente
@@ -1110,6 +1134,8 @@ def SP_set(
         "centros_calculados": CF_centros,
         "tiempo_sp_set": tiempo_sp_set,
         "T_max_fils": T_max_fils,
+        # Vacantes generadas en todo el set (sin las iniciales): limita los oxígenos del reset
+        "vacantes_generadas_set": vacantes_generadas_set,
         "voltaje": controller.estado(),
     }
 

@@ -83,6 +83,9 @@ class SimulationConstants:
     # "horizontal", "vertical" o "both" (los 4 vecinos directos). Uno por fase de SET.
     neighbor_mode_pp_set: str = "both"
     neighbor_mode_sp_set: str = "both"
+    # Máximo de iones de oxígeno simultáneos en el reset (ver Recombination.resolver_limite_oxigenos).
+    # None (defecto) → se usa 'vacantes_generadas_set' del estado del set.
+    max_oxigenos_reset: Optional[int] = None
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SimulationConstants":

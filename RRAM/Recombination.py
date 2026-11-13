@@ -4,6 +4,8 @@ import logging
 import math
 import sys
 
+from . import exceptions
+
 logger = logging.getLogger(__name__)
 
 k_b_ev = 8.617333262145e-5  # Boltzmann constant in eV/K
@@ -29,10 +31,66 @@ def Init_OxygenState(device_size_x: float, device_size_y: float, atom_size: floa
     return InitialOxygenState
 
 
-def generate_oxygen(oxygen_state: np.ndarray, max_num_oxygen: int) -> np.ndarray:
+def filas_interfaz_filamento(Ny: int, centros, grosor) -> np.ndarray:
+    """
+    Máscara 1D (Ny,) de las filas de la interfaz donde se pueden generar oxígenos:
+    centro ± grosor de cada filamento.
+
+    `grosor` es un entero común o una lista con un valor por filamento.
+    """
+    grosores = [int(grosor)] * len(centros) if isinstance(grosor, (int, np.integer)) else [int(g) for g in grosor]
+    if len(grosores) != len(centros):
+        raise ValueError("Debe haber un grosor asignado para cada centro de filamento.")
+    filas = np.zeros(Ny, dtype=bool)
+    for centro, g in zip(centros, grosores):
+        filas[max(0, int(centro) - g) : min(Ny, int(centro) + g + 1)] = True
+    return filas
+
+
+def filas_libres_interfaz(oxygen_state: np.ndarray, filas_permitidas: np.ndarray) -> np.ndarray:
+    """
+    Índices de las filas de la interfaz (columna x=0) sin ion y dentro de `filas_permitidas`.
+    """
+    return np.where((oxygen_state[:, 0] == 0) & filas_permitidas)[0]
+
+
+def resolver_limite_oxigenos(vacantes_generadas_set, max_oxigenos_reset) -> int:
+    """
+    Máximo de iones de oxígeno simultáneos en el reset.
+
+    - Valor manual (`max_oxigenos_reset`, de simulation_config.py): manda siempre; si además
+      existe el del set, se avisa en el log de que se usa el de la configuración.
+    - Solo el del set (`vacantes_generadas_set`): se usa ese.
+    - Ninguno: error en el log y LimiteOxigenosNoDefinidoException (se para la simulación).
+    """
+    if max_oxigenos_reset is not None:
+        if vacantes_generadas_set is not None:
+            logger.warning(
+                f"Límite de oxígenos del reset: se usa el valor del archivo de configuración "
+                f"max_oxigenos_reset={int(max_oxigenos_reset)} en lugar del heredado de la fase anterior "
+                f"({int(vacantes_generadas_set)})."
+            )
+        else:
+            logger.info(f"Límite de oxígenos del reset: max_oxigenos_reset={int(max_oxigenos_reset)} (archivo de configuración).")
+        return int(max_oxigenos_reset)
+    if vacantes_generadas_set is not None:
+        logger.info(f"Límite de oxígenos del reset: vacantes_generadas_set={int(vacantes_generadas_set)} (obtenido en el set).")
+        return int(vacantes_generadas_set)
+    raise exceptions.LimiteOxigenosNoDefinidoException()
+
+
+def cupo_oxigenos(oxygen_state: np.ndarray, max_oxigenos: int) -> int:
+    """
+    Iones de oxígeno que aún caben: max_oxigenos - iones presentes (nunca negativo).
+    """
+    return max(0, int(max_oxigenos) - int(np.sum(oxygen_state)))
+
+
+def generate_oxygen(oxygen_state: np.ndarray, max_num_oxygen: int, filas_candidatas: np.ndarray, cupo: int) -> np.ndarray:
     """
     Genera una cantidad aleatoria de oxígenos (hasta un máximo de 'max_num_oxygen')
-    en posiciones libres de la interfaz (columna x=0).
+    en la interfaz (columna x=0), solo en las filas de `filas_candidatas`
+    (ver filas_libres_interfaz) y sin pasar de `cupo` (ver cupo_oxigenos).
     """
     if max_num_oxygen <= 0:
         return oxygen_state
@@ -48,15 +106,13 @@ def generate_oxygen(oxygen_state: np.ndarray, max_num_oxygen: int) -> np.ndarray
     if cantidad_real == 0:
         return oxygen_state
 
-    # Buscamos qué posiciones (índices de fila) están libres en la columna 0
-    posiciones_libres = np.where(oxygen_state[:, 0] == 0)[0]
-
     # Limitamos por si la interfaz estuviera casi llena y no cupieran todos
-    cantidad_final = min(cantidad_real, len(posiciones_libres))
+    # y por el cupo de iones simultáneos
+    cantidad_final = min(cantidad_real, len(filas_candidatas), cupo)
 
     if cantidad_final > 0:
         # Elegimos aleatoriamente las posiciones SIN repetición (replace=False)
-        posiciones_elegidas = np.random.choice(posiciones_libres, size=cantidad_final, replace=False)
+        posiciones_elegidas = np.random.choice(filas_candidatas, size=cantidad_final, replace=False)
 
         # Asignamos los oxígenos elegidos
         oxygen_state[posiciones_elegidas, 0] = 1
@@ -64,8 +120,8 @@ def generate_oxygen(oxygen_state: np.ndarray, max_num_oxygen: int) -> np.ndarray
     return oxygen_state
 
 
-@njit
 def Prob_Recombination(
+    tiempo_tasa: float,
     paso_temporal: float,
     velocidad: float | np.ndarray,
     temp: float | np.ndarray,
@@ -75,8 +131,17 @@ def Prob_Recombination(
     long_decaimiento_concentracion: float,
 ) -> float | np.ndarray:
 
+    """
+    Probabilidad de recombinación en un paso.
+
+    El tiempo entra con dos papeles distintos:
+      - `tiempo_tasa`: ventana de tiempo de la tasa (ν·t). Con tiempo acumulativo es el
+        tiempo efectivo t_ef; si no, paso_temporal.
+      - `paso_temporal`: dt del paso, en exp(-dt·v/L) (desplazamiento del ion en un paso).
+        No se acumula: con t_ef el exponente haría caer la probabilidad decenas de órdenes.
+    """
     # IMPORTANTE: Usamos np.exp en lugar de math.exp para que pueda manejar tanto floats como arrays (mapas de calor) sin problemas de tipo de variable.
-    prob_in_equilibrio = (paso_temporal * vibration_frequency) * np.exp(-recombination_energy / (k_b_ev * temp))
+    prob_in_equilibrio = (tiempo_tasa * vibration_frequency) * np.exp(-recombination_energy / (k_b_ev * temp))
 
     exp_beta = np.exp(-(paso_temporal * velocidad) / long_decaimiento_concentracion) * recom_enchancement_factor
     prob_recom = prob_in_equilibrio * exp_beta
@@ -87,7 +152,8 @@ def Prob_Recombination(
 def Recombine_opt(
     vacancy_state: np.ndarray,
     oxygen_state: np.ndarray,
-    paso_temp: float,
+    tiempo_tasa: float,
+    paso_temporal: float,
     velocidad: np.ndarray | float,
     temperatura: np.ndarray | float,
     vibration_frequency: float,
@@ -129,7 +195,8 @@ def Recombine_opt(
     # 3. Calcular probabilidades
     # =========================================================================
     active_probs = Prob_Recombination(
-        paso_temporal=paso_temp,
+        tiempo_tasa=tiempo_tasa,
+        paso_temporal=paso_temporal,
         velocidad=active_vels,
         temp=active_temps,
         vibration_frequency=vibration_frequency,
@@ -156,33 +223,70 @@ def Recombine_opt(
 
     return state_updated, oxygen_updated
 
+@njit(cache=True)
+def _mover_con_bloqueo(
+    oxygen_state: np.ndarray, reloj: np.ndarray, velocidad: float, paso_temporal: float, grid_size: float
+) -> None:
+    """
+    Mueve los iones IN PLACE (oxygen_state y reloj a la vez) según su propio reloj.
 
-def desplazamiento_maximo(velocidad: float | np.ndarray, tiempo: float, grid_size: float) -> np.ndarray:
-    """Celdas que como máximo puede avanzar un ion con velocidad `velocidad` durante `tiempo`: round(v·t/celda)."""
-    return np.array(np.round((velocidad * tiempo) / grid_size), dtype=int)
+    Cada ion intenta avanzar d = round(v · reloj·dt / celda) celdas hacia la derecha.
+    Cada fila se recorre de derecha a izquierda, así el ion de detrás ve ya resuelto al de
+    delante (puede ocupar su hueco en el mismo paso):
+      - d <= 0: no se mueve y conserva su reloj.
+      - sin ion delante y destino fuera de la malla: sale y desaparece (ion y reloj a 0).
+      - ion delante: avanza como mucho hasta la celda anterior a él.
+      - si avanza >= 1 celda, su reloj pasa a 0; si está bloqueado, conserva su reloj.
+    """
+    filas, cols = oxygen_state.shape
+    factor = velocidad * paso_temporal / grid_size
+    for f in range(filas):
+        delante = cols  # columna del ion de delante ya resuelto; cols = no hay (borde libre)
+        for c in range(cols - 1, -1, -1):
+            if oxygen_state[f, c] == 0:
+                continue
+            d = int(round(factor * reloj[f, c]))
+            if d <= 0:
+                delante = c
+                continue
+            destino = c + d
+            if delante == cols and destino >= cols:
+                oxygen_state[f, c] = 0
+                reloj[f, c] = 0
+                continue
+            nueva = min(destino, delante - 1)
+            if nueva > c:
+                oxygen_state[f, c] = 0
+                reloj[f, c] = 0
+                oxygen_state[f, nueva] = 1
+                reloj[f, nueva] = 0
+                delante = nueva
+            else:
+                delante = c  # bloqueado: sigue acumulando
 
 
 def move_oxygen_ions(
-    tiempo_mov: float,
+    reloj_iones: np.ndarray,
     oxygen_state: np.ndarray,
     temperature: np.ndarray | float,
     E_field_filas: np.ndarray,
     grid_size: float,
+    paso_temporal: float,
     vibration_frequency: float,
     gamma_drift: float,
     migration_energy: float,
     cte_red: float,
     voltage: float,
     velocity_thresholds: dict,  # Diccionario pasado como argumento
-) -> tuple[np.ndarray, np.ndarray | float, bool]:
+) -> tuple[np.ndarray, float]:
     """
-    Mueve los iones de oxígeno de forma estocástica. La velocidad se determina
+    Mueve los iones de oxígeno según el reloj propio de cada uno. La velocidad se determina
     comparando el parámetro 'voltage' contra los umbrales en 'velocity_thresholds'.
 
-    `tiempo_mov` es el tiempo acumulado de movimiento (n·dt a V constante). Si
-    round(v·tiempo_mov/celda) < 1 los iones no se mueven y el llamador sigue acumulando.
-    Devuelve (oxygen_state, velocidad, movimiento_posible): `movimiento_posible` es True cuando
-    el desplazamiento máximo es >= 1 celda, haya o no iones; con él se resetea el reloj de movimiento.
+    `reloj_iones` (int, misma forma que oxygen_state) son los pasos acumulados por cada ion;
+    cada uno avanza round(v·reloj·dt/celda) celdas, con bloqueo por el ion de delante
+    (ver `_mover_con_bloqueo`). Modifica IN PLACE `oxygen_state` y `reloj_iones`.
+    Devuelve (oxygen_state, velocidad).
 
     `E_field_filas` es el campo local de cada fila (GapElectricField, un valor por
     fila de oxygen_state). Hoy solo alimenta la velocidad física de referencia; el
@@ -209,47 +313,17 @@ def move_oxygen_ions(
     # 2. LÓGICA DINÁMICA DE UMBRALES
     # =========================================================================
     # Inicializamos con el valor por defecto (si no supera ningún umbral)
-    oxygen_velocity = 0
+    oxygen_velocity = 0.0
 
     # Ordenamos las llaves de mayor a menor para asegurar la asignación correcta
     for threshold in sorted(velocity_thresholds.keys(), reverse=True):
         if abs(voltage) > abs(threshold):
-            oxygen_velocity = velocity_thresholds[threshold]
-            # print(f"Voltage {voltage} supera el umbral {threshold}, asignando velocidad {oxygen_velocity}")
+            oxygen_velocity = float(velocity_thresholds[threshold])
             break  # Salimos al encontrar el primer umbral que se cumple
 
     # =========================================================================
-    # 3. CÁLCULO DEL DESPLAZAMIENTO MÁXIMO
+    # 3. MOVIMIENTO CON RELOJ POR ION Y BLOQUEO
     # =========================================================================
-    max_displacement = desplazamiento_maximo(oxygen_velocity, tiempo_mov, grid_size)
-    movimiento_posible = bool(np.any(max_displacement >= 1))
-    oxygen_state_new = np.zeros_like(oxygen_state)
+    _mover_con_bloqueo(oxygen_state, reloj_iones, oxygen_velocity, paso_temporal, grid_size)
 
-    # =========================================================================
-    # 4. MOVIMIENTO ALEATORIO INDEPENDIENTE
-    # =========================================================================
-    rows, cols = np.where(oxygen_state == 1)
-    num_ions = len(rows)
-
-    if num_ions > 0:
-        actual_shifts = np.zeros(num_ions, dtype=int)
-
-        if max_displacement.ndim > 0:
-            max_allowed = max_displacement[rows, cols]
-            mask = max_allowed > 0
-            if np.any(mask):
-                actual_shifts[mask] = np.random.randint(1, max_allowed[mask] + 1)
-        else:
-            if max_displacement > 0:
-                actual_shifts = np.random.randint(1, max_displacement + 1, size=num_ions)
-
-        new_cols = cols + actual_shifts
-
-        # Verificamos límites del array
-        valid_mask = (new_cols >= 0) & (new_cols < oxygen_state.shape[1])
-        valid_rows = rows[valid_mask]
-        valid_new_cols = new_cols[valid_mask]
-
-        oxygen_state_new[valid_rows, valid_new_cols] = 1
-
-    return oxygen_state_new, oxygen_velocity, movimiento_posible
+    return oxygen_state, oxygen_velocity

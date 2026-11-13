@@ -1,16 +1,17 @@
 {
-  "perfil_electrodo": 303.7551930718169,
+  "perfil_electrodo": 302.2787788358159,
+  "v_prev_reloj": 0.0,
   "sistema_percola": false,
-  "Temperatura_final": 303.7551930718169,
+  "Temperatura_final": 302.2787788358159,
   "voltaje_max_reset": 0.0,
-  "tiempo_pp_reset": 0.020499999999999997,
+  "tiempo_pp_reset": 20.5,
   "CF_destruido_index": 1,
   "roturas_dict": {
     "0": {
       "filamento": 1,
       "voltaje": -0.5,
       "etapa": "pp_reset",
-      "k": 19979
+      "k": 2595
     }
   },
   "voltaje": {
@@ -563,11 +564,12 @@
       }
     ]
   },
-  "temperatura_final": 303.7551930718169,
+  "temperatura_final": 302.2787788358159,
   "centros_calculados": [
     59
   ],
   "T_max_fils": [
-    361.11030681791925
-  ]
+    351.2101375044099
+  ],
+  "max_oxigenos_reset": 150
 }

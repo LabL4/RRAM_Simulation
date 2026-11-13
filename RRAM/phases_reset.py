@@ -10,10 +10,11 @@ from . import (
 from . import CurrentSolver
 from . import ElectricField
 from . import Percolation
+from . import Recombination
 from . import Temperature
 from . import exceptions
 from .filament_tracking import procesar_filamentos_destruidos
-from .acumulador_tiempo import AcumuladorTiempo
+from .acumulador_tiempo import AcumuladorTiempo, RelojesIones
 from .state_updates import update_state_recombinate
 from .voltage_controller import Medidas, ProtocoloVoltaje
 import logging
@@ -78,16 +79,23 @@ def PP_reset(
     rutas["data_simulation_path"].mkdir(parents=True, exist_ok=True)
 
     oxygen_state = np.zeros_like(actual_state, dtype=np.int8)
+    # Filas de la interfaz donde se pueden generar oxígenos: banda de los filamentos (centro ± grosor)
+    filas_gen_oxigeno = Recombination.filas_interfaz_filamento(actual_state.shape[0], CF_centros, sim_ctes.grosor_filamento)
+    # Máximo de iones de oxígeno simultáneos: manual (configuración) o vacantes generadas en el set
+    max_oxigenos_reset = Recombination.resolver_limite_oxigenos(
+        final_state_sp_set.get("vacantes_generadas_set"), sim_ctes.max_oxigenos_reset
+    )
 
     N = len(CF_ranges)
     # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], ..., I_N[A], R_1[Ohm], ..., R_N[Ohm], T_1[K], ..., T_N[K]
     # El orden por bloques debe coincidir con el ensamblado de cada fila:
-    # [t, V, I_total, R_total] + I_fils + R_fils + T_fils
-    num_columnas = 4 + 3 * N
+    # [t, V, I_total, R_total] + I_fils + R_fils + T_fils + [t_ef]
+    num_columnas = 4 + 3 * N + 1  # + t_ef al final, para no mover las columnas por bloques
     cols = ["t[s]", "V[V]", "I_total[A]", "R_total[Ohm]"]
     cols += [f"I_{i}[A]" for i in range(1, N + 1)]
     cols += [f"R_{i}[Ohm]" for i in range(1, N + 1)]
     cols += [f"T_{i}[K]" for i in range(1, N + 1)]
+    cols += ["t_ef[s]"]
     header_pp_reset = ",".join(cols)
 
     # (data_pp_reset se reserva más abajo, cuando el controlador ya ha calculado
@@ -145,7 +153,8 @@ def PP_reset(
 
     # Ciclo para la primera parte del reset
     acumulador_tiempo = AcumuladorTiempo(params.paso_temporal)
-    acumulador_movimiento = AcumuladorTiempo(params.paso_temporal)
+    relojes = RelojesIones(np.zeros(oxygen_state.shape, dtype=np.int32))  # reloj propio de cada ion
+    probabilidad_recombinacion = None  # campo de probabilidad del último paso (se guarda con el estado)
     for k in range(0, presupuesto + 1):
         T_electrodo_paso = T_electrodo  # la que usa el solver en este paso (antes de actualizarla)
         simulation_time = params.paso_temporal * k
@@ -159,12 +168,15 @@ def PP_reset(
             )
         )
         tiempo_efectivo = acumulador_tiempo.actualizar(voltage)
-        tiempo_movimiento = acumulador_movimiento.actualizar(voltage)
         voltage_anterior = voltage
 
         # La forma de onda ha terminado: se corta antes de la física.
         if controller.terminado:
             break
+
+        # Reloj de cada ion: después del corte (el paso terminado repite el último V y no se
+        # simula) y antes de generar (los iones nuevos empiezan en 0).
+        relojes.actualizar(voltage, oxygen_state)
 
         # Obtengo los valores del campo eléctrico
         E_field = abs(ElectricField.SimpleElectricField(voltage, params.device_size_x))
@@ -352,7 +364,7 @@ def PP_reset(
         temperatura_para_recombinacion = temperatura[:, 1:-1] if isinstance(temperatura, np.ndarray) else temperatura
 
         # Actualizo el estado del sistema con la recombinación
-        actual_state, oxygen_state, movimiento_posible = update_state_recombinate(
+        actual_state, oxygen_state, probabilidad_recombinacion = update_state_recombinate(
             voltage=voltage,
             E_field_filas=E_field_vector,
             oxygen_config=oxygen_config,
@@ -362,15 +374,15 @@ def PP_reset(
             oxygen_state=oxygen_state,
             temperatura=temperatura_para_recombinacion,
             velocity_thresholds=velocity_thresholds,
+            relojes=relojes,
+            filas_permitidas=filas_gen_oxigeno,
+            max_oxigenos=max_oxigenos_reset,
             tiempo_efectivo=tiempo_efectivo,
-            tiempo_movimiento=tiempo_movimiento,
         )
-        if movimiento_posible:
-            acumulador_movimiento.reiniciar()
 
         # Tiempo total de la simulacion
         tiempo_total = simulation_time + tiempo_sp_set
-        fila = [tiempo_total, voltage, current, R_total] + I_fils + R_fils + T_fils
+        fila = [tiempo_total, voltage, current, R_total] + I_fils + R_fils + T_fils + [tiempo_efectivo]
         data_pp_reset[k] = fila
         perfil_electrodo[k] = T_electrodo_paso
         n_filas = k + 1
@@ -394,6 +406,8 @@ def PP_reset(
                 k=k,
                 actual_state=actual_state,
                 oxygen_state=oxygen_state,
+                probabilidad_recombinacion=probabilidad_recombinacion,
+                reloj_iones=relojes.reloj,
                 cf_clean_matrix=locals().get("cf_clean_matrix"),  # Si no existe, devuelve None
                 temperatura=locals().get("temperatura"),
                 mapa_resistencias=locals().get("R_local"),
@@ -419,6 +433,8 @@ def PP_reset(
             k=k,
             actual_state=actual_state,
             oxygen_state=oxygen_state,
+            probabilidad_recombinacion=probabilidad_recombinacion,
+            reloj_iones=relojes.reloj,
             cf_clean_matrix=locals().get("cf_clean_matrix"),
             temperatura=locals().get("temperatura"),
             matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
@@ -453,6 +469,9 @@ def PP_reset(
         "perfil_electrodo": T_electrodo,
         "actual_state": actual_state,
         "oxygen_state": oxygen_state,
+        # Relojes por ion (pasos acumulados) y último V aplicado: SP_reset los hereda.
+        "reloj_iones": relojes.estado()[0],
+        "v_prev_reloj": relojes.estado()[1],
         "sistema_percola": percola,
         "sim_ctes": sim_ctes,
         "params": params,
@@ -468,6 +487,8 @@ def PP_reset(
         "temperatura_final": temperatura,
         "centros_calculados": CF_centros,
         "T_max_fils": T_max_fils,
+        # Máximo de iones de oxígeno simultáneos: SP_reset lo hereda.
+        "max_oxigenos_reset": max_oxigenos_reset,
     }
 
     logger.info(f"Temperatura máxima por filamento en pp_reset: {T_max_fils} K")
@@ -496,6 +517,17 @@ def SP_reset(
     voltage_CF_destruido = final_state_pp_reset["voltage_CF_destruido"]
     roturas_dict = final_state_pp_reset["roturas_dict"]
     centros_calculados = final_state_pp_reset["centros_calculados"]
+    # Filas de la interfaz donde se pueden generar oxígenos: banda de los filamentos (centro ± grosor)
+    filas_gen_oxigeno = Recombination.filas_interfaz_filamento(actual_state.shape[0], centros_calculados, sim_ctes.grosor_filamento)
+    # Máximo de iones de oxígeno simultáneos: el que resolvió PP_reset. Si el manual de la
+    # configuración es distinto (p.ej. al arrancar desde un pp_reset guardado), manda el manual;
+    # un estado antiguo sin la clave y sin manual para con error.
+    max_oxigenos_heredado = final_state_pp_reset.get("max_oxigenos_reset")
+    if max_oxigenos_heredado is not None and sim_ctes.max_oxigenos_reset in (None, max_oxigenos_heredado):
+        max_oxigenos_reset = int(max_oxigenos_heredado)
+        logger.info(f"Límite de oxígenos del sp reset (heredado de pp reset): {max_oxigenos_reset}")
+    else:
+        max_oxigenos_reset = Recombination.resolver_limite_oxigenos(max_oxigenos_heredado, sim_ctes.max_oxigenos_reset)
 
     pendiente_temperatura = sim_ctes.pendiente_temperatura
     filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(centros_calculados)
@@ -522,12 +554,13 @@ def SP_reset(
     N = len(CF_ranges)
     # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], ..., I_N[A], R_1[Ohm], ..., R_N[Ohm], T_1[K], ..., T_N[K]
     # El orden por bloques debe coincidir con el ensamblado de cada fila:
-    # [t, V, I_total, R_total] + I_fils + R_fils + T_fils
-    num_columnas = 4 + 3 * N
+    # [t, V, I_total, R_total] + I_fils + R_fils + T_fils + [t_ef]
+    num_columnas = 4 + 3 * N + 1  # + t_ef al final, para no mover las columnas por bloques
     cols = ["t[s]", "V[V]", "I_total[A]", "R_total[Ohm]"]
     cols += [f"I_{i}[A]" for i in range(1, N + 1)]
     cols += [f"R_{i}[Ohm]" for i in range(1, N + 1)]
     cols += [f"T_{i}[K]" for i in range(1, N + 1)]
+    cols += ["t_ef[s]"]
     header_sp_reset = ",".join(cols)
 
     # (data_sp_reset y resistencia_vector se reservan más abajo, cuando el
@@ -572,7 +605,9 @@ def SP_reset(
 
     # Ciclo para la primera parte del reset
     acumulador_tiempo = AcumuladorTiempo(params.paso_temporal)
-    acumulador_movimiento = AcumuladorTiempo(params.paso_temporal)
+    # Relojes por ion heredados de PP_reset: solo se reinician si el primer V difiere del último de PP_reset
+    relojes = RelojesIones(final_state_pp_reset["reloj_iones"], final_state_pp_reset["v_prev_reloj"])
+    probabilidad_recombinacion = None  # campo de probabilidad del último paso (se guarda con el estado)
     for k in range(0, presupuesto + 1):
         T_electrodo_paso = T_electrodo  # la que usa el solver en este paso (antes de actualizarla)
         simulation_time = params.paso_temporal * k
@@ -586,12 +621,15 @@ def SP_reset(
             )
         )
         tiempo_efectivo = acumulador_tiempo.actualizar(voltage)
-        tiempo_movimiento = acumulador_movimiento.actualizar(voltage)
         voltage_anterior = voltage
 
         # La forma de onda ha terminado: se corta antes de la física.
         if controller.terminado:
             break
+
+        # Reloj de cada ion: después del corte (el paso terminado repite el último V y no se
+        # simula) y antes de generar (los iones nuevos empiezan en 0).
+        relojes.actualizar(voltage, oxygen_state)
 
         # Obtengo los valores del campo eléctrico y la temperatura
         E_field = abs(ElectricField.SimpleElectricField(voltage, params.device_size_x))
@@ -764,7 +802,7 @@ def SP_reset(
         temperatura_para_recombinacion = temperatura[:, 1:-1] if isinstance(temperatura, np.ndarray) else temperatura
 
         # Actualizo el estado del sistema con la recombinación
-        actual_state, oxygen_state, movimiento_posible = update_state_recombinate(
+        actual_state, oxygen_state, probabilidad_recombinacion = update_state_recombinate(
             voltage=voltage,
             E_field_filas=E_field_vector,
             oxygen_config=oxygen_config,
@@ -774,15 +812,15 @@ def SP_reset(
             oxygen_state=oxygen_state,
             temperatura=temperatura_para_recombinacion,
             velocity_thresholds=velocity_thresholds,
+            relojes=relojes,
+            filas_permitidas=filas_gen_oxigeno,
+            max_oxigenos=max_oxigenos_reset,
             tiempo_efectivo=tiempo_efectivo,
-            tiempo_movimiento=tiempo_movimiento,
         )
-        if movimiento_posible:
-            acumulador_movimiento.reiniciar()
 
         # Tiempo total de la simulacion
         tiempo_total = simulation_time + tiempo_pp_reset
-        fila = [tiempo_total, voltage, current, R_total] + I_fils + R_fils + T_fils
+        fila = [tiempo_total, voltage, current, R_total] + I_fils + R_fils + T_fils + [tiempo_efectivo]
         data_sp_reset[k] = fila
         perfil_electrodo[k] = T_electrodo_paso
         n_filas = k + 1
@@ -808,6 +846,8 @@ def SP_reset(
                 k=k,
                 actual_state=actual_state,
                 oxygen_state=oxygen_state,
+                probabilidad_recombinacion=probabilidad_recombinacion,
+                reloj_iones=relojes.reloj,
                 cf_clean_matrix=locals().get("cf_clean_matrix"),  # Si no existe, devuelve None
                 temperatura=locals().get("temperatura"),
                 mapa_resistencias=locals().get("R_local"),
@@ -829,6 +869,8 @@ def SP_reset(
             k=k,
             actual_state=actual_state,
             oxygen_state=oxygen_state,
+            probabilidad_recombinacion=probabilidad_recombinacion,
+            reloj_iones=relojes.reloj,
             cf_clean_matrix=locals().get("cf_clean_matrix"),
             temperatura=locals().get("temperatura"),
             matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
@@ -858,6 +900,8 @@ def SP_reset(
         "perfil_electrodo": T_electrodo,
         "actual_state": actual_state,
         "oxygen_state": oxygen_state,
+        "reloj_iones": relojes.estado()[0],
+        "v_prev_reloj": relojes.estado()[1],
         "sistema_percola": percola,
         "sim_ctes": sim_ctes,
         "params": params,
