@@ -5,11 +5,11 @@
   ],
   "tiempo_sp_set": 0.0,
   "vecindad_inicial": {
-    "vecinos_0": 0,
-    "vecinos_1": 5,
-    "vecinos_2": 36,
-    "vecinos_3": 89,
-    "vecinos_4": 115,
+    "vecinos_0": 2,
+    "vecinos_1": 1,
+    "vecinos_2": 43,
+    "vecinos_3": 101,
+    "vecinos_4": 98,
     "total_vacantes_zona": 245
   }
 }

@@ -1,920 +1,369 @@
-"""Fases del ciclo RESET de la simulación RRAM (PP_reset y SP_reset)."""
+"""
+Etapas del RESET: PP_reset (rotura de los filamentos) y SP_reset (con los filamentos ya destruidos).
 
+El bucle del paso está en `etapa.Etapa`. Aquí está lo propio del RESET (`EtapaReset`: iones de
+oxígeno y recombinación, campo uniforme, Poole-Frenkel del RESET, tiempo efectivo en los datos) y
+lo que distingue a cada una de las dos etapas. `PP_reset` y `SP_reset` son las funciones de
+siempre: construyen la etapa y la ejecutan.
+"""
+
+from __future__ import annotations
+
+import logging
 from typing import List
 
 import numpy as np
 
-from . import (
-    utils,
-)
-from . import CurrentSolver
-from . import ElectricField
-from . import Percolation
-from . import Recombination
-from . import Temperature
-from . import exceptions
+from . import CurrentSolver, ElectricField, Recombination, Temperature, exceptions
+from .acumulador_tiempo import RelojesIones
+from .estado_fase import EstadoFase, como_estado_fase
+from .etapa import ContextoPaso, Etapa
 from .filament_tracking import procesar_filamentos_destruidos
-from .acumulador_tiempo import AcumuladorTiempo, RelojesIones
-from .state_updates import update_state_recombinate
-from .voltage_controller import Medidas, ProtocoloVoltaje
-import logging
+from .procesos_estocasticos import ProcesoRecombinacion
+from .topologia_filamentos import TopologiaFilamentos
+from .voltage_controller import ProtocoloVoltaje
 
 logger = logging.getLogger(__name__)
 
 
+class EtapaReset(Etapa):
+    """
+    Lo común a las dos etapas del RESET. Cada una crea su `self.recombinacion` y fija `CF_destruido`,
+    `voltage_CF_destruido` y `roturas_dict`.
+    """
+
+    SUBCARPETA = "reset"
+    CON_T_EF = True
+
+    #: Proceso de los iones de oxígeno de la etapa.
+    recombinacion: ProcesoRecombinacion
+    #: Un booleano por filamento, voltaje de rotura de cada uno y registro de las roturas.
+    CF_destruido: np.ndarray
+    voltage_CF_destruido: np.ndarray
+    roturas_dict: dict
+
+    def filamentos_para_el_controlador(self) -> int:
+        return int(np.sum(~self.CF_destruido))
+
+    def empezar_paso(self, ctx: ContextoPaso) -> None:
+        # Reloj de cada ion: después del corte de la forma de onda (el paso terminado repite el
+        # último V y no se simula) y antes de generar (los iones nuevos empiezan en 0).
+        self.recombinacion.empezar_paso(ctx.voltage)
+
+    def campo_electrico(self, voltage: float):
+        E_uniforme = abs(ElectricField.SimpleElectricField(voltage, self.params.device_size_x))
+        # Campo local por filas: lo recibe el movimiento de los iones. Hoy la velocidad aplicada sale
+        # de los umbrales de voltaje, pero es la entrada del modelo físico que se quiere recuperar.
+        E_filas = np.abs(
+            ElectricField.GapElectricFieldVector(voltage, self.actual_state, self.params.device_size_x, self.params.atom_size)
+        )
+        return E_filas, E_uniforme
+
+    def joule_sin_percolar(self, ctx: ContextoPaso, temperatura_para_corriente) -> None:
+        """
+        Paso sin percolación: Poole-Frenkel con `temperatura_para_corriente` y, con esa corriente,
+        temperatura de Joule amortiguada.
+
+        El paso en que se pasa del mapa FVM al escalar de Joule (rotura del filamento) NO se
+        amortigua: la temperatura anterior sigue siendo el mapa y no hay un valor de Joule con el que
+        comparar. A partir del paso siguiente la anterior es escalar y ya se amortigua.
+        """
+        # TODO: usar la media del campo local por filas, np.mean(ctx.E_filas), como en el SET, en
+        # lugar del campo uniforme. Pendiente de decidir: cambia la corriente del tramo sin percolación.
+        self.current = abs(
+            CurrentSolver.Poole_Frenkel(
+                temperatura_para_corriente,
+                ctx.E_uniforme,
+                pb_metal_insul=self.sim_ctes.pb_metal_insul_reset,
+                permitividad_relativa=self.sim_ctes.permitividad_relativa_reset,
+                I_0=self.sim_ctes.I_0_reset,
+            )
+            * (self.params.device_size_y)
+        )
+        T_joule = self.temperatura_joule(ctx)
+        self.paso.temperatura_sin_amortiguar = T_joule
+        self.paso.T_fils = self.termico.registrar_joule(T_joule, self.sim_ctes)
+        self.paso.sin_percolacion(self.N)
+
+    def temperatura_joule(self, ctx: ContextoPaso):
+        """Joule escalar con la corriente que haya en `self.current` en ese momento."""
+        return Temperature.Temperature_Joule(
+            ctx.voltage, self.current, T_0=self.params.init_temp, r_termica=self.sim_ctes.r_termica_no_percola
+        )
+
+    def actualizar_estado(self, ctx: ContextoPaso) -> np.ndarray:
+        # La recombinación indexa con las coordenadas de actual_state: recibe la temperatura sin columnas de electrodo
+        return self.recombinacion.actualizar(
+            self.actual_state, ctx.voltage, ctx.E_filas, self.termico.actual.interior, self.params, self.sim_ctes,
+            ctx.tiempo_efectivo,
+        )
+
+    def columnas_extra(self, ctx: ContextoPaso) -> tuple:
+        return (ctx.tiempo_efectivo,)
+
+    def estado_a_guardar(self) -> dict:
+        return dict(
+            actual_state=self.actual_state,
+            oxygen_state=self.recombinacion.oxygen_state,
+            probabilidad_recombinacion=self.recombinacion.probabilidad(),
+            reloj_iones=self.recombinacion.relojes.reloj,
+            cf_clean_matrix=self.paso.cf_clean_matrix,
+            temperatura=self.termico.actual.legado(),
+            matriz_para_plot_muro=self.paso.matriz_muro_para_plot(self.centros),
+            mapa_resistencias=self.paso.R_local,
+            **Temperature.extra_sin_amortiguar(self.sim_ctes, self.paso.temperatura_sin_amortiguar),
+        )
+
+    def campos_estado_final(self) -> dict:
+        reloj, v_prev = self.recombinacion.relojes.estado()
+        return dict(
+            oxygen_state=self.recombinacion.oxygen_state,
+            # Relojes por ion (pasos acumulados) y último V aplicado: la etapa siguiente los hereda
+            reloj_iones=reloj,
+            v_prev_reloj=v_prev,
+            CF_destruido=self.CF_destruido,
+            voltage_CF_destruido=self.voltage_CF_destruido,
+            roturas_dict=self.roturas_dict,
+            # Máximo de iones de oxígeno simultáneos
+            max_oxigenos_reset=self.recombinacion.max_oxigenos,
+        )
+
+    def _informar_oxigeno(self) -> None:
+        for umbral, n in self.recombinacion.oxygen_config.items():
+            logger.info(f"  generación de oxígeno por encima de {umbral} V: hasta {n} por paso")
+        for umbral, v in self.recombinacion.velocity_thresholds.items():
+            logger.info(f"  velocidad de los iones por encima de {umbral} V: {v} m/s")
+
+
+class EtapaPPReset(EtapaReset):
+    """
+    Primera parte del RESET: los iones de oxígeno recombinan vacantes hasta romper los filamentos.
+
+    Parte percolando (Ohm + FVM) y pasa a Poole-Frenkel + Joule al romperse. Termina con
+    `FilamentosNoDestruidosException` si no se rompen todos; la etapa se cierra antes y su estado
+    viaja en la excepción.
+    """
+
+    FASE = "pp_reset"
+    NOMBRE = "PP_reset"
+
+    def __init__(
+        self,
+        previo: EstadoFase,
+        num_simulation: int,
+        CF_ranges: List[tuple],
+        protocolo: ProtocoloVoltaje,
+        cada_estados: int,
+        usar_muro: bool = True,
+        results_dir="Results",
+    ):
+        previo = como_estado_fase(previo, "sp_set")  # un dict antiguo también vale
+        super().__init__(
+            num_simulation=num_simulation, params=previo.params, sim_ctes=previo.sim_ctes, CF_ranges=CF_ranges,
+            centros=previo.centros, actual_state=previo.actual_state, protocolo=protocolo, cada_estados=cada_estados,
+            previo=previo, usar_muro=usar_muro, results_dir=results_dir, tiempo_origen=previo.tiempo_fin,
+            # El dispositivo llega del SET en LRS, así que percola al entrar; aún no hay corriente
+            corriente_inicial=0.0, percola_inicial=True,
+        )
+        sim_ctes = self.sim_ctes
+        self.filas_intermedias, self.dist_casillas = Temperature.calcular_filas_intermedias(self.centros)
+
+        self.CF_destruido = np.full(self.N, False, dtype=bool)
+        self.voltage_CF_destruido = np.full(self.N, 0.0)
+        self.roturas_dict: dict = {}
+
+        oxygen_state = np.zeros_like(self.actual_state, dtype=np.int8)
+        self.recombinacion = ProcesoRecombinacion(
+            oxygen_state,
+            RelojesIones(np.zeros(oxygen_state.shape, dtype=np.int32)),  # reloj propio de cada ion
+            # CUIDADO: los umbrales tienen que ir ordenados de mayor a menor
+            oxygen_config={
+                float(sim_ctes.voltaje_gen_oxigeno_pp_2): int(sim_ctes.num_oxigenos_pp_reset_2),
+                float(sim_ctes.voltaje_gen_oxigeno_pp_1): int(sim_ctes.num_oxigenos_pp_reset_1),
+            },
+            velocity_thresholds={
+                float(sim_ctes.voltaje_gen_oxigeno_pp_2): sim_ctes.velocidad_iones_pp_2,
+                float(sim_ctes.voltaje_gen_oxigeno_pp_1): sim_ctes.velocidad_iones_pp_1,
+            },
+            # Filas de la interfaz donde se pueden generar oxígenos: banda de los filamentos (centro ± grosor)
+            filas_permitidas=Recombination.filas_interfaz_filamento(self.actual_state.shape[0], self.centros, sim_ctes.grosor_filamento),
+            # Máximo de iones simultáneos: manual (configuración) o vacantes generadas en el set
+            max_oxigenos=Recombination.resolver_limite_oxigenos(previo.vacantes_generadas_set, sim_ctes.max_oxigenos_reset),
+            rng=self.rng,
+        )
+        self._informar_oxigeno()
+
+    def seguir_filamentos(self, ctx: ContextoPaso, topo: TopologiaFilamentos) -> None:
+        if not any(~self.CF_destruido):  # ya están todos rotos
+            return
+        destruidos_antes = int(np.sum(self.CF_destruido))
+        procesar_filamentos_destruidos(
+            imagen_path=self.rutas["figures_path"],
+            data_save_path=self.rutas["data_simulation_path"],
+            existentes=topo.existe,
+            CF_destruido=self.CF_destruido,
+            voltage=ctx.voltage,
+            voltage_CF_destruido=self.voltage_CF_destruido,
+            actual_state=self.actual_state,
+            num_simulation=self.num_simulation,
+            roturas_dict=self.roturas_dict,
+            k=ctx.k,
+            etapa=self.FASE,
+        )
+        if int(np.sum(self.CF_destruido)) > destruidos_antes:
+            self.grabador.marcar_evento()  # rotura de un filamento: se guarda este paso
+
+    def rama_percolante(self, ctx: ContextoPaso, topo: TopologiaFilamentos) -> None:
+        self.paso.cf_clean_matrix = topo.matriz_filamentos
+        # El muro solo aplica cuando TODOS los filamentos están intactos y hay al menos 2
+        intactos = int(np.sum(~self.CF_destruido))
+        con_muro = not np.any(self.CF_destruido) and self.usar_muro and intactos >= 2
+        self.conduccion_ohmica(ctx, self.paso.cf_clean_matrix, con_muro=con_muro, perfiles_siempre=False)
+
+    def rama_no_percolante(self, ctx: ContextoPaso) -> None:
+        # La corriente se calcula con la temperatura de Joule de la corriente del paso anterior
+        # (en k = 0 no hay corriente: la temperatura inicial)
+        self.joule_sin_percolar(ctx, self.temperatura_joule(ctx))
+
+    def validar_final(self, estado: EstadoFase) -> None:
+        logger.info(f"La temperatura máxima al final del reset es: {self.termico.actual.maximo():.1f} K")
+        if sum(self.CF_destruido) < self.N:
+            raise exceptions.FilamentosNoDestruidosException(
+                simulation_path=self.rutas["simulation_path"],
+                figures_path=self.rutas["figures_path"],
+                voltage=self.voltage,
+                num_simulation=self.num_simulation,
+                actual_state=self.actual_state,
+                CF_destruidos=sum(self.CF_destruido),
+                CF_esperados=self.N,
+                estado_fase=estado,
+            )
+
+
+class EtapaSPReset(EtapaReset):
+    """
+    Segunda parte del RESET: sigue la recombinación con TODOS los filamentos ya destruidos.
+
+    Lo comprueba al arrancar (rotos en el estado de partida y registrados por PP_reset); si no,
+    `FilamentosNoDestruidosException` antes de simular. La recombinación solo quita vacantes, así
+    que la etapa no puede volver a percolar.
+    """
+
+    FASE = "sp_reset"
+    NOMBRE = "SP_reset"
+
+    def __init__(
+        self,
+        previo: EstadoFase,
+        num_simulation: int,
+        CF_ranges: List[tuple],
+        protocolo: ProtocoloVoltaje,
+        cada_estados: int,
+        results_dir="Results",
+    ):
+        previo = como_estado_fase(previo, "pp_reset")  # un dict antiguo también vale
+        super().__init__(
+            num_simulation=num_simulation, params=previo.params, sim_ctes=previo.sim_ctes, CF_ranges=CF_ranges,
+            centros=previo.centros, actual_state=previo.actual_state, protocolo=protocolo, cada_estados=cada_estados,
+            previo=previo, results_dir=results_dir, tiempo_origen=previo.tiempo_fin,
+            # El controlador lee la corriente del paso anterior y en k = 0 todavía no hay ninguna
+            corriente_inicial=0.0, percola_inicial=previo.percola,
+        )
+        sim_ctes = self.sim_ctes
+        self.CF_destruido = previo.CF_destruido
+        self.voltage_CF_destruido = previo.voltage_CF_destruido
+        self.roturas_dict = previo.roturas_dict
+        logger.info(f"Voltajes de rotura en PP_reset: {self.voltage_CF_destruido}; destruidos: {self.CF_destruido}")
+        self._exigir_filamentos_destruidos()
+
+        # Máximo de iones simultáneos: el que resolvió PP_reset. Si el manual de la configuración es
+        # distinto (p. ej. al arrancar desde un pp_reset guardado), manda el manual; un estado
+        # antiguo sin el dato y sin manual para con error.
+        heredado = previo.max_oxigenos_reset
+        if heredado is not None and sim_ctes.max_oxigenos_reset in (None, heredado):
+            max_oxigenos = int(heredado)
+            logger.info(f"Límite de oxígenos del sp reset (heredado de pp reset): {max_oxigenos}")
+        else:
+            max_oxigenos = Recombination.resolver_limite_oxigenos(heredado, sim_ctes.max_oxigenos_reset)
+
+        # Relojes por ion heredados de PP_reset: solo se reinician si el primer V difiere del último de PP_reset
+        reloj = previo.reloj_iones
+        if reloj is None:  # estados antiguos, anteriores a los relojes por ion
+            logger.warning("El estado de PP_reset no trae 'reloj_iones': los relojes de los iones empiezan en 0.")
+            reloj = np.zeros(previo.oxygen_state.shape, dtype=np.int32)
+        self.recombinacion = ProcesoRecombinacion(
+            previo.oxygen_state,
+            RelojesIones(reloj, previo.v_prev_reloj),
+            oxygen_config={float(sim_ctes.voltaje_gen_oxigeno_sp): int(sim_ctes.num_oxigenos_sp_reset)},
+            velocity_thresholds={float(sim_ctes.voltaje_gen_oxigeno_sp): sim_ctes.velocidad_iones_sp},
+            filas_permitidas=Recombination.filas_interfaz_filamento(self.actual_state.shape[0], self.centros, sim_ctes.grosor_filamento),
+            max_oxigenos=max_oxigenos,
+            rng=self.rng,
+        )
+        self._informar_oxigeno()
+
+    def _exigir_filamentos_destruidos(self) -> None:
+        """En el ciclo completo PP_reset aborta si no los destruye; al arrancar con --start-from sp_reset se comprueba aquí."""
+        topo = self.cache_topologia.analizar(self.actual_state)
+        sin_destruir = []
+        for i, (existe, destruido) in enumerate(zip(topo.existe, self.CF_destruido), start=1):
+            if existe:
+                sin_destruir.append(f"filamento {i}: sigue formado en el estado de partida")
+            elif not destruido:
+                sin_destruir.append(f"filamento {i}: PP_reset no lo registró como destruido")
+        if sin_destruir:
+            logger.error("SP_reset necesita todos los filamentos destruidos: " + "; ".join(sin_destruir))
+            raise exceptions.FilamentosNoDestruidosException(
+                simulation_path=self.rutas["simulation_path"],
+                figures_path=self.rutas["figures_path"],
+                voltage=self.voltage if self.voltage is not None else 0.0,
+                num_simulation=self.num_simulation,
+                actual_state=self.actual_state,
+                CF_destruidos=self.N - len(sin_destruir),
+                CF_esperados=self.N,
+            )
+
+    def rama_percolante(self, ctx: ContextoPaso, topo: TopologiaFilamentos) -> None:
+        raise RuntimeError("SP_reset: el sistema ha vuelto a percolar, pero la recombinación solo puede quitar vacantes.")
+
+    def rama_no_percolante(self, ctx: ContextoPaso) -> None:
+        # La corriente se calcula con la temperatura del paso anterior, que debe ser escalar (ValueError si es un mapa)
+        self.joule_sin_percolar(ctx, self.termico.actual.como_escalar())
+
+
 def PP_reset(
-    final_state_sp_set: dict,
+    final_state_sp_set: EstadoFase,
     num_simulation: int,
     CF_ranges: List[tuple],
     protocolo: ProtocoloVoltaje,
     num_pasos_guardar_estado: int,
     usar_muro: bool = True,
     results_dir: str = "Results",
-):
+) -> EstadoFase:
     """
-    Simulates the reset process of a resistive switching device, updating the system's state and tracking the evolution of various parameters over time.
-    Args:
-         - final_state_sp_set (dict): A dictionary containing the final state of the set process, including parameters, constants, temperature, time, and other simulation data.
-            Expected keys:
-                - "params": Simulation parameters.
-                - "sim_ctes": Simulation constants.
-                - "Temperatura_final": Final temperature from the set process.
-                - "tiempo_sp_set": Time elapsed during the set process.
-                - "percola": Boolean indicating if percolation occurred.
-                - "actual_state": Current state of the system.
+    Primera parte del RESET (ver `EtapaPPReset`), desde el estado de `SP_set`. Devuelve el de `SP_reset`.
 
-         - num_simulation (int): The simulation number, used for file naming and tracking.
-         - CF_ranges (List[tuple]): A list of tuples defining the ranges for conductive filaments (CFs).
-         - protocolo (ProtocoloVoltaje): Protocolo de voltaje; da el controlador de la etapa pp_reset.
-         - num_pasos_guardar_estado (int): Cada cuántos pasos se guarda el estado intermedio.
-    Returns:
-        None. The function performs the simulation, updates the system's state, and saves
-        intermediate results (e.g., figures, data files) to disk.
-    Notes:
-        - During the reset process, no vacancies are generated; only recombination occurs.
-        - The simulation involves calculating electric fields, currents, and temperature changes based on the system's state and applied voltage.
-        - The state of the system is updated iteratively, and intermediate results are saved every 3000 steps.
-        - The function handles both Ohmic and Poole-Frenkel conduction mechanisms depending on whether percolation occurs.
-        - If a ZeroDivisionError occurs during current calculation, a custom exception is raised to handle null resistance scenarios.
+    Lanza `NullResistanceException` o `FilamentosNoDestruidosException`.
     """
-
-    params = final_state_sp_set["params"]
-    utils.aplicar_semilla(params)
-    sim_ctes = final_state_sp_set["sim_ctes"]
-    temperatura = final_state_sp_set["Temperatura_final"]
-    tiempo_sp_set = final_state_sp_set["tiempo_sp_set"]
-    actual_state = final_state_sp_set["actual_state"]
-    CF_centros = final_state_sp_set["centros_calculados"]
-
-    # Parametros termicos
-    temperatura_anterior = final_state_sp_set["Temperatura_final"][:, 1:-1]
-    pendiente_temperatura = sim_ctes.pendiente_temperatura
-    # Temperatura de los electrodos: parte del perfil que dejó SP_set (estados antiguos sin él: la constante)
-    T_electrodo = final_state_sp_set.get("perfil_electrodo", sim_ctes.Temperatura_electrodo)
-
-    filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(CF_centros)
-
-    rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="reset", results_dir=results_dir)
-
-    rutas["data_simulation_path"].mkdir(parents=True, exist_ok=True)
-
-    oxygen_state = np.zeros_like(actual_state, dtype=np.int8)
-    # Filas de la interfaz donde se pueden generar oxígenos: banda de los filamentos (centro ± grosor)
-    filas_gen_oxigeno = Recombination.filas_interfaz_filamento(actual_state.shape[0], CF_centros, sim_ctes.grosor_filamento)
-    # Máximo de iones de oxígeno simultáneos: manual (configuración) o vacantes generadas en el set
-    max_oxigenos_reset = Recombination.resolver_limite_oxigenos(
-        final_state_sp_set.get("vacantes_generadas_set"), sim_ctes.max_oxigenos_reset
-    )
-
-    N = len(CF_ranges)
-    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], ..., I_N[A], R_1[Ohm], ..., R_N[Ohm], T_1[K], ..., T_N[K]
-    # El orden por bloques debe coincidir con el ensamblado de cada fila:
-    # [t, V, I_total, R_total] + I_fils + R_fils + T_fils + [t_ef]
-    num_columnas = 4 + 3 * N + 1  # + t_ef al final, para no mover las columnas por bloques
-    cols = ["t[s]", "V[V]", "I_total[A]", "R_total[Ohm]"]
-    cols += [f"I_{i}[A]" for i in range(1, N + 1)]
-    cols += [f"R_{i}[Ohm]" for i in range(1, N + 1)]
-    cols += [f"T_{i}[K]" for i in range(1, N + 1)]
-    cols += ["t_ef[s]"]
-    header_pp_reset = ",".join(cols)
-
-    # (data_pp_reset se reserva más abajo, cuando el controlador ya ha calculado
-    #  el presupuesto de pasos de la fase.)
-
-    # Máximo histórico de temperatura de cada filamento en esta fase (solo pasos FVM).
-    T_max_fils: List[float | None] = [None] * N
-
-    # CUIDADO Configuración de umbrales, tiene q estar ordenado de mayor a menor!!
-    oxygen_config = {
-        float(sim_ctes.voltaje_gen_oxigeno_pp_2): int(sim_ctes.num_oxigenos_pp_reset_2),
-        float(sim_ctes.voltaje_gen_oxigeno_pp_1): int(sim_ctes.num_oxigenos_pp_reset_1),
-    }
-
-    velocity_thresholds = {
-        float(sim_ctes.voltaje_gen_oxigeno_pp_2): 5.2e-07,
-        float(sim_ctes.voltaje_gen_oxigeno_pp_1): 3e-07,
-    }
-
-    logger.info("La configuración de generación de oxígeno en la pp reset es:")
-    for key, value in oxygen_config.items():
-        logger.info(f"  - {key} V: {value} oxígenos")
-
-        logger.info("La configuración de velocidades de oxígeno en la pp reset es:")
-    for key, value in velocity_thresholds.items():
-        logger.info(f"  - {key} V: {value} m/s")
-
-    CF_destruido = np.full(len(CF_ranges), False, dtype=bool)
-    all_df_destruidos = False
-    voltage_CF_destruido = np.full(len(CF_ranges), 0.0)
-
-    E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
-
-    # Todo el voltaje lo decide el protocolo; de SP_set solo se toma su V final
-    # (para 'anterior' y para el informe de enganche).
-    controller = protocolo.controlador("pp_reset", previo=final_state_sp_set)
-    presupuesto = controller.presupuesto()
-    voltage_anterior = controller.v_previo
-    n_filas = 0
-
-    # El presupuesto es una COTA SUPERIOR: se reservan presupuesto+1 filas y al final
-    # se recortan las no usadas si la forma de onda terminó antes.
-    data_pp_reset = np.zeros((presupuesto + 1, num_columnas), dtype=np.float64)
-    # Perfil de temperatura del electrodo usado en cada paso (escalar repetido sin FVM)
-    perfil_electrodo = np.zeros((presupuesto + 1, actual_state.shape[0]), dtype=np.float64)
-
-    CF_destruido_index = 1
-    roturas_dict = {}
-    current = 0.0  # inicialización para T_joule en k=0
-    # El dispositivo llega del SET en LRS, así que percola al entrar. Se arrastra de
-    # un paso al siguiente para no repetir el A* de is_path solo para el controlador.
-    percola = True
-
-    logger.info(f"Simulacion {num_simulation} - primera parte del reset")
-
-    # Ciclo para la primera parte del reset
-    acumulador_tiempo = AcumuladorTiempo(params.paso_temporal)
-    relojes = RelojesIones(np.zeros(oxygen_state.shape, dtype=np.int32))  # reloj propio de cada ion
-    probabilidad_recombinacion = None  # campo de probabilidad del último paso (se guarda con el estado)
-    for k in range(0, presupuesto + 1):
-        T_electrodo_paso = T_electrodo  # la que usa el solver en este paso (antes de actualizarla)
-        simulation_time = params.paso_temporal * k
-        voltage = controller.next(
-            Medidas(
-                I_total=float(current),
-                n_vacantes=int(np.sum(actual_state)),
-                n_filamentos=int(np.sum(~CF_destruido)),
-                percola=percola,  # del paso anterior: is_path es A* y ya se evalúa más abajo
-                k=k,
-            )
-        )
-        tiempo_efectivo = acumulador_tiempo.actualizar(voltage)
-        voltage_anterior = voltage
-
-        # La forma de onda ha terminado: se corta antes de la física.
-        if controller.terminado:
-            break
-
-        # Reloj de cada ion: después del corte (el paso terminado repite el último V y no se
-        # simula) y antes de generar (los iones nuevos empiezan en 0).
-        relojes.actualizar(voltage, oxygen_state)
-
-        # Obtengo los valores del campo eléctrico
-        E_field = abs(ElectricField.SimpleElectricField(voltage, params.device_size_x))
-
-        # Campo local por filas (GapElectricField). Lo usa el movimiento de los iones
-        # de oxígeno: hoy solo para la velocidad física de referencia (la aplicada sale
-        # de los umbrales), pero es la entrada del modelo físico que se quiere recuperar.
-        for i in range(0, actual_state.shape[0]):
-            E_field_vector[i] = abs(
-                ElectricField.GapElectricField(
-                    voltage, i, actual_state, device_size_x=params.device_size_x, grid_size=params.atom_size
-                )
-            )
-
-        _, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
-
-        max_x, max_y = actual_state.shape
-        filamentos = CurrentSolver.Clasificar_CF(CF_graph, actual_state, CF_ranges)
-        exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(CF_ranges))
-
-        if any(~CF_destruido):  # mientras haya alguno sin romper
-            procesar_filamentos_destruidos(
-                imagen_path=rutas["figures_path"],
-                data_save_path=rutas["data_simulation_path"],
-                existentes=exist_cf,
-                CF_destruido=CF_destruido,
-                voltage=voltage,
-                voltage_CF_destruido=voltage_CF_destruido,
-                actual_state=actual_state,
-                num_simulation=num_simulation,
-                roturas_dict=roturas_dict,
-                k=k,
-                etapa="pp_reset",
-            )
-
-        # Temperatura Joule como semilla escalar (barato, siempre disponible).
-        # Usa el current del paso anterior: en k=0 current=0 → T_joule=init_temp.
-        T_joule = Temperature.Temperature_Joule(
-            voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola
-        )
-
-        if Percolation.is_path(actual_state):
-            percola = True
-            cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf, actual_state)
-
-            # Mapa de resistencias por celda (geometría + temperatura del paso anterior).
-            # Entrada única de las ramas eléctrica y térmica.
-            R_local = CurrentSolver.mapa_resistencias(
-                cf_matrix=cf_clean_matrix,
-                temperatura=temperatura_anterior,
-                sigma_0=sim_ctes.sigma_0,
-                alpha_T=sim_ctes.alpha_T,
-                T_0=params.init_temp,
-                delta_z_r=sim_ctes.delta_z_r,
-            )
-
-            try:
-                current, R_total, I_fils, R_fils = CurrentSolver.OmhCurrent_filamentos(voltage, R_local, CF_ranges)
-            except ZeroDivisionError:
-                raise exceptions.NullResistanceException(
-                    simulation_path=rutas["simulation_path"],
-                    voltage=voltage,
-                    num_simulation=num_simulation,
-                    actual_state=actual_state,
-                )
-
-            materials_map = Temperature.crear_matriz_materiales(cf_clean_matrix)
-            # Cada filamento disipa según SU propia corriente I_fils[f]
-            Q_source_map = Temperature.calculate_heat_source(
-                atom_size=params.atom_size,
-                delta_z_r=sim_ctes.delta_z_r,
-                R_local=R_local,
-                factor_generar_calor=sim_ctes.factor_generar_calor,
-                CF_ranges=CF_ranges,
-                I_fils=I_fils,
-            )
-
-            # El muro solo aplica cuando TODOS los filamentos están intactos y hay ≥2
-            filamentos_intactos = int(np.sum(~CF_destruido))
-            muro_activo = not np.any(CF_destruido) and usar_muro and filamentos_intactos >= 2
-
-            if muro_activo:
-                if isinstance(temperatura_anterior, (float, int)):
-                    raise ValueError(
-                        "La temperatura no se ha calculado como matriz, no se pueden extraer los perfiles de los filamentos. Se esperaba una matriz de temperaturas, pero se ha recibido un valor escalar."
-                    )
-                mis_perfiles_extraidos = Temperature.extraer_perfiles_filamentos(
-                    matriz_temperaturas=temperatura_anterior, filas_centros=CF_centros
-                )
-                perfiles_muros_calculados = Temperature.calcular_perfiles_muro(
-                    perfiles_filamentos=mis_perfiles_extraidos,
-                    distancias_casillas=dist_casillas,
-                    pendiente_temperatura=pendiente_temperatura,
-                    atom_size=params.atom_size,
-                    T_ambient=params.init_temp,
-                )
-                matriz_temperaturas_fijas = Temperature.colocar_muro_termico(
-                    matriz_molde=cf_clean_matrix,
-                    filas_intermedias=filas_intermedias,
-                    perfiles_muros_calculados=perfiles_muros_calculados,
-                )
-                Ny = matriz_temperaturas_fijas.shape[0]
-                columna_ceros = np.zeros((Ny, 1))
-                matriz_temperaturas_fijas_final = np.hstack([columna_ceros, matriz_temperaturas_fijas, columna_ceros])
-                temperatura = Temperature.solve_thermal_state(
-                    types_map=materials_map,
-                    Q_map=Q_source_map,
-                    thermal_props=sim_ctes.propiedades_termicas,
-                    atom_size=params.atom_size,
-                    T_electrodo=T_electrodo,
-                    matriz_muros=matriz_temperaturas_fijas_final,
-                )
-            else:
-                temperatura = Temperature.solve_thermal_state(
-                    types_map=materials_map,
-                    Q_map=Q_source_map,
-                    thermal_props=sim_ctes.propiedades_termicas,
-                    atom_size=params.atom_size,
-                    T_electrodo=T_electrodo,
-                    matriz_muros=None,
-                )
-
-            # Amortiguación de caídas bruscas (conserva las columnas de electrodo). Se guarda
-            # el mapa FVM sin amortiguar para poder compararlo con el amortiguado.
-            temperatura_sin_amortiguar = temperatura
-            temperatura, temperatura_anterior, T_electrodo, T_fils = (
-                Temperature.procesar_temperatura_amortiguamiento(
-                    temperatura_sin_amortiguar,
-                    temperatura_anterior,
-                    T_electrodo,
-                    params,
-                    sim_ctes,
-                    centros=CF_centros,
-                    N=N,
-                )
-            )
-            T_max_fils = utils.acumular_T_max_filamentos(T_max_fils, T_fils)
-
-        else:
-            percola = False
-            # TODO: usar la media del campo local por filas, np.mean(E_field_vector), como en
-            # PP_set/SP_set (mean_field), en lugar del campo uniforme E_field. Pendiente de
-            # decidir: cambia la corriente del tramo sin percolación del RESET.
-            current = abs(
-                CurrentSolver.Poole_Frenkel(
-                    T_joule,
-                    E_field,
-                    pb_metal_insul=sim_ctes.pb_metal_insul_reset,
-                    permitividad_relativa=sim_ctes.permitividad_relativa_reset,
-                    I_0=sim_ctes.I_0_reset,
-                )
-                * (params.device_size_y)
-            )
-            temperatura = Temperature.Temperature_Joule(
-                voltage, current, T_0=params.init_temp, r_termica=sim_ctes.r_termica_no_percola
-            )
-
-            # Amortiguación de caídas bruscas. El paso en que se pasa del mapa FVM al escalar
-            # de Joule (rotura del filamento) NO se amortigua: no hay un valor anterior
-            # calculado con Joule con el que comparar (temperatura_anterior sigue siendo la
-            # matriz FVM). A partir del paso siguiente el anterior es escalar y ya se amortigua.
-            temperatura_sin_amortiguar = temperatura
-            temperatura, temperatura_anterior, T_electrodo, T_fils = (
-                Temperature.procesar_temperatura_amortiguamiento(
-                    temperatura_sin_amortiguar,
-                    temperatura_anterior,
-                    T_electrodo,
-                    params,
-                    sim_ctes,
-                    centros=CF_centros,
-                    N=N,
-                )
-            )
-
-            # No ha percolado: valores neutros por filamento (no hay resistencia/corriente/mapa FVM por filamento)
-            R_total = np.nan
-            I_fils = [np.nan] * N
-            R_fils = [np.nan] * N
-
-        # FIX: `temperatura` puede ser la matriz FVM con columnas de electrodo (140,42) o el
-        # escalar de Temperature_Joule. Recombine_opt indexa con coordenadas de actual_state
-        # (espacio real, sin electrodos), así que si es matriz hay que recortar columnas 0 y -1
-        # (electrodos) antes de pasarla; si no, se desalinea una columna y la columna real 0
-        # lee el electrodo fijo en vez de su propia temperatura.
-        temperatura_para_recombinacion = temperatura[:, 1:-1] if isinstance(temperatura, np.ndarray) else temperatura
-
-        # Actualizo el estado del sistema con la recombinación
-        actual_state, oxygen_state, probabilidad_recombinacion = update_state_recombinate(
-            voltage=voltage,
-            E_field_filas=E_field_vector,
-            oxygen_config=oxygen_config,
-            sim_ctes=sim_ctes,
-            params=params,
-            actual_state=actual_state,
-            oxygen_state=oxygen_state,
-            temperatura=temperatura_para_recombinacion,
-            velocity_thresholds=velocity_thresholds,
-            relojes=relojes,
-            filas_permitidas=filas_gen_oxigeno,
-            max_oxigenos=max_oxigenos_reset,
-            tiempo_efectivo=tiempo_efectivo,
-        )
-
-        # Tiempo total de la simulacion
-        tiempo_total = simulation_time + tiempo_sp_set
-        fila = [tiempo_total, voltage, current, R_total] + I_fils + R_fils + T_fils + [tiempo_efectivo]
-        data_pp_reset[k] = fila
-        perfil_electrodo[k] = T_electrodo_paso
-        n_filas = k + 1
-
-        # Represento el estado cada X pasos
-        if k % num_pasos_guardar_estado == 0:
-            if (
-                locals().get("matriz_temperaturas_fijas") is not None
-                and locals().get("mis_perfiles_extraidos") is not None
-            ):
-                matriz_para_plot_muro = np.copy(matriz_temperaturas_fijas)
-                for centro, perfil_filamento in zip(CF_centros, mis_perfiles_extraidos):
-                    if centro is not None and perfil_filamento is not None:
-                        matriz_para_plot_muro[centro, :] = perfil_filamento
-
-            # Guardo las variables del estado
-            utils.guardar_estado_intermedio(
-                ruta_destino=rutas["data_simulation_path"],
-                etapa="pp_reset",
-                num_simulation=num_simulation,
-                k=k,
-                actual_state=actual_state,
-                oxygen_state=oxygen_state,
-                probabilidad_recombinacion=probabilidad_recombinacion,
-                reloj_iones=relojes.reloj,
-                cf_clean_matrix=locals().get("cf_clean_matrix"),  # Si no existe, devuelve None
-                temperatura=locals().get("temperatura"),
-                mapa_resistencias=locals().get("R_local"),
-                **Temperature.extra_sin_amortiguar(sim_ctes, locals().get("temperatura_sin_amortiguar")),
-            )
-
-    # Recorto a las filas realmente escritas y calculo el traspaso a SP_reset.
-    data_pp_reset = data_pp_reset[:n_filas]
-    perfil_electrodo = perfil_electrodo[:n_filas]
-    # Traspaso a SP_reset: instante ABSOLUTO que le tocaría a la fila siguiente.
-    # Incluye tiempo_sp_set, que es el origen del eje de esta fase.
-    tiempo_pp_reset = tiempo_sp_set + params.paso_temporal * n_filas
-    logger.info(
-        f"PP_reset termina: {n_filas} filas, V final {data_pp_reset[-1, 1]:.5f} V, t traspaso {tiempo_pp_reset:.5f} s"
-    )
-
-    # Guardo el estado final si el último k no cayó en múltiplo de num_pasos_guardar_estado
-    if k % num_pasos_guardar_estado != 0:
-        utils.guardar_estado_intermedio(
-            ruta_destino=rutas["data_simulation_path"],
-            etapa="pp_reset",
-            num_simulation=num_simulation,
-            k=k,
-            actual_state=actual_state,
-            oxygen_state=oxygen_state,
-            probabilidad_recombinacion=probabilidad_recombinacion,
-            reloj_iones=relojes.reloj,
-            cf_clean_matrix=locals().get("cf_clean_matrix"),
-            temperatura=locals().get("temperatura"),
-            matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
-            mapa_resistencias=locals().get("R_local"),
-            **Temperature.extra_sin_amortiguar(sim_ctes, locals().get("temperatura_sin_amortiguar")),
-        )
-
-    # Guardo los datos de la simulacion
-    utils.guardar_datos(
-        save_path_data=rutas["simulation_path"] / f"Data_pp_reset_{num_simulation}",
-        headers={"datos_simulacion": header_pp_reset},
-        datos_sim=data_pp_reset,
-        perfil_electrodo=perfil_electrodo,
-    )
-    logger.info(f"La temperatura final alcanzada en el reset es: {temperatura} K")
-    np.savez(rutas["simulation_path"] / f"Final_state_pp_reset_{num_simulation}.npz", actual_state)
-
-    if sum(CF_destruido) < len(CF_ranges):
-        raise exceptions.FilamentosNoDestruidosException(
-            simulation_path=rutas["simulation_path"],
-            figures_path=rutas["figures_path"],
-            voltage=voltage,
-            num_simulation=num_simulation,
-            actual_state=actual_state,
-            CF_destruidos=sum(CF_destruido),
-            CF_esperados=len(CF_ranges),
-        )
-
-    # Guardo todas las variables del estado final del PP set para usarlas en el PS set
-    final_state_pp_reset = {
-        # Perfil (o escalar) del electrodo con el que arranca la etapa siguiente
-        "perfil_electrodo": T_electrodo,
-        "actual_state": actual_state,
-        "oxygen_state": oxygen_state,
-        # Relojes por ion (pasos acumulados) y último V aplicado: SP_reset los hereda.
-        "reloj_iones": relojes.estado()[0],
-        "v_prev_reloj": relojes.estado()[1],
-        "sistema_percola": percola,
-        "sim_ctes": sim_ctes,
-        "params": params,
-        "Temperatura_final": temperatura,
-        "voltaje_max_reset": float(data_pp_reset[-1, 1]),
-        "tiempo_pp_reset": tiempo_pp_reset,
-        "CF_destruido": CF_destruido,
-        "voltage_CF_destruido": voltage_CF_destruido,
-        "CF_destruido_index": CF_destruido_index,
-        "roturas_dict": roturas_dict,
-        # Estado del voltaje de la etapa: la siguiente lee de aquí su V_fin.
-        "voltaje": controller.estado(),
-        "temperatura_final": temperatura,
-        "centros_calculados": CF_centros,
-        "T_max_fils": T_max_fils,
-        # Máximo de iones de oxígeno simultáneos: SP_reset lo hereda.
-        "max_oxigenos_reset": max_oxigenos_reset,
-    }
-
-    logger.info(f"Temperatura máxima por filamento en pp_reset: {T_max_fils} K")
-
-    return final_state_pp_reset
+    return EtapaPPReset(
+        final_state_sp_set, num_simulation, CF_ranges, protocolo, num_pasos_guardar_estado,
+        usar_muro=usar_muro, results_dir=results_dir,
+    ).ejecutar()
 
 
 def SP_reset(
-    final_state_pp_reset: dict,
+    final_state_pp_reset: EstadoFase,
     num_simulation: int,
     CF_ranges: List[tuple],
     protocolo: ProtocoloVoltaje,
     num_pasos_guardar_estado: int,
     results_dir: str = "Results",
-):
-    params = final_state_pp_reset["params"]
-    utils.aplicar_semilla(params)
-    sim_ctes = final_state_pp_reset["sim_ctes"]
-    temperatura = final_state_pp_reset["Temperatura_final"]
-    tiempo_pp_reset = final_state_pp_reset["tiempo_pp_reset"]
-    percola = final_state_pp_reset["sistema_percola"]
-    actual_state = final_state_pp_reset["actual_state"]
-    oxygen_state = final_state_pp_reset["oxygen_state"]
-    CF_destruido_index = final_state_pp_reset["CF_destruido_index"]
-    CF_destruido = final_state_pp_reset["CF_destruido"]
-    voltage_CF_destruido = final_state_pp_reset["voltage_CF_destruido"]
-    roturas_dict = final_state_pp_reset["roturas_dict"]
-    centros_calculados = final_state_pp_reset["centros_calculados"]
-    # Filas de la interfaz donde se pueden generar oxígenos: banda de los filamentos (centro ± grosor)
-    filas_gen_oxigeno = Recombination.filas_interfaz_filamento(actual_state.shape[0], centros_calculados, sim_ctes.grosor_filamento)
-    # Máximo de iones de oxígeno simultáneos: el que resolvió PP_reset. Si el manual de la
-    # configuración es distinto (p.ej. al arrancar desde un pp_reset guardado), manda el manual;
-    # un estado antiguo sin la clave y sin manual para con error.
-    max_oxigenos_heredado = final_state_pp_reset.get("max_oxigenos_reset")
-    if max_oxigenos_heredado is not None and sim_ctes.max_oxigenos_reset in (None, max_oxigenos_heredado):
-        max_oxigenos_reset = int(max_oxigenos_heredado)
-        logger.info(f"Límite de oxígenos del sp reset (heredado de pp reset): {max_oxigenos_reset}")
-    else:
-        max_oxigenos_reset = Recombination.resolver_limite_oxigenos(max_oxigenos_heredado, sim_ctes.max_oxigenos_reset)
+) -> EstadoFase:
+    """
+    Segunda parte del RESET (ver `EtapaSPReset`), desde el estado de `PP_reset`. Devuelve el estado final del ciclo.
 
-    pendiente_temperatura = sim_ctes.pendiente_temperatura
-    filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(centros_calculados)
-
-    # FIX: temperatura_anterior se usa dentro del bloque `if Percolation.is_path(...)` para
-    # extraer perfiles térmicos de filamentos. En el original NO se inicializaba en SP_reset,
-    # provocando NameError la primera vez que el sistema percolaba en esta fase.
-    # Se hereda del estado final de PP_reset, recortando los electrodos (columnas 0 y -1).
-    if isinstance(temperatura, np.ndarray) and temperatura.ndim == 2:
-        temperatura_anterior = temperatura[:, 1:-1]
-    else:
-        # Si PP_reset terminó sin percolación, temperatura es escalar; el bloque que usa
-        # temperatura_anterior detectará el caso con su propio isinstance(...) y elevará
-        # ValueError explicativo en lugar de NameError.
-        temperatura_anterior = temperatura
-
-    # Temperatura de los electrodos: parte del perfil que dejó PP_reset (estados antiguos sin él: la constante)
-    T_electrodo = final_state_pp_reset.get("perfil_electrodo", sim_ctes.Temperatura_electrodo)
-
-    logger.info(f"Lol voltaje de rotura de pp reset son:  {voltage_CF_destruido}")
-
-    rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state="reset", results_dir=results_dir)
-
-    N = len(CF_ranges)
-    # cols: t[s], V[V], I_total[A], R_total[Ohm], I_1[A], ..., I_N[A], R_1[Ohm], ..., R_N[Ohm], T_1[K], ..., T_N[K]
-    # El orden por bloques debe coincidir con el ensamblado de cada fila:
-    # [t, V, I_total, R_total] + I_fils + R_fils + T_fils + [t_ef]
-    num_columnas = 4 + 3 * N + 1  # + t_ef al final, para no mover las columnas por bloques
-    cols = ["t[s]", "V[V]", "I_total[A]", "R_total[Ohm]"]
-    cols += [f"I_{i}[A]" for i in range(1, N + 1)]
-    cols += [f"R_{i}[Ohm]" for i in range(1, N + 1)]
-    cols += [f"T_{i}[K]" for i in range(1, N + 1)]
-    cols += ["t_ef[s]"]
-    header_sp_reset = ",".join(cols)
-
-    # (data_sp_reset y resistencia_vector se reservan más abajo, cuando el
-    #  controlador ya ha calculado el presupuesto de pasos de la fase.)
-
-    # Máximo histórico de temperatura de cada filamento en esta fase (solo pasos FVM).
-    T_max_fils: List[float | None] = [None] * N
-
-    # configuración de generación de oxígeno, si el voltaje supera el umbral se generan el número de oxígenos indicados, si hay varios umbrales se comprueba de mayor a menor y se asigna el número de oxígenos correspondiente al primer umbral que se supere
-    oxygen_config = {float(sim_ctes.voltaje_gen_oxigeno_sp): int(sim_ctes.num_oxigenos_sp_reset)}
-    velocity_thresholds = {float(sim_ctes.voltaje_gen_oxigeno_sp): 5.2e-07}
-
-    logger.info("La configuración de generación de oxígeno en la sp reset es:")
-    for key, value in oxygen_config.items():
-        logger.info(f"  - {key} V: {value} oxígenos")
-
-    logger.info("La configuración de velocidades de oxígeno en la sp reset es:")
-    for key, value in velocity_thresholds.items():
-        logger.info(f"  - {key} V: {value} m/s")
-
-    logger.info(f"Los filamentos destruidos al inicio del SP reset son:  {CF_destruido}")
-
-    E_field_vector = np.zeros((actual_state.shape[0]), dtype=np.float64)
-
-    # Todo el voltaje lo decide el protocolo; de PP_reset solo se toma su V final
-    # (para 'anterior' y para el informe de enganche).
-    controller = protocolo.controlador("sp_reset", previo=final_state_pp_reset)
-    presupuesto = controller.presupuesto()
-    voltage_anterior = controller.v_previo
-    n_filas = 0
-    # Igual que en PP_reset: el controlador lee la corriente del paso anterior y en
-    # k=0 todavía no hay ninguna. No afecta a ninguna condición porque `next()` no
-    # evalúa transiciones en el primer paso.
-    current = 0.0
-
-    data_sp_reset = np.zeros((presupuesto + 1, num_columnas), dtype=np.float64)
-    # Perfil de temperatura del electrodo usado en cada paso (escalar repetido sin FVM)
-    perfil_electrodo = np.zeros((presupuesto + 1, actual_state.shape[0]), dtype=np.float64)
-    resistencia_vector = np.zeros((presupuesto + 1, 3), dtype=np.float64)
-
-    logger.info(f"\nSimulacion {num_simulation} - segunda parte del reset")
-
-    # Ciclo para la primera parte del reset
-    acumulador_tiempo = AcumuladorTiempo(params.paso_temporal)
-    # Relojes por ion heredados de PP_reset: solo se reinician si el primer V difiere del último de PP_reset
-    relojes = RelojesIones(final_state_pp_reset["reloj_iones"], final_state_pp_reset["v_prev_reloj"])
-    probabilidad_recombinacion = None  # campo de probabilidad del último paso (se guarda con el estado)
-    for k in range(0, presupuesto + 1):
-        T_electrodo_paso = T_electrodo  # la que usa el solver en este paso (antes de actualizarla)
-        simulation_time = params.paso_temporal * k
-        voltage = controller.next(
-            Medidas(
-                I_total=float(current),
-                n_vacantes=int(np.sum(actual_state)),
-                n_filamentos=int(np.sum(~CF_destruido)),
-                percola=percola,
-                k=k,
-            )
-        )
-        tiempo_efectivo = acumulador_tiempo.actualizar(voltage)
-        voltage_anterior = voltage
-
-        # La forma de onda ha terminado: se corta antes de la física.
-        if controller.terminado:
-            break
-
-        # Reloj de cada ion: después del corte (el paso terminado repite el último V y no se
-        # simula) y antes de generar (los iones nuevos empiezan en 0).
-        relojes.actualizar(voltage, oxygen_state)
-
-        # Obtengo los valores del campo eléctrico y la temperatura
-        E_field = abs(ElectricField.SimpleElectricField(voltage, params.device_size_x))
-
-        # Campo local por filas (GapElectricField). Lo usa el movimiento de los iones
-        # de oxígeno: hoy solo para la velocidad física de referencia (la aplicada sale
-        # de los umbrales), pero es la entrada del modelo físico que se quiere recuperar.
-        for i in range(0, actual_state.shape[0]):
-            E_field_vector[i] = abs(
-                ElectricField.GapElectricField(
-                    voltage, i, actual_state, device_size_x=params.device_size_x, grid_size=params.atom_size
-                )
-            )
-
-        actual_state_clean_CF, CF_graph = CurrentSolver.Clean_state_matrix(actual_state)
-
-        max_x, max_y = actual_state.shape
-        filamentos = CurrentSolver.Clasificar_CF(CF_graph, actual_state, CF_ranges)
-        exist_cf = CurrentSolver.Existe_filamentos(filamentos, len(CF_ranges))
-
-        anterior_voltage_CF = voltage_CF_destruido.copy()
-
-        if any(~CF_destruido):  # mientras haya alguno sin romper
-            procesar_filamentos_destruidos(
-                imagen_path=rutas["figures_path"],
-                data_save_path=rutas["data_simulation_path"],
-                existentes=exist_cf,
-                CF_destruido=CF_destruido,
-                voltage=voltage,
-                voltage_CF_destruido=voltage_CF_destruido,
-                actual_state=actual_state,
-                num_simulation=num_simulation,
-                roturas_dict=roturas_dict,
-                k=k,
-                etapa="sp_reset",
-            )
-
-        # Obtengo la corrriente, antes decido cual usar comprobando si ha percolado o no
-        if Percolation.is_path(actual_state):
-            # Obtengo los caminos de percolación
-            cf_clean_matrix = CurrentSolver.Eliminar_filamentos_incompletos(CF_graph, CF_ranges, exist_cf, actual_state)
-            percola = True
-
-            # Mapa de resistencias por celda (geometría + temperatura del paso anterior).
-            # Entrada única de las ramas eléctrica y térmica.
-            R_local = CurrentSolver.mapa_resistencias(
-                cf_matrix=cf_clean_matrix,
-                temperatura=temperatura_anterior,
-                sigma_0=sim_ctes.sigma_0,
-                alpha_T=sim_ctes.alpha_T,
-                T_0=params.init_temp,
-                delta_z_r=sim_ctes.delta_z_r,
-            )
-
-            # Si ha percolado uso la corriente de Ohm
-            try:
-                current, R_total, I_fils, R_fils = CurrentSolver.OmhCurrent_filamentos(voltage, R_local, CF_ranges)
-                resistencia = R_total
-            except ZeroDivisionError:
-                raise exceptions.NullResistanceException(
-                    simulation_path=rutas["simulation_path"],
-                    voltage=voltage,
-                    num_simulation=num_simulation,
-                    actual_state=actual_state,
-                )
-
-            # El sistema percola por lo que resuelvo la ecuación del calor. Primero se obtiene el mapa de materiales
-            materials_map = Temperature.crear_matriz_materiales(cf_clean_matrix)
-
-            # Cáculo de las fuentes de calor (el filamento)
-            # Cada filamento disipa según SU propia corriente I_fils[f]
-            Q_source_map = Temperature.calculate_heat_source(
-                atom_size=params.atom_size,
-                delta_z_r=sim_ctes.delta_z_r,
-                R_local=R_local,
-                factor_generar_calor=sim_ctes.factor_generar_calor,
-                CF_ranges=CF_ranges,
-                I_fils=I_fils,
-            )
-
-            # Compruebo si temperatura es un float, si es así se lanza una excepción porque no se puede extraer el perfil, si no es así se asume que es una matriz y se lanza la función de extracción
-            if isinstance(temperatura_anterior, (float, int)):
-                raise ValueError(
-                    "La temperatura no se ha calculado como matriz, no se pueden extraer los perfiles de los filamentos. Se esperaba una matriz de temperaturas, pero se ha recibido un valor escalar."
-                )
-            else:
-                mis_perfiles_extraidos = Temperature.extraer_perfiles_filamentos(
-                    matriz_temperaturas=temperatura_anterior,
-                    filas_centros=centros_calculados,
-                )
-
-            # En SP_reset no hay filamentos intactos: el muro térmico nunca aplica.
-            temperatura = Temperature.solve_thermal_state(
-                types_map=materials_map,
-                Q_map=Q_source_map,
-                thermal_props=sim_ctes.propiedades_termicas,
-                atom_size=params.atom_size,
-                T_electrodo=T_electrodo,
-                matriz_muros=None,
-            )
-            # No se amortigua: en SP_reset ya no hay filamentos, esta rama FVM no se alcanza.
-            temperatura, temperatura_anterior, T_electrodo, T_fils = (
-                Temperature.procesar_temperatura_amortiguamiento(
-                    temperatura,
-                    temperatura_anterior,
-                    T_electrodo,
-                    params,
-                    sim_ctes,
-                    centros=centros_calculados,
-                    N=N,
-                    amortiguar=False,
-                )
-            )
-            T_max_fils = utils.acumular_T_max_filamentos(T_max_fils, T_fils)
-
-        else:
-            percola = False
-
-            # Si no ha percolado uso la corriente de Poole-Frenkel
-            # Compruebo que sea un floar, si no lo es se lanza una excepción porque no se puede calcular la corriente
-            if not isinstance(temperatura, float):
-                raise ValueError(
-                    "La temperatura calculada no es un valor escalar, no se puede calcular la corriente de Poole-Frenkel."
-                )
-            # TODO: usar la media del campo local por filas, np.mean(E_field_vector), como en
-            # PP_set/SP_set (mean_field), en lugar del campo uniforme E_field. Pendiente de
-            # decidir: cambia la corriente del tramo sin percolación del RESET.
-            current = abs(
-                CurrentSolver.Poole_Frenkel(
-                    temperatura,
-                    E_field,
-                    pb_metal_insul=sim_ctes.pb_metal_insul_reset,
-                    permitividad_relativa=sim_ctes.permitividad_relativa_reset,
-                    I_0=sim_ctes.I_0_reset,
-                )
-                * (params.device_size_y)
-            )
-
-            temperatura = Temperature.Temperature_Joule(
-                voltage, current, params.init_temp, r_termica=sim_ctes.r_termica_no_percola
-            )
-
-            # Amortiguación de caídas bruscas. El paso en que se pasa del mapa FVM al escalar
-            # de Joule (rotura del filamento) NO se amortigua: no hay un valor anterior
-            # calculado con Joule con el que comparar (temperatura_anterior sigue siendo la
-            # matriz FVM). A partir del paso siguiente el anterior es escalar y ya se amortigua.
-            temperatura_sin_amortiguar = temperatura
-            temperatura, temperatura_anterior, T_electrodo, T_fils = (
-                Temperature.procesar_temperatura_amortiguamiento(
-                    temperatura_sin_amortiguar,
-                    temperatura_anterior,
-                    T_electrodo,
-                    params,
-                    sim_ctes,
-                    centros=centros_calculados,
-                    N=N,
-                )
-            )
-
-            # No ha percolado: valores neutros por filamento (no hay resistencia/corriente/mapa FVM por filamento)
-            R_total = np.nan
-            I_fils = [np.nan] * N
-            R_fils = [np.nan] * N
-
-        # FIX: `temperatura` puede ser la matriz FVM con columnas de electrodo (140,42) o el
-        # escalar de Temperature_Joule. Recombine_opt indexa con coordenadas de actual_state
-        # (espacio real, sin electrodos), así que si es matriz hay que recortar columnas 0 y -1
-        # (electrodos) antes de pasarla; si no, se desalinea una columna y la columna real 0
-        # lee el electrodo fijo en vez de su propia temperatura.
-        temperatura_para_recombinacion = temperatura[:, 1:-1] if isinstance(temperatura, np.ndarray) else temperatura
-
-        # Actualizo el estado del sistema con la recombinación
-        actual_state, oxygen_state, probabilidad_recombinacion = update_state_recombinate(
-            voltage=voltage,
-            E_field_filas=E_field_vector,
-            oxygen_config=oxygen_config,
-            sim_ctes=sim_ctes,
-            params=params,
-            actual_state=actual_state,
-            oxygen_state=oxygen_state,
-            temperatura=temperatura_para_recombinacion,
-            velocity_thresholds=velocity_thresholds,
-            relojes=relojes,
-            filas_permitidas=filas_gen_oxigeno,
-            max_oxigenos=max_oxigenos_reset,
-            tiempo_efectivo=tiempo_efectivo,
-        )
-
-        # Tiempo total de la simulacion
-        tiempo_total = simulation_time + tiempo_pp_reset
-        fila = [tiempo_total, voltage, current, R_total] + I_fils + R_fils + T_fils + [tiempo_efectivo]
-        data_sp_reset[k] = fila
-        perfil_electrodo[k] = T_electrodo_paso
-        n_filas = k + 1
-
-        if locals().get("resistencia") is not None:
-            resistencia_vector[k] = np.array([k, voltage, resistencia])
-        else:
-            resistencia_vector[k] = np.array([k, voltage, 0])
-
-        # Represento el estado cada x pasos
-        if k % num_pasos_guardar_estado == 0:
-            # Si se ha creado la matriz de temperaturas fijas es porque se ha creado el muro y entonces tiene sentido guardarlo.
-            if locals().get("matriz_temperaturas_fijas") is not None:
-                matriz_para_plot_muro = np.copy(matriz_temperaturas_fijas)  # type: ignore
-                for centro, perfil_filamento in zip(centros_calculados, mis_perfiles_extraidos):  # type: ignore
-                    if centro is not None and perfil_filamento is not None:
-                        matriz_para_plot_muro[centro, :] = perfil_filamento
-
-            utils.guardar_estado_intermedio(
-                ruta_destino=rutas["data_simulation_path"],
-                etapa="sp_reset",
-                num_simulation=num_simulation,
-                k=k,
-                actual_state=actual_state,
-                oxygen_state=oxygen_state,
-                probabilidad_recombinacion=probabilidad_recombinacion,
-                reloj_iones=relojes.reloj,
-                cf_clean_matrix=locals().get("cf_clean_matrix"),  # Si no existe, devuelve None
-                temperatura=locals().get("temperatura"),
-                mapa_resistencias=locals().get("R_local"),
-                **Temperature.extra_sin_amortiguar(sim_ctes, locals().get("temperatura_sin_amortiguar")),
-            )
-
-    # Recorto a las filas realmente escritas.
-    data_sp_reset = data_sp_reset[:n_filas]
-    perfil_electrodo = perfil_electrodo[:n_filas]
-    resistencia_vector = resistencia_vector[:n_filas]
-    logger.info(f"SP_reset termina: {n_filas} filas, V final {data_sp_reset[-1, 1]:.5f} V")
-
-    # Guardo el estado final si el último k no cayó en múltiplo de num_pasos_guardar_estado
-    if k % num_pasos_guardar_estado != 0:
-        utils.guardar_estado_intermedio(
-            ruta_destino=rutas["data_simulation_path"],
-            etapa="sp_reset",
-            num_simulation=num_simulation,
-            k=k,
-            actual_state=actual_state,
-            oxygen_state=oxygen_state,
-            probabilidad_recombinacion=probabilidad_recombinacion,
-            reloj_iones=relojes.reloj,
-            cf_clean_matrix=locals().get("cf_clean_matrix"),
-            temperatura=locals().get("temperatura"),
-            matriz_para_plot_muro=locals().get("matriz_para_plot_muro"),
-            mapa_resistencias=locals().get("R_local"),
-            **Temperature.extra_sin_amortiguar(sim_ctes, locals().get("temperatura_sin_amortiguar")),
-        )
-
-    # Guardo los datos de la simulación
-    save_path_data = rutas["simulation_path"] / f"Data_sp_reset_{num_simulation}.txt"
-    data_encabezados = {"datos_simulacion": header_sp_reset}
-
-    # Guardo los datos de la simulacion
-    utils.guardar_datos(
-        save_path_data=save_path_data,
-        headers=data_encabezados,
-        datos_sim=data_sp_reset,
-        perfil_electrodo=perfil_electrodo,
-    )
-
-    np.savez(rutas["simulation_path"] / f"Final_state_sp_reset_{num_simulation}.npz", actual_state)
-
-    logger.info(f"\nSimulación {num_simulation} finalizada correctamente.")
-
-    # Guardo todas las variables del estado final del PP set para usarlas en el PS set
-    final_state_sp_reset = {
-        # Perfil (o escalar) del electrodo con el que arranca la etapa siguiente
-        "perfil_electrodo": T_electrodo,
-        "actual_state": actual_state,
-        "oxygen_state": oxygen_state,
-        "reloj_iones": relojes.estado()[0],
-        "v_prev_reloj": relojes.estado()[1],
-        "sistema_percola": percola,
-        "sim_ctes": sim_ctes,
-        "params": params,
-        "Temperatura_final": temperatura,
-        "tiempo_sp_reset": simulation_time,
-        "voltage_CF_destruido": voltage_CF_destruido,
-        "CF_destruido": CF_destruido,
-        "roturas_dict": roturas_dict,
-        "T_max_fils": T_max_fils,
-        # Estado del voltaje de la etapa: la siguiente lee de aquí su V_fin.
-        "voltaje": controller.estado(),
-    }
-
-    logger.info(f"Temperatura máxima por filamento en sp_reset: {T_max_fils} K")
-
-    return final_state_sp_reset
+    Lanza `FilamentosNoDestruidosException` al arrancar si queda algún filamento sin destruir.
+    """
+    return EtapaSPReset(
+        final_state_pp_reset, num_simulation, CF_ranges, protocolo, num_pasos_guardar_estado, results_dir=results_dir
+    ).ejecutar()

@@ -5,7 +5,6 @@ from typing import Any, List
 import numpy as np
 
 from . import Temperature
-from . import Representate
 from .constants_simulation import SimulationConstants
 import logging
 
@@ -68,6 +67,8 @@ def procesar_filamentos_creados(
 
         if plot_filamento:
             nombre_img = imagen_path / f"Filamento_{i + 1}_creado_set_{num_simulation}.png"
+            from . import Representate  # import perezoso: solo hace falta al dibujar
+
             Representate.RepresentateState(actual_state, round(voltage, 5), str(nombre_img))
 
         # Guardar estado actual en archivo pkl
@@ -128,6 +129,8 @@ def procesar_filamentos_destruidos(
 
         if plot_filamento:
             nombre_img = imagen_path / f"Filamento_{i + 1}_roto_reset_{num_simulation}.png"
+            from . import Representate  # import perezoso: solo hace falta al dibujar
+
             Representate.RepresentateState(actual_state, round(voltage, 5), str(nombre_img))
 
         data_name = data_save_path / f"filamento_{i + 1}_roto_reset_{num_simulation}.npz"
@@ -156,21 +159,18 @@ def actualizar_parametros_por_filamento(
     if num_esperados == 1:
         if filamentos_actuales == 1:
             logger.info("Todos los filamentos creados.")
-            sim_ctes = sim_ctes.update_gamma(
-                sim_ctes.gamma / 1
-            )  # 1.5 simulaciones amortiguacion termica 3 en el caso de factor_gamma_activado
-            # sim_ctes = sim_ctes.update_generation_energy(1.75)
+            sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / sim_ctes.divisor_gamma_1_filamento)
             all_CFs_created = True
 
     # 2. Caso para dos filamentos
     elif num_esperados == 2:
         if filamentos_actuales == 1:
             logger.info("Se ha formado el primer filamento de dos.")
-            sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 1.5)
+            sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / sim_ctes.divisor_gamma_2_filamentos)
 
         elif filamentos_actuales == 2:
             logger.info("Se ha formado el segundo filamento de dos.")
-            sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 1.5)
+            sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / sim_ctes.divisor_gamma_2_filamentos)
             all_CFs_created = True
             filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(CF_centros)
 
@@ -178,7 +178,7 @@ def actualizar_parametros_por_filamento(
     else:
         nuevos_formados = filamentos_actuales - filamentos_previos
         for _ in range(nuevos_formados):
-            sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / 1.2)
+            sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / sim_ctes.divisor_gamma_n_filamentos)
 
         if filamentos_actuales == num_esperados:
             logger.info("Todos los filamentos creados.")

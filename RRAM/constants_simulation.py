@@ -86,6 +86,26 @@ class SimulationConstants:
     # Máximo de iones de oxígeno simultáneos en el reset (ver Recombination.resolver_limite_oxigenos).
     # None (defecto) → se usa 'vacantes_generadas_set' del estado del set.
     max_oxigenos_reset: Optional[int] = None
+    # Velocidad de los iones de oxígeno [m/s] cuando el voltaje del RESET supera cada umbral
+    # voltaje_gen_oxigeno_pp_1, voltaje_gen_oxigeno_pp_2 y voltaje_gen_oxigeno_sp.
+    velocidad_iones_pp_1: float = 3e-07
+    velocidad_iones_pp_2: float = 5.2e-07
+    velocidad_iones_sp: float = 5.2e-07
+    # Divisor de gamma al formarse filamentos, según cuántos filamentos tenga el dispositivo:
+    # uno (al formarse), dos (a cada uno de los dos) y tres o más (a cada nuevo filamento).
+    divisor_gamma_1_filamento: float = 1.0
+    divisor_gamma_2_filamentos: float = 1.5
+    divisor_gamma_n_filamentos: float = 1.2
+
+    def __post_init__(self):
+        from .Generation import NEIGHBOR_MODES
+
+        for clave in ("neighbor_mode_pp_set", "neighbor_mode_sp_set"):
+            if getattr(self, clave) not in NEIGHBOR_MODES:
+                raise ValueError(f"{clave} debe ser uno de {NEIGHBOR_MODES}, recibido {getattr(self, clave)!r}")
+        for clave in ("umbral_caida_temperatura", "umbral_caida_electrodo"):
+            if not getattr(self, clave) > 0:
+                raise ValueError(f"{clave} debe ser > 0, recibido {getattr(self, clave)!r}")
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SimulationConstants":

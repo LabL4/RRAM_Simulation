@@ -203,6 +203,10 @@ def save_phase_state(
     dicts de metadatos) en un .json compañero. Los dataclasses (params,
     sim_ctes) se omiten: se recargan del CSV al cargar la config.
     """
+    from .estado_fase import EstadoFase
+
+    if isinstance(state_dict, EstadoFase):
+        state_dict = state_dict.a_dict()  # mismas claves de siempre en disco
     init_data_dir = Path(init_data_dir)
     init_data_dir.mkdir(parents=True, exist_ok=True)
     npz_path, json_path = _phase_state_paths(init_data_dir, num_simulation, phase_name)
@@ -218,9 +222,12 @@ def save_phase_state(
         else:
             meta[k] = _to_jsonable(v)
 
+    # Se serializa ANTES de escribir nada: si algún valor no es serializable, falla sin dejar un
+    # JSON a medias ni un .npz sin su .json (que --start-from cargaría como un estado incompleto).
+    texto_json = json.dumps(meta, ensure_ascii=False, indent=2, default=_json_default)
     np.savez_compressed(str(npz_path), **arrays)
     with open(json_path, "w", encoding="utf-8") as f:
-        json.dump(meta, f, ensure_ascii=False, indent=2, default=_json_default)
+        f.write(texto_json)
 
     logger.info(f"Estado de fase '{phase_name}' guardado en {npz_path.parent}")
 
@@ -274,6 +281,13 @@ def load_phase_state(
 
     logger.info(f"Estado de fase '{phase_name}' cargado desde {npz_path.parent}")
     return state
+
+
+def cargar_estado_fase(phase_name: str, num_simulation: int, init_data_dir: Path | str, cfg: Any):
+    """Como `load_phase_state`, pero devuelve un `EstadoFase` (lo que reciben las fases)."""
+    from .estado_fase import EstadoFase
+
+    return EstadoFase.desde_dict(load_phase_state(phase_name, num_simulation, init_data_dir, cfg), phase_name)
 
 
 def _json_default(obj: Any) -> Any:

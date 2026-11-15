@@ -12,7 +12,8 @@ Uso programático:
     plot_results_marcado(num_simulation=3)  # I-V_marcado_3.png (curva + puntos a-g)
     plot_estados(plot_type="state", phases=["pp_set", "sp_set"])
 
-O vía CLI: `python -m RRAM plot 3` / `python -m RRAM plot_marcado 3`.
+O vía CLI: `python -m RRAM plot 2` / `python -m RRAM plot_marcado 2` (índice 0-based del CSV,
+el mismo que `exec`; la carpeta es Results/simulation_3).
 """
 
 from __future__ import annotations

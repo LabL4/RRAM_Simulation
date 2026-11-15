@@ -6,17 +6,20 @@ factorización en módulos independientes. Mantiene compatibilidad hacia atrás
 con código que importa `from RRAM import Simulation` y accede a símbolos como
 `Simulation.PP_set`, `Simulation.SimulationParameters`, etc.
 
-Estructura tras factorización:
-    - parameters.py            → SimulationParameters
-    - constants_simulation.py  → SimulationConstants
-    - decorators.py            → medir_tiempo
-    - filament_tracking.py     → procesar_filamentos_creados,
-                                 procesar_filamentos_destruidos,
+Estructura:
+    - parameters.py / constants_simulation.py → SimulationParameters, SimulationConstants
+    - etapa.py                 → Etapa: el bucle del paso, común a las cuatro etapas
+    - phases_set.py            → EtapaPPSet, EtapaSPSet y las funciones PP_set, SP_set
+    - phases_reset.py          → EtapaPPReset, EtapaSPReset y las funciones PP_reset, SP_reset
+    - procesos_estocasticos.py → ProcesoGeneracion, ProcesoRecombinacion
+    - state_updates.py         → update_state_generation, update_state_recombinate
+    - fisica_paso.py           → rama eléctrica, muro térmico y FVM de un paso
+    - estado_termico.py        → CampoTemperatura, EstadoTermico
+    - estado_fase.py           → EstadoFase (lo que pasa de una etapa a la siguiente)
+    - grabador.py              → RegistroDatos, GrabadorEstados
+    - topologia_filamentos.py  → percolación y filamentos
+    - filament_tracking.py     → procesar_filamentos_creados / destruidos,
                                  actualizar_parametros_por_filamento
-    - state_updates.py         → update_state_generation,
-                                 update_state_recombinate
-    - phases_set.py            → PP_set, SP_set
-    - phases_reset.py          → PP_reset, SP_reset
     - iv_analysis.py           → simulation_IV
 """
 

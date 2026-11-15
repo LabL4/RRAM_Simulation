@@ -2,33 +2,12 @@ from numba import njit
 import numpy as np
 import logging
 import math
-import sys
 
 from . import exceptions
 
 logger = logging.getLogger(__name__)
 
 k_b_ev = 8.617333262145e-5  # Boltzmann constant in eV/K
-
-
-def Init_OxygenState(device_size_x: float, device_size_y: float, atom_size: float):
-    """
-    Inicializa la matriz de estado de iones de oxígeno con las dimensiones del dieléctrico.
-
-    Parámetros:
-    - device_size_x (float): Distancia entre electrodos [m] → shape[0].
-    - device_size_y (float): Ancho del dispositivo [m] → shape[1].
-    - atom_size (float): Tamaño de celda de la malla [m].
-
-    Retorna:
-    - InitialOxygenState (np.ndarray): Matriz de ceros con shape (eje_x, eje_y).
-    """
-    eje_x = int(math.ceil(device_size_x / atom_size))
-    eje_y = int(math.ceil(device_size_y / atom_size))
-
-    InitialOxygenState = np.zeros((eje_x, eje_y), dtype=int)
-
-    return InitialOxygenState
 
 
 def filas_interfaz_filamento(Ny: int, centros, grosor) -> np.ndarray:
@@ -86,7 +65,7 @@ def cupo_oxigenos(oxygen_state: np.ndarray, max_oxigenos: int) -> int:
     return max(0, int(max_oxigenos) - int(np.sum(oxygen_state)))
 
 
-def generate_oxygen(oxygen_state: np.ndarray, max_num_oxygen: int, filas_candidatas: np.ndarray, cupo: int) -> np.ndarray:
+def generate_oxygen(oxygen_state: np.ndarray, max_num_oxygen: int, filas_candidatas: np.ndarray, cupo: int, rng=None) -> np.ndarray:
     """
     Genera una cantidad aleatoria de oxígenos (hasta un máximo de 'max_num_oxygen')
     en la interfaz (columna x=0), solo en las filas de `filas_candidatas`
@@ -94,10 +73,11 @@ def generate_oxygen(oxygen_state: np.ndarray, max_num_oxygen: int, filas_candida
     """
     if max_num_oxygen <= 0:
         return oxygen_state
+    rng = np.random if rng is None else rng
 
     # Genera un número aleatorio entre 0 y el máximo que se indica en max_num_oxygen.
     # Ej: Si max_num_oxygen es 3, puede generar 0, 1, 2 o 3 en este paso.
-    cantidad_real = np.random.randint(0, max_num_oxygen + 1)
+    cantidad_real = rng.randint(0, max_num_oxygen + 1)
 
     # (Nota: Si prefieres que simule un "lanzamiento de moneda" independiente
     # por cada oxígeno con un 60% de probabilidad de éxito, podrías usar:
@@ -112,7 +92,7 @@ def generate_oxygen(oxygen_state: np.ndarray, max_num_oxygen: int, filas_candida
 
     if cantidad_final > 0:
         # Elegimos aleatoriamente las posiciones SIN repetición (replace=False)
-        posiciones_elegidas = np.random.choice(filas_candidatas, size=cantidad_final, replace=False)
+        posiciones_elegidas = rng.choice(filas_candidatas, size=cantidad_final, replace=False)
 
         # Asignamos los oxígenos elegidos
         oxygen_state[posiciones_elegidas, 0] = 1
@@ -160,6 +140,7 @@ def Recombine_opt(
     recom_enchancement_factor: float,
     recombination_energy: float,
     long_decaimiento_concentracion: float,
+    rng=None,
 ) -> tuple[np.ndarray, np.ndarray]:
 
     state_updated = np.copy(vacancy_state)
@@ -209,7 +190,7 @@ def Recombine_opt(
     active_probs = np.minimum(active_probs, 1.0)
 
     # 4. Tirar los dados
-    random_values = np.random.rand(num_coincidencias)
+    random_values = (np.random if rng is None else rng).rand(num_coincidencias)
 
     # 5. Ver cuáles han tenido éxito
     success_mask_1d = random_values < active_probs
@@ -265,6 +246,30 @@ def _mover_con_bloqueo(
                 delante = c  # bloqueado: sigue acumulando
 
 
+def velocidad_arrhenius(
+    temperature: np.ndarray | float,
+    E_field_filas: np.ndarray,
+    cte_red: float,
+    vibration_frequency: float,
+    gamma_drift: float,
+    migration_energy: float,
+) -> np.ndarray:
+    """
+    Velocidad física de deriva de los iones (modelo de referencia, NO se usa en la simulación).
+
+        v = 2 · a · ν · sinh(a · E · γ / (2 k_B T)) · exp(-E_m / (k_B T))
+
+    `E_field_filas` es el campo local de cada fila (un valor por fila); se extiende a toda la fila,
+    de modo que con una temperatura escalar o un mapa (filas, columnas) devuelve una velocidad por
+    celda. Hasta ahora la simulación usa los umbrales de voltaje de `move_oxygen_ions`; esta función
+    queda como punto de partida para recuperar el modelo físico con una velocidad por celda.
+    """
+    E_field = np.asarray(E_field_filas, dtype=float)[:, np.newaxis]
+    senoh = np.sinh((cte_red * E_field * gamma_drift) / (2 * k_b_ev * temperature))
+    exp_velocity = np.exp(-migration_energy / (k_b_ev * temperature))
+    return 2 * cte_red * vibration_frequency * (senoh * exp_velocity)
+
+
 def move_oxygen_ions(
     reloj_iones: np.ndarray,
     oxygen_state: np.ndarray,
@@ -288,29 +293,13 @@ def move_oxygen_ions(
     (ver `_mover_con_bloqueo`). Modifica IN PLACE `oxygen_state` y `reloj_iones`.
     Devuelve (oxygen_state, velocidad).
 
-    `E_field_filas` es el campo local de cada fila (GapElectricField, un valor por
-    fila de oxygen_state). Hoy solo alimenta la velocidad física de referencia; el
-    objetivo es volver a ese modelo físico, con una velocidad por celda.
+    La velocidad es la de los umbrales de voltaje. `temperature`, `E_field_filas`, `vibration_frequency`,
+    `gamma_drift`, `migration_energy` y `cte_red` NO se usan con este modelo: se conservan en la firma
+    hasta limpiar la interfaz y solo sirven al modelo físico de referencia `velocidad_arrhenius`.
     """
 
     # =========================================================================
-    # 1. CÁLCULO FÍSICO DE LA VELOCIDAD (Referencia que luego no se usa)
-    # =========================================================================
-    # Campo de cada fila extendido a toda la fila: (filas, 1) se combina con una
-    # temperatura escalar o con el mapa (filas, columnas) y da una velocidad por celda.
-    E_field = np.asarray(E_field_filas, dtype=float)[:, np.newaxis]
-    try:
-        senoh = np.sinh((cte_red * E_field * gamma_drift) / (2 * k_b_ev * temperature))
-        exp_velocity = np.exp(-migration_energy / (k_b_ev * temperature))
-        # Nota: Esta variable se calcula pero será sobrescrita por la lógica de umbrales
-        oxygen_velocity_fisica = 2 * cte_red * vibration_frequency * (senoh * exp_velocity)
-
-    except OverflowError as Overflow_exception:
-        logger.info(f"\n Error en el cálculo de la velocidad: {Overflow_exception}")
-        sys.exit(1)
-
-    # =========================================================================
-    # 2. LÓGICA DINÁMICA DE UMBRALES
+    # 1. VELOCIDAD POR UMBRALES DE VOLTAJE (modelo vigente)
     # =========================================================================
     # Inicializamos con el valor por defecto (si no supera ningún umbral)
     oxygen_velocity = 0.0
@@ -322,7 +311,7 @@ def move_oxygen_ions(
             break  # Salimos al encontrar el primer umbral que se cumple
 
     # =========================================================================
-    # 3. MOVIMIENTO CON RELOJ POR ION Y BLOQUEO
+    # 2. MOVIMIENTO CON RELOJ POR ION Y BLOQUEO
     # =========================================================================
     _mover_con_bloqueo(oxygen_state, reloj_iones, oxygen_velocity, paso_temporal, grid_size)
 

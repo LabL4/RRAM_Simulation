@@ -23,15 +23,15 @@ from __future__ import annotations
 import numpy as np
 import argparse
 import logging
+import os
 import sys
 
-import matplotlib
-
-matplotlib.use("Agg")
+# Backend sin pantalla. Es una variable de entorno que matplotlib lee cuando se importe, de modo que
+# `exec` no carga matplotlib; solo se carga al dibujar (plot, plot_marcado, all).
+os.environ.setdefault("MPLBACKEND", "Agg")
 
 from .init_simulation import build_initial_states, load_simulation_config
 from .logging_config import setup_logging
-from .plot_results import plot_results, plot_results_marcado
 from .run_cycle import run_cycle
 
 
@@ -63,7 +63,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help=(
             "Con --seed fijado, usa la MISMA semilla (sin +i) para todas las "
             "simulaciones en vez de seed+i. Si además comparten geometría "
-            "(eje_x, eje_y, num_trampas, filamentos), el estado inicial "
+            "(n_filas, n_cols, num_trampas, filamentos), el estado inicial "
             "(posición de trampas) es idéntico en todo el ensemble. Útil para "
             "aislar el efecto de un parámetro del barrido controlando el resto. "
             "Por defecto: False (seed+i, ensemble con estados distintos)."
@@ -111,10 +111,16 @@ def _build_parser() -> argparse.ArgumentParser:
         default=False,
         help="Desactiva el muro térmico en todas las fases del ciclo, SET y RESET (pasa matriz_muros=None al solver).",
     )
+    p_exec.add_argument(
+        "--sin-estados",
+        action="store_true",
+        default=False,
+        help="No guarda estados intermedios (Estado_*): solo datos, estados finales y metadata.",
+    )
 
     # plot
     p_plot = sub.add_parser("plot", help="Replotea la curva I-V sin marcar (I-V_{N}.png).")
-    p_plot.add_argument("num_simulation", type=int, help="Índice usado al ejecutar (offset +1).")
+    p_plot.add_argument("num_simulation", type=int, help="Índice 0-based de la simulación en el CSV (el mismo que en exec).")
     p_plot.add_argument("--results-dir", default="Results")
     p_plot.add_argument(
         "--no-forma-onda",
@@ -134,7 +140,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p_plot_marcado = sub.add_parser(
         "plot_marcado", help="Replotea la curva I-V con puntos a-g marcados (I-V_marcado_{N}.png)."
     )
-    p_plot_marcado.add_argument("num_simulation", type=int, help="Índice usado al ejecutar (offset +1).")
+    p_plot_marcado.add_argument("num_simulation", type=int, help="Índice 0-based de la simulación en el CSV (el mismo que en exec).")
     p_plot_marcado.add_argument("--results-dir", default="Results")
     p_plot_marcado.add_argument(
         "--puntos-iv",
@@ -174,6 +180,12 @@ def _build_parser() -> argparse.ArgumentParser:
             "estado inicial de todas las simulaciones (ver 'init --mismo-estado-inicial'). "
             "Solo tiene efecto si esta sim dispara la generación de Init_data."
         ),
+    )
+    p_all.add_argument(
+        "--sin-estados",
+        action="store_true",
+        default=False,
+        help="No guarda estados intermedios (Estado_*): solo datos, estados finales y metadata.",
     )
     p_all.add_argument("--guardar-datos", action="store_true")
     p_all.add_argument("--init-data-dir", default="Init_data")
@@ -246,6 +258,7 @@ def _cmd_exec(args) -> int:
             stop_at=args.stop_at,
             init_data_dir=args.init_data_dir,
             usar_muro=not args.no_muro,
+            guardar_estados=not args.sin_estados,
         )
         return 0
     except Exception as e:
@@ -254,21 +267,24 @@ def _cmd_exec(args) -> int:
 
 
 def _cmd_plot(args) -> int:
-    setup_logging(num_simulation=args.num_simulation, file_mode="a")
+    from .plot_results import plot_results  # import perezoso: arrastra matplotlib
+
+    n_save = args.num_simulation + 1  # carpeta Results/simulation_{N+1}, igual que exec
+    setup_logging(num_simulation=n_save, file_mode="a")
     log = logging.getLogger("RRAM.__main__")
     try:
         plot_results(
-            num_simulation=args.num_simulation,
+            num_simulation=n_save,
             results_dir=args.results_dir,
             plot_forma_onda=not args.no_forma_onda,
             mostrar_experimental=not args.sin_experimental,
         )
         return 0
     except FileNotFoundError as e:
-        log.error(f"plot sim={args.num_simulation}: {e}")
+        log.error(f"plot sim={n_save}: {e}")
         return 2
     except Exception as e:
-        log.exception(f"plot sim={args.num_simulation} abortado: {e}")
+        log.exception(f"plot sim={n_save} abortado: {e}")
         return 1
 
 
@@ -283,25 +299,30 @@ def _leer_puntos_iv(ruta: str | None) -> dict | None:
 
 
 def _cmd_plot_marcado(args) -> int:
-    setup_logging(num_simulation=args.num_simulation, file_mode="a")
+    from .plot_results import plot_results_marcado  # import perezoso: arrastra matplotlib
+
+    n_save = args.num_simulation + 1  # carpeta Results/simulation_{N+1}, igual que exec
+    setup_logging(num_simulation=n_save, file_mode="a")
     log = logging.getLogger("RRAM.__main__")
     try:
         plot_results_marcado(
-            num_simulation=args.num_simulation,
+            num_simulation=n_save,
             results_dir=args.results_dir,
             puntos_iv=_leer_puntos_iv(args.puntos_iv),
             mostrar_experimental=not args.sin_experimental,
         )
         return 0
     except FileNotFoundError as e:
-        log.error(f"plot_marcado sim={args.num_simulation}: {e}")
+        log.error(f"plot_marcado sim={n_save}: {e}")
         return 2
     except Exception as e:
-        log.exception(f"plot_marcado sim={args.num_simulation} abortado: {e}")
+        log.exception(f"plot_marcado sim={n_save} abortado: {e}")
         return 1
 
 
 def _cmd_all(args) -> int:
+    from .plot_results import plot_results, plot_results_marcado  # import perezoso: arrastra matplotlib
+
     setup_logging(num_simulation=args.num_simulation + 1)
     logger = logging.getLogger("RRAM.__main__")
 
@@ -333,6 +354,7 @@ def _cmd_all(args) -> int:
             start_from=args.start_from,
             stop_at=args.stop_at,
             init_data_dir=args.init_data_dir,
+            guardar_estados=not args.sin_estados,
         )
     except Exception as e:
         logger.exception(f"all/exec sim={args.num_simulation + 1} abortado: {e}")

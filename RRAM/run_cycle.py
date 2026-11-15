@@ -24,12 +24,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+import numpy as np
+
+from .estado_fase import EstadoFase
 from .init_simulation import SimulationConfig
 from .persistence import (
     PHASE_ORDER,
     PHASE_PRECEDING,
     SimulationMetadata,
-    load_phase_state,
+    cargar_estado_fase,
     save_metadata,
     save_phase_state,
     serialize_dataclass,
@@ -42,11 +45,11 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class SimulationStates:
-    """Estados finales de las 4 fases del ciclo."""
-    pp_set: Optional[dict] = None
-    sp_set: Optional[dict] = None
-    pp_reset: Optional[dict] = None
-    sp_reset: Optional[dict] = None
+    """Estados finales (`EstadoFase`) de las 4 fases del ciclo."""
+    pp_set: Optional[EstadoFase] = None
+    sp_set: Optional[EstadoFase] = None
+    pp_reset: Optional[EstadoFase] = None
+    sp_reset: Optional[EstadoFase] = None
 
 
 def _resolve_simulation_path(results_dir: Path | str, n_save: int) -> Path:
@@ -72,13 +75,53 @@ def _temperaturas_max_por_fase(states: SimulationStates) -> dict:
     """
     temperaturas_max: dict = {}
     for fase in PHASE_ORDER:
-        T_max_fils = (getattr(states, fase) or {}).get("T_max_fils")
+        estado = getattr(states, fase)
+        T_max_fils = None if estado is None else estado.T_max_fils
         if T_max_fils is None:
             continue
         temperaturas_max[fase] = {
             f"T_{i}": (float(t) if t is not None else None) for i, t in enumerate(T_max_fils, start=1)
         }
     return temperaturas_max
+
+
+def _guardar_estado_fallo(error: Exception) -> None:
+    """
+    Guarda en disco el estado que dejó una excepción de simulación (si lo trae) y su figura.
+
+    Las excepciones (`exceptions.ExcepcionConEstado`) solo transportan los datos; aquí, en la
+    capa que las captura, se escribe. Un fallo al guardar el diagnóstico se registra pero no
+    tapa el error original.
+    """
+    ruta = getattr(error, "ruta_estado_fallo", None)
+    estado = getattr(error, "actual_state", None)
+    if ruta is None or estado is None:
+        return
+    try:
+        Path(ruta).parent.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(ruta, actual_state=estado)
+        logger.info(f"Estado del fallo guardado en {ruta}")
+        figura = getattr(error, "ruta_figura_fallo", None)
+        if figura is not None:
+            from . import Representate  # import perezoso: solo hace falta al dibujar
+
+            Path(figura).parent.mkdir(parents=True, exist_ok=True)
+            Representate.RepresentateState(estado, round(error.voltage, 3), str(figura))
+    except Exception as e2:  # noqa: BLE001 - el diagnóstico no debe ocultar el fallo original
+        logger.warning(f"No se pudo guardar el estado del fallo: {type(e2).__name__}: {e2}")
+
+
+#: Sufijo del estado de una fase que se paró por excepción (Init_data/phase_state_N_<fase>_fallida.*).
+#: `--start-from` no lo usa nunca: solo sirve para inspeccionar lo que la fase llegó a calcular.
+SUFIJO_FASE_FALLIDA = "_fallida"
+
+
+def _guardar_estado_fase_fallida(estado_fase, nombre: str, n_save: int, init_data_dir) -> None:
+    """Guarda las variables de una fase que se paró por excepción. Un fallo aquí no tapa el original."""
+    try:
+        save_phase_state(estado_fase, f"{nombre}{SUFIJO_FASE_FALLIDA}", n_save, init_data_dir)
+    except Exception as e2:  # noqa: BLE001
+        logger.warning(f"No se pudieron guardar las variables de la fase fallida {nombre}: {type(e2).__name__}: {e2}")
 
 
 def _save_partial_metadata(
@@ -99,17 +142,17 @@ def _save_partial_metadata(
     `extra`: sin ellos no hay forma de saber a posteriori con qué modelo se
     generó una carpeta de resultados.
     """
-    pp_set = states.pp_set or {}
-    sp_set = states.sp_set or {}
-    sp_reset = states.sp_reset or {}
+    pp_set, sp_set = states.pp_set, states.sp_set
 
-    voltaje_perco = pp_set.get("voltaje_percolacion", 0.0)
-    paso_perco = pp_set.get("paso_percolacion")
-    creaciones = pp_set.get("creaciones_dict", {}) or {}
+    voltaje_perco = pp_set.voltaje_percolacion if pp_set else 0.0
+    paso_perco = pp_set.paso_percolacion if pp_set else None
+    creaciones = (pp_set.creaciones_dict if pp_set else None) or {}
     # SP_reset recibe y amplía el roturas_dict de PP_reset: se toma el más avanzado
     # disponible, para no perder las roturas si el ciclo se detiene en pp_reset.
-    roturas = (sp_reset or states.pp_reset or {}).get("roturas_dict", {}) or {}
-    vecindad_inicial = sp_set.get("vecindad_inicial", None)
+    ultimo_reset = states.sp_reset or states.pp_reset
+    roturas = (ultimo_reset.roturas_dict if ultimo_reset else None) or {}
+    # La ponen los notebooks que preparan un estado de sp_set (Preparar_pp_reset*)
+    vecindad_inicial = sp_set.extra.get("vecindad_inicial") if sp_set else None
 
     params_dict = serialize_dataclass(cfg.params)
 
@@ -140,6 +183,10 @@ def _save_partial_metadata(
             "seed": cfg.params.seed,
             # Pico de temperatura de cada filamento, por fase.
             "temperaturas_max": _temperaturas_max_por_fase(states),
+            # Pasos con estado intermedio guardado en cada fase ejecutada
+            "estados_guardados": {f: list(getattr(states, f).estados_guardados)
+                                  for f in PHASE_ORDER[PHASE_ORDER.index(start_from or PHASE_ORDER[0]):]
+                                  if getattr(states, f) is not None},
             **({"error": error} if error else {}),
             **({"vecindad_inicial": vecindad_inicial} if vecindad_inicial is not None else {}),
         },
@@ -156,6 +203,7 @@ def run_cycle(
     stop_at: Optional[str] = None,
     init_data_dir: Path | str = "Init_data",
     usar_muro: bool = True,
+    guardar_estados: bool = True,
 ) -> SimulationStates:
     """
     Ejecuta SET (PP+SP) → RESET (PP+SP) y guarda metadatos.
@@ -207,35 +255,38 @@ def run_cycle(
             f"=== Sim {n_save} · ciclo desde '{start_from}' "
             f"(cargando estado de '{preceding}') ==="
         )
-        loaded = load_phase_state(preceding, n_save, init_data_dir, cfg)
+        loaded = cargar_estado_fase(preceding, n_save, init_data_dir, cfg)
         setattr(states, preceding, loaded)
     else:
         logger.info(f"=== Sim {n_save} · ciclo SET → RESET ===")
+
+    # Cada cuántos pasos se guarda un estado intermedio; 0 = ninguno (--sin-estados)
+    cada_estados = cfg.sim_ctes.pasos_guardar_estado if guardar_estados else 0
 
     fases_all = [
         ("pp_set",   lambda: PP_set(
             num_simulation=n_save, params=cfg.params, sim_ctes=cfg.sim_ctes,
             CF_ranges=cfg.cf_ranges, CF_creado=cfg.cf_creado, protocolo=cfg.protocolo,
-            num_pasos_guardar_estado=cfg.sim_ctes.pasos_guardar_estado,
+            num_pasos_guardar_estado=cada_estados,
             CF_centros=cfg.cf_centros, actual_state=cfg.actual_state,
             usar_muro=usar_muro, results_dir=results_dir,
         )),
         ("sp_set",   lambda: SP_set(
             final_state_pp_set=states.pp_set, num_simulation=n_save,
             CF_ranges=cfg.cf_ranges, protocolo=cfg.protocolo,
-            num_pasos_guardar_estado=cfg.sim_ctes.pasos_guardar_estado,
+            num_pasos_guardar_estado=cada_estados,
             usar_muro=usar_muro, results_dir=results_dir,
         )),
         ("pp_reset", lambda: PP_reset(
             final_state_sp_set=states.sp_set, num_simulation=n_save,
             CF_ranges=cfg.cf_ranges, protocolo=cfg.protocolo,
-            num_pasos_guardar_estado=cfg.sim_ctes.pasos_guardar_estado,
+            num_pasos_guardar_estado=cada_estados,
             usar_muro=usar_muro, results_dir=results_dir,
         )),
         ("sp_reset", lambda: SP_reset(
             final_state_pp_reset=states.pp_reset, num_simulation=n_save,
             CF_ranges=cfg.cf_ranges, protocolo=cfg.protocolo,
-            num_pasos_guardar_estado=cfg.sim_ctes.pasos_guardar_estado,
+            num_pasos_guardar_estado=cada_estados,
             results_dir=results_dir,
         )),
     ]
@@ -255,6 +306,13 @@ def run_cycle(
             save_phase_state(resultado, nombre, n_save, init_data_dir)
         except Exception as e:
             logger.error(f"Fase {nombre} abortada: {type(e).__name__}: {e}")
+            _guardar_estado_fallo(e)
+            estado_fase = getattr(e, "estado_fase", None)
+            if estado_fase is not None:
+                # Lo que llegó a calcular la fase: entra en la metadata parcial (voltaje de
+                # percolación, creaciones, roturas, T máximas) y se guarda aparte.
+                setattr(states, nombre, estado_fase)
+                _guardar_estado_fase_fallida(estado_fase, nombre, n_save, init_data_dir)
             _save_partial_metadata(
                 cfg, n_save, states, results_dir,
                 status=f"failed_at_{nombre}",
@@ -264,8 +322,8 @@ def run_cycle(
             raise
 
     last_phase = fases[-1][0]
-    creaciones = (states.pp_set or {}).get("creaciones_dict", {}) or {}
-    roturas = (states.sp_reset or {}).get("roturas_dict", {}) or {}
+    creaciones = (states.pp_set.creaciones_dict if states.pp_set else None) or {}
+    roturas = (states.sp_reset.roturas_dict if states.sp_reset else None) or {}
     logger.info(
         f"Fase final: '{last_phase}' · "
         f"creaciones: {len(creaciones)} · roturas: {len(roturas)}"

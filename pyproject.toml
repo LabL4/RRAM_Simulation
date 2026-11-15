@@ -1,4 +1,26 @@
+[project]
+name = "rram-simulation"
+version = "0.1.0"
+description = "Simulador 2D de memorias RRAM (generación y recombinación de vacantes, conducción y térmica)"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy",
+    "scipy",
+    "pandas",
+    "numba",
+]
+
+[project.optional-dependencies]
+# Representación de resultados (no hace falta para ejecutar simulaciones)
+plots = ["matplotlib"]
+dev = ["pytest", "ruff"]
+
 [tool.ruff]
 line-length = 120
-select = ["E225"]
-fix = true
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "I"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]

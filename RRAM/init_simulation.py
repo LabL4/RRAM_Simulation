@@ -53,8 +53,8 @@ class SimulationConfig:
 
     def __post_init__(self):
         cf_ranges, _, cf_centros = utils.generar_configuracion_filamentos(
-            eje_x=self.params.y_size,
-            eje_y=self.params.x_size,
+            n_filas=self.params.n_filas,
+            n_cols=self.params.n_cols,
             num_filamentos=self.sim_ctes.num_filamentos,
             grosores_filamento=self.sim_ctes.grosor_filamento,
             centros_override=self.sim_ctes.centros_filamento,  # ← nuevo
@@ -67,6 +67,10 @@ class SimulationConfig:
 # ---------------------------------------------------------------------------
 # 1. Pre-generación de estados iniciales (todas las simulaciones del CSV)
 # ---------------------------------------------------------------------------
+
+
+def _es_nulo(v) -> bool:
+    return v is None or (isinstance(v, float) and math.isnan(v))
 
 
 def build_initial_states(
@@ -87,7 +91,7 @@ def build_initial_states(
                 un estado distinto pero reproducible corrida a corrida (se
                 conserva la diversidad del ensemble; comportamiento histórico).
             True  → siembra con `seed` fijo (sin `+i`) en todas las simulaciones.
-                Si además todas comparten geometría (eje_x, eje_y, num_trampas,
+                Si además todas comparten geometría (n_filas, n_cols, num_trampas,
                 num_filamentos, grosor/centros de filamento), el sorteo de
                 trampas es idéntico byte a byte en todo el ensemble: útil para
                 aislar el efecto de un parámetro (p.ej. Delta_z_R) controlando
@@ -115,11 +119,11 @@ def build_initial_states(
         # entre sims pero idéntico corrida a corrida. Con mismo_estado_inicial=True
         # se usa `seed` fijo para las N sims (mismo sorteo de trampas si además
         # comparten geometría). Sin seed no se toca np.random (aleatorio real).
-        if seed is not None:
-            np.random.seed(seed if mismo_estado_inicial else seed + int(i))
+        # RandomState propio: ya no se siembra el estado global de numpy.
+        rng = np.random.RandomState(seed if mismo_estado_inicial else seed + int(i)) if seed is not None else None
 
-        eje_x = int(math.ceil(row["device_size_y"] / row["atom_size"]))
-        eje_y = int(math.ceil(row["device_size_x"] / row["atom_size"]))
+        n_filas = int(math.ceil(row["device_size_y"] / row["atom_size"]))
+        n_cols = int(math.ceil(row["device_size_x"] / row["atom_size"]))
         num_trampas = int(row["num_trampas"])
 
         num_filamentos = 2
@@ -127,40 +131,18 @@ def build_initial_states(
         grosor_filamento_init = None
         centros_filamento = None
         if df_ctes is not None and i < len(df_ctes):
-            raw_nf = df_ctes.iloc[i].get("num_filamentos", None)
-            if raw_nf is not None:
-                try:
-                    num_filamentos = int(float(raw_nf))
-                except (ValueError, TypeError):
-                    pass
-
-            raw_gf = df_ctes.iloc[i].get("grosor_filamento", None)
-            if raw_gf is not None:
-                try:
-                    grosor_filamento = ast.literal_eval(str(raw_gf).strip())
-                except (ValueError, SyntaxError):
-                    grosor_filamento = int(float(raw_gf))
-
-            # grosor_filamento_init: override opcional SOLO para el sorteo de
-            # trampas/vacantes iniciales (ver docstring). Vacío/NaN = no fijado
-            # -> se usa grosor_filamento (comportamiento histórico).
-            raw_gfi = df_ctes.iloc[i].get("grosor_filamento_init", None)
-            if raw_gfi is not None and not (isinstance(raw_gfi, float) and math.isnan(raw_gfi)):
-                raw_gfi_str = str(raw_gfi).strip()
-                if raw_gfi_str not in ("", "None", "nan"):
-                    try:
-                        grosor_filamento_init = ast.literal_eval(raw_gfi_str)
-                    except (ValueError, SyntaxError):
-                        grosor_filamento_init = int(float(raw_gfi))
-
-            raw_cf = df_ctes.iloc[i].get("centros_filamento", None)
-            if raw_cf is not None:
-                try:
-                    parsed = ast.literal_eval(str(raw_cf).strip())
-                    if isinstance(parsed, list):
-                        centros_filamento = parsed
-                except (ValueError, SyntaxError):
-                    pass
+            # Mismo parseo que el resto del código (celdas vacías → None, "[3]" → lista).
+            fila = {k: (None if _es_nulo(v) else (v.item() if hasattr(v, "item") else v)) for k, v in df_ctes.iloc[i].items()}
+            try:
+                ctes = SimulationConstants.from_dict(fila)
+            except TypeError as e:
+                raise ValueError(f"simulation_constants.csv, fila {i}: columnas incompletas ({e})") from e
+            num_filamentos = ctes.num_filamentos
+            grosor_filamento = ctes.grosor_filamento
+            # grosor_filamento_init: override opcional SOLO para el sorteo de trampas/vacantes
+            # iniciales (ver docstring). None = se usa grosor_filamento.
+            grosor_filamento_init = ctes.grosor_filamento_init
+            centros_filamento = ctes.centros_filamento if isinstance(ctes.centros_filamento, list) else None
 
         # Grosor usado SOLO para ponderar dónde caen las trampas/vacantes
         # iniciales. Si grosor_filamento_init no está fijado, cae en
@@ -171,16 +153,16 @@ def build_initial_states(
         grosor_para_trampas = grosor_filamento_init if grosor_filamento_init is not None else grosor_filamento
 
         f_ranges, regiones_pesos, _ = utils.generar_configuracion_filamentos(
-            eje_x,
-            eje_y,
+            n_filas,
+            n_cols,
             num_filamentos=num_filamentos,
             grosores_filamento=grosor_para_trampas,
             centros_override=centros_filamento,
         )
-        init_state = Generation.initial_state_priv(eje_x, eje_y, num_trampas, regiones_pesos)
+        init_state = Generation.initial_state_priv(n_filas, n_cols, num_trampas, regiones_pesos, rng)
 
         logger.info(
-            f"Simulación {i}: dispositivo=({eje_x},{eje_y}) "
+            f"Simulación {i}: dispositivo=({n_filas},{n_cols}) "
             f"trampas={num_trampas} filamentos={num_filamentos} ranges={f_ranges} "
             f"grosor={grosor_filamento} grosor_init={grosor_filamento_init or '(=grosor_filamento)'}"
         )

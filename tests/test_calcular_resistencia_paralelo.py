@@ -36,7 +36,7 @@ def test_una_sola_resistencia_devuelve_ella_misma():
 
 def test_ningun_filamento_formado_da_resistencia_infinita():
     # Todos los filamentos son inf (no formados) → rama abierta total,
-    # tal y como documenta OmhCurrent_filamentos.
+    # tal y como documenta OhmCurrent_filamentos.
     resistencias = [np.inf, np.inf, np.inf]
 
     resultado = CurrentSolver.calcular_resistencia_paralelo(resistencias)

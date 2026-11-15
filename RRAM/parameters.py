@@ -28,14 +28,25 @@ class SimulationParameters:
     # valor al empezar, para que la corrida sea exactamente reproducible.
     seed: Optional[int] = None
 
-    x_size: int = field(init=False)
-    y_size: int = field(init=False)
+    # Forma de la matriz de estado: (n_filas, n_cols). Las filas recorren el alto del
+    # dispositivo (device_size_y) y las columnas la distancia entre electrodos (device_size_x).
+    n_filas: int = field(init=False)
+    n_cols: int = field(init=False)
     num_max_vacantes: int = field(init=False)
 
     def __post_init__(self):
-        self.x_size = int(np.ceil(self.device_size_x / self.atom_size))  # Número de "casillas" en la dimensión x
-        self.y_size = int(np.ceil(self.device_size_y / self.atom_size))  # Número de "casillas" en la dimensión y
-        self.num_max_vacantes = int(0.95 * (self.x_size * self.y_size))  # 95% de la matriz puede llenarse de vacantes
+        self.n_cols = int(np.ceil(self.device_size_x / self.atom_size))
+        self.n_filas = int(np.ceil(self.device_size_y / self.atom_size))
+        self.num_max_vacantes = int(0.95 * (self.n_filas * self.n_cols))  # 95% de la matriz puede llenarse de vacantes
+
+    # Nombres antiguos (los usan notebooks): x_size era n_cols e y_size era n_filas.
+    @property
+    def x_size(self) -> int:
+        return self.n_cols
+
+    @property
+    def y_size(self) -> int:
+        return self.n_filas
 
     def __repr__(self):
         # Crear lista de líneas con "nombre=valor" para cada atributo

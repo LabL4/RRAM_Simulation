@@ -1,6 +1,7 @@
 """Actualizaciones del estado del sistema (generación y recombinación)."""
 
 import logging
+from typing import Callable
 
 import numpy as np
 
@@ -26,23 +27,22 @@ def update_state_generation(
     custom_mask: np.ndarray | None = None,
     num_iteracion=None,
     tiempo_efectivo: float | None = None,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    rng=None,
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Orquesta el proceso de generación de vacantes asegurando que no se supere
     el límite máximo establecido. Si las candidatas superan el cupo, se eligen
     al azar entre ellas (todas con la misma oportunidad).
 
-    Devuelve (estado, probabilidades, aleatorios): `aleatorios` es la matriz de U(0,1) del sorteo
-    `aleatorios < prob_final`, para poder comprobar a posteriori que es uniforme.
+    Devuelve (estado, probabilidades).
     """
 
-    # En NumPy el primer valor devuelto por shape son las filas y el segundo las columnas, por lo que asumo que x_size son tus filas en el eje Y físico, y y_size son tus columnas en el eje X físico. Mientras mantengas esa lógica, es perfecto).
     act_state = state.copy()
-    x_size, y_size = state.shape
+    n_filas, n_cols = state.shape
 
     # 1. Ajuste del Campo Eléctrico
     if isinstance(E_field, np.ndarray) and E_field.ndim == 1:
-        E_field_matrix = np.repeat(E_field[:, np.newaxis], y_size, axis=1)
+        E_field_matrix = np.repeat(E_field[:, np.newaxis], n_cols, axis=1)
     else:
         E_field_matrix = E_field
 
@@ -69,29 +69,9 @@ def update_state_generation(
         custom_mask=custom_mask,
     )
 
-    # =========================================================================
-    # TEST TEMPORAL: limitar vacantes generadas a un máximo de 20 por paso.
-    # Propósito: aislar si la generación masiva de vacantes dispara la
-    # temperatura en los pasos ~7969. ELIMINAR antes de producción.
-    # =========================================================================
-    # _TEST_MAX_GENERACION_POR_PASO = 20
-    # candidatas_mask = prob_final > 0
-    # num_candidatas = int(np.sum(candidatas_mask))
-    # if num_candidatas > _TEST_MAX_GENERACION_POR_PASO:
-    #     coords_cand = np.argwhere(candidatas_mask)
-    #     probs_cand = prob_final[candidatas_mask]
-    #     top_indices = np.argsort(probs_cand)[::-1][:_TEST_MAX_GENERACION_POR_PASO]
-    #     seleccionadas = coords_cand[top_indices]
-    #     prob_final_test = np.zeros_like(prob_final)
-    #     prob_final_test[seleccionadas[:, 0], seleccionadas[:, 1]] = prob_final[seleccionadas[:, 0], seleccionadas[:, 1]]
-    #     prob_final = prob_final_test
-    # =========================================================================
-    # FIN TEST TEMPORAL
-    # =========================================================================
-
     # 4. Evaluación de la estocástica (cuáles "intentan" generarse)
     # TODO para que todas las simulaciones sean iguales, eliminar dps
-    aleatorios = np.random.rand(x_size, y_size)
+    aleatorios = (np.random if rng is None else rng).rand(n_filas, n_cols)
     nueva_vacante = aleatorios < prob_final
 
     # 5. LIMITACIÓN INTELIGENTE DE VACANTES
@@ -101,7 +81,7 @@ def update_state_generation(
 
     if vacantes_disponibles <= 0:
         # Ya estamos en el límite, no se permite generar ninguna más
-        return act_state, prob_final, aleatorios
+        return act_state, prob_final
 
     if num_nuevas > vacantes_disponibles:
         # Se ha superado el límite: se eligen al azar `vacantes_disponibles` candidatas.
@@ -117,8 +97,8 @@ def update_state_generation(
         # Obtenemos las coordenadas (i,j) de las candidatas
         coords = np.argwhere(nueva_vacante)
 
-        # Elección al azar sin repetición (np.random global: respeta la semilla de aplicar_semilla)
-        elegidas = coords[np.random.choice(len(coords), vacantes_disponibles, replace=False)]
+        # Elección al azar sin repetición (con el `rng` de la fase)
+        elegidas = coords[(np.random if rng is None else rng).choice(len(coords), vacantes_disponibles, replace=False)]
 
         # Actualizamos la matriz solo con las elegidas
         act_state[elegidas[:, 0], elegidas[:, 1]] = 1
@@ -126,7 +106,7 @@ def update_state_generation(
         # Si no se ha superado el límite, se aprueban todas
         act_state[nueva_vacante] = 1
 
-    return act_state, prob_final, aleatorios
+    return act_state, prob_final
 
 
 def update_state_recombinate(
@@ -143,7 +123,8 @@ def update_state_recombinate(
     filas_permitidas: np.ndarray,
     max_oxigenos: int,
     tiempo_efectivo: float | None = None,
-) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    rng=None,
+) -> tuple[np.ndarray, np.ndarray, Callable[[], np.ndarray]]:
     """
     Orquesta el proceso completo de RESET en un paso de tiempo.
 
@@ -155,10 +136,13 @@ def update_state_recombinate(
     `relojes` lleva el reloj propio de cada ion: el llamador ya lo ha avanzado este paso
     (`relojes.actualizar`, antes de generar); aquí se mueve con él y, tras recombinar, se
     borra el reloj de los iones desaparecidos (`relojes.limpiar`).
-    Devuelve (vacantes, oxígenos, prob_recombinacion):
-      - prob_recombinacion es el CAMPO de probabilidad de recombinación de este paso en toda
-        la matriz (misma forma que actual_state), con el mismo tiempo, velocidad y temperatura
-        que el sorteo real; solo se usa de verdad en las celdas con ion y vacante.
+    Devuelve (vacantes, oxígenos, campo_probabilidad):
+      - campo_probabilidad es una FUNCIÓN sin argumentos que devuelve el CAMPO de probabilidad de
+        recombinación de este paso en toda la matriz (misma forma que actual_state), con el mismo
+        tiempo, velocidad y temperatura que el sorteo real; solo se usa de verdad en las celdas con
+        ion y vacante. Se devuelve sin evaluar porque solo se necesita al guardar el estado (cada
+        `pasos_guardar_estado`) y evaluarlo en todos los pasos cuesta exponenciales sobre toda la
+        matriz. Se evalúa con `evaluar_campo_probabilidad`.
 
     1. Generación de iones oxígenos por voltaje (solo en `filas_permitidas`).
     2. Movimiento de iones.
@@ -170,7 +154,7 @@ def update_state_recombinate(
         if abs(voltage) > abs(threshold_voltage):
             filas_candidatas = Recombination.filas_libres_interfaz(oxygen_state, filas_permitidas)
             cupo = Recombination.cupo_oxigenos(oxygen_state, max_oxigenos)
-            oxygen_state = Recombination.generate_oxygen(oxygen_state, max_oxigenos_paso, filas_candidatas, cupo)
+            oxygen_state = Recombination.generate_oxygen(oxygen_state, max_oxigenos_paso, filas_candidatas, cupo, rng)
             break  # Solo usar el umbral más alto superado
 
     # 2. Movemos los ionesx
@@ -205,23 +189,33 @@ def update_state_recombinate(
         recom_enchancement_factor=sim_ctes.recom_enchancement_factor,
         recombination_energy=sim_ctes.recombination_energy,
         long_decaimiento_concentracion=sim_ctes.long_decaimiento_concentracion,
+        rng=rng,
     )
     relojes.limpiar(oxygen_state_update)  # iones recombinados: su reloj a 0
 
-    # 4. Campo de probabilidad de recombinación (para guardarlo, como la matriz de generación)
-    prob_recombinacion = np.minimum(
-        Recombination.Prob_Recombination(
-            tiempo_tasa=tiempo_tasa,
-            paso_temporal=params.paso_temporal,
-            velocidad=velocidad,
-            temp=temperatura,
-            vibration_frequency=sim_ctes.vibration_frequency,
-            recom_enchancement_factor=sim_ctes.recom_enchancement_factor,
-            recombination_energy=sim_ctes.recombination_energy,
-            long_decaimiento_concentracion=sim_ctes.long_decaimiento_concentracion,
-        ),
-        1.0,
-    )
-    prob_recombinacion = np.broadcast_to(prob_recombinacion, actual_state.shape).copy()
+    # 4. Campo de probabilidad de recombinación (para guardarlo, como la matriz de generación).
+    # Se devuelve diferido: captura los valores de ESTE paso y solo se calcula si alguien lo pide.
+    forma = actual_state.shape
 
-    return actual_state_update, oxygen_state_update, prob_recombinacion
+    def campo_probabilidad() -> np.ndarray:
+        prob = np.minimum(
+            Recombination.Prob_Recombination(
+                tiempo_tasa=tiempo_tasa,
+                paso_temporal=params.paso_temporal,
+                velocidad=velocidad,
+                temp=temperatura,
+                vibration_frequency=sim_ctes.vibration_frequency,
+                recom_enchancement_factor=sim_ctes.recom_enchancement_factor,
+                recombination_energy=sim_ctes.recombination_energy,
+                long_decaimiento_concentracion=sim_ctes.long_decaimiento_concentracion,
+            ),
+            1.0,
+        )
+        return np.broadcast_to(prob, forma).copy()
+
+    return actual_state_update, oxygen_state_update, campo_probabilidad
+
+
+def evaluar_campo_probabilidad(campo: Callable[[], np.ndarray] | None) -> np.ndarray | None:
+    """Evalúa el campo diferido de `update_state_recombinate`; None si aún no hubo ningún paso."""
+    return None if campo is None else campo()

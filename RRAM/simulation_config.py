@@ -1,3 +1,4 @@
+from dataclasses import fields
 from typing import Dict, Any, Optional, List
 import pandas as pd
 import itertools
@@ -5,7 +6,9 @@ import logging
 import os
 
 from .voltage_controller import ProtocoloVoltaje
+from .constants_simulation import SimulationConstants
 from .Generation import NEIGHBOR_MODES
+from .parameters import SimulationParameters
 
 logger = logging.getLogger(__name__)
 
@@ -92,7 +95,7 @@ SIMULATION_DEFAULTS = {
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
     "num_trampas": 100,
     # Paso temporal [s]. ENTRADA obligatoria. Cambiarlo altera la física
-    "paso_temporal": 1e-3,
+    "paso_temporal": 1e-6,
     # El voltaje NO tiene valores por defecto: cada simulación debe traer su
     # "protocolo_voltaje" (ver RRAM.voltage_controller.ProtocoloVoltaje).
     "densidad_vacantes": 4.0,  # vacantes / nm²
@@ -104,7 +107,8 @@ SIMULATION_DEFAULTS = {
 # ============================================================================
 SET_RESET_DEFAULTS = {
     "ocupacion_max_pp_set": 0.99,
-    "ocupacion_max_sp_set": 0.45,
+    # 0.0 → SP_set no genera vacantes. Subirlo (p. ej. 0.45) hace que SP_set siga generando hasta esa ocupación.
+    "ocupacion_max_sp_set": 0.0,
     # Cada cuántos pasos se guarda el estado intermedio (matrices) en las cuatro etapas.
     "pasos_guardar_estado": 10,
     "factor_vecinos_pp_set": 1.0,
@@ -122,6 +126,14 @@ SET_RESET_DEFAULTS = {
     "num_oxigenos_sp_reset": 5,
     # Máximo de iones de oxígeno simultáneos en el reset. None (defecto) → se usa 'vacantes_generadas_set' del estado del set. Si se fija, manda este valor (aviso en el log). Obligatorio si el reset arranca de un estado sin 'vacantes_generadas_set'.
     "max_oxigenos_reset": 150,
+    # Velocidad de los iones de oxígeno [m/s] por encima de cada umbral de voltaje del RESET.
+    "velocidad_iones_pp_1": 3e-07,
+    "velocidad_iones_pp_2": 5.2e-07,
+    "velocidad_iones_sp": 5.2e-07,
+    # Divisor de gamma al formarse filamentos (1, 2 o 3+ filamentos en el dispositivo).
+    "divisor_gamma_1_filamento": 1.0,
+    "divisor_gamma_2_filamentos": 1.5,
+    "divisor_gamma_n_filamentos": 1.2,
 }
 
 DEFAULT_PARAMS = {
@@ -134,8 +146,9 @@ DEFAULT_PARAMS = {
 }
 
 
-# Esta clase no es mas que un contenedor vacío, inicialmente se creó para tener un lugar donde crear nuevos parámetros a partir de los base pero ya se hace en las clases SimulationParameters y SimulationConstants, por lo que esta clase ya no tiene sentido para no tardar en eliminarla, se deja como un contenedor de parámetros que no hace nada.
-class SimulationConfig:
+# Una simulación del barrido: su id y sus parámetros (base + modificaciones). No confundir con
+# init_simulation.SimulationConfig, la configuración ya cargada para ejecutar.
+class CasoSimulacion:
     def __init__(self, sim_id: int):
         self.sim_id = sim_id
         # Solo copiamos los valores por defecto. NO calculamos nada derivado.
@@ -155,9 +168,9 @@ class SimulationConfig:
 
 class ConfigManager:
     def __init__(self):
-        self.simulations: List[SimulationConfig] = []
+        self.simulations: List[CasoSimulacion] = []
 
-    def add_config(self, config: SimulationConfig):
+    def add_config(self, config: CasoSimulacion):
         self.simulations.append(config)
 
     def add_zip(self, zip_params: Dict[str, List[Any]], fixed_params: Optional[Dict[str, Any]] = None):
@@ -187,7 +200,7 @@ class ConfigManager:
             if fixed_params:
                 mods.update(fixed_params)
             sim_id = len(self.simulations)
-            self.simulations.append(SimulationConfig.from_base(sim_id, mods))
+            self.simulations.append(CasoSimulacion.from_base(sim_id, mods))
             casos_totales += 1
 
         logger.info(f"-> Generadas {casos_totales} combinaciones por zip.")
@@ -200,7 +213,7 @@ class ConfigManager:
         for combinacion in itertools.product(*values):
             mods = dict(zip(keys, combinacion))
             sim_id = len(self.simulations)
-            self.simulations.append(SimulationConfig.from_base(sim_id, mods))
+            self.simulations.append(CasoSimulacion.from_base(sim_id, mods))
             casos_totales += 1
         logger.info(f"-> Generadas {casos_totales} combinaciones.")
 
@@ -210,69 +223,11 @@ class ConfigManager:
 
         # === LIMPIEZA: SOLO EXPORTAMOS LOS INPUTS ===
         # Quitamos x_size, y_size, etc. porque se calcularán solos al cargar.
-        cols_params = [
-            "device_size_x",
-            "device_size_y",
-            "atom_size",
-            "num_trampas",
-            "paso_temporal",
-            "init_temp",
-            "densidad_vacantes",
-        ]
+        # Una columna por campo de entrada del dataclass (la semilla se fija por CLI, no va al CSV).
+        cols_params = [f.name for f in fields(SimulationParameters) if f.init and f.name != "seed"]
 
         # Quitamos conductividades calculadas y diccionarios complejos
-        cols_ctes = [
-            "cte_red",
-            "permitividad_relativa_set",
-            "permitividad_relativa_reset",
-            "generation_energy",
-            "recombination_energy",
-            "pb_metal_insul_set",
-            "pb_metal_insul_reset",
-            "recom_enchancement_factor",
-            "long_decaimiento_concentracion",
-            "sigma_0",
-            "alpha_T",
-            "delta_z_r",
-            "num_filamentos",
-            "grosor_filamento",
-            "grosor_filamento_init",
-            "vibration_frequency",
-            "gamma",
-            "gamma_drift",
-            "E_m",
-            "I_0_set",
-            "I_0_reset",
-            "r_termica_no_percola",
-            "conductividad_termica_dielectrico",
-            "conductividad_termica_CF",
-            "conductividad_termica_aislante",
-            "conductividad_termica_electrodo",
-            "Temperatura_electrodo",
-            "factor_generar_calor",
-            "pendiente_temperatura",
-            "k_amortiguacion_termica",
-            "umbral_caida_temperatura",
-            "k_electrodo_enfriamiento",
-            "umbral_caida_electrodo",
-            "ocupacion_max_pp_set",
-            "ocupacion_max_sp_set",
-            "pasos_guardar_estado",
-            "factor_vecinos_pp_set",
-            "factor_libre_pp_set",
-            "factor_vecinos_sp_set",
-            "factor_libre_sp_set",
-            "neighbor_mode_pp_set",
-            "neighbor_mode_sp_set",
-            "voltaje_gen_oxigeno_pp_1",
-            "num_oxigenos_pp_reset_1",
-            "voltaje_gen_oxigeno_pp_2",
-            "num_oxigenos_pp_reset_2",
-            "voltaje_gen_oxigeno_sp",
-            "num_oxigenos_sp_reset",
-            "centros_filamento",  # ← añadir al final
-            "max_oxigenos_reset",
-        ]
+        cols_ctes = [f.name for f in fields(SimulationConstants)]
 
         # Protocolo de voltaje: obligatorio, validado aquí (una errata falla en el
         # notebook y no a mitad de simulación) y exportado a su propio CSV.

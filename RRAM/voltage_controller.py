@@ -601,12 +601,12 @@ class ProtocoloVoltaje:
 
     # ------------------------------------------------------- ejecución
 
-    def controlador(self, fase: str, previo: Optional[dict] = None) -> VoltageController:
+    def controlador(self, fase: str, previo=None) -> VoltageController:
         """
         Controlador de la etapa `fase`.
 
-        `previo` es el dict de estado que devolvió la etapa anterior (el que
-        contiene la clave ``"voltaje"``), o None en PP_set. De él solo se lee el
+        `previo` es el estado que devolvió la etapa anterior (`EstadoFase`, o un dict
+        antiguo con la clave ``"voltaje"``), o None en PP_set. De él solo se lee el
         último voltaje aplicado (``previo["voltaje"]["V_fin"]``).
         """
         if fase not in FASES:
@@ -614,7 +614,8 @@ class ProtocoloVoltaje:
         # Un estado preparado a mano (p. ej. Preparar_pp_reset.ipynb) puede no traer
         # su voltaje: entonces no hay enganche y un 'anterior' en el primer
         # segmento da error al construir el controlador.
-        v_previo = ((previo or {}).get("voltaje") or {}).get("V_fin")
+        voltaje_previo = previo.get("voltaje") if isinstance(previo, dict) else getattr(previo, "voltaje", None)
+        v_previo = (voltaje_previo or {}).get("V_fin")
         controller = VoltageController(fase, getattr(self, fase), v_previo=v_previo)
         self._controladores[fase] = controller
         logger.info(f"{fase}: forma de onda\n{_texto_etapa(fase, controller.segmentos, controller.presupuesto())}")

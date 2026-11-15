@@ -8,13 +8,13 @@ logger = logging.getLogger(__name__)
 k_b_ev = 8.617333262145e-5  # Boltzmann constant in eV/K
 
 
-def initial_state_priv(Eje_x: int, Eje_y: int, num_trampas: int, regiones_pesos: list):
+def initial_state_priv(n_filas: int, n_cols: int, num_trampas: int, regiones_pesos: list, rng=None):
     """
     Generate an initial state matrix with traps based on the given parameters with weighted regions.
 
     Args:
-        Eje_x (int): The size of the x-axis.
-        Eje_y (int): The size of the y-axis.
+        n_filas (int): Número de filas.
+        n_cols (int): Número de columnas.
         num_trampas (int): The number of traps to generate.
         regiones_pesos (list): A list of tuples defining regions and their weights.
         Each tuple should be ((x_start, x_end, y_start, y_end), weight).
@@ -22,11 +22,11 @@ def initial_state_priv(Eje_x: int, Eje_y: int, num_trampas: int, regiones_pesos:
     Returns:
         np.ndarray: The initial state matrix with traps.
     """
-    # Create a matrix of zeros with size Eje_x x Eje_y
-    InitialState = np.zeros((Eje_x, Eje_y), dtype=int)
+    # Create a matrix of zeros with size n_filas x n_cols
+    InitialState = np.zeros((n_filas, n_cols), dtype=int)
 
     # Create a weight matrix initialized to 1
-    pesos = np.ones((Eje_x, Eje_y), dtype=float)
+    pesos = np.ones((n_filas, n_cols), dtype=float)
 
     # Apply weights to specified regions
     for (x_start, x_end, y_start, y_end), weight in regiones_pesos:
@@ -36,11 +36,11 @@ def initial_state_priv(Eje_x: int, Eje_y: int, num_trampas: int, regiones_pesos:
     pesos_flat = pesos.flatten()
 
     # Generate random positions for the traps with weights
-    posiciones_unos = np.random.choice(Eje_x * Eje_y, num_trampas, replace=False, p=pesos_flat / np.sum(pesos_flat))
+    posiciones_unos = (np.random if rng is None else rng).choice(n_filas * n_cols, num_trampas, replace=False, p=pesos_flat / np.sum(pesos_flat))
 
     # Assign the value 1 to the selected positions
     for pos in posiciones_unos:
-        fila, columna = divmod(pos, Eje_y)
+        fila, columna = divmod(pos, n_cols)
         InitialState[fila, columna] = 1
 
     return InitialState
