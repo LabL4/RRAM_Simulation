@@ -1,7 +1,7 @@
 """
 Topología de los filamentos conductores: percolación, limpieza y clasificación por filamento.
 
-Sustituye a la cadena `Percolation.is_path` (A* de `pathfinding`) + `CurrentSolver.Clean_state_matrix`
+Sustituye a la cadena el antiguo `is_path` de `Percolation` (A* de `pathfinding`) + `Clean_state_matrix`
 + `Clasificar_CF` + `Existe_filamentos` + `Eliminar_filamentos_incompletos` (grafos de `networkx`)
 por un etiquetado de componentes conexas con `scipy.ndimage.label` y una poda de hojas sobre
 arrays. Reproduce exactamente sus resultados (ver tests/test_topologia_filamentos.py), en una sola
@@ -42,6 +42,24 @@ class TopologiaFilamentos:
     matriz_filamentos: np.ndarray
 
 
+def filas_banda_filamentos(n_filas: int, centros, grosor) -> np.ndarray:
+    """
+    Máscara 1D (n_filas,) de las filas de la banda de cada filamento: centro ± grosor.
+
+    `grosor` es un entero común o una lista con un valor por filamento. Es la definición única de
+    la banda: la usan la máscara de generación (`Generation.create_custom_mask`), las filas de la
+    interfaz donde nacen los oxígenos (`Recombination.filas_interfaz_filamento`) y el perfil del
+    electrodo (`thermal.muro.filas_filamento`).
+    """
+    grosores = [int(grosor)] * len(centros) if isinstance(grosor, (int, np.integer)) else [int(g) for g in grosor]
+    if len(grosores) != len(centros):
+        raise ValueError("Debe haber un grosor asignado para cada centro de filamento.")
+    filas = np.zeros(n_filas, dtype=bool)
+    for centro, g in zip(centros, grosores):
+        filas[max(0, int(centro) - g) : min(n_filas, int(centro) + g + 1)] = True
+    return filas
+
+
 def _componentes_entre_electrodos(conductora: np.ndarray) -> np.ndarray:
     """Máscara de las celdas cuya componente conexa (4-vecindad) toca las columnas 0 y última."""
     etiquetas, _ = ndimage.label(conductora)
@@ -76,6 +94,10 @@ def _podar_ramas_muertas(mascara: np.ndarray) -> np.ndarray:
 def percola(estado: np.ndarray) -> bool:
     """True si alguna componente conductora une la columna 0 con la última."""
     return bool(_componentes_entre_electrodos(np.asarray(estado) >= 1).any())
+
+
+#: Nombre antiguo (`is_path` de `Percolation`), aún usado desde notebooks.
+is_path = percola
 
 
 def analizar_topologia(estado: np.ndarray, cf_ranges: Sequence[Tuple[int, int]]) -> TopologiaFilamentos:

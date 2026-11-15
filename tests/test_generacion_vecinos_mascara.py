@@ -32,7 +32,6 @@ KW = dict(
     generation_energy=1.04,
     cte_red=2.5e-10,
     gamma=10.0,
-    num_iteracion=None,
 )
 
 
@@ -91,7 +90,7 @@ except ValueError:
     check("modo inválido lanza ValueError", True)
 
 # constantes: el modo viaja como texto y los antiguos sin la clave cargan con "both"
-c = SimulationConstants.from_dict({**{k: 1.0 for k in SimulationConstants.__dataclass_fields__ if k not in ("num_filamentos", "grosor_filamento", "neighbor_mode_pp_set", "neighbor_mode_sp_set", "centros_filamento", "grosor_filamento_init", "k_amortiguacion_termica", "umbral_caida_temperatura", "k_electrodo_enfriamiento", "pasos_guardar_estado", "num_oxigenos_pp_reset_1", "num_oxigenos_pp_reset_2", "num_oxigenos_sp_reset")}, "num_filamentos": 1, "grosor_filamento": [3], "pasos_guardar_estado": 10, "num_oxigenos_pp_reset_1": 1, "num_oxigenos_pp_reset_2": 1, "num_oxigenos_sp_reset": 1})
+c = SimulationConstants.from_dict({**{k: 1.0 for k in SimulationConstants.__dataclass_fields__ if k not in ("num_filamentos", "grosor_filamento", "neighbor_mode_pp_set", "neighbor_mode_sp_set", "centros_filamento", "grosor_filamento_init", "k_amortiguacion_termica", "umbral_caida_temperatura", "k_electrodo_enfriamiento", "pasos_guardar_estado", "num_oxigenos_pp_reset_1", "num_oxigenos_pp_reset_2", "num_oxigenos_sp_reset")}, "num_filamentos": 1, "grosor_filamento": [3], "pasos_guardar_estado": 10, "num_oxigenos_pp_reset_1": 1, "num_oxigenos_pp_reset_2": 1, "num_oxigenos_sp_reset": 1, "voltaje_gen_oxigeno_pp_2": 2.0})
 check("constantes sin la clave: neighbor_mode = both", c.neighbor_mode_pp_set == "both" and c.neighbor_mode_sp_set == "both")
 c2 = SimulationConstants.from_dict({**c.__dict__, "neighbor_mode_pp_set": "horizontal", "neighbor_mode_sp_set": "vertical"})
 check("constantes: el modo se conserva como texto", (c2.neighbor_mode_pp_set, c2.neighbor_mode_sp_set) == ("horizontal", "vertical"))

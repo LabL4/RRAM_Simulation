@@ -55,7 +55,7 @@ class SimulationStates:
 def _resolve_simulation_path(results_dir: Path | str, n_save: int) -> Path:
     """
     Devuelve la ruta de `Results/simulation_{N}/` consistente con
-    `utils.crear_rutas_simulacion`.
+    `grabador.crear_rutas_simulacion`.
     """
     return Path(results_dir) / f"simulation_{n_save}"
 
@@ -211,7 +211,7 @@ def run_cycle(
     Args:
         cfg: Configuración cargada desde `load_simulation_config`.
         results_dir: Carpeta raíz donde cada simulación tiene su subcarpeta
-            `simulation_{N+1}` (consistente con `utils.crear_rutas_simulacion`).
+            `simulation_{N+1}` (consistente con `grabador.crear_rutas_simulacion`).
         start_from: Fase desde la que comenzar el ciclo. Valores válidos:
             ``"sp_set"``, ``"pp_reset"``, ``"sp_reset"``.  Si es ``None``
             (defecto) el ciclo empieza desde ``pp_set``.
@@ -269,7 +269,7 @@ def run_cycle(
             CF_ranges=cfg.cf_ranges, CF_creado=cfg.cf_creado, protocolo=cfg.protocolo,
             num_pasos_guardar_estado=cada_estados,
             CF_centros=cfg.cf_centros, actual_state=cfg.actual_state,
-            usar_muro=usar_muro, results_dir=results_dir,
+            usar_muro=usar_muro, results_dir=results_dir, init_data_dir=init_data_dir,
         )),
         ("sp_set",   lambda: SP_set(
             final_state_pp_set=states.pp_set, num_simulation=n_save,

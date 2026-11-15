@@ -14,13 +14,15 @@ from typing import List
 
 import numpy as np
 
-from . import CurrentSolver, ElectricField, Generation, Temperature, exceptions, utils
+from . import ElectricField, Generation, conduccion, exceptions
 from .constants_simulation import SimulationConstants
 from .estado_fase import EstadoFase, como_estado_fase
 from .etapa import ContextoPaso, Etapa
 from .filament_tracking import actualizar_parametros_por_filamento, procesar_filamentos_creados
 from .parameters import SimulationParameters
+from .persistence import cargar_estado
 from .procesos_estocasticos import ProcesoGeneracion
+from .thermal import muro
 from .topologia_filamentos import TopologiaFilamentos
 from .voltage_controller import ProtocoloVoltaje
 
@@ -52,19 +54,13 @@ class EtapaSet(Etapa):
 
     def poole_frenkel(self, temperatura, campo) -> float:
         """Corriente sin percolación, con las constantes del SET."""
-        return CurrentSolver.Poole_Frenkel(
+        return conduccion.Poole_Frenkel(
             temperatura,
             campo,
             pb_metal_insul=self.sim_ctes.pb_metal_insul_set,
             permitividad_relativa=self.sim_ctes.permitividad_relativa_set,
             I_0=self.sim_ctes.I_0_set,
         ) * (self.params.device_size_y)
-
-    def temperatura_joule(self, ctx: ContextoPaso):
-        """Joule escalar con la corriente del paso anterior."""
-        return Temperature.Temperature_Joule(
-            ctx.voltage, self.current, T_0=self.params.init_temp, r_termica=self.sim_ctes.r_termica_no_percola
-        )
 
     def actualizar_estado(self, ctx: ContextoPaso) -> np.ndarray:
         estado, self.paso.probabilidad_generacion = self.generacion.actualizar(
@@ -80,7 +76,8 @@ class EtapaSet(Etapa):
             temperatura=self.termico.actual.legado(),
             matriz_para_plot_muro=self.paso.matriz_muro_para_plot(self.centros),
             mapa_resistencias=self.paso.R_local,
-            **Temperature.extra_sin_amortiguar(self.sim_ctes, self.paso.temperatura_sin_amortiguar),
+            # Probabilidades del sorteo de generación del paso (vacío si el cupo está lleno y no se sorteó)
+            probabilidad_matrix=self.paso.probabilidad_generacion,
         )
 
 
@@ -110,10 +107,11 @@ class EtapaPPSet(EtapaSet):
         actual_state: np.ndarray | None = None,
         usar_muro: bool = True,
         results_dir="Results",
+        init_data_dir="Init_data",
     ):
         # Estado inicial: prioridad al argumento explícito, fallback al disco
         if actual_state is None:
-            actual_state = utils.cargar_estado(Path.cwd() / f"Init_data/init_state_{num_simulation - 1}")
+            actual_state = cargar_estado(Path(init_data_dir) / f"init_state_{num_simulation - 1}")
         else:
             actual_state = actual_state.copy()
         super().__init__(
@@ -158,7 +156,7 @@ class EtapaPPSet(EtapaSet):
         # calculan ya. El muro se coloca en cuanto el FVM entra con el PRIMER filamento. Con un solo
         # filamento no hay interfaces: se quedan en None y no hay muro.
         if self.N >= 2:
-            self.filas_intermedias, self.dist_casillas = Temperature.calcular_filas_intermedias(CF_centros)  # type: ignore
+            self.filas_intermedias, self.dist_casillas = muro.calcular_filas_intermedias(CF_centros)  # type: ignore
 
     def filamentos_para_el_controlador(self) -> int:
         return int(np.sum(self.CF_creado))
@@ -227,7 +225,6 @@ class EtapaPPSet(EtapaSet):
         campo_medio = np.mean(ctx.E_filas).item()
         # Temperatura de Joule, amortiguada contra la escalar del paso anterior
         T_joule = self.temperatura_joule(ctx)
-        self.paso.temperatura_sin_amortiguar = T_joule
         self.paso.T_fils = self.termico.registrar_joule(T_joule, self.sim_ctes)
         self.paso.sin_percolacion(self.N)
         # Con el cupo de vacantes lleno la corriente se queda en su último valor
@@ -239,11 +236,6 @@ class EtapaPPSet(EtapaSet):
             vacantes=np.array([ctx.k, ctx.voltage, ctx.total_vacantes]),
             resistencia=np.array([ctx.k, ctx.voltage, self.resistencia]),
         )
-
-    def estado_a_guardar(self) -> dict:
-        estado = super().estado_a_guardar()
-        estado["probabilidad_matrix"] = self.paso.probabilidad_generacion
-        return estado
 
     def ruta_estado_final(self):
         return self.rutas["simulation_path"] / f"Final_state_{self.num_simulation}_pp_set.npz"
@@ -319,7 +311,7 @@ class EtapaSPSet(EtapaSet):
             rng=self.rng,
         )
 
-        self.filas_intermedias, self.dist_casillas = Temperature.calcular_filas_intermedias(self.centros)
+        self.filas_intermedias, self.dist_casillas = muro.calcular_filas_intermedias(self.centros)
         logger.info(
             f"Centros de los filamentos: {self.centros}; filas intermedias: {self.filas_intermedias}; "
             f"distancias: {self.dist_casillas}"
@@ -370,12 +362,13 @@ def PP_set(
     actual_state: np.ndarray | None = None,
     usar_muro: bool = True,
     results_dir: str = "Results",
+    init_data_dir: str = "Init_data",
 ) -> EstadoFase:
     """
     Primera parte del SET (ver `EtapaPPSet`). Devuelve el `EstadoFase` con el que arranca `SP_set`.
 
     `CF_creado` (un booleano por filamento) se actualiza in situ. `actual_state` es el estado inicial;
-    si es None se carga `Init_data/init_state_{num_simulation - 1}`. `num_pasos_guardar_estado` es la
+    si es None se carga `{init_data_dir}/init_state_{num_simulation - 1}`. `num_pasos_guardar_estado` es la
     cadencia de los estados intermedios (0 = no se guardan).
 
     Lanza `MaxVacantesException`, `NullResistanceException`, `NoPercolationException`,
@@ -384,6 +377,7 @@ def PP_set(
     return EtapaPPSet(
         num_simulation, params, sim_ctes, CF_ranges, CF_creado, protocolo, num_pasos_guardar_estado,
         CF_centros=CF_centros, actual_state=actual_state, usar_muro=usar_muro, results_dir=results_dir,
+        init_data_dir=init_data_dir,
     ).ejecutar()
 
 

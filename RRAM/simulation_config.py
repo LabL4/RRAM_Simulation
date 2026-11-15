@@ -1,14 +1,15 @@
-from dataclasses import fields
-from typing import Dict, Any, Optional, List
-import pandas as pd
+import difflib
 import itertools
 import logging
 import os
+from dataclasses import fields
+from typing import Any, Dict, List, Optional
 
-from .voltage_controller import ProtocoloVoltaje
+import pandas as pd
+
 from .constants_simulation import SimulationConstants
-from .Generation import NEIGHBOR_MODES
 from .parameters import SimulationParameters
+from .voltage_controller import ProtocoloVoltaje
 
 logger = logging.getLogger(__name__)
 
@@ -72,12 +73,12 @@ THERMAL_DEFAULTS = {
     "Temperatura_electrodo": 300,
     "factor_generar_calor": 6e-5,  # 5.5e-5,
     "pendiente_temperatura": -28,  # -24.7,
-    # Amortiguación de caídas bruscas de T (ver Temperature.amortiguar_enfriamiento):
+    # Amortiguación de caídas bruscas de T (ver amortiguacion.amortiguar_enfriamiento):
     # donde T cae más que 'umbral_caida_temperatura' [K] respecto al paso anterior,
     # T = T_0 + (T_prev - T_0) * exp(-k * paso_temporal). k = 0 la desactiva.
     "k_amortiguacion_termica": 1,  # [1/s]
     "umbral_caida_temperatura": 1,  # [K], > 0
-    # Perfil de temperatura de los electrodos (ver Temperature.actualizar_temperatura_electrodo):
+    # Perfil de temperatura de los electrodos (ver amortiguacion.actualizar_temperatura_electrodo):
     # columna adyacente sin amortiguar en las filas centro ± grosor de cada filamento y
     # init_temp en el resto; las celdas que caen más que 'umbral_caida_electrodo' [K] se
     # enfrían con exp(-k * paso_temporal). k = 0 lo desactiva (electrodo fijo).
@@ -229,6 +230,16 @@ class ConfigManager:
         # Quitamos conductividades calculadas y diccionarios complejos
         cols_ctes = [f.name for f in fields(SimulationConstants)]
 
+        # Una clave que no es de ninguna columna no llegaría al CSV: se exportaría el valor por
+        # defecto sin avisar (p. ej. una errata en un barrido). Se rechaza aquí.
+        admitidas = set(cols_params) | set(cols_ctes) | set(DEFAULT_PARAMS) | {"protocolo_voltaje"}
+        for sim in self.simulations:
+            for clave in sim.params:
+                if clave not in admitidas:
+                    parecidas = difflib.get_close_matches(str(clave), admitidas, n=1)
+                    sugerencia = f" ¿Querías decir {parecidas[0]!r}?" if parecidas else ""
+                    raise ValueError(f"sim {sim.sim_id}: parámetro desconocido {clave!r}.{sugerencia}")
+
         # Protocolo de voltaje: obligatorio, validado aquí (una errata falla en el
         # notebook y no a mitad de simulación) y exportado a su propio CSV.
         protocolos = []
@@ -243,22 +254,17 @@ class ConfigManager:
             except ValueError as e:
                 raise ValueError(f"sim {sim.sim_id}: protocolo_voltaje inválido: {e}") from e
 
-        for sim in self.simulations:
-            for clave in ("neighbor_mode_pp_set", "neighbor_mode_sp_set"):
-                modo = sim.params.get(clave, "both")
-                if modo not in NEIGHBOR_MODES:
-                    raise ValueError(f"sim {sim.sim_id}: {clave} debe ser uno de {NEIGHBOR_MODES}, recibido {modo!r}")
-
-        for sim in self.simulations:
-            umbral = sim.params.get("umbral_caida_temperatura", 10.0)
-            if not umbral > 0:
-                raise ValueError(f"sim {sim.sim_id}: umbral_caida_temperatura debe ser > 0, recibido {umbral!r}")
-            umbral_e = sim.params.get("umbral_caida_electrodo", 0.1)
-            if not umbral_e > 0:
-                raise ValueError(f"sim {sim.sim_id}: umbral_caida_electrodo debe ser > 0, recibido {umbral_e!r}")
-
         data_params = [{col: sim.params[col] for col in cols_params} for sim in self.simulations]
         data_ctes = [{col: sim.params[col] for col in cols_ctes} for sim in self.simulations]
+
+        # Se construyen los mismos objetos que cargará la simulación: sus validaciones
+        # (modos de vecinos, umbrales, tipos...) saltan aquí y no al ejecutar.
+        for sim, fila_params, fila_ctes in zip(self.simulations, data_params, data_ctes):
+            try:
+                SimulationParameters.from_dict(fila_params)
+                SimulationConstants.from_dict(fila_ctes)
+            except (ValueError, TypeError) as e:
+                raise ValueError(f"sim {sim.sim_id}: configuración inválida: {e}") from e
 
         df_params = pd.DataFrame(data_params)
         df_ctes = pd.DataFrame(data_ctes)

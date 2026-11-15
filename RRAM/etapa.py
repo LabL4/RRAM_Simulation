@@ -28,12 +28,14 @@ from typing import Any, List, Optional
 
 import numpy as np
 
-from . import fisica_paso, utils
+from . import fisica_paso
 from .acumulador_tiempo import AcumuladorTiempo
 from .estado_fase import EstadoFase
 from .estado_termico import EstadoTermico
-from .grabador import GrabadorEstados, RegistroDatos
-from .paso_simulacion import PasoSimulacion
+from .fisica_paso import PasoSimulacion
+from .grabador import GrabadorEstados, RegistroDatos, crear_rutas_simulacion
+from .procesos_estocasticos import crear_rng
+from .thermal import joule
 from .topologia_filamentos import CacheTopologia, TopologiaFilamentos
 from .voltage_controller import Medidas, ProtocoloVoltaje
 
@@ -89,7 +91,7 @@ class Etapa:
         percola_inicial: bool = False,
     ):
         #: Generador aleatorio de la fase, compartido por sus procesos estocásticos.
-        self.rng = utils.crear_rng(params, self.FASE)
+        self.rng = crear_rng(params, self.FASE)
         self.num_simulation = num_simulation
         self.params = params
         #: Constantes de la simulación. PP_set las cambia al formarse cada filamento.
@@ -100,7 +102,7 @@ class Etapa:
         self.actual_state = actual_state
         self.usar_muro = usar_muro
 
-        self.rutas = utils.crear_rutas_simulacion(num_simulation=num_simulation, state=self.SUBCARPETA, results_dir=results_dir)
+        self.rutas = crear_rutas_simulacion(num_simulation=num_simulation, state=self.SUBCARPETA, results_dir=results_dir)
         for carpeta in ("simulation_path", "figures_path", "data_simulation_path"):
             self.rutas[carpeta].mkdir(parents=True, exist_ok=True)
 
@@ -266,11 +268,15 @@ class Etapa:
             cf_matrix, self.paso.R_local, self.paso.I_fils, self.termico.T_electrodo, self.params, self.sim_ctes,
             self.CF_ranges, matriz_muro=self.paso.matriz_muro,
         )
-        # Se guarda el mapa FVM sin amortiguar para poder compararlo con el amortiguado
-        self.paso.temperatura_sin_amortiguar = T_fvm
         self.paso.T_fils = self.termico.registrar_fvm(T_fvm, self.sim_ctes)
-        self.T_max_fils = utils.acumular_T_max_filamentos(self.T_max_fils, self.paso.T_fils)
+        self.T_max_fils = acumular_T_max_filamentos(self.T_max_fils, self.paso.T_fils)
         return ohm
+
+    def temperatura_joule(self, ctx: ContextoPaso):
+        """Temperatura escalar de Joule con el voltaje del paso y la corriente que haya en `self.current`."""
+        return joule.Temperature_Joule(
+            ctx.voltage, self.current, T_0=self.params.init_temp, r_termica=self.sim_ctes.r_termica_no_percola
+        )
 
     # ================================================================== lo que define cada etapa
 
@@ -324,3 +330,19 @@ class Etapa:
 
     def validar_final(self, estado: EstadoFase) -> None:
         """Lanza la excepción que corresponda si la etapa no cumplió su objetivo. `estado` viaja en ella."""
+
+
+def acumular_T_max_filamentos(acumulado: List[Optional[float]], T_fils: List[float]) -> List[Optional[float]]:
+    """
+    Acumula el máximo histórico de temperatura de cada filamento a lo largo de una fase.
+
+    Se llama SOLO desde las ramas que resuelven el mapa térmico FVM, es decir,
+    cuando `T_fils` es la temperatura real de cada filamento extraída de su fila
+    central. Los pasos sin filamento (`T_fils` = temperatura de Joule del
+    dispositivo replicada N veces) no cuentan: no son la temperatura de ningún
+    filamento porque el filamento aún no existe.
+
+    Un `None` en el acumulado significa que esa fase nunca llegó a resolver el
+    FVM para ese filamento.
+    """
+    return [nuevo if maximo is None else max(maximo, nuevo) for maximo, nuevo in zip(acumulado, T_fils)]

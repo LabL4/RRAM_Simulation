@@ -109,10 +109,3 @@ def temperatura_electrodo_joule(T_joule: float, T_e_prev, k):
 def como_mapa(T, forma) -> np.ndarray:
     """Convierte una temperatura escalar en un mapa de forma `forma` (float: sin truncar a entero)."""
     return np.full(forma, T, dtype=float)
-
-
-def extra_sin_amortiguar(sim_ctes, temperatura_sin_amortiguar) -> dict:
-    """Kwargs extra para guardar_estado_intermedio: el mapa de T sin amortiguar, solo si la amortiguación está activa."""
-    if amortiguacion_activa(sim_ctes.k_amortiguacion_termica) and temperatura_sin_amortiguar is not None:
-        return {"temperatura_sin_amortiguar": temperatura_sin_amortiguar}
-    return {}

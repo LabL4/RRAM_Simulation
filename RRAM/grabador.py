@@ -21,9 +21,6 @@ from typing import Callable, Dict, List, Optional
 
 import numpy as np
 
-from . import utils
-from .esquema_datos import columnas_datos
-
 logger = logging.getLogger(__name__)
 
 #: Tipo con el que se guarda cada matriz de un estado intermedio (las no listadas, tal cual).
@@ -36,7 +33,6 @@ TIPOS_ESTADO = {
     "cf_clean_matrix": np.int8,
     "oxygen_state": np.int8,
     "temperatura": np.float32,
-    "temperatura_sin_amortiguar": np.float32,
     "mapa_resistencias": np.float32,
     "matriz_para_plot_muro": np.float32,
 }
@@ -98,7 +94,7 @@ class RegistroDatos:
 
     def guardar(self) -> None:
         n = self.n_filas
-        utils.guardar_datos(
+        guardar_datos(
             save_path_data=self.ruta,
             headers={"datos_sim": ",".join(self.columnas), **self.cabeceras_extra},
             datos_sim=self._datos[:n],
@@ -130,7 +126,7 @@ class GrabadorEstados:
     `cada <= 0` desactiva todo el guardado (opción --sin-estados).
     `pasos_guardados` es el índice de lo guardado; acaba en la metadata.
 
-    Los nombres de fichero y las claves son los de siempre (`utils.guardar_estado_intermedio`); cada
+    Los nombres de fichero y las claves son los de siempre (`guardar_estado_intermedio`); cada
     matriz se guarda con el tipo compacto de `TIPOS_ESTADO`.
     """
 
@@ -165,7 +161,128 @@ class GrabadorEstados:
             self._guardar(k, contenido())
 
     def _guardar(self, k: int, matrices: dict) -> None:
-        utils.guardar_estado_intermedio(
+        guardar_estado_intermedio(
             ruta_destino=self.ruta_destino, etapa=self.etapa, num_simulation=self.num_simulation, k=k, **compactar(matrices)
         )
         self.pasos_guardados.append(int(k))
+
+
+# ---------------------------------------------------------------------------
+# Esquema de columnas de `datos_sim` (los `Data_<fase>_<N>.npz`)
+# ---------------------------------------------------------------------------
+# Única definición del orden de columnas: la usa el grabador para escribir (y para la cabecera
+# `header_datos_sim` de cada fichero) y cualquier lector puede importarla. Si cambia el orden o el
+# significado de una columna, subir `VERSION_ESQUEMA`.
+
+
+VERSION_ESQUEMA = 1
+
+
+def columnas_datos(N: int, con_t_ef: bool = False) -> List[str]:
+    """
+    Columnas de `datos_sim`: [t, V, I_total, R_total] + I_1..I_N + R_1..R_N + T_1..T_N (+ t_ef en el RESET).
+    El orden por bloques es el de `PasoSimulacion.fila`.
+    """
+    cols = ["t[s]", "V[V]", "I_total[A]", "R_total[Ohm]"]
+    cols += [f"I_{i}[A]" for i in range(1, N + 1)]
+    cols += [f"R_{i}[Ohm]" for i in range(1, N + 1)]
+    cols += [f"T_{i}[K]" for i in range(1, N + 1)]
+    if con_t_ef:
+        cols += ["t_ef[s]"]
+    return cols
+
+
+def indices_columnas(N: int, con_t_ef: bool = False) -> Dict[str, int]:
+    """Posición de cada columna por nombre, p. ej. `indices_columnas(2)["R_total[Ohm]"] == 3`."""
+    return {nombre: i for i, nombre in enumerate(columnas_datos(N, con_t_ef))}
+
+
+# ---------------------------------------------------------------------------
+# Rutas de salida y escritura de ficheros
+# ---------------------------------------------------------------------------
+
+
+def crear_rutas_simulacion(num_simulation: int, state: str, results_dir: str | Path = "Results") -> dict:
+    """
+    Crea las rutas necesarias para guardar resultados de la simulación.
+
+    Args:
+        num_simulation (int): Número índice de la simulación.
+        state (str): Estado de la simulación, puede ser 'set' o 'reset'.
+        results_dir (str | Path): Carpeta raíz de resultados. Por defecto "Results"
+            (comportamiento histórico, relativo a Path.cwd()). Pasar una ruta
+            distinta (p.ej. para pruebas de diagnóstico) aísla completamente
+            los datos escritos por esta simulación sin tocar Results/ real.
+
+    Returns:
+        dict: Diccionario con las rutas Path para 'simulation', 'figures' y 'set'.
+
+    Side-effects:
+        Crea las carpetas en disco si no existen.
+    """
+    results_dir = Path(results_dir)
+    base = results_dir if results_dir.is_absolute() else Path.cwd() / results_dir
+    simulation_path = base / f"simulation_{num_simulation}"
+    figures_path = simulation_path / "Figures"
+    data_simulation_path = simulation_path / state
+
+    return {
+        "simulation_path": simulation_path,
+        "figures_path": figures_path,
+        "data_simulation_path": data_simulation_path,
+    }
+
+
+def guardar_datos(save_path_data: Path, headers: Optional[dict] = None, **vectores) -> None:
+    """
+    Guarda múltiples vectores, matrices o datos escalares en un archivo .npz comprimido.
+    Asocia dinámicamente encabezados a los datos si se proporcionan.
+
+    Args:
+        ruta_destino (Path): Ruta del archivo donde se guardarán los datos.
+        headers (dict, opcional): Diccionario con los encabezados. Las claves deben
+                                  coincidir con los nombres dados en **vectores.
+        **vectores: Datos a guardar pasados como argumentos con nombre (ej: datos_iv=matriz).
+    """
+    if headers is None:
+        headers = {}
+
+    datos_seguros = {}
+
+    for nombre, vector in vectores.items():
+        if vector is not None:
+            datos_seguros[nombre] = vector
+
+            # Si el usuario ha proporcionado un encabezado para este vector específico,
+            # lo guardamos en el .npz añadiendo el prefijo 'header_' al nombre original.
+            if nombre in headers:
+                # Lo convertimos a array de NumPy de 1 elemento para guardarlo de forma nativa
+                datos_seguros[f"header_{nombre}"] = np.array([headers[nombre]])
+        else:
+            # Si se pasa un None, guardamos un array vacío para mantener la estructura de claves
+            datos_seguros[nombre] = np.array([])
+
+    # Guardamos todo el paquete de forma consolidada y comprimida
+    np.savez_compressed(save_path_data.with_suffix(".npz"), **datos_seguros)
+
+
+def guardar_estado_intermedio(ruta_destino: Path, etapa: str, num_simulation: int, k: int, **matrices) -> None:
+    """
+    Guarda todas las matrices relevantes de un paso de simulación en un único archivo .npz comprimido.
+    Garantiza que todas las claves pasadas existan en el archivo final.
+    """
+
+    # 1. Reemplazamos los valores None por un array vacío de NumPy.
+    # Esto es mejor que guardar 'None' a secas, porque NumPy prefiere trabajar con arrays.
+    matrices_seguras = {}
+    for nombre, matriz in matrices.items():
+        if matriz is None:
+            matrices_seguras[nombre] = np.array([])  # Array vacío indicando que no hay datos
+        else:
+            matrices_seguras[nombre] = matriz
+
+    # 2. Construimos el nombre del archivo estandarizado
+    nombre_archivo = ruta_destino / f"Estado_{etapa}_sim_{num_simulation}_paso_{k}.npz"
+
+    # 3. Guardamos de forma comprimida asegurando que todas las claves se escriben
+    np.savez_compressed(nombre_archivo, **matrices_seguras)

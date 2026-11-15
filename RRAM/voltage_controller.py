@@ -69,16 +69,16 @@ diccionario en texto (``ast.literal_eval``).
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
-from dataclasses import dataclass, field
+import ast
 import logging
 import math
-import ast
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple
+
+from .estado_fase import FASES
 
 logger = logging.getLogger(__name__)
 
-#: Etapas del ciclo, en orden.
-FASES = ("pp_set", "sp_set", "pp_reset", "sp_reset")
 
 #: Palabra especial: "donde quedó el segmento o la etapa anterior".
 ANTERIOR = "anterior"
@@ -758,8 +758,10 @@ def previsualizar(fuente: Any, sims: Optional[List[int]] = None, max_figuras: in
 
     import matplotlib.pyplot as plt  # solo aquí: el controlador no depende de matplotlib
 
-    # Figura de diagnóstico: sin LaTeX (el paquete puede haberlo activado globalmente).
-    with plt.rc_context({"text.usetex": True}):
+    # Mismo interruptor que el resto de figuras (`Representate.configurar_latex`, LaTeX por defecto).
+    from .Representate import latex_activo
+
+    with plt.rc_context({"text.usetex": latex_activo()}):
         n = len(protocolos)
         cols = 1 if n == 1 else 2
         filas = math.ceil(n / cols)

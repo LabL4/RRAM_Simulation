@@ -10,7 +10,7 @@ Uso programático:
     from RRAM.plot_results import plot_results, plot_results_marcado, plot_estados
     plot_results(num_simulation=3)          # I-V_3.png (curva sin marcar)
     plot_results_marcado(num_simulation=3)  # I-V_marcado_3.png (curva + puntos a-g)
-    plot_estados(plot_type="state", phases=["pp_set", "sp_set"])
+    plot_estados(plot_types=["state"], phases=["pp_set", "sp_set"], cada=50)
 
 O vía CLI: `python -m RRAM plot 2` / `python -m RRAM plot_marcado 2` (índice 0-based del CSV,
 el mismo que `exec`; la carpeta es Results/simulation_3).
@@ -18,16 +18,16 @@ el mismo que `exec`; la carpeta es Results/simulation_3).
 
 from __future__ import annotations
 
-from typing import Literal, Optional
-from pathlib import Path
 import logging
-import json
 import re
+from pathlib import Path
+from typing import Literal, Optional
 
 import numpy as np
 
-from .persistence import load_metadata, save_metadata
+from .estado_fase import FASES
 from .iv_analysis import INTENSIDAD_MINIMA_DEFAULT, PUNTOS_IV, simulation_IV
+from .persistence import load_metadata, save_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 FASES_SET = ("pp_set", "sp_set")
 FASES_RESET = ("pp_reset", "sp_reset")
-TODAS_FASES = FASES_SET + FASES_RESET
+TODAS_FASES = FASES
 
 # Tipos de plot soportados → subcarpeta dentro de Figures/
 TIPO_SUBCARPETA: dict[str, str] = {
@@ -48,6 +48,12 @@ TIPO_SUBCARPETA: dict[str, str] = {
     "clean_state": "clean_state",
     "resistencia": "resistencia",
 }
+
+#: Matriz de probabilidad que guarda cada tipo de etapa (clave en Estado_*.npz, título de la figura).
+PROBABILIDADES = (
+    ("probabilidad_matrix", "Generation Probability"),
+    ("probabilidad_recombinacion", "Recombination Probability"),
+)
 
 PlotType = Literal["state", "thermal", "probability", "muro", "clean_state", "resistencia"]
 
@@ -280,12 +286,20 @@ def _cargar_voltaje_por_fase(simulation_path: Path, num_simulation: int) -> dict
     for fase in TODAS_FASES:
         data_file = simulation_path / f"Data_{fase}_{num_simulation}.npz"
         if data_file.exists():
-            d = np.load(data_file, allow_pickle=True)
-            if "datos_sim" in d:
-                datos = d["datos_sim"]
-                if datos.ndim == 2 and datos.shape[1] >= 2:
-                    voltajes[fase] = datos[:, 1]
+            with np.load(data_file) as d:
+                if "datos_sim" in d:
+                    datos = d["datos_sim"]
+                    if datos.ndim == 2 and datos.shape[1] >= 2:
+                        voltajes[fase] = datos[:, 1]
     return voltajes
+
+
+def _seleccionar_pasos(guardados: list[int], pasos_pedidos: set[int] | None, cada: int | None) -> set[int]:
+    """Pasos a dibujar de una fase: los pedidos que tengan estado y, de ellos, uno de cada `cada` más el último."""
+    elegidos = [p for p in guardados if pasos_pedidos is None or p in pasos_pedidos]
+    if cada is not None and elegidos:
+        elegidos = elegidos[::cada] + [elegidos[-1]]
+    return set(elegidos)
 
 
 def _temperatura_escalar(temp_data: np.ndarray) -> float:
@@ -326,7 +340,10 @@ def plot_estados(
     results_dir: Path | str = "Results",
     sim_indices: list[int] | None = None,
     extension: str = "svg",
-    update_metadata: bool = True,
+    update_metadata: bool = False,
+    pasos: list[int] | None = None,
+    cada: int | None = None,
+    dpi: int = 300,
 ) -> dict[int, dict[str, float]]:
     """
     Itera sobre simulaciones y genera figuras para uno o varios tipos de plot.
@@ -349,34 +366,41 @@ def plot_estados(
         - ``"clean_state"``  → ``clean_state/``
         - ``"resistencia"``  → ``resistencia/``
 
-    La temperatura (``"thermal"``) se trata exactamente igual que el resto de
-    tipos: se activa incluyéndola en ``plot_types``. De forma independiente,
-    la temperatura máxima final de cada fase **siempre** se extrae del campo
-    ``temperatura`` del npz y se escribe en la metadata (si
-    ``update_metadata=True``), independientemente de si ``"thermal"`` está en
-    ``plot_types`` o no.
+    ``"probability"`` dibuja la probabilidad del proceso de la etapa: generación
+    en el SET y recombinación en el RESET.
+
+    La temperatura máxima del último estado guardado de cada fase se devuelve
+    siempre (se lee del campo ``temperatura`` del npz, se dibuje o no
+    ``"thermal"``) y, con ``update_metadata=True``, se escribe en la metadata.
 
     Args:
-        plot_types:       Lista de tipos a generar. ``None`` → todos
-                          (``["state", "thermal", "probability", "muro"]``).
+        plot_types:       Lista de tipos a generar. ``None`` → los seis de
+                          ``TODOS_PLOT_TYPES``.
         phases:           Fases a procesar. ``None`` → todas las 4 fases.
         results_dir:      Carpeta raíz con ``simulation_{N}/``.
         sim_indices:      Índices de simulación. ``None`` → autodetección.
         extension:        Formato de guardado (``"png"``, ``"pdf"``, ``"svg"``).
         update_metadata:  Si True escribe ``T_final_{fase}`` en ``extra`` del
-                          JSON de metadatos.
+                          JSON de metadatos. Por defecto no se toca la metadata.
+        pasos:            Pasos concretos a dibujar (los que no tengan estado
+                          guardado se ignoran). ``None`` → todos.
+        cada:             Dibuja uno de cada ``cada`` estados guardados de cada
+                          fase (el primero y el último siempre). Se aplica
+                          después de ``pasos``. ``None`` → todos.
+        dpi:              Resolución de las figuras en formatos de píxeles.
 
     Returns:
         ``{num_sim: {"T_final_pp_set": float, ...}}``
     """
-    from .Representate import (
-        RepresentateState,
-        plot_thermal_state,
-        RepresentateHeatmap,
-        plot_muro_termico,
-        plot_mapa_resistencias,
-    )
     from dataclasses import replace as dc_replace
+
+    from .Representate import (
+        RepresentateHeatmap,
+        RepresentateState,
+        plot_mapa_resistencias,
+        plot_muro_termico,
+        plot_thermal_state,
+    )
 
     # Validar y normalizar plot_types
     tipos_activos: tuple[PlotType, ...] = (
@@ -387,6 +411,9 @@ def plot_estados(
         raise ValueError(f"plot_types no válidos: {invalidos}. Opciones: {list(TIPO_SUBCARPETA)}")
 
     fases_activas: tuple[str, ...] = tuple(phases) if phases is not None else TODAS_FASES
+    if cada is not None and cada < 1:
+        raise ValueError(f"cada debe ser un entero >= 1, recibido {cada!r}")
+    pasos_pedidos = None if pasos is None else {int(p) for p in pasos}
     ext = extension.lower()
     results_dir = Path(results_dir)
 
@@ -446,14 +473,17 @@ def plot_estados(
             for fase, lista in archivos_por_fase.items():
                 lista_ordenada = sorted(lista, key=lambda x: x[0])
                 paso_max = lista_ordenada[-1][0]
+                a_dibujar = _seleccionar_pasos([paso for paso, _ in lista_ordenada], pasos_pedidos, cada)
 
                 for paso, fpath in lista_ordenada:
-                    datos = np.load(fpath, allow_pickle=True)
+                    # El último estado se lee siempre (da T_final); el resto, solo si se dibuja
+                    if paso not in a_dibujar and paso != paso_max:
+                        continue
+                    datos = np.load(fpath)
                     claves_disponibles = set(datos.files)
 
                     # Campos requeridos por tipo de plot (carga lazy)
-                    necesita_state = "state" in tipos_activos or update_metadata
-                    necesita_temp = "thermal" in tipos_activos or update_metadata
+                    necesita_temp = True  # T_final se devuelve siempre
                     necesita_prob = "probability" in tipos_activos
                     necesita_muro = "muro" in tipos_activos
                     necesita_clean = "clean_state" in tipos_activos
@@ -474,10 +504,13 @@ def plot_estados(
                         if (necesita_temp and "temperatura" in claves_disponibles)
                         else np.array(0.0)
                     )
+                    # Probabilidad del proceso de la etapa: generación (SET) o recombinación (RESET).
+                    # Sin la matriz (clave ausente o array vacío) queda vacía y el tipo se salta.
+                    clave_prob, titulo_prob = next(
+                        ((c, t) for c, t in PROBABILIDADES if c in claves_disponibles), (None, "")
+                    )
                     prob_matrix: np.ndarray = (
-                        datos["probabilidad_matrix"]
-                        if (necesita_prob and "probabilidad_matrix" in claves_disponibles)
-                        else np.zeros_like(actual_state, dtype=np.float64)
+                        datos[clave_prob] if (necesita_prob and clave_prob is not None) else np.array([])
                     )
                     muro_matrix: np.ndarray = (
                         datos["matriz_para_plot_muro"]
@@ -492,6 +525,8 @@ def plot_estados(
                         if (necesita_resistencia and "mapa_resistencias" in claves_disponibles)
                         else np.full((1, 1), np.inf, dtype=np.float64)
                     )
+                    # Todas las matrices están ya en memoria: se cierra el fichero
+                    datos.close()
 
                     # Voltaje en este paso
                     v_arr = voltajes_por_fase.get(fase)
@@ -501,7 +536,7 @@ def plot_estados(
                     stem = fpath.stem  # "Estado_{fase}_sim_{N}_paso_{paso}"
 
                     # --- Generar cada tipo de plot solicitado ---
-                    for pt in tipos_activos:
+                    for pt in tipos_activos if paso in a_dibujar else ():
                         out_path = fig_dirs[pt] / f"{stem}.{ext}"
 
                         if pt == "state":
@@ -509,8 +544,10 @@ def plot_estados(
                                 matriz=actual_state,
                                 voltaje=voltaje_r,
                                 filename=str(out_path),
-                                guardar_png=(ext == "png"),
+                                # RepresentateState guarda `filename` tal cual (png, pdf...) o, con False, en svg
+                                guardar_png=(ext != "svg"),
                                 atom_size=atom_size,
+                                dpi=dpi,
                             )
 
                         elif pt == "thermal":
@@ -524,18 +561,23 @@ def plot_estados(
                                 voltage=voltaje_r,
                                 save_path=str(out_path),
                                 atom_size=atom_size,
+                                dpi=dpi,
                             )
 
                         elif pt == "probability":
+                            if prob_matrix.ndim < 2:
+                                logger.debug(f"Paso {paso} fase {fase}: sin matriz de probabilidad. Salto.")
+                                continue
                             RepresentateHeatmap(
                                 matriz=prob_matrix,
                                 voltaje=voltaje_r,
-                                titulo="Generation Probability",
+                                titulo=titulo_prob,
                                 filename=str(out_path),
                                 cmap_name="viridis",
                                 label_colorbar="Probability",
                                 cero_blanco=True,
-                                atom_size=atom_size,  # ✅ CAMBIO: ya no se usa device_size
+                                atom_size=atom_size,
+                                dpi=dpi,
                             )
 
                         elif pt == "muro":
@@ -548,6 +590,7 @@ def plot_estados(
                                 filename=str(out_path),
                                 titulo=rf"Thermal Wall — $V_{{RRAM}}$ = {voltaje_r} V",
                                 atom_size=atom_size,
+                                dpi=dpi,
                             )
 
                         elif pt == "resistencia":
@@ -561,6 +604,7 @@ def plot_estados(
                                 filename=str(out_path),
                                 titulo=rf"Cell Resistance — $V_{{RRAM}}$ = {voltaje_r} V",
                                 atom_size=atom_size,
+                                dpi=dpi,
                             )
 
                         elif pt == "clean_state":
@@ -571,8 +615,10 @@ def plot_estados(
                                 matriz=cf_clean_matrix,
                                 voltaje=voltaje_r,
                                 filename=str(out_path),
-                                guardar_png=(ext == "png"),
+                                # RepresentateState guarda `filename` tal cual (png, pdf...) o, con False, en svg
+                                guardar_png=(ext != "svg"),
                                 atom_size=atom_size,
+                                dpi=dpi,
                             )
 
                     # T_final siempre: temperatura del último paso de la fase
@@ -581,7 +627,7 @@ def plot_estados(
 
         resultados[num_sim] = t_finales
 
-        # Actualizar metadata con T_final (siempre, independiente de plot_types)
+        # Actualizar metadata con T_final (solo si se pide)
         if update_metadata and t_finales:
             try:
                 meta = load_metadata(sim_path, num_simulation=num_sim)

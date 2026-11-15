@@ -1,5 +1,5 @@
 """
-Verificación de `Temperature.amortiguar_enfriamiento` / `amortiguar_mapa_fvm`.
+Verificación de `amortiguacion.amortiguar_enfriamiento` / `amortiguar_mapa_fvm`.
 
 Ejecutar desde la raíz del repo:
     python3 tests/test_amortiguacion_termica.py
@@ -11,7 +11,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from RRAM import Temperature  # noqa: E402
+from RRAM.thermal import amortiguacion  # noqa: E402
 
 T0, K, DT, UMBRAL = 300.0, 1e5, 1e-6, 10.0
 F = float(np.exp(-K * DT))
@@ -25,7 +25,7 @@ def check(nombre, cond, detalle=""):
         fallos.append(nombre)
 
 
-amort = lambda Tc, Tp, k=K, u=UMBRAL: Temperature.amortiguar_enfriamiento(Tc, Tp, T0, k, DT, u)  # noqa: E731
+amort = lambda Tc, Tp, k=K, u=UMBRAL: amortiguacion.amortiguar_enfriamiento(Tc, Tp, T0, k, DT, u)  # noqa: E731
 
 # escalar con escalar -> float de Python
 r = amort(300.0, 600.0)
@@ -84,12 +84,12 @@ T_fvm[:, 0] = 123.0
 T_fvm[:, -1] = 456.0
 T_prev = np.full((Ny, Nx), 600.0)
 copia = T_fvm.copy()
-r = Temperature.amortiguar_mapa_fvm(T_fvm, T_prev, T0, K, DT, UMBRAL)
+r = amortiguacion.amortiguar_mapa_fvm(T_fvm, T_prev, T0, K, DT, UMBRAL)
 check("FVM: forma conservada", r.shape == (Ny, Nx + 2))
 check("FVM: columnas de electrodo intactas", np.array_equal(r[:, 0], copia[:, 0]) and np.array_equal(r[:, -1], copia[:, -1]))
 check("FVM: interior amortiguado", np.allclose(r[:, 1:-1], T0 + 300.0 * F))
 check("FVM: entrada sin modificar", np.array_equal(T_fvm, copia))
-check("FVM desactivada: mismo objeto", Temperature.amortiguar_mapa_fvm(T_fvm, T_prev, T0, 0.0, DT, UMBRAL) is T_fvm)
+check("FVM desactivada: mismo objeto", amortiguacion.amortiguar_mapa_fvm(T_fvm, T_prev, T0, 0.0, DT, UMBRAL) is T_fvm)
 
 # decaimiento exponencial sostenido (V=0 durante varios pasos)
 T = 800.0

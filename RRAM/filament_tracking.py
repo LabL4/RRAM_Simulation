@@ -1,12 +1,12 @@
 """Funciones de seguimiento y actualización de filamentos conductivos (CFs)."""
 
+import logging
 from typing import Any, List
 
 import numpy as np
 
-from . import Temperature
 from .constants_simulation import SimulationConstants
-import logging
+from .thermal import muro
 
 logger = logging.getLogger(__name__)
 
@@ -172,7 +172,7 @@ def actualizar_parametros_por_filamento(
             logger.info("Se ha formado el segundo filamento de dos.")
             sim_ctes = sim_ctes.update_gamma(sim_ctes.gamma / sim_ctes.divisor_gamma_2_filamentos)
             all_CFs_created = True
-            filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(CF_centros)
+            filas_intermedias, dist_casillas = muro.calcular_filas_intermedias(CF_centros)
 
     # 3. Caso general (3 o más)
     else:
@@ -187,7 +187,7 @@ def actualizar_parametros_por_filamento(
             # filamentos hay que calcular las filas intermedias y distancias de
             # los muros térmicos. Sin esto, PP_set recibe None y NUNCA aplica el
             # muro térmico cuando hay 3 o más filamentos.
-            filas_intermedias, dist_casillas = Temperature.calcular_filas_intermedias(CF_centros)
+            filas_intermedias, dist_casillas = muro.calcular_filas_intermedias(CF_centros)
 
     # Logs comunes
     logger.info(f"Filamentos: {filamentos_actuales}/{num_esperados}. Gamma: {sim_ctes.gamma}")

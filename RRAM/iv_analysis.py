@@ -1,13 +1,12 @@
 """Postprocesado y representación de curvas I-V de la simulación RRAM."""
 
+import logging
 from pathlib import Path
 
 import numpy as np
 
-from . import utils
-import logging
-
 from . import Representate
+from .estado_fase import FASES
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +41,6 @@ PUNTOS_IV = {
     "g": {"etapa": "sp_reset", "en": ("voltaje", -2e-7), "desplazamiento": (-0.12, 1.0)},
 }
 
-_ETAPAS_IV = ("pp_set", "sp_set", "pp_reset", "sp_reset")
 
 
 def validar_puntos_iv(puntos_iv: dict) -> dict:
@@ -61,8 +59,8 @@ def validar_puntos_iv(puntos_iv: dict) -> dict:
             raise ValueError(
                 f"{donde}: debe tener exactamente las claves 'etapa', 'en' y 'desplazamiento', llegó {punto!r}"
             )
-        if punto["etapa"] not in _ETAPAS_IV:
-            raise ValueError(f"{donde}: etapa {punto['etapa']!r} desconocida. Válidas: {_ETAPAS_IV}")
+        if punto["etapa"] not in FASES:
+            raise ValueError(f"{donde}: etapa {punto['etapa']!r} desconocida. Válidas: {FASES}")
         en = tuple(punto["en"]) if isinstance(punto["en"], (list, tuple)) else ()
         if not en or en[0] not in ("voltaje", "evento", "fin_etapa"):
             raise ValueError(
@@ -135,7 +133,7 @@ def localizar_puntos_iv(
             puntos_totales[etiqueta] = (float(curva[-1, 1]), float(abs(curva[-1, 2])))
         elif tipo == "voltaje":
             puntos_totales.update(
-                utils.obtener_puntos_en_curva(curva[:, 1], abs(curva[:, 2]), {etiqueta: punto["en"][1]})
+                obtener_puntos_en_curva(curva[:, 1], abs(curva[:, 2]), {etiqueta: punto["en"][1]})
             )
         else:
             nombre = punto["en"][1]
@@ -303,3 +301,22 @@ def simulation_IV(
     )
 
     return None
+
+
+def obtener_puntos_en_curva(v_array, i_array, puntos_x):
+    """
+    Devuelve un diccionario con las coordenadas (x, y) de los puntos
+    más cercanos en la curva definida por v_array e i_array.
+
+    v_array: array de voltajes de la curva
+    i_array: array de corrientes de la curva
+    puntos_x: diccionario {'label': x}
+
+    Retorna: diccionario {'label': (x, y)}
+    """
+    puntos = {}
+    for label, xp in puntos_x.items():
+        idx = np.argmin(np.abs(v_array - xp))  # índice del x más cercano
+        yp = i_array[idx]  # valor de y correspondiente
+        puntos[label] = (xp, yp)
+    return puntos

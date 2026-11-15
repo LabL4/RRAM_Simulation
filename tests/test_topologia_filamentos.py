@@ -18,8 +18,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from RRAM import Percolation  # noqa: E402
-from RRAM.topologia_filamentos import CacheTopologia, analizar_topologia, percola  # noqa: E402
+from RRAM.topologia_filamentos import CacheTopologia, analizar_topologia, is_path, percola  # noqa: E402
 
 
 def oraculo(estado, cf_ranges):
@@ -77,7 +76,7 @@ def test_igual_al_oraculo_en_estados_aleatorios():
             r = rangos(H, nf)
             p, limpia, existe, fil = oraculo(estado, r)
             t = analizar_topologia(estado, r)
-            assert t.percola == p == percola(estado) == Percolation.is_path(estado)
+            assert t.percola == p == percola(estado) == is_path(estado)
             assert np.array_equal(t.matriz_limpia, limpia) and t.existe == existe
             assert np.array_equal(t.matriz_filamentos, fil)
             n_percolan += p

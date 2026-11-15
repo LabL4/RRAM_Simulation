@@ -14,12 +14,13 @@ from typing import List
 
 import numpy as np
 
-from . import CurrentSolver, ElectricField, Recombination, Temperature, exceptions
+from . import ElectricField, Recombination, conduccion, exceptions
 from .acumulador_tiempo import RelojesIones
 from .estado_fase import EstadoFase, como_estado_fase
 from .etapa import ContextoPaso, Etapa
 from .filament_tracking import procesar_filamentos_destruidos
 from .procesos_estocasticos import ProcesoRecombinacion
+from .thermal import muro
 from .topologia_filamentos import TopologiaFilamentos
 from .voltage_controller import ProtocoloVoltaje
 
@@ -71,7 +72,7 @@ class EtapaReset(Etapa):
         # TODO: usar la media del campo local por filas, np.mean(ctx.E_filas), como en el SET, en
         # lugar del campo uniforme. Pendiente de decidir: cambia la corriente del tramo sin percolación.
         self.current = abs(
-            CurrentSolver.Poole_Frenkel(
+            conduccion.Poole_Frenkel(
                 temperatura_para_corriente,
                 ctx.E_uniforme,
                 pb_metal_insul=self.sim_ctes.pb_metal_insul_reset,
@@ -81,15 +82,8 @@ class EtapaReset(Etapa):
             * (self.params.device_size_y)
         )
         T_joule = self.temperatura_joule(ctx)
-        self.paso.temperatura_sin_amortiguar = T_joule
         self.paso.T_fils = self.termico.registrar_joule(T_joule, self.sim_ctes)
         self.paso.sin_percolacion(self.N)
-
-    def temperatura_joule(self, ctx: ContextoPaso):
-        """Joule escalar con la corriente que haya en `self.current` en ese momento."""
-        return Temperature.Temperature_Joule(
-            ctx.voltage, self.current, T_0=self.params.init_temp, r_termica=self.sim_ctes.r_termica_no_percola
-        )
 
     def actualizar_estado(self, ctx: ContextoPaso) -> np.ndarray:
         # La recombinación indexa con las coordenadas de actual_state: recibe la temperatura sin columnas de electrodo
@@ -111,7 +105,6 @@ class EtapaReset(Etapa):
             temperatura=self.termico.actual.legado(),
             matriz_para_plot_muro=self.paso.matriz_muro_para_plot(self.centros),
             mapa_resistencias=self.paso.R_local,
-            **Temperature.extra_sin_amortiguar(self.sim_ctes, self.paso.temperatura_sin_amortiguar),
         )
 
     def campos_estado_final(self) -> dict:
@@ -166,7 +159,7 @@ class EtapaPPReset(EtapaReset):
             corriente_inicial=0.0, percola_inicial=True,
         )
         sim_ctes = self.sim_ctes
-        self.filas_intermedias, self.dist_casillas = Temperature.calcular_filas_intermedias(self.centros)
+        self.filas_intermedias, self.dist_casillas = muro.calcular_filas_intermedias(self.centros)
 
         self.CF_destruido = np.full(self.N, False, dtype=bool)
         self.voltage_CF_destruido = np.full(self.N, 0.0)
@@ -176,7 +169,7 @@ class EtapaPPReset(EtapaReset):
         self.recombinacion = ProcesoRecombinacion(
             oxygen_state,
             RelojesIones(np.zeros(oxygen_state.shape, dtype=np.int32)),  # reloj propio de cada ion
-            # CUIDADO: los umbrales tienen que ir ordenados de mayor a menor
+            # El orden no importa: manda el umbral superado de mayor |V|
             oxygen_config={
                 float(sim_ctes.voltaje_gen_oxigeno_pp_2): int(sim_ctes.num_oxigenos_pp_reset_2),
                 float(sim_ctes.voltaje_gen_oxigeno_pp_1): int(sim_ctes.num_oxigenos_pp_reset_1),

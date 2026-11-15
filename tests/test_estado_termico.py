@@ -1,5 +1,5 @@
 """
-Verificación de `RRAM.estado_termico` (D3) y `RRAM.paso_simulacion` (D1).
+Verificación de `RRAM.estado_termico` (D3) y `RRAM.fisica_paso.PasoSimulacion` (D1).
 
 Las comprobaciones de amortiguación y electrodo vienen de tests/test_procesar_temperatura.py, que
 verificaba `Temperature.procesar_temperatura_amortiguamiento`: misma referencia independiente,
@@ -16,10 +16,10 @@ from types import SimpleNamespace
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from RRAM import Temperature  # noqa: E402
+from RRAM.thermal import amortiguacion, muro  # noqa: E402
 from RRAM.estado_fase import EstadoFase  # noqa: E402
 from RRAM.estado_termico import CampoTemperatura, EstadoTermico  # noqa: E402
-from RRAM.paso_simulacion import PasoSimulacion  # noqa: E402
+from RRAM.fisica_paso import PasoSimulacion  # noqa: E402
 
 fallos = []
 
@@ -45,12 +45,12 @@ def estado(anterior, Te, actual=None):
 
 def referencia_mapa(T, ant, Te, amortiguar=True):
     """Rama FVM: perfil del electrodo con el mapa SIN amortiguar, luego el código previo de las fases."""
-    filas = Temperature.filas_filamento(T.shape[0], [3], 1)
-    Te = Temperature.actualizar_temperatura_electrodo(T, Te, filas, T_0=300.0, k=2.0, dt=1e-3, umbral=0.1)
+    filas = muro.filas_filamento(T.shape[0], [3], 1)
+    Te = amortiguacion.actualizar_temperatura_electrodo(T, Te, filas, T_0=300.0, k=2.0, dt=1e-3, umbral=0.1)
     if amortiguar:
-        T = Temperature.amortiguar_mapa_fvm(T, ant, T_0=300.0, k=1.0, dt=1e-3, umbral=1.0)
+        T = amortiguacion.amortiguar_mapa_fvm(T, ant, T_0=300.0, k=1.0, dt=1e-3, umbral=1.0)
     ant = T[:, 1:-1]
-    perfiles = Temperature.extraer_perfiles_filamentos(matriz_temperaturas=ant, filas_centros=centros)
+    perfiles = muro.extraer_perfiles_filamentos(matriz_temperaturas=ant, filas_centros=centros)
     return T, ant, Te, [float(np.max(p)) if p is not None else 300.0 for p in perfiles]
 
 
@@ -88,8 +88,8 @@ check("perfil calculado con el mapa sin amortiguar", np.allclose(e.T_electrodo[2
 
 # --- Joule sin percolar, amortiguando (PP_set, PP_reset, SP_reset)
 for T_raw, ant in [(300.5, 302.0), (305.0, 302.0), (300.2, 310.0)]:
-    Tref = Temperature.amortiguar_enfriamiento(T_raw, ant, T_0=300.0, k=1.0, dt=1e-3, umbral=1.0)
-    Te_ref = Temperature.temperatura_electrodo_joule(Tref, 300.0, k=2.0)
+    Tref = amortiguacion.amortiguar_enfriamiento(T_raw, ant, T_0=300.0, k=1.0, dt=1e-3, umbral=1.0)
+    Te_ref = amortiguacion.temperatura_electrodo_joule(Tref, 300.0, k=2.0)
     e = estado(ant, 300.0)
     T_fils = e.registrar_joule(T_raw, ctes)
     check(f"Joule amortiguado (T={T_raw}, ant={ant}) = código previo", tupla(e, T_fils) == (Tref, Tref, Te_ref, [Tref]))
@@ -108,7 +108,7 @@ check("SP_set Joule: anterior sin actualizar", e.anterior is ant_mapa)
 
 # --- como_mapa igual que el np.full_like anterior
 check("como_mapa = np.full_like(..., dtype=float)",
-      np.array_equal(Temperature.como_mapa(302.25, (7, 5)), np.full_like(np.zeros((7, 5), dtype=np.int64), 302.25, dtype=float)))
+      np.array_equal(amortiguacion.como_mapa(302.25, (7, 5)), np.full_like(np.zeros((7, 5), dtype=np.int64), 302.25, dtype=float)))
 
 # --- CampoTemperatura
 mapa = 300.0 + rng.random((6, 8))
@@ -145,7 +145,7 @@ check("perfiles con anterior mapa", np.array_equal(e.perfiles_anteriores()[0], n
 
 # --- PasoSimulacion
 p = PasoSimulacion()
-check("paso nuevo vacío", p.R_local is None and p.matriz_muro is None and p.temperatura_sin_amortiguar is None and p.matriz_muro_para_plot([1]) is None)
+check("paso nuevo vacío", p.R_local is None and p.matriz_muro is None and p.matriz_muro_para_plot([1]) is None)
 p.sin_percolacion(2)
 p.T_fils = [301.0, 302.0]
 f = p.fila(0.5, 1.1, 1e-6, 2e-3)

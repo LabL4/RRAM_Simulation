@@ -3,7 +3,7 @@ import numpy as np
 import sys
 
 sys.path.insert(0, "/Users/antonio_lopez_torres/Documents/GitHub/RRAM_Simulation")
-from RRAM import CurrentSolver
+from RRAM import conduccion
 
 atom_size = 0.25e-9
 sigma_0 = 930232558.1395348
@@ -17,8 +17,8 @@ Ny, Nx, w = 12, 10, 5
 cf = np.zeros((Ny, Nx), dtype=int)
 cf[3 : 3 + w, :] = 1  # w filas ocupadas en TODAS las columnas
 
-R_local = CurrentSolver.mapa_resistencias(cf, T0, sigma_0, alpha_T, T0, atom_size)
-R_codigo = CurrentSolver.calcular_resistencia(R_local)
+R_local = conduccion.mapa_resistencias(cf, T0, sigma_0, alpha_T, T0, atom_size)
+R_codigo = conduccion.calcular_resistencia(R_local)
 
 # Cálculo manual EXACTO según la descripción del usuario:
 # - columna: w celdas en paralelo, todas con la misma R_celda -> R_col = R_celda / w
@@ -48,8 +48,8 @@ anchos = [3, 4, 5, 5, 2, 6]  # w por columna, deliberadamente irregular
 for j, w_j in enumerate(anchos):
     cf[3 : 3 + w_j, j] = 1
 
-R_local = CurrentSolver.mapa_resistencias(cf, T0, sigma_0, alpha_T, T0, atom_size)
-R_codigo = CurrentSolver.calcular_resistencia(R_local)
+R_local = conduccion.mapa_resistencias(cf, T0, sigma_0, alpha_T, T0, atom_size)
+R_codigo = conduccion.calcular_resistencia(R_local)
 
 # Manual: cada columna j en paralelo con w_j celdas -> R_col_j = R_celda/w_j
 # luego las columnas en serie -> suma

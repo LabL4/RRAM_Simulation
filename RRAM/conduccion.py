@@ -1,8 +1,8 @@
-import numpy as np
+import logging
 import math
 
-from scipy.constants import elementary_charge, Boltzmann, epsilon_0
-import logging
+import numpy as np
+from scipy.constants import Boltzmann, elementary_charge, epsilon_0
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ def mapa_resistencias(
     Construye el MAPA DE RESISTENCIAS por celda a partir de la geometría del
     filamento y del mapa de temperaturas.
 
-    Es el análogo eléctrico de `Temperature.crear_matriz_materiales`: combina
+    Es el análogo eléctrico de `fvm.crear_matriz_materiales`: combina
     geometría y estado local en una única matriz que el resto de funciones
     consume sin saber cómo se ha construido.
 
@@ -98,8 +98,8 @@ def resistencias_por_columna(R_local: np.ndarray) -> np.ndarray:
 
     Esta es la FUENTE ÚNICA del modelo de resistencia. La consumen:
       - `calcular_resistencia`      (rama eléctrica): suma el vector -> R del bloque.
-      - `Temperature.calculate_heat_source` (rama térmica): necesita la caída de
-        tensión por columna (delta_V_j = I_filamento * R_col_j) para repartir el calor.
+      - `calculate_heat_source`     (fuente de calor): necesita la caída de tensión
+        por columna (delta_V_j = I_filamento * R_col_j) para repartir el calor.
 
     Devolver el vector en vez de solo la suma evita que ambas ramas implementen el
     mismo modelo por separado y se desincronicen.
@@ -153,7 +153,6 @@ def calcular_resistencia(R_local: np.ndarray, mostrar_calculo: bool = False) -> 
     return float(np.sum(R_cols))
 
 
-# En RRAM/CurrentSolver.py
 def Poole_Frenkel(
     temperature: float, E_field: float, pb_metal_insul: float, permitividad_relativa: float, I_0: float
 ) -> float:
@@ -248,3 +247,99 @@ def OhmCurrent_filamentos(
     I_fils = [potential / r if r != np.inf else 0.0 for r in R_fils]
     I_total = potential / R_total
     return I_total, R_total, I_fils, R_fils
+
+
+def calculate_heat_source(
+    atom_size: float,
+    delta_z_r: float,
+    R_local: np.ndarray,
+    factor_generar_calor: float,
+    CF_ranges: list,
+    I_fils: list,
+) -> np.ndarray:
+    """
+    Calcula el mapa de calor Q [W/m^3] resolviendo CADA FILAMENTO POR SEPARADO.
+
+    Cada filamento ocupa una banda de filas (`CF_ranges`) y disipa el calor que le
+    corresponde por SU propia corriente `I_fils[f]`, no por la corriente total del
+    dispositivo. Para una columna 'j' del filamento 'f':
+
+        R_col   = 1 / sum_i (1 / R_local[i, j])              <- celdas de la columna en paralelo
+        delta_V = I_f * R_col                                <- caída de tensión en la columna
+        Q[i, j] = delta_V^2 / (R_local[i, j] * atom_size**2 * delta_z_r)
+
+    La última expresión es la potencia disipada por la celda (delta_V^2 / R) dividida
+    por su volumen (atom_size**2 * delta_z_r), es decir densidad de potencia. Ese volumen
+    es el de la MISMA celda Delta_x_R x Delta_y_R x Delta_z_R que usa `mapa_resistencias`
+    para R_local (Delta_x_R = Delta_y_R = atom_size, Delta_z_R = delta_z_r): por eso esta
+    función vive en la rama eléctrica y no en `thermal`, y `delta_z_r` es independiente
+    del espesor que asuma `thermal.fvm.solve_thermal_state` (que no lo usa ni lo necesita:
+    el balance del FVM es invariante frente a su propio espesor).
+    Todas las celdas de una columna comparten `delta_V` (están en paralelo) pero pueden
+    tener resistencias distintas, de modo que cada una disipa según la suya.
+
+    La resistencia por columna se recalcula aquí con `resistencias_por_columna`, la misma
+    función que usa la rama eléctrica para obtener `I_fils`. Ambas ramas comparten modelo
+    de resistencia, por lo que no pueden desincronizarse.
+
+    Las columnas de cada banda se procesan de una vez (vectorizado), con el mismo orden
+    de operaciones que el cálculo columna a columna: el resultado es idéntico bit a bit.
+
+    Args:
+        atom_size (float): Tamaño de celda 'h' [m] (Delta_x_R = Delta_y_R).
+        delta_z_r (float): Espesor Delta_z_R de la celda [m], el mismo que usa
+            `mapa_resistencias` para calcular `R_local`.
+        R_local (np.ndarray): Mapa de resistencias por celda (Ny, Nx_interior) [Ohm],
+            con `inf` fuera del filamento (ver `mapa_resistencias`).
+        factor_generar_calor (float): Factor de calibración del calor generado.
+        CF_ranges (list): Bandas de filas (fila_min, fila_max) de cada filamento.
+        I_fils (list): Corriente de cada filamento [A]. 0.0 / NaN si no está formado.
+
+    Returns:
+        np.ndarray: Mapa de calor Q [W/m^3] en marco EXTENDIDO (Ny, Nx_interior + 2),
+            con las columnas de electrodo a cero, listo para `solve_thermal_state`.
+    """
+    R_local = np.asarray(R_local, dtype=float)
+    Ny, Nx_int = R_local.shape
+
+    # Marco extendido: se añaden las dos columnas de electrodo (a cero) para que la
+    # forma coincida con types_map en solve_thermal_state.
+    Q_map_global = np.zeros((Ny, Nx_int + 2))
+
+    # Iteramos por filamento. CF_ranges particiona todas las filas sin huecos ni
+    # solapes, así que cada celda de filamento recibe Q exactamente una vez.
+    for f, (fila_min, fila_max) in enumerate(CF_ranges):
+        I_f = I_fils[f]
+
+        # Filamento no formado o sin corriente: no genera calor
+        if not np.isfinite(I_f) or I_f == 0.0:
+            continue
+
+        # Bloque de resistencias de esta banda (marco interior)
+        bloque_R = R_local[fila_min : fila_max + 1, :]
+        R_cols = resistencias_por_columna(bloque_R)
+
+        # Columnas sin filamento (circuito abierto, R_col = inf): no disipan. Se les
+        # pone delta_V = 0 (y R_col = 0 antes de multiplicar, para no evaluar inf * I_f).
+        con_filamento = np.isfinite(R_cols)
+
+        # Caída de tensión en cada columna del filamento f
+        delta_V_local = np.where(con_filamento, I_f * np.where(con_filamento, R_cols, 0.0), 0.0)
+
+        # Q = delta_V^2 / (R_celda * atom_size**2 * delta_z_r). Las celdas de óxido
+        # llevan R = inf, así que reciben Q = 0 automáticamente: no hace falta
+        # enmascarar. El volumen atom_size**2 * delta_z_r es el de la celda de la
+        # RAMA ELÉCTRICA (misma Delta_z_R que mapa_resistencias); no tiene relación
+        # con el espesor que asuma solve_thermal_state, que es independiente.
+        # np.power(x, 2.0) y no x**2: sobre un array, `**2` se atajó como x*x, que difiere
+        # en el último bit de pow(x, 2.0), lo que hacía el cálculo escalar columna a columna.
+        Q_bloque = np.power(delta_V_local, 2.0) / (bloque_R * atom_size**2 * delta_z_r) * factor_generar_calor
+
+        # 1:-1 en columnas para saltar los electrodos del marco extendido
+        Q_map_global[fila_min : fila_max + 1, 1:-1] = np.where(con_filamento, Q_bloque, 0.0)
+
+    return Q_map_global
+
+
+# Nombre antiguo (errata) de OhmCurrent_filamentos, aún usado por código externo
+OmhCurrent_filamentos = OhmCurrent_filamentos

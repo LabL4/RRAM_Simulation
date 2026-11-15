@@ -1,6 +1,6 @@
 """
 Verificación del perfil de temperatura de los electrodos:
-`Temperature.filas_filamento`, `actualizar_temperatura_electrodo`, `temperatura_electrodo_joule`
+`muro.filas_filamento`, `actualizar_temperatura_electrodo`, `temperatura_electrodo_joule`
 y el perfil como condición de contorno de `solve_thermal_state`.
 
 Ejecutar desde la raíz del repo:
@@ -13,7 +13,7 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from RRAM import Temperature  # noqa: E402
+from RRAM.thermal import amortiguacion, fvm, muro  # noqa: E402
 
 T0, K, DT, UMBRAL = 300.0, 10.0, 1e-3, 0.1
 F = float(np.exp(-K * DT))
@@ -29,19 +29,19 @@ def check(nombre, cond, detalle=""):
 
 
 # --- filas del filamento: centro ± grosor
-f = Temperature.filas_filamento(NY, [5], 1)
+f = muro.filas_filamento(NY, [5], 1)
 check("filas: centro ± grosor (entero)", np.array_equal(np.where(f)[0], [4, 5, 6]))
-f = Temperature.filas_filamento(NY, [2, 8], [0, 2])
+f = muro.filas_filamento(NY, [2, 8], [0, 2])
 check("filas: un grosor por filamento", np.array_equal(np.where(f)[0], [2, 6, 7, 8, 9, 10]))
-f = Temperature.filas_filamento(NY, [0, 11], 2)
+f = muro.filas_filamento(NY, [0, 11], 2)
 check("filas: recortadas en los bordes", np.array_equal(np.where(f)[0], [0, 1, 2, 9, 10, 11]))
 try:
-    Temperature.filas_filamento(NY, [2, 8], [1])
+    muro.filas_filamento(NY, [2, 8], [1])
     check("filas: nº de grosores distinto lanza ValueError", False)
 except ValueError:
     check("filas: nº de grosores distinto lanza ValueError", True)
 
-filas = Temperature.filas_filamento(NY, [5], 1)
+filas = muro.filas_filamento(NY, [5], 1)
 
 
 def mapa(izq, der, base=T0):
@@ -52,7 +52,7 @@ def mapa(izq, der, base=T0):
     return T
 
 
-actualizar = lambda T, prev, k=K: Temperature.actualizar_temperatura_electrodo(T, prev, filas, T0, k, DT, UMBRAL)  # noqa: E731
+actualizar = lambda T, prev, k=K: amortiguacion.actualizar_temperatura_electrodo(T, prev, filas, T0, k, DT, UMBRAL)  # noqa: E731
 
 izq = T0 + np.arange(NY, dtype=float)  # filas 4-6 → 304, 305, 306
 der = T0 + 2.0 * np.arange(NY, dtype=float)  # filas 4-6 → 308, 310, 312
@@ -94,9 +94,9 @@ for _ in range(5):
 check("V=0 sostenido: decaimiento exponencial", np.allclose(tray, [T0 + 100.0 * F**n for n in range(1, 6)]), str(np.round(tray, 3)))
 
 # --- Joule: escalar
-check("Joule activa: electrodo = T_joule", Temperature.temperatura_electrodo_joule(320.0, 300.0, K) == 320.0)
-check("Joule desactivada: electrodo fijo", Temperature.temperatura_electrodo_joule(320.0, 300.0, 0.0) == 300.0)
-check("Joule tras perfil: vuelve a escalar", Temperature.temperatura_electrodo_joule(320.0, np.full(NY, 350.0), K) == 320.0)
+check("Joule activa: electrodo = T_joule", amortiguacion.temperatura_electrodo_joule(320.0, 300.0, K) == 320.0)
+check("Joule desactivada: electrodo fijo", amortiguacion.temperatura_electrodo_joule(320.0, 300.0, 0.0) == 300.0)
+check("Joule tras perfil: vuelve a escalar", amortiguacion.temperatura_electrodo_joule(320.0, np.full(NY, 350.0), K) == 320.0)
 
 # --- solve_thermal_state con perfil
 types = np.zeros((NY, NX + 2), dtype=int)
@@ -105,11 +105,11 @@ types[5, 1:-1] = 1
 Q = np.zeros(types.shape)
 Q[5, 1:-1] = 1e17
 props = {0: {"k": 2.3}, 1: {"k": 15.0}, 2: {"k": 1e-6}, 3: {"k": 5.0}}
-a = Temperature.solve_thermal_state(types, Q, props, 2.5e-10, 310.0)
-b = Temperature.solve_thermal_state(types, Q, props, 2.5e-10, np.full(NY, 310.0))
+a = fvm.solve_thermal_state(types, Q, props, 2.5e-10, 310.0)
+b = fvm.solve_thermal_state(types, Q, props, 2.5e-10, np.full(NY, 310.0))
 check("solver: perfil uniforme = escalar (bit a bit)", np.array_equal(a, b))
 perfil = np.where(filas, 330.0, T0)
-c = Temperature.solve_thermal_state(types, Q, props, 2.5e-10, perfil)
+c = fvm.solve_thermal_state(types, Q, props, 2.5e-10, perfil)
 check("solver: las celdas de electrodo toman el perfil", np.array_equal(c[:, 0], perfil) and np.array_equal(c[:, -1], perfil))
 
 print()

@@ -1,29 +1,18 @@
-from numba import njit
-import numpy as np
 import logging
-import math
+
+import numpy as np
+from numba import njit
 
 from . import exceptions
+from .topologia_filamentos import filas_banda_filamentos
 
 logger = logging.getLogger(__name__)
 
 k_b_ev = 8.617333262145e-5  # Boltzmann constant in eV/K
 
 
-def filas_interfaz_filamento(Ny: int, centros, grosor) -> np.ndarray:
-    """
-    Máscara 1D (Ny,) de las filas de la interfaz donde se pueden generar oxígenos:
-    centro ± grosor de cada filamento.
-
-    `grosor` es un entero común o una lista con un valor por filamento.
-    """
-    grosores = [int(grosor)] * len(centros) if isinstance(grosor, (int, np.integer)) else [int(g) for g in grosor]
-    if len(grosores) != len(centros):
-        raise ValueError("Debe haber un grosor asignado para cada centro de filamento.")
-    filas = np.zeros(Ny, dtype=bool)
-    for centro, g in zip(centros, grosores):
-        filas[max(0, int(centro) - g) : min(Ny, int(centro) + g + 1)] = True
-    return filas
+#: Filas de la interfaz donde se pueden generar oxígenos: la banda (centro ± grosor) de cada filamento.
+filas_interfaz_filamento = filas_banda_filamentos
 
 
 def filas_libres_interfaz(oxygen_state: np.ndarray, filas_permitidas: np.ndarray) -> np.ndarray:
@@ -304,8 +293,8 @@ def move_oxygen_ions(
     # Inicializamos con el valor por defecto (si no supera ningún umbral)
     oxygen_velocity = 0.0
 
-    # Ordenamos las llaves de mayor a menor para asegurar la asignación correcta
-    for threshold in sorted(velocity_thresholds.keys(), reverse=True):
+    # Umbrales de mayor a menor |V|: la comparación es en valor absoluto, así que el orden también
+    for threshold in sorted(velocity_thresholds.keys(), key=abs, reverse=True):
         if abs(voltage) > abs(threshold):
             oxygen_velocity = float(velocity_thresholds[threshold])
             break  # Salimos al encontrar el primer umbral que se cumple

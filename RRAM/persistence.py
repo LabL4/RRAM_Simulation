@@ -30,6 +30,8 @@ from typing import Any, Dict, Optional
 
 import numpy as np
 
+from .estado_fase import FASES
+
 logger = logging.getLogger(__name__)
 
 
@@ -177,7 +179,7 @@ PHASE_PRECEDING: Dict[str, str] = {
 }
 
 #: Orden canónico de las fases.
-PHASE_ORDER = ["pp_set", "sp_set", "pp_reset", "sp_reset"]
+PHASE_ORDER = FASES
 
 #: Claves cuyos dicts tienen claves enteras (se pierden al round-trip JSON).
 _INT_KEY_DICTS = {"creaciones_dict", "roturas_dict"}
@@ -303,3 +305,24 @@ def _json_default(obj: Any) -> Any:
     if isinstance(obj, tuple):
         return list(obj)
     raise TypeError(f"Objeto no serializable a JSON: {type(obj).__name__}")
+
+
+def cargar_estado(load_data_path: Path) -> np.ndarray:
+    """
+    Carga el estado de configuración desde archivo pkl y genera una imagen de ese estado.
+
+    Args:
+        pkl_path (Path): Ruta del pkl con el estado.
+        figures_path (Path): Ruta donde se guardará la imagen generada, debe incluir el nombre del archivo CON extensión.
+        plot_state (bool): Indica si se debe generar la imagen del estado, por defecto es True.
+
+    Returns:
+        np.ndarray: Matriz con el estado inicial cargado.
+    """
+
+    # Cargamos directamente el archivo .npz y extraemos la matriz 'actual_state'
+    datos = np.load(f"{load_data_path}.npz")
+    actual_state = datos["actual_state"]
+    datos.close()  # Siempre es buena práctica cerrar el archivo
+
+    return actual_state

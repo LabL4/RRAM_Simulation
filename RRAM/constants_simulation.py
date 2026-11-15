@@ -3,7 +3,7 @@
 import ast
 import logging
 from dataclasses import dataclass, replace
-from typing import Any, Dict, List, Optional, get_type_hints
+from typing import Any, Dict, List, Optional, Union, get_type_hints
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class SimulationConstants:
     num_filamentos: int
     # grosor "oficial": define la máscara que limita DÓNDE se generan vacantes
     # NUEVAS durante el crecimiento (PP_set) y se usa en logging/metadata.
-    grosor_filamento: int
+    grosor_filamento: Union[int, List[int]]
     gamma: float
     gamma_drift: float
     E_m: float
@@ -69,11 +69,11 @@ class SimulationConstants:
     # grosor_filamento sigue mandando en la máscara de generación durante el
     # crecimiento y en el resto de la física/metadata.
     grosor_filamento_init: Optional[Any] = None
-    # Amortiguación de caídas bruscas de temperatura (Temperature.amortiguar_enfriamiento).
+    # Amortiguación de caídas bruscas de temperatura (amortiguacion.amortiguar_enfriamiento).
     # k = 0 (defecto) la desactiva; los CSV antiguos sin estas columnas siguen cargando.
     k_amortiguacion_termica: float = 0.0
     umbral_caida_temperatura: float = 10.0
-    # Perfil de temperatura de los electrodos (Temperature.actualizar_temperatura_electrodo).
+    # Perfil de temperatura de los electrodos (amortiguacion.actualizar_temperatura_electrodo).
     # k = 0 (defecto) lo desactiva: el electrodo se queda fijo en Temperatura_electrodo.
     # Con k > 0, las celdas del perfil que caen más que umbral_caida_electrodo [K] se
     # enfrían con exp(-k * paso_temporal).
@@ -106,6 +106,12 @@ class SimulationConstants:
         for clave in ("umbral_caida_temperatura", "umbral_caida_electrodo"):
             if not getattr(self, clave) > 0:
                 raise ValueError(f"{clave} debe ser > 0, recibido {getattr(self, clave)!r}")
+        # Los dos umbrales de PP_reset se distinguen por su |V|: iguales, uno de los dos se perdería
+        if abs(float(self.voltaje_gen_oxigeno_pp_1)) == abs(float(self.voltaje_gen_oxigeno_pp_2)):
+            raise ValueError(
+                f"voltaje_gen_oxigeno_pp_1 y voltaje_gen_oxigeno_pp_2 no pueden tener el mismo valor absoluto "
+                f"({self.voltaje_gen_oxigeno_pp_1!r} y {self.voltaje_gen_oxigeno_pp_2!r})."
+            )
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SimulationConstants":

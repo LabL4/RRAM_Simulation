@@ -1,7 +1,7 @@
 # Excepciones personalizadas para el módulo RRAM
 
-from pathlib import Path
 import logging
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -12,26 +12,12 @@ class MaxVacantesException(Exception):
         if k is not None and voltage is not None:
             message = (
                 "El espacio de simulación se ha llenado de vacantes.\n"
-                f"Se ha llenado el 90% del espacio de la matriz en la iteración: {k} "
+                f"Se ha superado el máximo de vacantes (95% de la matriz) en la iteración: {k} "
                 f"que corresponde al voltaje: {voltage}"
             )
         else:
             message = "El espacio de simulación se ha llenado de vacantes"
         super().__init__(message)
-
-
-# Excepción para cuando la resistencia de la parte óhmica es baja y no se reproduce la seguna parte del set
-class LowResistanceException(Exception):
-    def __init__(self, valor_resistencia=None):
-        if valor_resistencia is not None:
-            message = (
-                "La resistencia del sistema no reproduce la curva de la segunda parte del set\n"
-                f"El valor de la resistencia alcanzada es: {valor_resistencia}"
-            )
-        else:
-            message = "La resistencia del sistema no reproduce la curva de la segunda parte del set"
-        self.message = message
-        super().__init__(self.message)
 
 
 class ExcepcionConEstado(Exception):

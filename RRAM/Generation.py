@@ -1,7 +1,8 @@
-from numba import njit
+import logging
+
 import numpy as np
 
-import logging
+from .topologia_filamentos import filas_banda_filamentos
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +55,6 @@ def calcular_probabilidad_generacion(
     generation_energy: float,
     cte_red: float,
     gamma: float,
-    num_iteracion: None,
 ) -> np.ndarray | float:
     """
     Calcula la matriz de probabilidades de generación para una matriz de campo eléctrico.
@@ -84,7 +84,6 @@ def get_generation_probabilities_matrix(
     generation_energy: float,
     cte_red: float,
     gamma: float,
-    num_iteracion: None,
     neighbor_mode: str = "both",
     custom_mask: np.ndarray | None = None,
 ) -> np.ndarray:
@@ -116,7 +115,6 @@ def get_generation_probabilities_matrix(
         generation_energy=generation_energy,
         cte_red=cte_red,
         gamma=gamma,
-        num_iteracion=num_iteracion,
     )
 
     if not isinstance(prob_base_raw, np.ndarray) or prob_base_raw.ndim == 0:
@@ -228,21 +226,6 @@ def create_custom_mask(state, centros_CF, grosor_CF):
         np.ndarray: Máscara booleana donde True indica que la celda pertenece a la
             banda horizontal de algún filamento (todas las columnas incluidas).
     """
-    # Normalizar grosor_CF a lista, una entrada por filamento
-    if isinstance(grosor_CF, (int, np.integer)):
-        grosores = [int(grosor_CF)] * len(centros_CF)
-    else:
-        grosores = list(grosor_CF)
-        if len(grosores) != len(centros_CF):
-            raise ValueError("Debe haber un grosor asignado para cada centro de filamento.")
-
-    filas, columnas = state.shape
-    mask = np.zeros((filas, columnas), dtype=bool)
-
-    for fila_central, grosor in zip(centros_CF, grosores):
-        fila_inicio = max(0, fila_central - grosor)
-        fila_fin = min(filas, fila_central + grosor + 1)
-        # Todas las columnas de la banda de filas quedan activas
-        mask[fila_inicio:fila_fin, :] = True
-
-    return mask
+    filas = filas_banda_filamentos(state.shape[0], centros_CF, grosor_CF)
+    # Todas las columnas de cada fila de la banda quedan activas
+    return np.repeat(filas[:, np.newaxis], state.shape[1], axis=1)

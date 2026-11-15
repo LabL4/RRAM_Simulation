@@ -1,25 +1,16 @@
 """Muro térmico entre filamentos y extracción de perfiles de temperatura."""
 
-import numpy as np
 import logging
+
+import numpy as np
+
+from ..topologia_filamentos import filas_banda_filamentos
 
 logger = logging.getLogger(__name__)
 
 
-def filas_filamento(Ny: int, centros, grosor) -> np.ndarray:
-    """
-    Máscara 1D (Ny,) de las filas de los filamentos: centro ± grosor de cada uno.
-
-    `grosor` es un entero común o una lista con un valor por filamento (misma banda
-    que Generation.create_custom_mask, pero en 1D).
-    """
-    grosores = [int(grosor)] * len(centros) if isinstance(grosor, (int, np.integer)) else list(grosor)
-    if len(grosores) != len(centros):
-        raise ValueError("Debe haber un grosor asignado para cada centro de filamento.")
-    filas = np.zeros(Ny, dtype=bool)
-    for centro, g in zip(centros, grosores):
-        filas[max(0, centro - g) : min(Ny, centro + g + 1)] = True
-    return filas
+#: Filas de los filamentos (centro ± grosor de cada uno): las que siguen al mapa en el perfil del electrodo.
+filas_filamento = filas_banda_filamentos
 
 
 def calcular_filas_intermedias(centros: list) -> tuple[list, list]:

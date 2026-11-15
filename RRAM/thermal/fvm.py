@@ -1,10 +1,11 @@
-"""Solver térmico por volúmenes finitos: materiales, fuente de calor, ensamblado y resolución."""
+"""Solver térmico por volúmenes finitos: materiales, ensamblado y resolución."""
 
-from scipy.sparse.linalg import splu
-from scipy.sparse import coo_matrix, csc_matrix
 from collections import Counter
 from typing import Optional
+
 import numpy as np
+from scipy.sparse import coo_matrix, csc_matrix
+from scipy.sparse.linalg import splu
 
 
 def crear_matriz_materiales(matriz_filamentos):
@@ -37,98 +38,6 @@ def crear_matriz_materiales(matriz_filamentos):
     types_map = np.hstack([columna_electrodo, inner_map, columna_electrodo])
 
     return types_map
-
-
-def calculate_heat_source(
-    atom_size: float,
-    delta_z_r: float,
-    R_local: np.ndarray,
-    factor_generar_calor: float,
-    CF_ranges: list,
-    I_fils: list,
-) -> np.ndarray:
-    """
-    Calcula el mapa de calor Q [W/m^3] resolviendo CADA FILAMENTO POR SEPARADO.
-
-    Cada filamento ocupa una banda de filas (`CF_ranges`) y disipa el calor que le
-    corresponde por SU propia corriente `I_fils[f]`, no por la corriente total del
-    dispositivo. Para una columna 'j' del filamento 'f':
-
-        R_col   = 1 / sum_i (1 / R_local[i, j])              <- celdas de la columna en paralelo
-        delta_V = I_f * R_col                                <- caída de tensión en la columna
-        Q[i, j] = delta_V^2 / (R_local[i, j] * atom_size**2 * delta_z_r)
-
-    La última expresión es la potencia disipada por la celda (delta_V^2 / R) dividida
-    por su volumen (atom_size**2 * delta_z_r), es decir densidad de potencia. Ese volumen
-    es el de la MISMA celda Delta_x_R x Delta_y_R x Delta_z_R que usa
-    `CurrentSolver.mapa_resistencias` para R_local (Delta_x_R = Delta_y_R = atom_size,
-    Delta_z_R = delta_z_r): esta función es parte de la rama eléctrica, no de la térmica,
-    y `delta_z_r` es independiente del espesor que asuma `solve_thermal_state` (que no lo
-    usa ni lo necesita: el balance del FVM es invariante frente a su propio espesor).
-    Todas las celdas de una columna comparten `delta_V` (están en paralelo) pero pueden
-    tener resistencias distintas, de modo que cada una disipa según la suya.
-
-    La resistencia por columna se recalcula aquí con `CurrentSolver.resistencias_por_columna`,
-    la misma función que usa la rama eléctrica para obtener `I_fils`. Ambas ramas comparten
-    modelo de resistencia, por lo que no pueden desincronizarse.
-
-    Args:
-        atom_size (float): Tamaño de celda 'h' [m] (Delta_x_R = Delta_y_R).
-        delta_z_r (float): Espesor Delta_z_R de la celda [m], el mismo que usa
-            `CurrentSolver.mapa_resistencias` para calcular `R_local`.
-        R_local (np.ndarray): Mapa de resistencias por celda (Ny, Nx_interior) [Ohm],
-            con `inf` fuera del filamento (ver `CurrentSolver.mapa_resistencias`).
-        factor_generar_calor (float): Factor de calibración del calor generado.
-        CF_ranges (list): Bandas de filas (fila_min, fila_max) de cada filamento.
-        I_fils (list): Corriente de cada filamento [A]. 0.0 / NaN si no está formado.
-
-    Returns:
-        np.ndarray: Mapa de calor Q [W/m^3] en marco EXTENDIDO (Ny, Nx_interior + 2),
-            con las columnas de electrodo a cero, listo para `solve_thermal_state`.
-    """
-    # Import local para dejar explícito que el modelo de resistencia vive en CurrentSolver
-    from .. import conduccion as CurrentSolver
-
-    R_local = np.asarray(R_local, dtype=float)
-    Ny, Nx_int = R_local.shape
-
-    # Marco extendido: se añaden las dos columnas de electrodo (a cero) para que la
-    # forma coincida con types_map en solve_thermal_state.
-    Q_map_global = np.zeros((Ny, Nx_int + 2))
-
-    # Iteramos por filamento. CF_ranges particiona todas las filas sin huecos ni
-    # solapes, así que cada celda de filamento recibe Q exactamente una vez.
-    for f, (fila_min, fila_max) in enumerate(CF_ranges):
-        I_f = I_fils[f]
-
-        # Filamento no formado o sin corriente: no genera calor
-        if not np.isfinite(I_f) or I_f == 0.0:
-            continue
-
-        # Bloque de resistencias de esta banda (marco interior)
-        bloque_R = R_local[fila_min : fila_max + 1, :]
-        R_cols = CurrentSolver.resistencias_por_columna(bloque_R)
-
-        for jj, R_col in enumerate(R_cols):
-            # Columna sin filamento (circuito abierto): no disipa
-            if not np.isfinite(R_col):
-                continue
-
-            # Caída de tensión en esta columna del filamento f
-            delta_V_local = I_f * R_col
-
-            # Q = delta_V^2 / (R_celda * atom_size**2 * delta_z_r). Las celdas de óxido
-            # llevan R = inf, así que reciben Q = 0 automáticamente: no hace falta
-            # enmascarar. El volumen atom_size**2 * delta_z_r es el de la celda de la
-            # RAMA ELÉCTRICA (misma Delta_z_R que mapa_resistencias); no tiene relación
-            # con el espesor que asuma solve_thermal_state, que es independiente.
-            Q_columna = (delta_V_local**2) / (bloque_R[:, jj] * atom_size**2 * delta_z_r)
-
-            # +1 en columnas para saltar el electrodo izquierdo del marco extendido
-            # Q_map_global[fila_min : fila_max + 1, jj + 1] = Q_columna
-            Q_map_global[fila_min : fila_max + 1, jj + 1] = Q_columna * factor_generar_calor
-
-    return Q_map_global
 
 
 #: Material de las celdas de electrodo (Dirichlet con la temperatura del electrodo).

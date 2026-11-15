@@ -20,7 +20,7 @@ Variables de entorno:
 """
 
 from __future__ import annotations
-import numpy as np
+
 import argparse
 import logging
 import os
@@ -30,9 +30,18 @@ import sys
 # `exec` no carga matplotlib; solo se carga al dibujar (plot, plot_marcado, all).
 os.environ.setdefault("MPLBACKEND", "Agg")
 
+from .estado_fase import FASES
 from .init_simulation import build_initial_states, load_simulation_config
 from .logging_config import setup_logging
 from .run_cycle import run_cycle
+
+
+def _aplicar_latex(args) -> None:
+    """`--no-latex`: desactiva LaTeX en todas las figuras. Sin el flag no se importa matplotlib (LaTeX por defecto)."""
+    if getattr(args, "no_latex", False):
+        from . import Representate  # import perezoso: arrastra matplotlib
+
+        Representate.configurar_latex(False)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -81,8 +90,8 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help=(
-            "Fija la semilla de numpy.random al inicio de cada fase (PP_set, SP_set, "
-            "PP_reset, SP_reset) para que la corrida sea exactamente reproducible. "
+            "Semilla de la simulación: cada fase (PP_set, SP_set, PP_reset, SP_reset) usa un "
+            "generador propio derivado de ella, así que la ejecución es exactamente reproducible. "
             "Por defecto: aleatorio real (sin fijar)."
         ),
     )
@@ -100,7 +109,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_exec.add_argument(
         "--stop-at",
-        choices=["pp_set", "sp_set", "pp_reset", "sp_reset"],
+        choices=FASES,
         default=None,
         metavar="FASE",
         help="Fase en la que terminar el ciclo, inclusive (pp_set | sp_set | pp_reset | sp_reset).",
@@ -166,8 +175,8 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help=(
-            "Fija la semilla de numpy.random al inicio de cada fase (PP_set, SP_set, "
-            "PP_reset, SP_reset) para que la ejecucion sea exactamente reproducible. "
+            "Semilla de la simulación: cada fase (PP_set, SP_set, PP_reset, SP_reset) usa un "
+            "generador propio derivado de ella, así que la ejecución es exactamente reproducible. "
             "Por defecto: aleatorio real (sin fijar)."
         ),
     )
@@ -186,6 +195,12 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
         help="No guarda estados intermedios (Estado_*): solo datos, estados finales y metadata.",
+    )
+    p_all.add_argument(
+        "--no-muro",
+        action="store_true",
+        default=False,
+        help="Desactiva el muro térmico en todas las fases del ciclo, SET y RESET (pasa matriz_muros=None al solver).",
     )
     p_all.add_argument("--guardar-datos", action="store_true")
     p_all.add_argument("--init-data-dir", default="Init_data")
@@ -208,7 +223,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     p_all.add_argument(
         "--stop-at",
-        choices=["pp_set", "sp_set", "pp_reset", "sp_reset"],
+        choices=FASES,
         default=None,
         metavar="FASE",
         help="Fase en la que terminar la simulacion, inclusive (pp_set | sp_set | pp_reset | sp_reset).",
@@ -226,6 +241,15 @@ def _build_parser() -> argparse.ArgumentParser:
         default=False,
         help="No superpone el ciclo experimental en la curva I-V.",
     )
+
+    # Interruptor común de LaTeX en las figuras (activado por defecto).
+    for sp in (p_exec, p_plot, p_plot_marcado, p_all):
+        sp.add_argument(
+            "--no-latex",
+            action="store_true",
+            default=False,
+            help="Dibuja todas las figuras sin LaTeX (por defecto se usa LaTeX, también en la figura de un fallo).",
+        )
 
     return p
 
@@ -354,6 +378,7 @@ def _cmd_all(args) -> int:
             start_from=args.start_from,
             stop_at=args.stop_at,
             init_data_dir=args.init_data_dir,
+            usar_muro=not args.no_muro,
             guardar_estados=not args.sin_estados,
         )
     except Exception as e:
@@ -390,6 +415,7 @@ def main(argv: list[str] | None = None) -> int:
         "plot_marcado": _cmd_plot_marcado,
         "all": _cmd_all,
     }
+    _aplicar_latex(args)
     return dispatch[args.command](args)
 
 

@@ -13,7 +13,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from RRAM import ElectricField, Recombination, state_updates  # noqa: E402
+from RRAM import ElectricField, Recombination, procesos_estocasticos  # noqa: E402
 from RRAM.acumulador_tiempo import RelojesIones  # noqa: E402
 
 
@@ -55,7 +55,7 @@ def test_campo_probabilidad_recombinacion_diferido_igual_al_directo():
     temperatura = np.full((6, 5), 500.0)
     relojes = RelojesIones(np.zeros((6, 5), dtype=np.int32))
     np.random.seed(1)
-    _, _, campo = state_updates.update_state_recombinate(
+    _, _, campo = procesos_estocasticos.update_state_recombinate(
         voltage=-0.5, E_field_filas=np.full(6, 1e8), oxygen_config={0.3: 1}, sim_ctes=ctes, params=params,
         actual_state=estado, oxygen_state=oxigeno, temperatura=temperatura, velocity_thresholds={0.3: 3e-7},
         relojes=relojes, filas_permitidas=np.ones(6, dtype=bool), max_oxigenos=10, tiempo_efectivo=2e-3,
@@ -68,20 +68,20 @@ def test_campo_probabilidad_recombinacion_diferido_igual_al_directo():
         ),
         1.0,
     )
-    obtenido = state_updates.evaluar_campo_probabilidad(campo)
+    obtenido = procesos_estocasticos.evaluar_campo_probabilidad(campo)
     assert obtenido.shape == estado.shape and np.array_equal(obtenido, esperado)
     assert np.array_equal(campo(), obtenido), "evaluarlo dos veces da lo mismo"
 
 
 def test_evaluar_campo_none_devuelve_none():
-    assert state_updates.evaluar_campo_probabilidad(None) is None
+    assert procesos_estocasticos.evaluar_campo_probabilidad(None) is None
 
 
 def test_import_del_paquete_perezoso():
     import importlib
     import subprocess
 
-    codigo = "import sys, RRAM; assert 'matplotlib' not in sys.modules and 'RRAM.Temperature' not in sys.modules; RRAM.Temperature; assert 'RRAM.Temperature' in sys.modules"
+    codigo = "import sys, RRAM; assert 'matplotlib' not in sys.modules and 'RRAM.thermal' not in sys.modules; RRAM.thermal; assert 'RRAM.thermal' in sys.modules"
     r = subprocess.run([sys.executable, "-W", "ignore", "-c", codigo], capture_output=True, text=True, cwd=Path(__file__).resolve().parent.parent)
     assert r.returncode == 0, r.stderr[-300:]
     importlib.invalidate_caches()

@@ -17,7 +17,7 @@ from scipy.sparse.linalg import spsolve
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from RRAM import Temperature  # noqa: E402
+from RRAM.thermal import fvm  # noqa: E402
 
 PROPS = {0: {"k": 2.3}, 1: {"k": 15.0}, 2: {"k": 1e-6}, 3: {"k": 5.0}}
 
@@ -65,7 +65,7 @@ def oraculo(types_map, Q_map, thermal_props, atom_size, T_electrodo, matriz_muro
 def caso(rng, Ny=30, Nx=12):
     cf = (rng.random((Ny, Nx)) < 0.25).astype(int)
     cf[Ny // 2, :] = 1
-    types_map = Temperature.crear_matriz_materiales(cf)
+    types_map = fvm.crear_matriz_materiales(cf)
     Q = rng.random(types_map.shape) * 1e17
     return types_map, Q
 
@@ -76,7 +76,7 @@ def test_identico_bit_a_bit_al_original_con_y_sin_muro():
         types_map, Q = caso(rng)
         muros = np.where(rng.random(types_map.shape) < 0.05, rng.uniform(300, 600, types_map.shape), 0.0)
         for Te, m in ((300.0, None), (np.linspace(300, 400, types_map.shape[0]), muros)):
-            s = Temperature.SolverTermico()
+            s = fvm.SolverTermico()
             assert np.array_equal(s.resolver(types_map, Q, PROPS, 0.25e-9, Te, m), oraculo(types_map, Q, PROPS, 0.25e-9, Te, m))
 
 
@@ -84,7 +84,7 @@ def test_reutilizar_la_factorizacion_da_los_mismos_bits():
     rng = np.random.default_rng(1)
     types_map, Q = caso(rng)
     mascara = rng.random(types_map.shape) < 0.05
-    s = Temperature.SolverTermico()
+    s = fvm.SolverTermico()
     for rep in range(6):
         Q2 = Q * (1 + rep)
         muros = np.where(mascara, 300.0 + 20 * rep, 0.0)
@@ -96,7 +96,7 @@ def test_reutilizar_la_factorizacion_da_los_mismos_bits():
 def test_cambio_de_geometria_o_de_muro_refactoriza():
     rng = np.random.default_rng(2)
     types_map, Q = caso(rng)
-    s = Temperature.SolverTermico()
+    s = fvm.SolverTermico()
     s.resolver(types_map, Q, PROPS, 0.25e-9, 300.0)
     otro = types_map.copy()
     otro[3, 3] = 1 if otro[3, 3] == 0 else 0
@@ -112,7 +112,7 @@ def test_cambio_de_geometria_o_de_muro_refactoriza():
 def test_conductividades_distintas_refactoriza():
     rng = np.random.default_rng(3)
     types_map, Q = caso(rng)
-    s = Temperature.SolverTermico()
+    s = fvm.SolverTermico()
     s.resolver(types_map, Q, PROPS, 0.25e-9, 300.0)
     otras = {**PROPS, 1: {"k": 20.0}}
     assert np.array_equal(s.resolver(types_map, Q, otras, 0.25e-9, 300.0), oraculo(types_map, Q, otras, 0.25e-9, 300.0))

@@ -18,11 +18,10 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from RRAM import Simulation  # noqa: E402
 from RRAM.acumulador_tiempo import RelojesIones  # noqa: E402
 from RRAM.etapa import Etapa  # noqa: E402
-from RRAM.phases_reset import EtapaPPReset, EtapaReset, EtapaSPReset, PP_reset, SP_reset  # noqa: E402
-from RRAM.phases_set import EtapaPPSet, EtapaSet, EtapaSPSet, PP_set, SP_set  # noqa: E402
+from RRAM.phases_reset import EtapaPPReset, EtapaReset, EtapaSPReset, SP_reset  # noqa: E402
+from RRAM.phases_set import EtapaPPSet, EtapaSet, EtapaSPSet, PP_set  # noqa: E402
 from RRAM.procesos_estocasticos import ProcesoGeneracion, ProcesoRecombinacion  # noqa: E402
 
 ETAPAS = {"pp_set": EtapaPPSet, "sp_set": EtapaSPSet, "pp_reset": EtapaPPReset, "sp_reset": EtapaSPReset}
@@ -56,9 +55,7 @@ def test_diferencias_set_reset():
         assert Etapa.ruta_estado_final(e).name == f"Final_state_{fase}_7.npz"
 
 
-def test_las_funciones_de_fase_siguen_donde_estaban():
-    assert Simulation.PP_set is PP_set and Simulation.SP_set is SP_set
-    assert Simulation.PP_reset is PP_reset and Simulation.SP_reset is SP_reset
+def test_firmas_de_las_funciones_de_fase():
     assert list(inspect.signature(PP_set).parameters)[:7] == [
         "num_simulation", "params", "sim_ctes", "CF_ranges", "CF_creado", "protocolo", "num_pasos_guardar_estado"]
     assert list(inspect.signature(SP_reset).parameters) == [

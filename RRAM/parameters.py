@@ -22,10 +22,9 @@ class SimulationParameters:
     init_temp: float
     densidad_vacantes: float
 
-    # Semilla de reproducibilidad. None (defecto) = aleatorio real, igual que
-    # el comportamiento histórico. Si se fija (vía --seed en la CLI), cada fase
-    # (PP_set, SP_set, PP_reset, SP_reset) reinicia np.random con este mismo
-    # valor al empezar, para que la corrida sea exactamente reproducible.
+    # Semilla de reproducibilidad. None (defecto) = aleatorio real. Si se fija (vía --seed en
+    # la CLI), cada fase (PP_set, SP_set, PP_reset, SP_reset) usa un generador propio derivado
+    # de ella (procesos_estocasticos.crear_rng), y la ejecución es exactamente reproducible.
     seed: Optional[int] = None
 
     # Forma de la matriz de estado: (n_filas, n_cols). Las filas recorren el alto del

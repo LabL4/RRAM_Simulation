@@ -97,14 +97,13 @@ def test_compactar_tipos_valores_y_casos_limite():
     R = np.where(estado == 1, 8.9, np.inf)
     P = np.full((5, 4), 1e-40)
     c = compactar({"actual_state": estado, "temperatura": T, "mapa_resistencias": R, "probabilidad_matrix": P,
-                   "cf_clean_matrix": None, "temperatura_sin_amortiguar": 312.5, "reloj_iones": np.full((5, 4), 70000, np.int32),
+                   "cf_clean_matrix": None, "reloj_iones": np.full((5, 4), 70000, np.int32),
                    "matriz_para_plot_muro": np.array([])})
     assert c["actual_state"].dtype == np.int8 and np.array_equal(c["actual_state"], estado)
     assert c["temperatura"].dtype == np.float32 and np.max(np.abs(c["temperatura"] - T)) < 1e-4
     assert c["mapa_resistencias"].dtype == np.float32 and np.isinf(c["mapa_resistencias"][estado == 0]).all()
     assert c["probabilidad_matrix"] is P and c["probabilidad_matrix"].min() > 0, "las probabilidades no se tocan"
     assert c["cf_clean_matrix"] is None and c["matriz_para_plot_muro"].size == 0
-    assert c["temperatura_sin_amortiguar"].dtype == np.float32 and c["temperatura_sin_amortiguar"].ndim == 0
     assert c["reloj_iones"].dtype == np.int32 and c["reloj_iones"].max() == 70000, "el reloj no se recorta a 16 bits"
     assert np.int8(1) - np.int8(0) == 1 and int(np.int8(0) - np.int8(1)) == -1, "restas de estados con signo"
     assert "aleatorios_matrix" not in TIPOS_ESTADO

@@ -18,6 +18,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+#: Etapas del ciclo, en orden. Definición única: el resto del paquete la importa de aquí.
+FASES = ("pp_set", "sp_set", "pp_reset", "sp_reset")
+
 #: Claves que se escribían y ya no lee nadie: se descartan al cargar.
 CLAVES_OBSOLETAS = {"k_maxima", "CF_destruido_index", "voltaje_max_reset", "tiempo_sp_reset"}
 

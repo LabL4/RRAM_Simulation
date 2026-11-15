@@ -12,21 +12,22 @@ Dos responsabilidades:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace as dc_replace
-from typing import List, Optional, Tuple
-from pathlib import Path
+import csv
 import logging
 import math
-import ast
+from dataclasses import dataclass, field
+from dataclasses import replace as dc_replace
+from pathlib import Path
+from typing import Dict, List, Optional
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
-from .constants_simulation import SimulationConstants
-from .voltage_controller import ProtocoloVoltaje
-from .parameters import SimulationParameters
 from . import Generation
-from . import utils
+from .constants_simulation import SimulationConstants
+from .parameters import SimulationParameters
+from .persistence import cargar_estado
+from .voltage_controller import ProtocoloVoltaje
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,7 @@ class SimulationConfig:
     cf_creado: np.ndarray = field(init=False)
 
     def __post_init__(self):
-        cf_ranges, _, cf_centros = utils.generar_configuracion_filamentos(
+        cf_ranges, _, cf_centros = generar_configuracion_filamentos(
             n_filas=self.params.n_filas,
             n_cols=self.params.n_cols,
             num_filamentos=self.sim_ctes.num_filamentos,
@@ -152,7 +153,7 @@ def build_initial_states(
         # "oficial" al cargar la sim para exec.
         grosor_para_trampas = grosor_filamento_init if grosor_filamento_init is not None else grosor_filamento
 
-        f_ranges, regiones_pesos, _ = utils.generar_configuracion_filamentos(
+        f_ranges, regiones_pesos, _ = generar_configuracion_filamentos(
             n_filas,
             n_cols,
             num_filamentos=num_filamentos,
@@ -204,23 +205,23 @@ def load_simulation_config(
         init_data_dir:   Carpeta con los CSVs e init_state_{i}.npz.
         num_filamentos:  Override opcional sobre el valor del CSV.
         seed:            Override opcional de semilla (--seed en la CLI). Si se
-            especifica, cada fase (PP_set, SP_set, PP_reset, SP_reset) reinicia
-            np.random con este valor al empezar, para reproducibilidad exacta
-            entre corridas. None (defecto) = aleatorio real.
+            especifica, cada fase (PP_set, SP_set, PP_reset, SP_reset) usa un
+            generador propio derivado de ella, para reproducibilidad exacta
+            entre ejecuciones. None (defecto) = aleatorio real.
 
     Returns:
         SimulationConfig listo para `run_cycle`.
     """
     init_data_dir = Path(init_data_dir)
 
-    sim_parmtrs = utils.read_csv_to_dic(str(init_data_dir / "simulation_parameters.csv"))
+    sim_parmtrs = read_csv_to_dic(str(init_data_dir / "simulation_parameters.csv"))
     params = SimulationParameters.from_dict(sim_parmtrs[num_simulation])
 
     if seed is not None and seed != params.seed:
         logger.info(f"seed override: {params.seed} → {seed}")
         params = dc_replace(params, seed=seed)
 
-    sim_cte = utils.read_csv_to_dic(str(init_data_dir / "simulation_constants.csv"))
+    sim_cte = read_csv_to_dic(str(init_data_dir / "simulation_constants.csv"))
     ctes = SimulationConstants.from_dict(sim_cte[num_simulation])
 
     if num_filamentos is not None and num_filamentos != ctes.num_filamentos:
@@ -237,11 +238,11 @@ def load_simulation_config(
             f"No existe {archivo_voltaje}. Regenera Init_data desde el notebook "
             f"(ConfigManager.export_to_init_data) con 'protocolo_voltaje' en cada simulación."
         )
-    filas_voltaje = utils.read_csv_to_dic(str(archivo_voltaje))
+    filas_voltaje = read_csv_to_dic(str(archivo_voltaje))
     protocolo = ProtocoloVoltaje.desde_config(filas_voltaje[num_simulation]["protocolo_voltaje"])
 
     init_state_path = init_data_dir / f"init_state_{num_simulation}"
-    actual_state = utils.cargar_estado(init_state_path)
+    actual_state = cargar_estado(init_state_path)
 
     num_trampas = int(sim_parmtrs[num_simulation].get("num_trampas", 0) or 0)
 
@@ -261,3 +262,82 @@ def load_simulation_config(
     )
 
     return cfg
+
+
+def read_csv_to_dic(cvs_path: str) -> List[Dict[str, str]]:
+    """
+    Reads a CSV file and returns its contents as a list of dictionaries.
+    Args:
+        cvs_path (str): The name of the CSV file to read.
+
+    Returns:
+        list: A list of dictionaries, where each dictionary represents a row in the CSV file.
+    """
+    with open(cvs_path, mode="r") as archivo:
+        reader = csv.DictReader(archivo)
+        data = [row for row in reader]
+    return data
+
+
+def generar_configuracion_filamentos(
+    n_filas: int,
+    n_cols: int,
+    num_filamentos: int,
+    peso_central: int = 70,
+    grosores_filamento: list | int | None = None,
+    centros_override: list[int] | None = None,
+) -> tuple:
+    """
+    Calcula los rangos de cada filamento y define las regiones de peso iniciales.
+
+    Argumentos:
+        n_filas (int): Número de filas de la matriz (alto del dispositivo).
+        n_cols (int): Número de columnas (distancia entre electrodos).
+        num_filamentos (int): Número de filamentos a distribuir.
+        peso_central (int): Probabilidad asignada a la zona central.
+        grosores_filamento (list | int | None): Grosor en celdas para cada filamento.
+            Si es lista, un valor por filamento. Si es int, se aplica a todos.
+            Si es None, usa el valor fijo heredado de 2.
+        centros_override (list[int] | None): Filas centrales explícitas por filamento.
+            Si es None, lista vacía o no-lista, usa midpoint automático.
+    """
+    # Normalizar grosores_filamento a lista de longitud num_filamentos
+    if grosores_filamento is None:
+        grosores = [2] * num_filamentos
+    elif isinstance(grosores_filamento, (int, np.integer)):
+        grosores = [int(grosores_filamento)] * num_filamentos
+    else:
+        grosores_raw = list(grosores_filamento)
+        if len(grosores_raw) < num_filamentos:
+            grosores_raw += [grosores_raw[-1]] * (num_filamentos - len(grosores_raw))
+        grosores = [int(g) for g in grosores_raw[:num_filamentos]]
+
+    usar_override = isinstance(centros_override, list) and len(centros_override) > 0
+
+    filamentos_ranges = []
+    regiones_pesos = []
+    filas_centrales = []
+
+    ancho_zona = n_filas // num_filamentos
+
+    for n in range(num_filamentos):
+        inicio_rango = n * ancho_zona
+        fin_rango = (n + 1) * ancho_zona - 1 if n < num_filamentos - 1 else n_filas - 1
+        filamentos_ranges.append((inicio_rango, fin_rango))
+
+        if usar_override:
+            fila_central = int(centros_override[n])
+            if not (inicio_rango <= fila_central <= fin_rango):
+                raise ValueError(f"centros_override[{n}]={fila_central} fuera de rango [{inicio_rango}, {fin_rango}]")
+        else:
+            fila_central = (inicio_rango + fin_rango) // 2
+        filas_centrales.append(fila_central)
+
+        grosor = grosores[n]
+        x_start = max(0, fila_central - grosor)
+        x_end = min(n_filas, fila_central + grosor + 1)
+
+        region = (x_start, x_end, 0, n_cols)
+        regiones_pesos.append((region, peso_central))
+
+    return filamentos_ranges, regiones_pesos, filas_centrales
