@@ -36,16 +36,21 @@ class AcumuladorTiempo:
 
 class RelojesIones:
     """
-    Reloj propio de cada ion de oxígeno: matriz entera con los pasos acumulados por celda
-    (el tiempo de un ion es reloj · dt). Invariante: reloj == 0 donde oxygen_state == 0;
-    la presencia de ion se mira SIEMPRE en oxygen_state (un ion recién movido o generado
-    también tiene reloj 0).
+    Reloj propio de cada ion de oxígeno (reloj de igual voltaje): matriz entera con los pasos
+    acumulados por celda (el tiempo de un ion es reloj · dt). Invariante: 0 donde
+    oxygen_state == 0; la presencia de ion se mira SIEMPRE en oxygen_state (un ion recién
+    movido o generado también tiene reloj 0).
 
-    - V = 0 o V distinto del paso anterior: todos los relojes a 0.
-    - V distinto (≠ 0): además, tras reiniciar, cada ion existente suma 1.
-    - V igual al anterior: cada ion existente suma 1.
-    El reinicio individual de un ion que se mueve lo hace el núcleo de movimiento.
-    La comparación de V es por igualdad exacta.
+    El reloj mueve al ion (d = floor(v·reloj·dt/celda)) y da el tiempo de su probabilidad de
+    recombinación: t_tasa = τ = reloj·dt (la tasa y el realce g usan el mismo tiempo).
+      - V igual al anterior (≠ 0): cada ion existente suma 1 (acumula).
+      - V distinto del anterior (≠ 0): todos a 0 y cada ion existente suma 1 (queda en 1).
+      - V = 0: todos a 0 y cada ion existente suma 1: queda en 1 en cada paso, sin acumular
+        (t_tasa = dt: sin campo aplicado la recombinación es posible pero muy difícil; con
+        V = 0 la velocidad es 0 y no mueve a nadie).
+
+    Se pone a 0 cuando el ion se mueve o sale (núcleo de movimiento) y se borra cuando
+    recombina (`limpiar`). La comparación de V es por igualdad exacta.
     """
 
     def __init__(self, reloj_inicial: np.ndarray, v_prev: float | None = None):
@@ -56,8 +61,7 @@ class RelojesIones:
         """Paso de reloj ANTES de generar: solo cuentan los iones que ya existían."""
         if voltage == 0 or voltage != self.v_prev:
             self.reloj.fill(0)
-        if voltage != 0:
-            self.reloj += oxygen_state  # oxygen_state es 0/1: suma 1 solo donde hay ion
+        self.reloj += oxygen_state  # oxygen_state es 0/1: suma 1 solo donde hay ion
         self.v_prev = voltage
 
     def limpiar(self, oxygen_state: np.ndarray) -> None:

@@ -22,7 +22,10 @@ MATERIAL_DEFAULTS = {
     "pb_metal_insul_set": 0.0026,
     "pb_metal_insul_reset": 0.0307,
     "recom_enchancement_factor": 3e3,
-    "long_decaimiento_concentracion": 1e-9,
+    "long_decaimiento_concentracion": 1e-9,  # sin uso desde el realce g(τ); se conserva en la configuración
+    # Realce por permanencia en la recombinación: g(t) = 1 + (G - 1)·t/(t + τ_c), t = reloj de igual voltaje·dt.
+    "realce_max_recombinacion": 1.5,  # G: realce máximo (g → G para t >> τ_c)
+    "tau_c_recombinacion": 4e-4,  # τ_c [s]: con t = τ_c el realce va por la mitad
     # sigma(T) = sigma_0 / (1 + alpha_T * (T - T_0)).
     "sigma_0": 4.5e8,
     "alpha_T": 2e-3,
@@ -72,14 +75,14 @@ THERMAL_DEFAULTS = {
     # Amortiguación de caídas bruscas de T (ver Temperature.amortiguar_enfriamiento):
     # donde T cae más que 'umbral_caida_temperatura' [K] respecto al paso anterior,
     # T = T_0 + (T_prev - T_0) * exp(-k * paso_temporal). k = 0 la desactiva.
-    "k_amortiguacion_termica": 1,  # [1/s]
-    "umbral_caida_temperatura": 1,  # [K], > 0
+    "k_amortiguacion_termica": 1000,  # [1/s]
+    "umbral_caida_temperatura": 0.001,  # [K], > 0
     # Perfil de temperatura de los electrodos (ver Temperature.actualizar_temperatura_electrodo):
     # columna adyacente sin amortiguar en las filas centro ± grosor de cada filamento y
     # init_temp en el resto; las celdas que caen más que 'umbral_caida_electrodo' [K] se
     # enfrían con exp(-k * paso_temporal). k = 0 lo desactiva (electrodo fijo).
-    "k_electrodo_enfriamiento": 2,  # [1/s]
-    "umbral_caida_electrodo": 0.1,  # [K], > 0
+    "k_electrodo_enfriamiento": 2000,  # [1/s]
+    "umbral_caida_electrodo": 0.001,  # [K], > 0
 }
 
 
@@ -92,7 +95,7 @@ SIMULATION_DEFAULTS = {
     "atom_size": 0.25e-9,  # Se deberia llamar tamaño de red
     "num_trampas": 100,
     # Paso temporal [s]. ENTRADA obligatoria. Cambiarlo altera la física
-    "paso_temporal": 1e-3,
+    "paso_temporal": 1e-6,
     # El voltaje NO tiene valores por defecto: cada simulación debe traer su
     # "protocolo_voltaje" (ver RRAM.voltage_controller.ProtocoloVoltaje).
     "densidad_vacantes": 4.0,  # vacantes / nm²
@@ -231,6 +234,8 @@ class ConfigManager:
             "pb_metal_insul_reset",
             "recom_enchancement_factor",
             "long_decaimiento_concentracion",
+            "realce_max_recombinacion",
+            "tau_c_recombinacion",
             "sigma_0",
             "alpha_T",
             "delta_z_r",

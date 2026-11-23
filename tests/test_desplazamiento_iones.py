@@ -1,9 +1,10 @@
 """
-Verificación del reloj por ion en el movimiento de iones de oxígeno:
-`Recombination.move_oxygen_ions` (núcleo `_mover_con_bloqueo`) y `RelojesIones`.
+Verificación de los relojes por ion en el movimiento de iones de oxígeno:
+`Recombination.move_oxygen_ions` (núcleo `_mover_con_bloqueo`) y `RelojesIones`
+(reloj de igual voltaje).
 
-Con v = 5.2e-7 m/s, dt = 1e-6 s y celda = 0.25e-9 m, d = round(v·n·dt/celda):
-  n = 240 -> 0, n = 241 -> 1, n = 722 -> 2, n = 1202 -> 3.
+Con v = 5.2e-7 m/s, dt = 1e-6 s y celda = 0.25e-9 m, d = floor(v·n·dt/celda):
+  n = 480 -> 0, n = 481 -> 1, n = 962 -> 2, n = 1443 -> 3.
 
 Ejecutar desde la raíz del repo:
     python3 tests/test_desplazamiento_iones.py
@@ -30,7 +31,7 @@ def check(nombre, cond, detalle=""):
 DT, CELDA, V_UMBRAL = 1e-6, 0.25e-9, 5.2e-7
 THRESHOLDS = {1.15: V_UMBRAL}
 FILAS, COLS = 10, 40
-N1, N2, N3 = 241, 722, 1202  # pasos para 1, 2 y 3 celdas
+N1, N2, N3 = 481, 962, 1443  # pasos para 1, 2 y 3 celdas (floor)
 
 
 def mover(estado, reloj, voltaje=-1.2):
@@ -69,16 +70,16 @@ def invariante(e, r):
     return bool(np.all(r[e == 0] == 0))
 
 
-# ── Umbral de una celda (round) ───────────────────────────────────────────
+# ── Umbral de una celda (floor) ───────────────────────────────────────────
 e, r = malla({(5, 0): N1 - 1})
 mover(e, r)
-check("n=240: no se mueve y conserva el reloj", iones_de(e, r, 5) == [(0, N1 - 1)])
+check("n=480: no se mueve y conserva el reloj", iones_de(e, r, 5) == [(0, N1 - 1)])
 e, r = malla({(5, 0): N1})
 mover(e, r)
-check("n=241: avanza 1 celda y su reloj pasa a 0", iones_de(e, r, 5) == [(1, 0)])
+check("n=481: avanza 1 celda y su reloj pasa a 0", iones_de(e, r, 5) == [(1, 0)])
 e, r = malla({(5, 0): N3})
 mover(e, r)
-check("n=1202: avanza directamente 3 celdas (sin sorteo)", iones_de(e, r, 5) == [(3, 0)])
+check("n=1443: avanza directamente 3 celdas (sin sorteo)", iones_de(e, r, 5) == [(3, 0)])
 e, r = malla({(5, 0): 10**6})
 _, v = mover(e, r, voltaje=-1.0)
 check("V bajo el umbral: v=0, no se mueve", v == 0 and iones_de(e, r, 5) == [(0, 10**6)])
@@ -120,7 +121,9 @@ check("mismo V: cada ion suma 1 por paso", rel.reloj[5, 3] == 3 and rel.reloj[6,
 rel.actualizar(-1.3, e)
 check("cambio de V: todos a 0 y suman el paso actual (1)", rel.reloj[5, 3] == 1 and rel.reloj[6, 3] == 1)
 rel.actualizar(0.0, e)
-check("V=0: todos a 0 sin sumar", rel.reloj.sum() == 0)
+check("V=0: reloj de igual voltaje a 1", rel.reloj[5, 3] == 1 and rel.reloj[6, 3] == 1 and rel.reloj.sum() == 2)
+rel.actualizar(0.0, e)
+check("V=0 seguido: sigue en 1, no acumula", rel.reloj[5, 3] == 1 and rel.reloj[6, 3] == 1)
 rel.actualizar(-1.2, e)
 rel.actualizar(-1.2, e)
 e[5, 3] = 0  # se recombina
@@ -134,7 +137,7 @@ check("herencia con el mismo V: sigue acumulando", heredado.reloj[6, 3] == 3)
 check("herencia: copia, no comparte memoria con el origen", rel.reloj[6, 3] == 2)
 heredado = RelojesIones(reloj_pp, v_pp)
 heredado.actualizar(-1.5, e)
-check("herencia con distinto V: reinicia", heredado.reloj[6, 3] == 1)
+check("herencia con distinto V: reinicia el de igual voltaje", heredado.reloj[6, 3] == 1)
 
 
 # ── Bucle completo (mismo orden que PP_reset/SP_reset) ────────────────────
@@ -163,19 +166,19 @@ def simular(voltajes, generar=None, fila=5):
     return movs, ok
 
 
-movs, ok = simular([-1.2] * 800)
-check("V constante: mueve en los pasos 241, 482 y 723", movs.get(5) == [241, 482, 723], str(movs))
+movs, ok = simular([-1.2] * 1500)
+check("V constante: mueve en los pasos 481, 962 y 1443", movs.get(5) == [481, 962, 1443], str(movs))
 check("invariante en V constante", ok)
 
-movs, ok = simular([-1.2] * 400, generar={1: 3, 101: 7})
-check("ion nuevo empieza en 0: generado en 1 mueve en 242", movs.get(3) == [242], str(movs.get(3)))
-check("cada ion con su reloj: generado en 101 mueve en 342", movs.get(7) == [342], str(movs.get(7)))
+movs, ok = simular([-1.2] * 700, generar={1: 3, 101: 7})
+check("ion nuevo empieza en 0: generado en 1 mueve en 482", movs.get(3) == [482], str(movs.get(3)))
+check("cada ion con su reloj: generado en 101 mueve en 582", movs.get(7) == [582], str(movs.get(7)))
 check("invariante con generación", ok)
 
-movs, ok = simular([-1.2] * 100 + [-1.3] * 300)
-check("cambio de V reinicia: mueve en 100+241=341", movs.get(5) == [341], str(movs))
+movs, ok = simular([-1.2] * 100 + [-1.3] * 600)
+check("cambio de V reinicia: mueve en 100+481=581", movs.get(5) == [581], str(movs))
 
-movs, ok = simular([-1.2] * 200 + [0.0] * 5 + [-1.2] * 200)
+movs, ok = simular([-1.2] * 400 + [0.0] * 5 + [-1.2] * 400)
 check("V=0 intermedio reinicia: no hay movimiento", movs == {}, str(movs))
 check("invariante con cambios de V", ok)
 

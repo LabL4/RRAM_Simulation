@@ -86,6 +86,11 @@ class SimulationConstants:
     # Máximo de iones de oxígeno simultáneos en el reset (ver Recombination.resolver_limite_oxigenos).
     # None (defecto) → se usa 'vacantes_generadas_set' del estado del set.
     max_oxigenos_reset: Optional[int] = None
+    # Realce por permanencia en la recombinación (Recombination.Prob_Recombination):
+    # g(t) = 1 + (G - 1)·t/(t + τ_c), con t = reloj de igual voltaje del ion · paso_temporal.
+    # Con defecto para que los CSV antiguos sin estas columnas sigan cargando.
+    realce_max_recombinacion: float = 1.5  # G
+    tau_c_recombinacion: float = 4e-4  # τ_c [s]
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "SimulationConstants":

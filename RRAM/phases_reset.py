@@ -153,7 +153,7 @@ def PP_reset(
 
     # Ciclo para la primera parte del reset
     acumulador_tiempo = AcumuladorTiempo(params.paso_temporal)
-    relojes = RelojesIones(np.zeros(oxygen_state.shape, dtype=np.int32))  # reloj propio de cada ion
+    relojes = RelojesIones(np.zeros(oxygen_state.shape, dtype=np.int32))  # reloj propio de cada ion (igual voltaje)
     probabilidad_recombinacion = None  # campo de probabilidad del último paso (se guarda con el estado)
     for k in range(0, presupuesto + 1):
         T_electrodo_paso = T_electrodo  # la que usa el solver en este paso (antes de actualizarla)
@@ -174,7 +174,7 @@ def PP_reset(
         if controller.terminado:
             break
 
-        # Reloj de cada ion: después del corte (el paso terminado repite el último V y no se
+        # Relojes de cada ion: después del corte (el paso terminado repite el último V y no se
         # simula) y antes de generar (los iones nuevos empiezan en 0).
         relojes.actualizar(voltage, oxygen_state)
 
@@ -377,7 +377,6 @@ def PP_reset(
             relojes=relojes,
             filas_permitidas=filas_gen_oxigeno,
             max_oxigenos=max_oxigenos_reset,
-            tiempo_efectivo=tiempo_efectivo,
         )
 
         # Tiempo total de la simulacion
@@ -470,8 +469,8 @@ def PP_reset(
         "actual_state": actual_state,
         "oxygen_state": oxygen_state,
         # Relojes por ion (pasos acumulados) y último V aplicado: SP_reset los hereda.
-        "reloj_iones": relojes.estado()[0],
-        "v_prev_reloj": relojes.estado()[1],
+        "reloj_iones": relojes.reloj,
+        "v_prev_reloj": relojes.v_prev,
         "sistema_percola": percola,
         "sim_ctes": sim_ctes,
         "params": params,
@@ -627,7 +626,7 @@ def SP_reset(
         if controller.terminado:
             break
 
-        # Reloj de cada ion: después del corte (el paso terminado repite el último V y no se
+        # Relojes de cada ion: después del corte (el paso terminado repite el último V y no se
         # simula) y antes de generar (los iones nuevos empiezan en 0).
         relojes.actualizar(voltage, oxygen_state)
 
@@ -815,7 +814,6 @@ def SP_reset(
             relojes=relojes,
             filas_permitidas=filas_gen_oxigeno,
             max_oxigenos=max_oxigenos_reset,
-            tiempo_efectivo=tiempo_efectivo,
         )
 
         # Tiempo total de la simulacion
@@ -900,8 +898,8 @@ def SP_reset(
         "perfil_electrodo": T_electrodo,
         "actual_state": actual_state,
         "oxygen_state": oxygen_state,
-        "reloj_iones": relojes.estado()[0],
-        "v_prev_reloj": relojes.estado()[1],
+        "reloj_iones": relojes.reloj,
+        "v_prev_reloj": relojes.v_prev,
         "sistema_percola": percola,
         "sim_ctes": sim_ctes,
         "params": params,

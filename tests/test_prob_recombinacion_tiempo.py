@@ -1,10 +1,10 @@
 """
-Verificación de cómo entra el tiempo en `Recombination.Prob_Recombination`:
-el tiempo efectivo (t_ef) solo multiplica la tasa (ν·t); el exponente exp(-dt·v/L)
-usa siempre el dt del paso.
+Verificación de `Recombination.Prob_Recombination` y `Recombination.Recombine_opt`:
 
-Valores de referencia del caso Results_pulsos_reset_1-3_t (pulso de -0.5 V):
-dt = 1e-3 s, v = 5.2e-7 m/s, T = 350 K, Er = 1.27 eV, ν = 1e13 Hz, L = 1e-9 m, factor 3000.
+    P = ν · t · exp(-E_r / (k_B·T)) · β · g(t),   g(t) = 1 + (G - 1) · t / (t + τ_c)
+
+con t = reloj de igual voltaje · dt (RelojesIones.reloj): el mismo tiempo en la tasa y en g.
+Valores: ν = 1e13 Hz, E_r = 1.27 eV, β = 3000, G = 1.5, τ_c = 400 µs, dt = 1e-6 s, T = 350 K.
 
 Ejecutar desde la raíz del repo:
     python3 tests/test_prob_recombinacion_tiempo.py
@@ -27,47 +27,77 @@ def check(nombre, cond, detalle=""):
         fallos.append(nombre)
 
 
-DT, V, T = 1e-3, 5.2e-7, 350.0
-CTES = dict(vibration_frequency=1e13, recom_enchancement_factor=3e3, recombination_energy=1.27, long_decaimiento_concentracion=1e-9)
+DT, T, G, TAU_C = 1e-6, 350.0, 1.5, 4e-4
+CTES = dict(
+    vibration_frequency=1e13,
+    recom_enchancement_factor=3e3,
+    recombination_energy=1.27,
+    realce_max=G,
+    tau_c=TAU_C,
+)
 
 
-def prob(t_tasa, v=V, temp=T):
-    return Recombination.Prob_Recombination(tiempo_tasa=t_tasa, paso_temporal=DT, velocidad=v, temp=temp, **CTES)
+def prob(t, temp=T):
+    return Recombination.Prob_Recombination(tiempo_tasa=t, temp=temp, **CTES)
 
 
-def prob_esperada(t_tasa, v=V, temp=T):
-    pref = t_tasa * CTES["vibration_frequency"] * np.exp(-CTES["recombination_energy"] / (Recombination.k_b_ev * temp))
-    return pref * np.exp(-DT * v / CTES["long_decaimiento_concentracion"]) * CTES["recom_enchancement_factor"]
+def prob_base(t, temp=T):
+    """P sin realce (g = 1)."""
+    arr = np.exp(-CTES["recombination_energy"] / (Recombination.k_b_ev * temp))
+    return t * CTES["vibration_frequency"] * arr * CTES["recom_enchancement_factor"]
 
 
-# --- 1. t_ef = dt: igual que la fórmula original ---
+def g(t):
+    return 1 + (G - 1) * t / (t + TAU_C)
+
+
+# --- 1. t = 0 (ion recién llegado o recién creado): P = 0 ---
+check("t = 0: P = 0", prob(0.0) == 0.0)
+
+# --- 2. t = dt (un paso, también V = 0): g casi 1 ---
 p_dt = prob(DT)
-check("t_ef = dt: valor de referencia ~9.2e-6", np.isclose(p_dt, prob_esperada(DT)) and 9.0e-6 < p_dt < 9.4e-6, f"{p_dt:.3e}")
+check("t = dt: g = 1 + 0.5·dt/(dt+τ_c) ≈ 1.00125", np.isclose(p_dt / prob_base(DT), g(DT)) and abs(g(DT) - 1.00125) < 1e-5, f"g = {p_dt / prob_base(DT):.6f}")
+check("t = dt: valor de referencia ~1.55e-8", 1.5e-8 < p_dt < 1.6e-8, f"{p_dt:.3e}")
 
-# --- 2. t_ef > dt: escala lineal con t_ef (ya no cae en el exponente) ---
-for t_ef in (0.101, 0.301):
-    p = prob(t_ef)
-    check(f"t_ef = {t_ef}: P = (t_ef/dt)·P(dt)", np.isclose(p, p_dt * t_ef / DT), f"{p:.3e}")
-check("t_ef = 0.301: ya no colapsa (> 1e-3)", prob(0.301) > 1e-3, f"{prob(0.301):.3e}")
+# --- 3. Forma de g(t) ---
+check("t = τ_c: g = (1 + G)/2 = 1.25", np.isclose(prob(TAU_C) / prob_base(TAU_C), 1.25))
+check("t = 481 µs: g ≈ 1.273", np.isclose(prob(481e-6) / prob_base(481e-6), 1 + 0.5 * 481 / 881))
+check("t >> τ_c: g → G", np.isclose(prob(1e3) / prob_base(1e3), G, rtol=1e-5))
+gs = [prob(t) / prob_base(t) for t in (1e-6, 1e-5, 1e-4, 1e-3, 1e-2)]
+check("g crece con t y nunca baja de 1", all(np.diff(gs) > 0) and min(gs) >= 1.0, str(np.round(gs, 4)))
 
-# --- 3. Velocidad 0 (V = 0): exponente = 1 ---
-check("v = 0: exponente = 1", np.isclose(prob(DT, v=0.0), prob_esperada(DT, v=0.0)), f"{prob(DT, v=0.0):.3e}")
+# --- 4. P crece más que linealmente en t (por g) ---
+check("P(300·dt) = 300·P_base(dt)·g(300·dt)", np.isclose(prob(300 * DT), 300 * prob_base(DT) * g(300 * DT)))
+check("P(300·dt) > 300·P(dt)", prob(300 * DT) > 300 * p_dt)
 
-# --- 4. Funciona con mapas (temperatura y velocidad por celda) ---
-temps = np.array([[300.0, 350.0], [340.0, 333.0]])
-vels = np.array([[0.0, V], [V, 3e-7]])
-p_mapa = Recombination.Prob_Recombination(tiempo_tasa=0.301, paso_temporal=DT, velocidad=vels, temp=temps, **CTES)
-check("mapas: misma forma y valores", p_mapa.shape == (2, 2) and np.allclose(p_mapa, prob_esperada(0.301, v=vels, temp=temps)))
+# --- 5. Celda a celda (t y T como matrices) ---
+t_m = np.array([[0.0, 1e-6], [2e-4, 4.8e-4]])
+temp_m = np.array([[300.0, 350.0], [340.0, 333.0]])
+p_m = prob(t_m, temp_m)
+check("matrices: misma forma y valores", p_m.shape == (2, 2) and np.allclose(p_m, prob_base(t_m, temp_m) * g(t_m)))
+check("matrices con T escalar", np.allclose(prob(t_m), prob_base(t_m) * g(t_m)))
 
-# --- 5. Recombine_opt pasa los dos tiempos ---
+# --- 6. Recombine_opt sortea con la matriz recibida ---
 np.random.seed(0)
 vac = np.ones((50, 50), dtype=int)
 oxy = np.ones((50, 50), dtype=np.int8)
-# Con t_tasa enorme la probabilidad satura a 1: todas las coincidencias recombinan
-vac2, oxy2 = Recombination.Recombine_opt(vac, oxy, tiempo_tasa=1e12, paso_temporal=DT, velocidad=V, temperatura=T, **CTES)
-check("Recombine_opt: P saturada -> recombinan todas", vac2.sum() == 0 and oxy2.sum() == 0)
-vac3, oxy3 = Recombination.Recombine_opt(vac, oxy, tiempo_tasa=DT, paso_temporal=DT, velocidad=V, temperatura=T, **CTES)
-check("Recombine_opt: P ~1e-5 -> casi ninguna", (vac.size - vac3.sum()) <= 3, f"recombinadas={vac.size - vac3.sum()}")
+vac2, oxy2 = Recombination.Recombine_opt(vac, oxy, np.ones((50, 50)))
+check("Recombine_opt: P = 1 -> recombinan todas", vac2.sum() == 0 and oxy2.sum() == 0)
+vac3, oxy3 = Recombination.Recombine_opt(vac, oxy, np.zeros((50, 50)))
+check("Recombine_opt: P = 0 -> ninguna", vac3.sum() == vac.size and oxy3.sum() == oxy.size)
+
+# Solo donde coinciden ion y vacante: P = 1 en toda la matriz, pero sin ion o sin vacante no cambia nada
+vac4 = np.zeros((4, 4), dtype=int)
+oxy4 = np.zeros((4, 4), dtype=np.int8)
+vac4[0, 0] = oxy4[0, 0] = 1  # coinciden
+vac4[1, 1] = 1  # vacante sola
+oxy4[2, 2] = 1  # ion solo
+vac5, oxy5 = Recombination.Recombine_opt(vac4, oxy4, np.ones((4, 4)))
+check(
+    "Recombine_opt: solo recombina donde coinciden ion y vacante",
+    vac5[0, 0] == 0 and oxy5[0, 0] == 0 and vac5[1, 1] == 1 and oxy5[2, 2] == 1,
+)
+check("Recombine_opt: no modifica las entradas", vac4[0, 0] == 1 and oxy4[0, 0] == 1)
 
 print()
 if fallos:

@@ -121,103 +121,58 @@ def generate_oxygen(oxygen_state: np.ndarray, max_num_oxygen: int, filas_candida
 
 
 def Prob_Recombination(
-    tiempo_tasa: float,
-    paso_temporal: float,
-    velocidad: float | np.ndarray,
+    tiempo_tasa: float | np.ndarray,
     temp: float | np.ndarray,
     vibration_frequency: float,
     recom_enchancement_factor: float,
     recombination_energy: float,
-    long_decaimiento_concentracion: float,
+    realce_max: float,
+    tau_c: float,
 ) -> float | np.ndarray:
-
     """
-    Probabilidad de recombinación en un paso.
+    Probabilidad de recombinación en un paso (sin saturar):
 
-    El tiempo entra con dos papeles distintos:
-      - `tiempo_tasa`: ventana de tiempo de la tasa (ν·t). Con tiempo acumulativo es el
-        tiempo efectivo t_ef; si no, paso_temporal.
-      - `paso_temporal`: dt del paso, en exp(-dt·v/L) (desplazamiento del ion en un paso).
-        No se acumula: con t_ef el exponente haría caer la probabilidad decenas de órdenes.
+        P = ν · t · exp(-E_r / (k_B·T)) · β · g(t),   g(t) = 1 + (G - 1) · t / (t + τ_c)
+
+    - `tiempo_tasa` (t): reloj de igual voltaje del ion · dt (RelojesIones.reloj). El mismo
+      tiempo entra en la tasa y en el realce g.
+    - `temp`: temperatura de la celda.
+    Ambos admiten escalar o matriz (celda a celda). g(0) = 1 y g → G para t >> τ_c.
     """
-    # IMPORTANTE: Usamos np.exp en lugar de math.exp para que pueda manejar tanto floats como arrays (mapas de calor) sin problemas de tipo de variable.
-    prob_in_equilibrio = (tiempo_tasa * vibration_frequency) * np.exp(-recombination_energy / (k_b_ev * temp))
-
-    exp_beta = np.exp(-(paso_temporal * velocidad) / long_decaimiento_concentracion) * recom_enchancement_factor
-    prob_recom = prob_in_equilibrio * exp_beta
-
-    return prob_recom
+    # np.exp en lugar de math.exp: admite escalares y matrices.
+    prob_base = (tiempo_tasa * vibration_frequency) * np.exp(-recombination_energy / (k_b_ev * temp))
+    realce = 1.0 + (realce_max - 1.0) * tiempo_tasa / (tiempo_tasa + tau_c)
+    return prob_base * recom_enchancement_factor * realce
 
 
 def Recombine_opt(
     vacancy_state: np.ndarray,
     oxygen_state: np.ndarray,
-    tiempo_tasa: float,
-    paso_temporal: float,
-    velocidad: np.ndarray | float,
-    temperatura: np.ndarray | float,
-    vibration_frequency: float,
-    recom_enchancement_factor: float,
-    recombination_energy: float,
-    long_decaimiento_concentracion: float,
+    prob_recombinacion: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray]:
-
+    """
+    Sortea la recombinación en las celdas donde coinciden ion y vacante, con la matriz de
+    probabilidad ya calculada (`prob_recombinacion`, misma forma que vacancy_state y ya
+    saturada a 1). La celda que recombina pierde la vacante y el ion.
+    """
     state_updated = np.copy(vacancy_state)
     oxygen_updated = np.copy(oxygen_state)
 
-    # 1. Buscar las coordenadas exactas donde coinciden un ion y una vacante
+    # 1. Coordenadas donde coinciden un ion y una vacante
     active_indices = np.where((oxygen_state == 1) & (vacancy_state == 1))
-
-    # Guardamos cuántas coincidencias hubo
     num_coincidencias = len(active_indices[0])
-
-    # Si no hay coincidencias, salimos
     if num_coincidencias == 0:
         return state_updated, oxygen_updated
 
-    # =========================================================================
-    # 2. GESTIÓN INTELIGENTE DE MATRICES (Extraer solo los datos útiles)
-    # =========================================================================
-
-    # Filtrar TEMPERATURAS
-    if isinstance(temperatura, np.ndarray):
-        active_temps = temperatura[active_indices]
-    else:
-        active_temps = temperatura
-
-    # Filtrar VELOCIDADES (¡La solución al problema!)
-    if isinstance(velocidad, np.ndarray):
-        active_vels = velocidad[active_indices]
-    else:
-        active_vels = velocidad
-
-    # =========================================================================
-    # 3. Calcular probabilidades
-    # =========================================================================
-    active_probs = Prob_Recombination(
-        tiempo_tasa=tiempo_tasa,
-        paso_temporal=paso_temporal,
-        velocidad=active_vels,
-        temp=active_temps,
-        vibration_frequency=vibration_frequency,
-        recom_enchancement_factor=recom_enchancement_factor,
-        recombination_energy=recombination_energy,
-        long_decaimiento_concentracion=long_decaimiento_concentracion,
-    )
-
-    # Saturamos a 1.0 por seguridad usando la versión de NumPy
-    active_probs = np.minimum(active_probs, 1.0)
-
-    # 4. Tirar los dados
+    # 2. Probabilidad de esas celdas y sorteo
+    active_probs = prob_recombinacion[active_indices]
     random_values = np.random.rand(num_coincidencias)
-
-    # 5. Ver cuáles han tenido éxito
     success_mask_1d = random_values < active_probs
 
-    # 6. Reconstruir las coordenadas 2D de los que tuvieron éxito
+    # 3. Coordenadas 2D de los que tuvieron éxito
     success_indices = (active_indices[0][success_mask_1d], active_indices[1][success_mask_1d])
 
-    # 7. Actualizar el estado físico rompiendo el filamento
+    # 4. Actualizar el estado físico rompiendo el filamento
     state_updated[success_indices] = 0
     oxygen_updated[success_indices] = 0
 
@@ -225,18 +180,23 @@ def Recombine_opt(
 
 @njit(cache=True)
 def _mover_con_bloqueo(
-    oxygen_state: np.ndarray, reloj: np.ndarray, velocidad: float, paso_temporal: float, grid_size: float
+    oxygen_state: np.ndarray,
+    reloj: np.ndarray,
+    velocidad: float,
+    paso_temporal: float,
+    grid_size: float,
 ) -> None:
     """
     Mueve los iones IN PLACE (oxygen_state y reloj a la vez) según su propio reloj.
 
-    Cada ion intenta avanzar d = round(v · reloj·dt / celda) celdas hacia la derecha.
+    Cada ion intenta avanzar d = floor(v · reloj·dt / celda) celdas hacia la derecha
+    (solo avanza cuando ha recorrido una celda completa).
     Cada fila se recorre de derecha a izquierda, así el ion de detrás ve ya resuelto al de
     delante (puede ocupar su hueco en el mismo paso):
       - d <= 0: no se mueve y conserva su reloj.
       - sin ion delante y destino fuera de la malla: sale y desaparece (ion y reloj a 0).
       - ion delante: avanza como mucho hasta la celda anterior a él.
-      - si avanza >= 1 celda, su reloj pasa a 0; si está bloqueado, conserva su reloj.
+      - si avanza >= 1 celda, su reloj pasa a 0; si está bloqueado, lo conserva.
     """
     filas, cols = oxygen_state.shape
     factor = velocidad * paso_temporal / grid_size
@@ -245,7 +205,7 @@ def _mover_con_bloqueo(
         for c in range(cols - 1, -1, -1):
             if oxygen_state[f, c] == 0:
                 continue
-            d = int(round(factor * reloj[f, c]))
+            d = int(math.floor(factor * reloj[f, c]))
             if d <= 0:
                 delante = c
                 continue
@@ -283,9 +243,10 @@ def move_oxygen_ions(
     Mueve los iones de oxígeno según el reloj propio de cada uno. La velocidad se determina
     comparando el parámetro 'voltage' contra los umbrales en 'velocity_thresholds'.
 
-    `reloj_iones` (int, misma forma que oxygen_state) son los pasos acumulados por cada ion;
-    cada uno avanza round(v·reloj·dt/celda) celdas, con bloqueo por el ion de delante
-    (ver `_mover_con_bloqueo`). Modifica IN PLACE `oxygen_state` y `reloj_iones`.
+    `reloj_iones` (int, misma forma que oxygen_state) son los pasos acumulados por cada ion
+    (reloj de igual voltaje); cada uno avanza floor(v·reloj·dt/celda) celdas, con bloqueo
+    por el ion de delante (ver `_mover_con_bloqueo`).
+    Modifica IN PLACE `oxygen_state` y `reloj_iones`.
     Devuelve (oxygen_state, velocidad).
 
     `E_field_filas` es el campo local de cada fila (GapElectricField, un valor por
